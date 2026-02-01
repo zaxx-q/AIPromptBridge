@@ -359,6 +359,32 @@ screen_snip_enabled = true
 screen_snip_hotkey = ctrl+shift+x
 
 # ============================================================
+# AUDIO TOOL - Audio recording and analysis with AI
+# ============================================================
+# Enable/disable Audio Tool feature
+audio_tool_enabled = true
+
+# Hotkey combination (e.g., ctrl+shift+a)
+audio_tool_hotkey = ctrl+shift+a
+
+# Default input device (blank = system default)
+# Partial names allowed (e.g., "Microphone (Realtek)")
+audio_default_device =
+
+# Default to loopback (system audio) instead of microphone?
+# true = Record what you hear (system audio)
+# false = Record microphone input
+audio_default_loopback = true
+
+# Enable audio compression (Opus/OGG) to reduce token usage
+# Highly recommended as raw WAV files can be very large
+audio_compression_enabled = true
+
+# Compression preset (controls trade-off between quality and size)
+# Options: recommended, preserve_audio, smallest, mp3_compat, music
+audio_compression_preset = recommended
+
+# ============================================================
 # FLASK API ENDPOINTS (Optional)
 # ============================================================
 # Enable Flask endpoints for external tools like ShareX
@@ -420,6 +446,7 @@ session_image_quality = 85
 # All prompts are now unified in prompts.json:
 # - text_edit_tool: Text manipulation prompts (Ctrl+Space hotkey)
 # - snip_tool: Screen snipping image analysis prompts (Ctrl+Shift+X)
+# - audio_tool: Audio analysis prompts (Ctrl+Shift+A)
 # - endpoints: Flask API endpoint prompts (if flask_endpoints_enabled=true)
 #
 # Edit prompts.json directly or use the Prompt Editor

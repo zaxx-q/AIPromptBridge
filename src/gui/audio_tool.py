@@ -110,22 +110,15 @@ class AudioToolApp:
         self.cancel_requested = False
         self._window_open = True
         
-        # Get prompts config for the window
-        prompts_config = self._get_prompts_config()
-        
         # Request window via GUICoordinator (runs on GUI thread)
         from .core import GUICoordinator
         GUICoordinator.get_instance().request_audio_analyzer_window(
-            prompts_config=prompts_config,
+            config=self.config,
+            ai_params=self.ai_params,
+            key_managers=self.key_managers,
             on_action=self._on_action_selected,
             on_close=self._on_window_closed
         )
-    
-    def _get_prompts_config(self) -> Dict[str, Any]:
-        """Get prompts configuration for the window."""
-        return {
-            "audio_tool": self.prompts.get_audio_tool()
-        }
     
     def _on_window_closed(self):
         """Handle window close."""

@@ -551,7 +551,10 @@ def _parse_models_response(data):
             models.append({
                 "id": model_id,
                 "name": model_id,
-                "owned_by": model.get("owned_by", "unknown")
+                "owned_by": model.get("owned_by", "unknown"),
+                "architecture": model.get("architecture"),
+                "context_length": model.get("context_length"),
+                "pricing": model.get("pricing"),
             })
         return models, None
     

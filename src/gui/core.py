@@ -402,13 +402,22 @@ class GUICoordinator:
         """Create an audio analyzer window on the GUI thread"""
         from .windows import create_audio_analyzer_window
         
-        prompts_config = request.get('prompts_config')
-        on_action = request.get('on_action')
-        on_close = request.get('on_close')
+        prompts_config = request.get('prompts_config')  # Actually 'config' from AudioToolApp
+        on_action = request.get('on_action')  # Actually 'ai_params'
+        on_close = request.get('on_close')    # Actually 'key_managers'
         
-        if prompts_config and on_action:
+        # Proper parameter extraction
+        config = request.get('config')
+        ai_params = request.get('ai_params')
+        key_managers = request.get('key_managers')
+        
+        real_on_action = request.get('real_on_action')
+        real_on_close = request.get('real_on_close')
+        
+        # ai_params might be empty dict, so check for None explicitly
+        if config is not None and ai_params is not None and key_managers is not None:
             create_audio_analyzer_window(
-                self._root, prompts_config, on_action, on_close
+                self._root, config, ai_params, key_managers, real_on_close, real_on_action
             )
     
     def request_chat_window(self, session, initial_response=None):
@@ -560,17 +569,21 @@ class GUICoordinator:
     
     def request_audio_analyzer_window(
         self,
-        prompts_config,
-        on_action,
+        config,
+        ai_params,
+        key_managers,
+        on_action=None,
         on_close=None
     ):
         """Request creation of an audio analyzer window (thread-safe)"""
         self.ensure_running()
         self._request_queue.put({
             'type': 'audio_analyzer',
-            'prompts_config': prompts_config,
-            'on_action': on_action,
-            'on_close': on_close
+            'config': config,
+            'ai_params': ai_params,
+            'key_managers': key_managers,
+            'real_on_action': on_action,
+            'real_on_close': on_close
         })
     
     def get_root(self):

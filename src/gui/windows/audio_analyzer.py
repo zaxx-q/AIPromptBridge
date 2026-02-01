@@ -30,7 +30,7 @@ from ..themes import (
     get_ctk_frame_colors, get_ctk_entry_colors,
     get_ctk_combobox_colors, sync_ctk_appearance
 )
-from ..core import get_next_window_id, register_window, unregister_window
+from ..core import get_next_window_id, register_window, unregister_window, GUICoordinator
 from ..custom_widgets import ScrollableComboBox
 from ..popups import Tooltip, CarouselButtonList, ModifierBar
 from ..prompts import get_prompts_config
@@ -60,7 +60,8 @@ class AudioAnalyzerWindow:
         config: Dict[str, Any],
         ai_params: Dict[str, Any],
         key_managers: Dict[str, Any],
-        on_close: Optional[Callable[[], None]] = None
+        on_close: Optional[Callable[[], None]] = None,
+        on_action: Optional[Callable] = None
     ):
         """
         Initialize the audio analyzer window.
@@ -71,12 +72,14 @@ class AudioAnalyzerWindow:
             ai_params: AI parameters dictionary
             key_managers: Dictionary of KeyManager instances
             on_close: Optional callback when window closes
+            on_action: Optional callback when action selected
         """
         self.parent_root = parent_root
         self.config = config
         self.ai_params = ai_params
         self.key_managers = key_managers
         self.on_close_callback = on_close
+        self.on_action_callback = on_action
         
         self.window_id = get_next_window_id()
         self.colors = get_colors()
@@ -181,14 +184,14 @@ class AudioAnalyzerWindow:
         register_window(self._get_window_tag())
         self.root.protocol("WM_DELETE_WINDOW", self._close)
         
-        # Initialize audio system
-        self._init_audio()
-        
         # Load models in background
         threading.Thread(target=self._load_models, daemon=True).start()
         
         # Start level monitoring
-        self._start_level_monitoring()
+        # self._start_level_monitoring() # Moved to after build, triggered by audio device update
+        
+        # Initialize audio system - deferred slightly to allow UI build
+        self.root.after(100, self._init_audio)
     
     def _build_ui(self):
         """Build the complete UI."""
@@ -206,6 +209,50 @@ class AudioAnalyzerWindow:
         )
         main_frame.pack(fill="both", expand=True, padx=15, pady=15)
         
+        # Hack to increase scroll speed
+        try:
+            def _scroll_handler(event):
+                if hasattr(main_frame, "_parent_canvas"):
+                    # High speed multiplier (Windows delta is usually 120)
+                    units = 0
+                    if event.delta:
+                        # Windows / MacOS with mouse
+                        # -1 * (delta/120) * multiplier
+                        # Using 6x speed
+                        units = int(-1 * (event.delta / 120) * 6)
+                    elif event.num == 4:
+                        # Linux scroll up
+                        units = -6
+                    elif event.num == 5:
+                        # Linux scroll down
+                        units = 6
+                        
+                    if units and main_frame._parent_canvas.winfo_exists():
+                        main_frame._parent_canvas.yview_scroll(units, "units")
+                        return "break"
+            
+            # Bind to canvas and frame without add="+" to attempt override/priority
+            # Also bind for Linux button events
+            if hasattr(main_frame, "_parent_canvas"):
+                canvas = main_frame._parent_canvas
+                
+                # Bind to canvas
+                canvas.bind("<MouseWheel>", _scroll_handler)
+                canvas.bind("<Button-4>", _scroll_handler)
+                canvas.bind("<Button-5>", _scroll_handler)
+                
+                # Bind to frame background
+                main_frame.bind("<MouseWheel>", _scroll_handler)
+                main_frame.bind("<Button-4>", _scroll_handler)
+                main_frame.bind("<Button-5>", _scroll_handler)
+                
+                # Bind to all children recursively (risky but ensures coverage)
+                # Alternatively, rely on event bubbling.
+                # If widgets don't handle scroll, they bubble to parent (frame/canvas).
+                
+        except Exception as e:
+            logging.warning(f"Could not apply custom scroll speed: {e}")
+            
         # === Provider & Model Section ===
         self._create_provider_section(main_frame)
         
@@ -391,7 +438,7 @@ class AudioAnalyzerWindow:
         
         # Device type radio buttons
         type_row = ctk.CTkFrame(content, fg_color="transparent")
-        type_row.pack(fill="x")
+        type_row.pack(fill="x", pady=(0, 10))
         
         self.device_type_var = tk.StringVar(value="loopback" if self.config.get("audio_default_loopback", True) else "input")
         
@@ -420,6 +467,24 @@ class AudioAnalyzerWindow:
             hover_color=self.colors.lavender,
             border_color=self.colors.surface2
         ).pack(side="left")
+
+        # Level meter row
+        meter_row = ctk.CTkFrame(content, fg_color="transparent")
+        meter_row.pack(fill="x")
+        
+        # Level meter canvas
+        self.level_canvas = tk.Canvas(
+            meter_row,
+            width=400,
+            height=20,
+            bg=self.colors.surface1,
+            highlightthickness=1,
+            highlightbackground=self.colors.surface2
+        )
+        self.level_canvas.pack(side="left", fill="x", expand=True)
+        
+        # Draw initial level bar (empty)
+        self._update_level_display(0.0)
     
     def _create_recording_section(self, parent):
         """Create recording controls section."""
@@ -474,24 +539,6 @@ class AudioAnalyzerWindow:
         )
         self.duration_label.pack(side="left")
         
-        # Level meter row
-        meter_row = ctk.CTkFrame(content, fg_color="transparent")
-        meter_row.pack(fill="x")
-        
-        # Level meter canvas
-        self.level_canvas = tk.Canvas(
-            meter_row,
-            width=400,
-            height=20,
-            bg=self.colors.surface1,
-            highlightthickness=1,
-            highlightbackground=self.colors.surface2
-        )
-        self.level_canvas.pack(side="left", fill="x", expand=True)
-        
-        # Draw initial level bar (empty)
-        self._update_level_display(0.0)
-    
     def _create_compression_section(self, parent):
         """Create compression settings section."""
         content = self._create_section_frame(parent, "Compression")
@@ -600,7 +647,6 @@ class AudioAnalyzerWindow:
             height=16,
             corner_radius=8,
             button_corner_radius=8,
-            button_length=0,
             fg_color=self.colors.surface1,
             progress_color=self.colors.accent,
             button_color=self.colors.accent,
@@ -841,6 +887,22 @@ class AudioAnalyzerWindow:
         except Exception as e:
             logging.error(f"[AudioAnalyzer] Failed to refresh devices: {e}")
             self._update_status(f"Device refresh failed: {e}", self.colors.red)
+            
+    def _init_audio(self):
+        """Initialize audio system."""
+        try:
+            from ...audio import is_pyaudio_available
+            
+            if not is_pyaudio_available():
+                self._update_status("PyAudioWPatch not available", self.colors.red)
+                return
+            
+            # Refresh device list
+            self._refresh_devices()
+            
+        except Exception as e:
+            logging.error(f"[AudioAnalyzer] Failed to initialize audio: {e}")
+            self._update_status(f"Audio init failed: {e}", self.colors.red)
     
     def _update_recorder_device(self):
         """Update the recorder with current device."""
@@ -888,7 +950,7 @@ class AudioAnalyzerWindow:
             if level < 0.5:
                 color = self.colors.green
             elif level < 0.8:
-                color = self.colors.yellow
+                color = self.colors.accent_yellow
             else:
                 color = self.colors.red
             
@@ -942,7 +1004,10 @@ class AudioAnalyzerWindow:
             
             if wav_data:
                 self.recorded_wav = wav_data
-                self.audio_duration = self.recorder.get_duration()
+                
+                # Calculate duration from data because recorder duration resets on stop
+                from ...audio.recorder import get_audio_duration
+                self.audio_duration = get_audio_duration(wav_data)
                 
                 # Update compression estimate
                 self._update_size_estimate()
@@ -952,7 +1017,7 @@ class AudioAnalyzerWindow:
                 
                 self._update_status(f"Recorded {self._format_duration(self.audio_duration)}", self.colors.green)
             else:
-                self._update_status("No audio recorded", self.colors.yellow)
+                self._update_status("No audio recorded", self.colors.accent_yellow)
             
             # Update UI
             self.record_btn.configure(state="normal")
@@ -1211,8 +1276,9 @@ class AudioAnalyzerWindow:
     
     def _on_model_changed(self, model: str):
         """Handle model selection change."""
-        if model and model not in ("(loading...)", "(no models)"):
+        if model and model not in ("(loading...)", "(no models)", "(no audio models found)"):
             self.model = model
+            # Ensure calling code knows about manually typed models
     
     def _on_device_changed(self, device_name: str):
         """Handle device dropdown change."""
@@ -1245,7 +1311,17 @@ class AudioAnalyzerWindow:
         try:
             from ...api_client import fetch_models
             
-            models, error = fetch_models(self.config, self.key_managers)
+            try:
+                # Pass current provider to fetch correct models
+                models, error = fetch_models(
+                    self.config,
+                    self.key_managers,
+                    provider_override=self.provider
+                )
+            except Exception as e:
+                logging.error(f"[AudioAnalyzer] fetch_models failed: {e}")
+                error = str(e)
+                models = None
             
             if models and not error and not self._destroyed:
                 # Filter for audio-capable models if OpenRouter
@@ -1254,20 +1330,60 @@ class AudioAnalyzerWindow:
                 
                 self.available_models = [m['id'] for m in models]
                 
+                # If no models found (e.g. filtered out), show indicator
+                if not self.available_models:
+                    self.available_models = ["(no audio models found)"]
+                
                 def update_dropdown():
                     if self._destroyed:
                         return
+                    
+                    # Log for debugging
+                    logging.info(f"[AudioAnalyzer] Updating dropdown with {len(self.available_models)} models")
+                    
                     self.model_dropdown.configure(values=self.available_models)
+                    
+                    # If current model is in list, keep it. If not, pick first.
+                    # Also support keeping manually entered model if it's not in the list but valid context
                     if self.model and self.model in self.available_models:
                         self.model_dropdown.set(self.model)
                     elif self.available_models:
+                        # Auto-select first if current invalid
+                        # But skip if current is "user typed" (we don't strictly validate that here yet,
+                        # relying on it being non-empty. But if they switch provider, we probably want to reset.)
                         self.model_dropdown.set(self.available_models[0])
                         self.model = self.available_models[0]
+                    
+                    # Handle empty/helper selection
+                    if self.available_models == ["(no audio models found)"]:
+                        self.model_dropdown.set("(no audio models found)")
+                        self.model = ""
                 
-                self.root.after(0, update_dropdown)
+                # Use GUICoordinator for thread-safe UI update
+                GUICoordinator.get_instance().run_on_gui_thread(update_dropdown)
+            elif self.model:
+                # Fallback to configured model if fetch failed
+                self.available_models = [self.model]
+                
+                def set_fallback():
+                    self.model_dropdown.configure(values=self.available_models)
+                    self.model_dropdown.set(self.model)
+                
+                GUICoordinator.get_instance().run_on_gui_thread(set_fallback)
                 
         except Exception as e:
             logging.error(f"[AudioAnalyzer] Model loading error: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Fallback
+            if self.model:
+                self.available_models = [self.model]
+                def set_fallback_exc():
+                    self.model_dropdown.configure(values=self.available_models)
+                    self.model_dropdown.set(self.model)
+                
+                GUICoordinator.get_instance().run_on_gui_thread(set_fallback_exc)
     
     def _filter_audio_models(self, models: List[Dict]) -> List[Dict]:
         """Filter OpenRouter models to those supporting audio input."""
@@ -1289,15 +1405,86 @@ class AudioAnalyzerWindow:
         self._update_status("Processing...", self.colors.accent)
         self.send_btn.configure(state="disabled")
         
-        # Run in background thread
-        threading.Thread(
-            target=self._process_audio,
-            args=(action_key,),
-            daemon=True
-        ).start()
-    
-    def _process_audio(self, action_key: str):
-        """Process audio in background thread."""
+        # Determine audio data and mime type
+        audio_data = self.recorded_wav
+        mime_type = "audio/wav"
+        
+        if self.compression_enabled:
+            # Compress in background if needed
+            threading.Thread(
+                target=self._prepare_and_send_audio,
+                args=(action_key,),
+                daemon=True
+            ).start()
+        else:
+            # Run in background thread
+            threading.Thread(
+                target=self._process_or_callback,
+                args=(action_key, audio_data, mime_type),
+                daemon=True
+            ).start()
+
+    def _prepare_and_send_audio(self, action_key: str):
+        """Compress audio then process."""
+        try:
+            if not self.compressed_audio:
+                self.compressed_audio = self.recorder.compress_audio(
+                    self.recorded_wav,
+                    self.compression_preset
+                )
+            
+            audio_data = self.compressed_audio or self.recorded_wav
+            
+            from ...audio.recorder import COMPRESSION_PRESETS
+            preset = COMPRESSION_PRESETS.get(self.compression_preset, {})
+            mime_type = "audio/ogg" if preset.get("output_ext", ".ogg") == ".ogg" else "audio/mpeg"
+            
+            self._process_or_callback(action_key, audio_data, mime_type)
+            
+        except Exception as e:
+            logging.error(f"[AudioAnalyzer] Compression error: {e}")
+            self.root.after(0, lambda: self._update_status(f"Compression error: {e}", self.colors.red))
+            self.is_processing = False
+            self.root.after(0, lambda: self.send_btn.configure(state="normal"))
+
+    def _process_or_callback(self, action_key, audio_data, mime_type):
+        """Delegate to callback or process internally."""
+        if self.on_action_callback:
+            # Delegate to callback (GUI Controller mode)
+            try:
+                # Need to run on main thread if callback updates UI, but typically
+                # callbacks are handled gracefully. AudioToolApp._on_action_selected
+                # starts its own thread, so we can call it directly.
+                # But to be safe and update OUR UI state:
+                
+                self.on_action_callback(
+                    action_key=action_key,
+                    audio_data=audio_data,
+                    mime_type=mime_type,
+                    custom_input=None, # Todo: Add custom input support
+                    duration=self.audio_duration,
+                    compressed=self.compression_enabled
+                )
+                
+                # Close window or reset state?
+                # SnipTool keeps popup open until action.
+                # Here we might want to keep window open.
+                # Reset processing state
+                self.is_processing = False
+                self.root.after(0, lambda: self.send_btn.configure(state="normal"))
+                self.root.after(0, lambda: self._update_status("Sent to AI", self.colors.green))
+                
+            except Exception as e:
+                logging.error(f"[AudioAnalyzer] Callback error: {e}")
+                self.is_processing = False
+                self.root.after(0, lambda: self.send_btn.configure(state="normal"))
+                self.root.after(0, lambda: self._update_status(f"Error: {e}", self.colors.red))
+        else:
+            # Process internally (Standalone mode)
+            self._process_audio_internal(action_key, audio_data, mime_type)
+
+    def _process_audio_internal(self, action_key: str, audio_data: bytes, mime_type: str):
+        """Process audio internally."""
         try:
             from ...request_pipeline import RequestPipeline, RequestContext, RequestOrigin, StreamCallback
             
@@ -1318,21 +1505,6 @@ class AudioAnalyzerWindow:
                 modifier_injections = self._build_modifier_injections()
                 if modifier_injections:
                     system_prompt = system_prompt + "\n\n" + modifier_injections
-            
-            # Get audio data (compress if enabled)
-            if self.compression_enabled:
-                if not self.compressed_audio:
-                    self.compressed_audio = self.recorder.compress_audio(
-                        self.recorded_wav,
-                        self.compression_preset
-                    )
-                audio_data = self.compressed_audio or self.recorded_wav
-                from ...audio.recorder import COMPRESSION_PRESETS
-                preset = COMPRESSION_PRESETS.get(self.compression_preset, {})
-                mime_type = "audio/ogg" if preset.get("output_ext", ".ogg") == ".ogg" else "audio/mpeg"
-            else:
-                audio_data = self.recorded_wav
-                mime_type = "audio/wav"
             
             # Build message with audio
             audio_b64 = base64.b64encode(audio_data).decode('utf-8')
@@ -1476,7 +1648,8 @@ def create_audio_analyzer_window(
     config: Dict[str, Any],
     ai_params: Dict[str, Any],
     key_managers: Dict[str, Any],
-    on_close: Optional[Callable[[], None]] = None
+    on_close: Optional[Callable[[], None]] = None,
+    on_action: Optional[Callable] = None
 ) -> AudioAnalyzerWindow:
     """
     Create an audio analyzer window.
@@ -1487,10 +1660,11 @@ def create_audio_analyzer_window(
         ai_params: AI parameters
         key_managers: Key manager instances
         on_close: Optional close callback
+        on_action: Optional action callback
         
     Returns:
         The created window instance
     """
     return AudioAnalyzerWindow(
-        parent_root, config, ai_params, key_managers, on_close
+        parent_root, config, ai_params, key_managers, on_close, on_action
     )

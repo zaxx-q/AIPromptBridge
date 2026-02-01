@@ -675,6 +675,8 @@ class ScrollableComboBox:
         self._text_widget.bind("<Button-1>", self._on_text_click)
         self._text_widget.bind("<Motion>", self._on_text_motion)
         self._text_widget.bind("<Leave>", self._on_text_leave)
+        # Stop scroll propagation
+        self._text_widget.bind("<MouseWheel>", self._on_mousewheel)
         self._dropdown_window.bind("<Escape>", lambda e: self._close_dropdown())
         
         # Position and show
@@ -729,6 +731,14 @@ class ScrollableComboBox:
         # Re-populate text widget
         self._populate_dropdown_items()
     
+    def _on_mousewheel(self, event):
+        """Handle mousewheel scrolling - stop propagation and boost speed."""
+        if self._text_widget:
+            # Scroll the text widget (3x faster speed)
+            units = int(-1 * (event.delta / 120) * 3)
+            self._text_widget.yview_scroll(units, "units")
+        return "break"
+
     def _on_text_click(self, event):
         """Handle click on text widget - select item."""
         if not self._text_widget:
