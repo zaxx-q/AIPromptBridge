@@ -55,6 +55,15 @@ except ImportError as e:
     HAVE_SNIP_TOOL = False
     # Silent - will show in startup
 
+# AudioTool - audio analysis feature
+AUDIO_TOOL_APP = None
+try:
+    from src.gui.audio_tool import AudioToolApp
+    HAVE_AUDIO_TOOL = True
+except ImportError as e:
+    HAVE_AUDIO_TOOL = False
+    # Silent - will show in startup
+
 
 def get_base_url(config, provider):
     """Get the base URL for a provider"""
@@ -260,9 +269,48 @@ def initialize_snip_tool(config, ai_params):
         return None
 
 
+def initialize_audio_tool(config, ai_params):
+    """Initialize AudioTool if enabled"""
+    global AUDIO_TOOL_APP
+    
+    if not HAVE_AUDIO_TOOL:
+        if HAVE_RICH:
+            console.print("  [red]✗[/red] AudioTool: Not available (missing dependencies)")
+        else:
+            print("  ✗ AudioTool: Not available (missing dependencies)")
+        return None
+    
+    if not config.get("audio_tool_enabled", True):
+        if HAVE_RICH:
+            console.print("  [red]✗[/red] AudioTool: Disabled in config")
+        else:
+            print("  ✗ AudioTool: Disabled in config")
+        return None
+    
+    try:
+        AUDIO_TOOL_APP = AudioToolApp(
+            config=config,
+            ai_params=ai_params,
+            key_managers=web_server.KEY_MANAGERS
+        )
+        AUDIO_TOOL_APP.start()
+        
+        # Register instance for hot-reload
+        from src.gui.audio_tool import set_instance
+        set_instance(AUDIO_TOOL_APP)
+        
+        return AUDIO_TOOL_APP
+    except Exception as e:
+        if HAVE_RICH:
+            console.print(f"  [red]✗ AudioTool: Failed to initialize: {e}[/red]")
+        else:
+            print(f"  ✗ AudioTool: Failed to initialize: {e}")
+        return None
+
+
 def cleanup():
     """Cleanup on shutdown"""
-    global TEXT_EDIT_TOOL_APP, SNIP_TOOL_APP
+    global TEXT_EDIT_TOOL_APP, SNIP_TOOL_APP, AUDIO_TOOL_APP
     
     if TEXT_EDIT_TOOL_APP:
         if HAVE_RICH:
@@ -279,6 +327,14 @@ def cleanup():
             print("Stopping SnipTool...")
         SNIP_TOOL_APP.stop()
         SNIP_TOOL_APP = None
+    
+    if AUDIO_TOOL_APP:
+        if HAVE_RICH:
+            console.print("Stopping AudioTool...")
+        else:
+            print("Stopping AudioTool...")
+        AUDIO_TOOL_APP.stop()
+        AUDIO_TOOL_APP = None
 
 
 def signal_handler(signum, frame):
@@ -596,6 +652,11 @@ def main():
     snip_tool_result = initialize_snip_tool(config, ai_params)
     if snip_tool_result:
         snip_hotkey = config.get("screen_snip_hotkey", "ctrl+shift+x")
+    
+    # AudioTool
+    audio_tool_result = initialize_audio_tool(config, ai_params)
+    if audio_tool_result:
+        audio_hotkey = config.get("audio_tool_hotkey", "ctrl+shift+a")
     
     if HAVE_RICH:
         console.print()

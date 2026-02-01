@@ -236,6 +236,8 @@ class GUICoordinator:
                     self._create_snip_overlay(request)
                 elif request_type == 'snip_popup':
                     self._create_snip_popup(request)
+                elif request_type == 'audio_analyzer':
+                    self._create_audio_analyzer_window(request)
                 elif request_type == 'callback':
                     # Generic callback execution on GUI thread
                     callback = request.get('callback')
@@ -396,6 +398,19 @@ class GUICoordinator:
                 on_action, on_close, on_request_compare_capture, x, y
             )
     
+    def _create_audio_analyzer_window(self, request):
+        """Create an audio analyzer window on the GUI thread"""
+        from .windows import create_audio_analyzer_window
+        
+        prompts_config = request.get('prompts_config')
+        on_action = request.get('on_action')
+        on_close = request.get('on_close')
+        
+        if prompts_config and on_action:
+            create_audio_analyzer_window(
+                self._root, prompts_config, on_action, on_close
+            )
+    
     def request_chat_window(self, session, initial_response=None):
         """Request creation of a chat window (thread-safe)"""
         self.ensure_running()
@@ -541,6 +556,21 @@ class GUICoordinator:
             'on_request_compare_capture': on_request_compare_capture,
             'x': x,
             'y': y
+        })
+    
+    def request_audio_analyzer_window(
+        self,
+        prompts_config,
+        on_action,
+        on_close=None
+    ):
+        """Request creation of an audio analyzer window (thread-safe)"""
+        self.ensure_running()
+        self._request_queue.put({
+            'type': 'audio_analyzer',
+            'prompts_config': prompts_config,
+            'on_action': on_action,
+            'on_close': on_close
         })
     
     def get_root(self):

@@ -467,6 +467,73 @@ DEFAULT_SNIP_ACTIONS = {
 }
 
 # =============================================================================
+# Default Audio Tool Configuration
+# =============================================================================
+
+DEFAULT_AUDIO_SETTINGS = {
+    "popup_use_groups": False,
+    "popup_items_per_page": 6,
+    "custom_task_template": "Regarding this audio: {custom_input}"
+}
+
+DEFAULT_AUDIO_ACTIONS = {
+    "Transcribe": {
+        "icon": "📝",
+        "system_prompt": "You are an expert transcriptionist who converts audio to accurate text.",
+        "task": "Transcribe this audio accurately. Preserve speaker changes if detectable. Output only the transcription.",
+        "show_chat_window": False
+    },
+    "Transcribe with Timestamps": {
+        "icon": "⏱️",
+        "system_prompt": "You are an expert transcriptionist who converts audio to accurate text with timestamps.",
+        "task": "Transcribe this audio with timestamps at natural breaks (every 10-30 seconds or at speaker changes). Format: [MM:SS] text",
+        "show_chat_window": False
+    },
+    "Analyze": {
+        "icon": "🔍",
+        "system_prompt": "You are an audio analysis expert who examines audio content comprehensively.",
+        "task": "Analyze this audio. Describe: 1) Content type (speech, music, sound effects) 2) Key topics or themes 3) Tone and sentiment 4) Notable elements or patterns.",
+        "show_chat_window": True
+    },
+    "Describe": {
+        "icon": "💬",
+        "system_prompt": "You are an audio description specialist.",
+        "task": "Describe what is happening in this audio recording. Include details about speakers, background sounds, and overall context.",
+        "show_chat_window": True
+    },
+    "Summarize": {
+        "icon": "📋",
+        "system_prompt": "You are a summarization expert who distills audio content to key points.",
+        "task": "Summarize the key points from this audio. Be concise but comprehensive.",
+        "show_chat_window": True
+    },
+    "Extract Key Points": {
+        "icon": "🔑",
+        "system_prompt": "You are an analyst who extracts important information from audio.",
+        "task": "Extract and list the key points, facts, or action items from this audio as a bullet list.",
+        "show_chat_window": True
+    },
+    "Identify Speakers": {
+        "icon": "👥",
+        "system_prompt": "You are a speaker identification specialist.",
+        "task": "Identify distinct speakers in this audio. Label them (Speaker 1, Speaker 2, etc.) and note their characteristics (gender, tone, role if apparent). Provide a brief transcript showing who said what.",
+        "show_chat_window": True
+    },
+    "Translate to English": {
+        "icon": "🇬🇧",
+        "system_prompt": "You are a professional translator who translates audio content to English.",
+        "task": "Transcribe and translate this audio to English. Preserve the meaning and tone.",
+        "show_chat_window": True
+    },
+    "_Custom": {
+        "icon": "⚡",
+        "system_prompt": "You are a versatile audio analysis assistant.",
+        "task": "",
+        "show_chat_window": True
+    }
+}
+
+# =============================================================================
 # Default Endpoints Configuration (from config.py)
 # =============================================================================
 
@@ -562,6 +629,13 @@ class PromptsConfig:
             }
             changed = True
         
+        if "audio_tool" not in self._config:
+            self._config["audio_tool"] = {
+                "_settings": DEFAULT_AUDIO_SETTINGS,
+                **DEFAULT_AUDIO_ACTIONS
+            }
+            changed = True
+        
         if "endpoints" not in self._config:
             self._config["endpoints"] = {
                 "_settings": DEFAULT_ENDPOINTS_SETTINGS,
@@ -587,6 +661,10 @@ class PromptsConfig:
             "snip_tool": {
                 "_settings": DEFAULT_SNIP_SETTINGS,
                 **DEFAULT_SNIP_ACTIONS
+            },
+            "audio_tool": {
+                "_settings": DEFAULT_AUDIO_SETTINGS,
+                **DEFAULT_AUDIO_ACTIONS
             },
             "endpoints": {
                 "_settings": DEFAULT_ENDPOINTS_SETTINGS,
@@ -649,6 +727,25 @@ class PromptsConfig:
     def can_use_text_edit_actions(self) -> bool:
         """Check if snip tool can borrow text edit tool actions."""
         return self.get_snip_setting("allow_text_edit_actions", True)
+    
+    # =========================================================================
+    # Audio Tool Accessors
+    # =========================================================================
+    
+    def get_audio_tool(self) -> dict:
+        """Get complete audio tool configuration (including _settings)."""
+        return self._config.get("audio_tool", {})
+    
+    def get_audio_setting(self, key: str, default=None):
+        """Get a setting from audio tool _settings."""
+        audio = self.get_audio_tool()
+        settings = audio.get("_settings", {})
+        return settings.get(key, DEFAULT_AUDIO_SETTINGS.get(key, default))
+    
+    def get_audio_actions(self) -> dict:
+        """Get audio tool actions (excluding _settings)."""
+        audio = self.get_audio_tool()
+        return {k: v for k, v in audio.items() if k != "_settings"}
     
     # =========================================================================
     # Global Settings Accessors

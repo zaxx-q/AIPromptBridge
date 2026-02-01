@@ -23,6 +23,7 @@ class RequestOrigin(Enum):
     POPUP_INPUT = "popup_input"
     POPUP_PROMPT = "popup_prompt"
     SNIP_TOOL = "snip_tool"
+    AUDIO_TOOL = "audio_tool"
     ENDPOINT_OCR = "endpoint/ocr"
     ENDPOINT_TRANSLATE = "endpoint/translate"
     ENDPOINT_DESCRIBE = "endpoint/describe"

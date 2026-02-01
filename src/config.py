@@ -83,6 +83,13 @@ DEFAULT_CONFIG = {
     "session_image_format": "webp",
     # Image quality for lossy formats (jpg, webp, avif): 1-100
     "session_image_quality": 85,
+    # Audio Tool settings
+    "audio_tool_enabled": True,
+    "audio_tool_hotkey": "ctrl+shift+a",
+    "audio_default_device": "",
+    "audio_default_loopback": True,
+    "audio_compression_enabled": True,
+    "audio_compression_preset": "recommended",
 }
 
 # API URLs

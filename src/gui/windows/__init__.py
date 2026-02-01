@@ -34,6 +34,12 @@ from .session_browser import (
 # Base classes (for extension)
 from .base import ChatWindowBase, BrowserWindowBase
 
+# Audio analyzer window
+from .audio_analyzer import (
+    AudioAnalyzerWindow,
+    create_audio_analyzer_window
+)
+
 __all__ = [
     # Utils
     'get_icon_path',
@@ -52,6 +58,10 @@ __all__ = [
     'StandaloneSessionBrowserWindow',
     'AttachedBrowserWindow',
     'create_attached_browser_window',
+    
+    # Audio analyzer
+    'AudioAnalyzerWindow',
+    'create_audio_analyzer_window',
     
     # Base classes
     'ChatWindowBase',

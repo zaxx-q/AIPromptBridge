@@ -19,5 +19,8 @@ rich
 # System tray (Windows)
 infi.systray
 
+# Audio Tool dependencies
+PyAudioWPatch
+
 # Build tool (optional, for creating executables)
 # cx-Freeze

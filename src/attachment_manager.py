@@ -68,6 +68,13 @@ class AttachmentManager:
         "pdf": "application/pdf",
         "txt": "text/plain",
         "md": "text/markdown",
+        # Audio
+        "wav": "audio/wav",
+        "mp3": "audio/mpeg",
+        "ogg": "audio/ogg",
+        "opus": "audio/opus",
+        "flac": "audio/flac",
+        "webm": "audio/webm",
     }
     
     # Reverse mapping: MIME type to extension
@@ -83,6 +90,15 @@ class AttachmentManager:
         "application/pdf": "pdf",
         "text/plain": "txt",
         "text/markdown": "md",
+        # Audio
+        "audio/wav": "wav",
+        "audio/x-wav": "wav",
+        "audio/mpeg": "mp3",
+        "audio/mp3": "mp3",
+        "audio/ogg": "ogg",
+        "audio/opus": "opus",
+        "audio/flac": "flac",
+        "audio/webm": "webm",
     }
     
     # Default format and quality
@@ -224,6 +240,60 @@ class AttachmentManager:
             
         except Exception as e:
             logging.error(f"[AttachmentManager] Failed to save image: {e}")
+            return ""
+    
+    @classmethod
+    def save_audio(
+        cls,
+        session_id: int,
+        audio_data: bytes,
+        mime_type: str,
+        message_index: int = 0,
+        original_filename: Optional[str] = None
+    ) -> str:
+        """
+        Save audio data to external file and return relative path.
+        
+        Unlike images, audio files are saved as-is without conversion
+        to preserve quality and compatibility.
+        
+        Args:
+            session_id: The session ID
+            audio_data: Raw audio bytes
+            mime_type: MIME type (e.g., "audio/wav", "audio/ogg")
+            message_index: Index of the message (for ordering)
+            original_filename: Optional original filename
+            
+        Returns:
+            Relative path to saved file (e.g., "session_attachments/5/0_1706000000_audio.wav")
+        """
+        try:
+            # Determine extension from MIME type
+            extension = cls.MIME_FORMAT_MAP.get(mime_type, "wav")
+            
+            # Generate filename
+            timestamp = int(time.time())
+            if original_filename:
+                base_name = cls._sanitize_filename(os.path.splitext(original_filename)[0])
+            else:
+                base_name = "audio"
+            filename = f"{message_index}_{timestamp}_{base_name}.{extension}"
+            
+            # Ensure directory exists
+            session_dir = cls._ensure_session_dir(session_id)
+            file_path = session_dir / filename
+            
+            # Write audio data
+            with _FILE_LOCK:
+                with open(file_path, "wb") as f:
+                    f.write(audio_data)
+            
+            relative_path = str(file_path)
+            logging.debug(f"[AttachmentManager] Saved audio: {relative_path}")
+            return relative_path
+            
+        except Exception as e:
+            logging.error(f"[AttachmentManager] Failed to save audio: {e}")
             return ""
     
     @classmethod
