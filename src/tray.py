@@ -468,7 +468,7 @@ class TrayApp:
         try:
             from .gui.core import show_prompt_editor, HAVE_GUI
             if HAVE_GUI:
-                print("\n✏️  Opening prompt editor...\n")
+                print("\n📝  Opening prompt editor...\n")
                 show_prompt_editor()
             else:
                 print("[Warning] GUI not available")

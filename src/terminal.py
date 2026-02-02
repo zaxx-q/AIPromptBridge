@@ -617,7 +617,7 @@ def terminal_session_manager(endpoints=None):
                     if HAVE_RICH:
                         console.print("\n[bold]📝  Opening prompt editor...[/bold]\n")
                     else:
-                        print("\n✏️  Opening prompt editor...\n")
+                        print("\n📝  Opening prompt editor...\n")
                     from .gui.core import show_prompt_editor
                     show_prompt_editor()
                 else:
