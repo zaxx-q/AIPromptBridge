@@ -261,14 +261,9 @@ class AudioRecorder:
                 def recording_callback(in_data, frame_count, time_info, status):
                     if self._recording_state.is_recording:
                         self._recording_state.frames.append(in_data)
-                        # Also update level if monitoring
-                        if self._monitoring:
-                            self._current_level = get_rms_level(in_data, self._recording_state.sample_width)
-                            if self._level_callback:
-                                try:
-                                    self._level_callback(self._current_level)
-                                except Exception:
-                                    pass
+                        # Update level for polling via get_level() - don't call callback
+                        # to avoid flooding the GUI thread with events
+                        self._current_level = get_rms_level(in_data, self._recording_state.sample_width)
                     return (in_data, pyaudio.paContinue)
                 
                 # Open recording stream
