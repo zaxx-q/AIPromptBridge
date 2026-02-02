@@ -314,9 +314,9 @@ class AudioRecorder:
                 # For loopback devices, use larger buffer to get more data per callback
                 # WASAPI loopback typically buffers internally and delivers data less frequently
                 if is_loopback:
-                    # Request the device's full buffer period worth of frames
-                    # This should get us more audio per callback
-                    chunk_size = self._sample_rate  # 1 second of audio
+                    # Use a moderate buffer size (e.g. 4096) to balance stability and update rate
+                    # Providing full 1-sec buffer causes level meter to lag (1Hz updates)
+                    chunk_size = self.LOOPBACK_CHUNK_SIZE
                 else:
                     chunk_size = self.CHUNK_SIZE
                 
