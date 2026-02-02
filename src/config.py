@@ -90,6 +90,10 @@ DEFAULT_CONFIG = {
     "audio_default_loopback": True,
     "audio_compression_enabled": True,
     "audio_compression_preset": "recommended",
+    # Level meter display style
+    # - progressbar: Smooth, simple progress bar (recommended)
+    # - canvas: Custom canvas with grid lines and color gradient
+    "audio_level_meter_style": "progressbar",
 }
 
 # API URLs
@@ -383,6 +387,11 @@ audio_compression_enabled = true
 # Compression preset (controls trade-off between quality and size)
 # Options: recommended, preserve_audio, smallest, mp3_compat, music
 audio_compression_preset = recommended
+
+# Level meter display style
+# - progressbar: Smooth, simple progress bar (recommended)
+# - canvas: Custom canvas with grid lines and color gradient
+audio_level_meter_style = progressbar
 
 # ============================================================
 # FLASK API ENDPOINTS (Optional)

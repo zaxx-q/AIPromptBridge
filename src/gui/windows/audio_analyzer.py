@@ -140,7 +140,9 @@ class AudioAnalyzerWindow:
         self.record_btn = None
         self.stop_btn = None
         self.duration_label = None
-        self.level_canvas = None
+        self.level_canvas = None  # Canvas-based meter (legacy)
+        self.level_bar = None  # CTkProgressBar-based meter (new)
+        self.meter_style = self.config.get("audio_level_meter_style", "progressbar")
         self.compression_var = None
         self.preset_dropdown = None
         self.size_label = None
@@ -156,6 +158,7 @@ class AudioAnalyzerWindow:
         self.result_text_widget = None
         self.copy_btn = None
         self.status_label = None
+        self._use_unified_stream = True  # Use new unified stream architecture
     
     def _get_window_tag(self) -> str:
         """Return unique window tag."""
@@ -480,18 +483,36 @@ class AudioAnalyzerWindow:
         meter_row = ctk.CTkFrame(content, fg_color="transparent")
         meter_row.pack(fill="x")
         
-        # Level meter canvas
-        self.level_canvas = tk.Canvas(
-            meter_row,
-            width=400,
-            height=20,
-            bg=self.colors.surface1,
-            highlightthickness=1,
-            highlightbackground=self.colors.surface2
-        )
-        self.level_canvas.pack(side="left", fill="x", expand=True)
+        # Check config for meter style
+        if self.meter_style == "progressbar":
+            # Simple CTkProgressBar (smooth, performant)
+            self.level_bar = ctk.CTkProgressBar(
+                meter_row,
+                width=400,
+                height=18,
+                corner_radius=8,
+                progress_color=self.colors.accent,
+                fg_color=self.colors.surface1
+            )
+            self.level_bar.pack(side="left", fill="x", expand=True)
+            self.level_bar.set(0)
+            self.level_canvas = None  # Not used in this mode
+        else:
+            # Canvas-based meter with grid lines (legacy)
+            self.level_canvas = tk.Canvas(
+                meter_row,
+                width=400,
+                height=20,
+                bg=self.colors.surface1,
+                highlightthickness=1,
+                highlightbackground=self.colors.surface2
+            )
+            self.level_canvas.pack(side="left", fill="x", expand=True)
+            self.level_bar = None  # Not used in this mode
+            # Draw initial static grid lines once
+            self._draw_level_grid()
         
-        # Draw initial level bar (empty)
+        # Initial display
         self._update_level_display(0.0)
     
     def _create_recording_section(self, parent):
@@ -896,63 +917,58 @@ class AudioAnalyzerWindow:
             logging.error(f"[AudioAnalyzer] Failed to refresh devices: {e}")
             self._update_status(f"Device refresh failed: {e}", self.colors.red)
             
-    def _init_audio(self):
-        """Initialize audio system."""
-        try:
-            from ...audio import is_pyaudio_available
-            
-            if not is_pyaudio_available():
-                self._update_status("PyAudioWPatch not available", self.colors.red)
-                return
-            
-            # Refresh device list
-            self._refresh_devices()
-            
-        except Exception as e:
-            logging.error(f"[AudioAnalyzer] Failed to initialize audio: {e}")
-            self._update_status(f"Audio init failed: {e}", self.colors.red)
-    
     def _update_recorder_device(self):
         """Update the recorder with current device."""
         try:
             from ...audio import AudioRecorder
             
-            # Stop existing monitoring before cleanup
+            # Stop existing stream before cleanup
             if self.recorder:
-                self._stop_level_monitoring()
+                if self._use_unified_stream:
+                    self.recorder.stop_stream()
+                else:
+                    self._stop_level_monitoring()
                 self.recorder.cleanup()
             
             if self.current_device:
                 self.recorder = AudioRecorder(self.current_device)
                 print(f"[AudioAnalyzer] Created recorder for device: {self.current_device.name}")
-                # NOTE: We don't start standalone level monitoring because:
-                # 1. WASAPI doesn't allow multiple streams on the same device
-                # 2. Starting a monitor stream would prevent recording from working
-                # Level meter will work during recording via polling get_level()
+                
+                if self._use_unified_stream:
+                    # Start stream immediately with level callback
+                    callback = self._create_level_callback()
+                    if self.recorder.start_stream(level_callback=callback):
+                        print(f"[AudioAnalyzer] Stream started for: {self.current_device.name}")
+                        # Start continuous level updates
+                        self._start_continuous_level_updates()
+                    else:
+                        print(f"[AudioAnalyzer] Failed to start stream")
+                # NOTE: With unified stream, level meter works continuously!
                 
         except Exception as e:
             print(f"[AudioAnalyzer] Failed to update recorder: {e}")
             logging.error(f"[AudioAnalyzer] Failed to update recorder: {e}")
     
     def _create_level_callback(self):
-        """Create the level callback function with amplification and smoothing."""
+        """Create the level callback function (simplified like transcription_popup.py).
+        
+        Uses GUICoordinator for thread-safe UI updates and simple progressbar.set().
+        The polling in _start_continuous_level_updates handles amplification/smoothing.
+        """
         def level_callback(level: float):
-            """Process level with amplification and smoothing."""
+            """Handle audio level update (called from audio thread)."""
             if self._destroyed:
                 return
             
-            # Apply amplification for better sensitivity
-            # Raw RMS levels are typically very low (loud sounds ~0.15)
+            # Simple amplification for visibility
             amplified = min(1.0, level * self.LEVEL_AMPLIFICATION)
             
-            # Apply smoothing to reduce jitter
-            smoothed = (self._current_level * self.LEVEL_SMOOTHING +
-                       amplified * (1.0 - self.LEVEL_SMOOTHING))
-            self._current_level = smoothed
-            
-            # Schedule UI update on main thread
+            # Update via GUICoordinator (thread-safe like transcription_popup.py)
             try:
-                self.root.after(0, lambda l=smoothed: self._update_level_display(l))
+                if self.meter_style == "progressbar" and self.level_bar:
+                    GUICoordinator.get_instance().run_on_gui_thread(
+                        lambda l=amplified: self.level_bar.set(l)
+                    )
             except Exception:
                 pass  # Window may be closing
         
@@ -988,6 +1004,34 @@ class AudioAnalyzerWindow:
         """Start continuous level monitoring (wrapper for compatibility)."""
         self._try_start_standalone_monitoring()
     
+    def _start_continuous_level_updates(self):
+        """Start continuous polling of level (works before and during recording).
+        
+        This is used with the unified stream architecture where the stream
+        is always active and we just need to poll the level value.
+        """
+        if self._destroyed:
+            return
+        
+        try:
+            # Get level from recorder (always available when stream is active)
+            level = self.recorder.get_level() if self.recorder else 0.0
+            
+            # Apply amplification and smoothing
+            amplified = min(1.0, level * self.LEVEL_AMPLIFICATION)
+            smoothed = (self._current_level * self.LEVEL_SMOOTHING +
+                       amplified * (1.0 - self.LEVEL_SMOOTHING))
+            self._current_level = smoothed
+            
+            # Update display
+            self._update_level_display(smoothed)
+            
+            # Schedule next update (runs continuously while window is open)
+            self.root.after(self.LEVEL_UPDATE_INTERVAL, self._start_continuous_level_updates)
+            
+        except Exception as e:
+            logging.debug(f"[AudioAnalyzer] Level update error: {e}")
+    
     def _stop_level_monitoring(self):
         """Stop level monitoring."""
         if not self.recorder:
@@ -1001,52 +1045,72 @@ class AudioAnalyzerWindow:
         except Exception as e:
             logging.debug(f"[AudioAnalyzer] Error stopping level monitor: {e}")
     
+    def _draw_level_grid(self):
+        """Draw static grid lines on canvas (called once)."""
+        if not self.level_canvas:
+            return
+        
+        canvas_width = 400  # Initial width
+        canvas_height = 20
+        segment_width = canvas_width // 10
+        
+        for i in range(10):
+            x = i * segment_width
+            self.level_canvas.create_line(
+                x, 0, x, canvas_height,
+                fill=self.colors.surface2, width=1, tags="grid"
+            )
+    
     def _update_level_display(self, level: float):
         """Update the level meter display."""
-        if not self.level_canvas or self._destroyed:
+        if self._destroyed:
             return
         
         try:
-            # Clear canvas
-            self.level_canvas.delete("all")
-            
-            # Calculate bar width
-            canvas_width = self.level_canvas.winfo_width() or 400
-            canvas_height = self.level_canvas.winfo_height() or 20
-            bar_width = int(level * canvas_width)
-            
-            # Draw background segments for visual reference
-            segment_width = canvas_width // 10
-            for i in range(10):
-                x = i * segment_width
-                # Subtle grid lines
-                self.level_canvas.create_line(
-                    x, 0, x, canvas_height,
-                    fill=self.colors.surface2, width=1
-                )
-            
-            # Determine color based on level (gradient effect)
-            if level < 0.5:
-                color = self.colors.green
-            elif level < 0.75:
-                color = self.colors.accent_yellow
-            else:
-                color = self.colors.red
-            
-            # Draw level bar with rounded appearance
-            if bar_width > 0:
-                self.level_canvas.create_rectangle(
-                    0, 2, bar_width, canvas_height - 2,
-                    fill=color, outline=""
-                )
-            
-            # Draw peak indicator line
-            if level > 0.9:
-                self.level_canvas.create_rectangle(
-                    bar_width - 3, 0, bar_width, canvas_height,
-                    fill=self.colors.red, outline=""
-                )
+            if self.meter_style == "progressbar" and self.level_bar:
+                # Simple progressbar update - very fast
+                self.level_bar.set(level)
                 
+                # Update color based on level
+                if level < 0.5:
+                    color = self.colors.green
+                elif level < 0.75:
+                    color = self.colors.accent_yellow
+                else:
+                    color = self.colors.red
+                self.level_bar.configure(progress_color=color)
+                
+            elif self.level_canvas:
+                # Canvas-based update - more expensive
+                # Only delete the level bar, not the grid
+                self.level_canvas.delete("level")
+                
+                canvas_width = self.level_canvas.winfo_width() or 400
+                canvas_height = self.level_canvas.winfo_height() or 20
+                bar_width = int(level * canvas_width)
+                
+                # Determine color based on level
+                if level < 0.5:
+                    color = self.colors.green
+                elif level < 0.75:
+                    color = self.colors.accent_yellow
+                else:
+                    color = self.colors.red
+                
+                # Draw level bar
+                if bar_width > 0:
+                    self.level_canvas.create_rectangle(
+                        0, 2, bar_width, canvas_height - 2,
+                        fill=color, outline="", tags="level"
+                    )
+                
+                # Peak indicator
+                if level > 0.9:
+                    self.level_canvas.create_rectangle(
+                        bar_width - 3, 0, bar_width, canvas_height,
+                        fill=self.colors.red, outline="", tags="level"
+                    )
+                    
         except Exception:
             pass
     
@@ -1060,35 +1124,54 @@ class AudioAnalyzerWindow:
             return
         
         try:
-            # CRITICAL: Stop standalone level monitoring before starting recording
-            # WASAPI doesn't allow multiple streams on the same device
-            if self._level_monitor_active:
-                logging.info("[AudioAnalyzer] Stopping level monitor before recording...")
-                self._stop_level_monitoring()
-                # Give the stream time to close
-                time.sleep(0.1)
-            
-            if self.recorder.start_recording():
-                self.is_recording = True
-                self.recording_start_time = time.time()
-                
-                # Update UI
-                self.record_btn.configure(state="disabled")
-                self.stop_btn.configure(state="normal")
-                
-                # Start duration update
-                self._update_duration()
-                
-                # Start level meter updates using recording callback
-                # The recorder's recording callback will call our level callback
-                # if we register it (the recorder already does this in its callback)
-                self._start_recording_level_updates()
-                
-                self._update_status("Recording...", self.colors.red)
+            if self._use_unified_stream:
+                # Unified stream architecture: recording is just a flag toggle
+                # Stream is already open, level meter continues working
+                if self.recorder.start_recording_unified():
+                    self.is_recording = True
+                    self.recording_start_time = time.time()
+                    
+                    # Update UI
+                    self.record_btn.configure(state="disabled")
+                    self.stop_btn.configure(state="normal")
+                    
+                    # Start duration update
+                    self._update_duration()
+                    
+                    # Level meter already running via _start_continuous_level_updates
+                    self._update_status("Recording...", self.colors.red)
+                    print("[AudioAnalyzer] Recording started (unified stream)")
+                else:
+                    self._update_status("Failed to start recording", self.colors.red)
             else:
-                self._update_status("Failed to start recording", self.colors.red)
-                # Try to restart level monitoring if recording failed
-                self._try_start_standalone_monitoring()
+                # Legacy architecture: separate streams for monitoring and recording
+                # CRITICAL: Stop standalone level monitoring before starting recording
+                # WASAPI doesn't allow multiple streams on the same device
+                if self._level_monitor_active:
+                    logging.info("[AudioAnalyzer] Stopping level monitor before recording...")
+                    self._stop_level_monitoring()
+                    # Give the stream time to close
+                    time.sleep(0.1)
+                
+                if self.recorder.start_recording():
+                    self.is_recording = True
+                    self.recording_start_time = time.time()
+                    
+                    # Update UI
+                    self.record_btn.configure(state="disabled")
+                    self.stop_btn.configure(state="normal")
+                    
+                    # Start duration update
+                    self._update_duration()
+                    
+                    # Start level meter updates using recording callback
+                    self._start_recording_level_updates()
+                    
+                    self._update_status("Recording...", self.colors.red)
+                else:
+                    self._update_status("Failed to start recording", self.colors.red)
+                    # Try to restart level monitoring if recording failed
+                    self._try_start_standalone_monitoring()
                 
         except Exception as e:
             logging.error(f"[AudioAnalyzer] Recording error: {e}")
@@ -1124,39 +1207,66 @@ class AudioAnalyzerWindow:
             return
         
         try:
-            wav_data = self.recorder.stop_recording()
-            self.is_recording = False
-            
-            # Reset level display
-            self._current_level = 0.0
-            self._update_level_display(0.0)
-            
-            if wav_data:
-                self.recorded_wav = wav_data
+            if self._use_unified_stream:
+                # Unified stream: recording is just a flag, stream stays open
+                wav_data = self.recorder.stop_recording_unified()
+                self.is_recording = False
                 
-                # Calculate duration from data because recorder duration resets on stop
-                from ...audio.recorder import get_audio_duration
-                self.audio_duration = get_audio_duration(wav_data)
+                # Level meter continues running via _start_continuous_level_updates
+                # No need to reset level display - it will show live input level
                 
-                logging.info(f"[AudioAnalyzer] Recording stopped: {len(wav_data)} bytes, {self.audio_duration:.1f}s")
-                
-                # Update compression estimate
-                self._update_size_estimate()
-                
-                # Enable playback and send
-                self._enable_audio_controls()
-                
-                self._update_status(f"Recorded {self._format_duration(self.audio_duration)}", self.colors.green)
+                if wav_data:
+                    self.recorded_wav = wav_data
+                    
+                    # Calculate duration from data
+                    from ...audio.recorder import get_audio_duration
+                    self.audio_duration = get_audio_duration(wav_data)
+                    
+                    logging.info(f"[AudioAnalyzer] Recording stopped (unified): {len(wav_data)} bytes, {self.audio_duration:.1f}s")
+                    print(f"[AudioAnalyzer] Recording stopped (unified): {len(wav_data)} bytes, {self.audio_duration:.1f}s")
+                    
+                    # Update compression estimate
+                    self._update_size_estimate()
+                    
+                    # Enable playback and send
+                    self._enable_audio_controls()
+                    
+                    self._update_status(f"Recorded {self._format_duration(self.audio_duration)}", self.colors.green)
+                else:
+                    logging.warning("[AudioAnalyzer] No WAV data returned from stop_recording_unified")
+                    self._update_status("No audio recorded", self.colors.accent_yellow)
             else:
-                logging.warning("[AudioAnalyzer] No WAV data returned from stop_recording")
-                self._update_status("No audio recorded", self.colors.accent_yellow)
+                # Legacy architecture
+                wav_data = self.recorder.stop_recording()
+                self.is_recording = False
+                
+                # Reset level display
+                self._current_level = 0.0
+                self._update_level_display(0.0)
+                
+                if wav_data:
+                    self.recorded_wav = wav_data
+                    
+                    # Calculate duration from data because recorder duration resets on stop
+                    from ...audio.recorder import get_audio_duration
+                    self.audio_duration = get_audio_duration(wav_data)
+                    
+                    logging.info(f"[AudioAnalyzer] Recording stopped: {len(wav_data)} bytes, {self.audio_duration:.1f}s")
+                    
+                    # Update compression estimate
+                    self._update_size_estimate()
+                    
+                    # Enable playback and send
+                    self._enable_audio_controls()
+                    
+                    self._update_status(f"Recorded {self._format_duration(self.audio_duration)}", self.colors.green)
+                else:
+                    logging.warning("[AudioAnalyzer] No WAV data returned from stop_recording")
+                    self._update_status("No audio recorded", self.colors.accent_yellow)
             
             # Update UI
             self.record_btn.configure(state="normal")
             self.stop_btn.configure(state="disabled")
-            
-            # NOTE: We don't restart standalone monitoring - it would prevent
-            # the next recording from working. Level meter only works during recording.
             
         except Exception as e:
             logging.error(f"[AudioAnalyzer] Stop recording error: {e}")
@@ -1759,10 +1869,17 @@ class AudioAnalyzerWindow:
         """Close window and cleanup."""
         self._destroyed = True
         
-        # Stop level monitoring first
-        self._stop_level_monitoring()
+        # Stop level monitoring / unified stream first
+        if self._use_unified_stream:
+            # Unified stream: stop the always-open stream
+            if self.recorder:
+                self.recorder.stop_stream()
+                print("[AudioAnalyzer] Unified stream stopped on close")
+        else:
+            # Legacy: stop standalone level monitoring
+            self._stop_level_monitoring()
         
-        # Stop recording/playback
+        # Stop recording/playback and cleanup
         if self.recorder:
             self.recorder.cleanup()
             self.recorder = None
