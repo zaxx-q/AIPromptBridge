@@ -146,6 +146,7 @@ class AudioAnalyzerWindow:
         self.compression_var = None
         self.preset_dropdown = None
         self.size_label = None
+        self.preset_desc_label = None  # New: description label
         self.play_btn = None
         self.pause_btn = None
         self.seek_slider = None
@@ -173,8 +174,8 @@ class AudioAnalyzerWindow:
             self.root = tk.Toplevel(self.parent_root)
         
         self.root.title("🎤 Audio Analyzer")
-        self.root.geometry("650x750")
-        self.root.minsize(550, 650)
+        self.root.geometry("800x600")
+        self.root.minsize(700, 550)
         
         # Position window
         offset = (self.window_id % 5) * 30
@@ -198,9 +199,6 @@ class AudioAnalyzerWindow:
         # Load models in background
         threading.Thread(target=self._load_models, daemon=True).start()
         
-        # Start level monitoring
-        # self._start_level_monitoring() # Moved to after build, triggered by audio device update
-        
         # Initialize audio system - deferred slightly to allow UI build
         self.root.after(100, self._init_audio)
     
@@ -212,84 +210,48 @@ class AudioAnalyzerWindow:
             self._build_tk_ui()
     
     def _build_ctk_ui(self):
-        """Build CustomTkinter UI."""
-        # Main scrollable container
-        main_frame = ctk.CTkScrollableFrame(
+        """Build CustomTkinter UI with two-column layout."""
+        # === IMPORTANT: Create bottom bar FIRST so it stays visible ===
+        self._create_bottom_bar()
+        
+        # Main container (no scroll)
+        main_frame = ctk.CTkFrame(
             self.root,
             fg_color="transparent"
         )
         main_frame.pack(fill="both", expand=True, padx=15, pady=15)
         
-        # Hack to increase scroll speed
-        try:
-            def _scroll_handler(event):
-                if hasattr(main_frame, "_parent_canvas"):
-                    # High speed multiplier (Windows delta is usually 120)
-                    units = 0
-                    if event.delta:
-                        # Windows / MacOS with mouse
-                        # -1 * (delta/120) * multiplier
-                        # Using 6x speed
-                        units = int(-1 * (event.delta / 120) * 6)
-                    elif event.num == 4:
-                        # Linux scroll up
-                        units = -6
-                    elif event.num == 5:
-                        # Linux scroll down
-                        units = 6
-                        
-                    if units and main_frame._parent_canvas.winfo_exists():
-                        main_frame._parent_canvas.yview_scroll(units, "units")
-                        return "break"
-            
-            # Bind to canvas and frame without add="+" to attempt override/priority
-            # Also bind for Linux button events
-            if hasattr(main_frame, "_parent_canvas"):
-                canvas = main_frame._parent_canvas
-                
-                # Bind to canvas
-                canvas.bind("<MouseWheel>", _scroll_handler)
-                canvas.bind("<Button-4>", _scroll_handler)
-                canvas.bind("<Button-5>", _scroll_handler)
-                
-                # Bind to frame background
-                main_frame.bind("<MouseWheel>", _scroll_handler)
-                main_frame.bind("<Button-4>", _scroll_handler)
-                main_frame.bind("<Button-5>", _scroll_handler)
-                
-                # Bind to all children recursively (risky but ensures coverage)
-                # Alternatively, rely on event bubbling.
-                # If widgets don't handle scroll, they bubble to parent (frame/canvas).
-                
-        except Exception as e:
-            logging.warning(f"Could not apply custom scroll speed: {e}")
-            
-        # === Provider & Model Section ===
-        self._create_provider_section(main_frame)
+        # Configure grid weights for two-column layout
+        main_frame.grid_columnconfigure(0, weight=0, minsize=300)  # Left column - fixed width
+        main_frame.grid_columnconfigure(1, weight=1)  # Right column - expands
+        # Only right column rows expand
+        main_frame.grid_rowconfigure(2, weight=1)  # Result row expands
         
-        # === Audio Source Section ===
-        self._create_audio_source_section(main_frame)
+        # === Row 0: Top Action Bar with Provider/Model on left, Send/Clear on right ===
+        self._create_top_action_bar(main_frame)
         
-        # === Recording Section ===
-        self._create_recording_section(main_frame)
+        # === Left Column (Audio controls - don't stretch vertically) ===
+        left_container = ctk.CTkFrame(main_frame, fg_color="transparent")
+        left_container.grid(row=1, column=0, rowspan=2, sticky="new", padx=(0, 5), pady=5)
         
-        # === Compression Section ===
-        self._create_compression_section(main_frame)
+        # Audio Source
+        self._create_audio_source_section_pack(left_container)
         
-        # === Preview Section ===
-        self._create_preview_section(main_frame)
+        # Recording
+        self._create_recording_section_pack(left_container)
         
-        # === Prompt Selection Section ===
-        self._create_prompt_section(main_frame)
+        # Compression
+        self._create_compression_section_pack(left_container)
         
-        # === Action Buttons ===
-        self._create_action_buttons(main_frame)
+        # Preview
+        self._create_preview_section_pack(left_container)
         
-        # === Result Section ===
-        self._create_result_section(main_frame)
+        # === Right Column (Prompt Selection + Result) ===
+        # Row 1: Prompt Selection
+        self._create_prompt_section_grid(main_frame, row=1, col=1)
         
-        # === Status Bar ===
-        self._create_status_bar()
+        # Row 2: Result (expands)
+        self._create_result_section_grid(main_frame, row=2, col=1, rowspan=1)
     
     def _build_tk_ui(self):
         """Build standard Tkinter UI (fallback)."""
@@ -324,8 +286,8 @@ class AudioAnalyzerWindow:
             command=self._close
         ).pack(pady=20)
     
-    def _create_section_frame(self, parent, title: str) -> ctk.CTkFrame:
-        """Create a titled section frame."""
+    def _create_section_frame_grid(self, parent, title: str, row: int, col: int, rowspan: int = 1) -> ctk.CTkFrame:
+        """Create a titled section frame using grid layout."""
         frame = ctk.CTkFrame(
             parent,
             fg_color=self.colors.surface0,
@@ -333,7 +295,125 @@ class AudioAnalyzerWindow:
             border_color=self.colors.surface2,
             border_width=1
         )
-        frame.pack(fill="x", pady=(0, 10))
+        frame.grid(row=row, column=col, rowspan=rowspan, sticky="nsew", padx=5, pady=5)
+        
+        # Section title
+        ctk.CTkLabel(
+            frame,
+            text=title,
+            font=get_ctk_font(size=12, weight="bold"),
+            text_color=self.colors.accent
+        ).pack(anchor="w", padx=12, pady=(10, 5))
+        
+        # Content container
+        content = ctk.CTkFrame(frame, fg_color="transparent")
+        content.pack(fill="both", expand=True, padx=12, pady=(0, 10))
+        
+        return content
+    
+    def _create_top_action_bar(self, parent):
+        """Create top action bar with Provider/Model on left, Send/Clear on right."""
+        bar = ctk.CTkFrame(parent, fg_color="transparent")
+        bar.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        
+        # === Left side: Provider & Model ===
+        left_frame = ctk.CTkFrame(bar, fg_color="transparent")
+        left_frame.pack(side="left", fill="x", expand=True)
+        
+        # Provider dropdown
+        ctk.CTkLabel(
+            left_frame,
+            text="Provider:",
+            font=get_ctk_font(size=11),
+            text_color=self.colors.text
+        ).pack(side="left", padx=(0, 5))
+        
+        providers = ["google", "openrouter", "custom"]
+        self.provider_dropdown = ctk.CTkOptionMenu(
+            left_frame,
+            values=providers,
+            command=self._on_provider_changed,
+            width=100,
+            height=32,
+            corner_radius=6,
+            fg_color=self.colors.surface1,
+            button_color=self.colors.surface2,
+            button_hover_color=self.colors.overlay0,
+            dropdown_fg_color=self.colors.surface0,
+            dropdown_hover_color=self.colors.surface1,
+            text_color=self.colors.text,
+            font=get_ctk_font(size=11)
+        )
+        self.provider_dropdown.set(self.provider)
+        self.provider_dropdown.pack(side="left", padx=(0, 15))
+        
+        # Model dropdown
+        ctk.CTkLabel(
+            left_frame,
+            text="Model:",
+            font=get_ctk_font(size=11),
+            text_color=self.colors.text
+        ).pack(side="left", padx=(0, 5))
+        
+        self.model_dropdown = ScrollableComboBox(
+            left_frame,
+            colors=self.colors,
+            values=["(loading...)"],
+            width=200,
+            height=32,
+            command=self._on_model_changed
+        )
+        self.model_dropdown.pack(side="left")
+        self.model_dropdown.set(self.model or "(loading...)")
+        
+        # === Right side: Send/Clear buttons ===
+        right_frame = ctk.CTkFrame(bar, fg_color="transparent")
+        right_frame.pack(side="right")
+        
+        # Send button
+        send_content = prepare_emoji_content("📤 Send", size=14)
+        self.send_btn = ctk.CTkButton(
+            right_frame,
+            **send_content,
+            font=get_ctk_font(size=12, weight="bold"),
+            width=100,
+            height=36,
+            corner_radius=8,
+            command=self._send_audio,
+            state="disabled",
+            **get_ctk_button_colors(self.colors, "success")
+        )
+        self.send_btn.pack(side="left", padx=(0, 10))
+        
+        # Clear button
+        clear_content = prepare_emoji_content("🗑 Clear Audio", size=14)
+        self.clear_btn = ctk.CTkButton(
+            right_frame,
+            **clear_content,
+            font=get_ctk_font(size=11),
+            width=120,
+            height=36,
+            corner_radius=8,
+            command=self._clear_audio,
+            state="disabled",
+            **get_ctk_button_colors(self.colors, "danger")
+        )
+        self.clear_btn.pack(side="left")
+    
+    # =========================================================================
+    # Pack-based section methods for left column
+    # =========================================================================
+    
+    def _create_section_frame_pack(self, parent, title: str) -> ctk.CTkFrame:
+        """Create a titled section frame using pack layout."""
+        frame = ctk.CTkFrame(
+            parent,
+            fg_color=self.colors.surface0,
+            corner_radius=10,
+            border_color=self.colors.surface2,
+            border_width=1
+        )
+        frame.pack(fill="x", pady=(0, 8))
         
         # Section title
         ctk.CTkLabel(
@@ -349,62 +429,9 @@ class AudioAnalyzerWindow:
         
         return content
     
-    def _create_provider_section(self, parent):
-        """Create provider and model selection section."""
-        content = self._create_section_frame(parent, "Provider & Model")
-        
-        row = ctk.CTkFrame(content, fg_color="transparent")
-        row.pack(fill="x")
-        
-        # Provider
-        ctk.CTkLabel(
-            row,
-            text="Provider:",
-            font=get_ctk_font(size=11),
-            text_color=self.colors.text
-        ).pack(side="left", padx=(0, 5))
-        
-        providers = ["google", "openrouter", "custom"]
-        self.provider_dropdown = ctk.CTkOptionMenu(
-            row,
-            values=providers,
-            command=self._on_provider_changed,
-            width=120,
-            height=28,
-            corner_radius=6,
-            fg_color=self.colors.surface1,
-            button_color=self.colors.surface2,
-            button_hover_color=self.colors.overlay0,
-            dropdown_fg_color=self.colors.surface0,
-            dropdown_hover_color=self.colors.surface1,
-            text_color=self.colors.text,
-            font=get_ctk_font(size=11)
-        )
-        self.provider_dropdown.set(self.provider)
-        self.provider_dropdown.pack(side="left", padx=(0, 15))
-        
-        # Model
-        ctk.CTkLabel(
-            row,
-            text="Model:",
-            font=get_ctk_font(size=11),
-            text_color=self.colors.text
-        ).pack(side="left", padx=(0, 5))
-        
-        self.model_dropdown = ScrollableComboBox(
-            row,
-            colors=self.colors,
-            values=["(loading...)"],
-            width=200,
-            height=28,
-            command=self._on_model_changed
-        )
-        self.model_dropdown.pack(side="left")
-        self.model_dropdown.set(self.model or "(loading...)")
-    
-    def _create_audio_source_section(self, parent):
-        """Create audio source selection section."""
-        content = self._create_section_frame(parent, "Audio Source")
+    def _create_audio_source_section_pack(self, parent):
+        """Create audio source selection section (pack layout)."""
+        content = self._create_section_frame_pack(parent, "Audio Source")
         
         # Device dropdown row
         device_row = ctk.CTkFrame(content, fg_color="transparent")
@@ -421,7 +448,7 @@ class AudioAnalyzerWindow:
             device_row,
             values=["(loading...)"],
             command=self._on_device_changed,
-            width=350,
+            width=160,
             height=28,
             corner_radius=6,
             fg_color=self.colors.surface1,
@@ -432,12 +459,13 @@ class AudioAnalyzerWindow:
             text_color=self.colors.text,
             font=get_ctk_font(size=10)
         )
-        self.device_dropdown.pack(side="left", padx=(0, 10))
+        self.device_dropdown.pack(side="left", fill="x", expand=True, padx=(0, 8))
         
-        # Refresh button
+        # Refresh button - using prepare_emoji_content for proper emoji rendering
+        refresh_content = prepare_emoji_content("🔄", size=14)
         refresh_btn = ctk.CTkButton(
             device_row,
-            text="🔄",
+            **refresh_content,
             width=32,
             height=28,
             corner_radius=6,
@@ -449,13 +477,13 @@ class AudioAnalyzerWindow:
         
         # Device type radio buttons
         type_row = ctk.CTkFrame(content, fg_color="transparent")
-        type_row.pack(fill="x", pady=(0, 10))
+        type_row.pack(fill="x")
         
         self.device_type_var = tk.StringVar(value="loopback" if self.config.get("audio_default_loopback", True) else "input")
         
         ctk.CTkRadioButton(
             type_row,
-            text="🎤 Input Device",
+            text="🎤 Input",
             variable=self.device_type_var,
             value="input",
             command=self._on_device_type_changed,
@@ -464,11 +492,11 @@ class AudioAnalyzerWindow:
             fg_color=self.colors.accent,
             hover_color=self.colors.lavender,
             border_color=self.colors.surface2
-        ).pack(side="left", padx=(0, 20))
+        ).pack(side="left", padx=(0, 15))
         
         ctk.CTkRadioButton(
             type_row,
-            text="🔊 System Loopback",
+            text="🔊 Loopback",
             variable=self.device_type_var,
             value="loopback",
             command=self._on_device_type_changed,
@@ -478,53 +506,14 @@ class AudioAnalyzerWindow:
             hover_color=self.colors.lavender,
             border_color=self.colors.surface2
         ).pack(side="left")
-
-        # Level meter row
-        meter_row = ctk.CTkFrame(content, fg_color="transparent")
-        meter_row.pack(fill="x")
-        
-        # Check config for meter style
-        if self.meter_style == "progressbar":
-            # Simple CTkProgressBar like transcription_popup.py
-            # (slider-like appearance, fixed accent color)
-            self.level_bar = ctk.CTkProgressBar(
-                meter_row,
-                width=300,
-                height=15,
-                progress_color=self.colors.accent,
-                fg_color=self.colors.surface1
-            )
-            self.level_bar.pack(side="left", fill="x", expand=True, pady=5)
-            self.level_bar.set(0)
-            self.level_canvas = None  # Not used in this mode
-        else:
-            # Canvas-based meter with grid lines (legacy)
-            self.level_canvas = tk.Canvas(
-                meter_row,
-                width=400,
-                height=20,
-                bg=self.colors.surface1,
-                highlightthickness=1,
-                highlightbackground=self.colors.surface2
-            )
-            self.level_canvas.pack(side="left", fill="x", expand=True)
-            self.level_bar = None  # Not used in this mode
-            self._canvas_drawn_width = 0  # Track drawn width for resize detection
-            # Bind to resize event to redraw gradient when canvas expands
-            self.level_canvas.bind("<Configure>", self._on_canvas_resize)
-            # Draw initial gradient after canvas is mapped (deferred)
-            self.level_canvas.after(50, self._draw_level_grid)
-        
-        # Initial display
-        self._update_level_display(0.0)
     
-    def _create_recording_section(self, parent):
-        """Create recording controls section."""
-        content = self._create_section_frame(parent, "Recording")
+    def _create_recording_section_pack(self, parent):
+        """Create recording controls section (pack layout)."""
+        content = self._create_section_frame_pack(parent, "Recording")
         
         # Controls row
         controls_row = ctk.CTkFrame(content, fg_color="transparent")
-        controls_row.pack(fill="x", pady=(0, 8))
+        controls_row.pack(fill="x")
         
         # Record button
         record_content = prepare_emoji_content("🔴 Record", size=14)
@@ -546,43 +535,36 @@ class AudioAnalyzerWindow:
             controls_row,
             **stop_content,
             font=get_ctk_font(size=11),
-            width=80,
+            width=70,
             height=32,
             corner_radius=6,
             command=self._stop_recording,
             state="disabled",
             **get_ctk_button_colors(self.colors, "secondary")
         )
-        self.stop_btn.pack(side="left", padx=(0, 15))
+        self.stop_btn.pack(side="left", padx=(0, 10))
         
         # Duration display
-        ctk.CTkLabel(
-            controls_row,
-            text="Duration:",
-            font=get_ctk_font(size=11),
-            text_color=self.colors.overlay0
-        ).pack(side="left", padx=(0, 5))
-        
         self.duration_label = ctk.CTkLabel(
             controls_row,
             text="00:00:00",
-            font=get_ctk_font(size=14, weight="bold"),
+            font=get_ctk_font(size=12, weight="bold"),
             text_color=self.colors.text
         )
         self.duration_label.pack(side="left")
+    
+    def _create_compression_section_pack(self, parent):
+        """Create compression settings section (pack layout)."""
+        content = self._create_section_frame_pack(parent, "Compression")
         
-    def _create_compression_section(self, parent):
-        """Create compression settings section."""
-        content = self._create_section_frame(parent, "Compression")
-        
-        row = ctk.CTkFrame(content, fg_color="transparent")
-        row.pack(fill="x")
+        row_frame = ctk.CTkFrame(content, fg_color="transparent")
+        row_frame.pack(fill="x", pady=(0, 5))
         
         # Enable checkbox
         self.compression_var = tk.BooleanVar(value=self.compression_enabled)
         compression_cb = ctk.CTkCheckBox(
-            row,
-            text="Enable Compression",
+            row_frame,
+            text="Enable",
             variable=self.compression_var,
             command=self._on_compression_toggled,
             font=get_ctk_font(size=11),
@@ -590,13 +572,14 @@ class AudioAnalyzerWindow:
             fg_color=self.colors.accent,
             hover_color=self.colors.lavender,
             border_color=self.colors.surface2,
-            checkmark_color=self.colors.base
+            checkmark_color=self.colors.base,
+            width=24
         )
-        compression_cb.pack(side="left", padx=(0, 15))
+        compression_cb.pack(side="left", padx=(0, 10))
         
         # Preset dropdown
         ctk.CTkLabel(
-            row,
+            row_frame,
             text="Preset:",
             font=get_ctk_font(size=11),
             text_color=self.colors.overlay0
@@ -604,13 +587,12 @@ class AudioAnalyzerWindow:
         
         from ...audio.recorder import COMPRESSION_PRESETS
         preset_names = [p["name"] for p in COMPRESSION_PRESETS.values()]
-        preset_keys = list(COMPRESSION_PRESETS.keys())
         
         self.preset_dropdown = ctk.CTkOptionMenu(
-            row,
+            row_frame,
             values=preset_names,
             command=self._on_preset_changed,
-            width=140,
+            width=110,
             height=28,
             corner_radius=6,
             fg_color=self.colors.surface1,
@@ -619,33 +601,47 @@ class AudioAnalyzerWindow:
             dropdown_fg_color=self.colors.surface0,
             dropdown_hover_color=self.colors.surface1,
             text_color=self.colors.text,
-            font=get_ctk_font(size=11)
+            font=get_ctk_font(size=10)
         )
         # Set current preset
         current_preset = COMPRESSION_PRESETS.get(self.compression_preset, {})
         self.preset_dropdown.set(current_preset.get("name", "Recommended"))
-        self.preset_dropdown.pack(side="left", padx=(0, 15))
+        self.preset_dropdown.pack(side="left")
+        
+        # Second row: Size estimation and description
+        info_row = ctk.CTkFrame(content, fg_color="transparent")
+        info_row.pack(fill="x")
         
         # Size estimation
         self.size_label = ctk.CTkLabel(
-            row,
+            info_row,
             text="",
             font=get_ctk_font(size=10),
             text_color=self.colors.overlay0
         )
         self.size_label.pack(side="left")
-    
-    def _create_preview_section(self, parent):
-        """Create audio preview/playback section."""
-        content = self._create_section_frame(parent, "Preview")
         
-        row = ctk.CTkFrame(content, fg_color="transparent")
-        row.pack(fill="x")
+        # Preset description
+        desc = current_preset.get("description", "")
+        self.preset_desc_label = ctk.CTkLabel(
+            info_row,
+            text=f"• {desc}" if desc else "",
+            font=get_ctk_font(size=9),
+            text_color=self.colors.overlay0
+        )
+        self.preset_desc_label.pack(side="right")
+    
+    def _create_preview_section_pack(self, parent):
+        """Create audio preview/playback section (pack layout)."""
+        content = self._create_section_frame_pack(parent, "Preview")
+        
+        row_frame = ctk.CTkFrame(content, fg_color="transparent")
+        row_frame.pack(fill="x")
         
         # Play button
         play_content = prepare_emoji_content("▶", size=14)
         self.play_btn = ctk.CTkButton(
-            row,
+            row_frame,
             **play_content,
             width=40,
             height=32,
@@ -659,7 +655,7 @@ class AudioAnalyzerWindow:
         # Pause button
         pause_content = prepare_emoji_content("⏸", size=14)
         self.pause_btn = ctk.CTkButton(
-            row,
+            row_frame,
             **pause_content,
             width=40,
             height=32,
@@ -668,14 +664,14 @@ class AudioAnalyzerWindow:
             state="disabled",
             **get_ctk_button_colors(self.colors, "secondary")
         )
-        self.pause_btn.pack(side="left", padx=(0, 10))
+        self.pause_btn.pack(side="left", padx=(0, 8))
         
         # Seek slider
         self.seek_slider = ctk.CTkSlider(
-            row,
+            row_frame,
             from_=0,
             to=100,
-            width=250,
+            width=80,
             height=16,
             corner_radius=8,
             button_corner_radius=8,
@@ -687,20 +683,24 @@ class AudioAnalyzerWindow:
         )
         self.seek_slider.set(0)
         self.seek_slider.configure(state="disabled")
-        self.seek_slider.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.seek_slider.pack(side="left", fill="x", expand=True, padx=(0, 8))
         
         # Position label
         self.position_label = ctk.CTkLabel(
-            row,
-            text="00:00 / 00:00",
+            row_frame,
+            text="00:00",
             font=get_ctk_font(size=10),
             text_color=self.colors.overlay0
         )
         self.position_label.pack(side="left")
     
-    def _create_prompt_section(self, parent):
+    # =========================================================================
+    # Grid-based section methods (for right column)
+    # =========================================================================
+    
+    def _create_prompt_section_grid(self, parent, row: int, col: int):
         """Create prompt selection section."""
-        content = self._create_section_frame(parent, "Prompt Selection")
+        content = self._create_section_frame_grid(parent, "Prompt Selection", row, col)
         
         # Get audio actions
         actions = self.prompts.get_audio_actions()
@@ -719,7 +719,7 @@ class AudioAnalyzerWindow:
                 content,
                 items=items,
                 on_click=self._on_action_click,
-                items_per_page=6
+                items_per_page=4
             )
             self.carousel.pack(fill="x", pady=(0, 8))
         
@@ -733,42 +733,7 @@ class AudioAnalyzerWindow:
             )
             self.modifier_bar.pack(fill="x")
     
-    def _create_action_buttons(self, parent):
-        """Create send/clear action buttons."""
-        row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(fill="x", pady=(0, 10))
-        
-        # Send button
-        send_content = prepare_emoji_content("📤 Send", size=14)
-        self.send_btn = ctk.CTkButton(
-            row,
-            **send_content,
-            font=get_ctk_font(size=12, weight="bold"),
-            width=100,
-            height=36,
-            corner_radius=8,
-            command=self._send_audio,
-            state="disabled",
-            **get_ctk_button_colors(self.colors, "success")
-        )
-        self.send_btn.pack(side="left", padx=(0, 10))
-        
-        # Clear button
-        clear_content = prepare_emoji_content("🗑 Clear Audio", size=14)
-        self.clear_btn = ctk.CTkButton(
-            row,
-            **clear_content,
-            font=get_ctk_font(size=11),
-            width=120,
-            height=36,
-            corner_radius=8,
-            command=self._clear_audio,
-            state="disabled",
-            **get_ctk_button_colors(self.colors, "danger")
-        )
-        self.clear_btn.pack(side="left")
-    
-    def _create_result_section(self, parent):
+    def _create_result_section_grid(self, parent, row: int, col: int, rowspan: int = 1):
         """Create result display section."""
         frame = ctk.CTkFrame(
             parent,
@@ -777,7 +742,7 @@ class AudioAnalyzerWindow:
             border_color=self.colors.surface2,
             border_width=1
         )
-        frame.pack(fill="both", expand=True, pady=(0, 10))
+        frame.grid(row=row, column=col, rowspan=rowspan, sticky="nsew", padx=5, pady=5)
         
         # Header row
         header = ctk.CTkFrame(frame, fg_color="transparent")
@@ -829,24 +794,69 @@ class AudioAnalyzerWindow:
         self.result_text_widget.insert("1.0", "(Transcription/analysis result will appear here)")
         self.result_text_widget.configure(state=tk.DISABLED, fg=self.colors.overlay0)
     
-    def _create_status_bar(self):
-        """Create status bar at bottom of window."""
-        status_frame = ctk.CTkFrame(
+    def _create_bottom_bar(self):
+        """Create bottom bar with level meter and status."""
+        bottom_frame = ctk.CTkFrame(
             self.root,
             fg_color=self.colors.surface0,
             corner_radius=0,
-            height=30
+            height=60
         )
-        status_frame.pack(fill="x", side="bottom")
-        status_frame.pack_propagate(False)
+        bottom_frame.pack(fill="x", side="bottom")
+        bottom_frame.pack_propagate(False)
+        
+        # Level meter (full width, placed at top of bottom bar)
+        meter_container = ctk.CTkFrame(bottom_frame, fg_color="transparent")
+        meter_container.pack(fill="x", padx=15, pady=(8, 0))
+        
+        ctk.CTkLabel(
+            meter_container,
+            text="Level:",
+            font=get_ctk_font(size=10),
+            text_color=self.colors.overlay0
+        ).pack(side="left", padx=(0, 8))
+        
+        # Check config for meter style
+        if self.meter_style == "progressbar":
+            # Simple CTkProgressBar
+            self.level_bar = ctk.CTkProgressBar(
+                meter_container,
+                height=12,
+                progress_color=self.colors.accent,
+                fg_color=self.colors.surface1
+            )
+            self.level_bar.pack(side="left", fill="x", expand=True)
+            self.level_bar.set(0)
+            self.level_canvas = None
+        else:
+            # Canvas-based meter with grid lines (legacy)
+            self.level_canvas = tk.Canvas(
+                meter_container,
+                height=12,
+                bg=self.colors.surface1,
+                highlightthickness=1,
+                highlightbackground=self.colors.surface2
+            )
+            self.level_canvas.pack(side="left", fill="x", expand=True)
+            self.level_bar = None
+            self._canvas_drawn_width = 0
+            self.level_canvas.bind("<Configure>", self._on_canvas_resize)
+            self.level_canvas.after(50, self._draw_level_grid)
+        
+        # Status bar (below level meter)
+        status_container = ctk.CTkFrame(bottom_frame, fg_color="transparent")
+        status_container.pack(fill="x", padx=15, pady=(4, 8))
         
         self.status_label = ctk.CTkLabel(
-            status_frame,
+            status_container,
             text="Ready",
             font=get_ctk_font(size=10),
             text_color=self.colors.overlay0
         )
-        self.status_label.pack(side="left", padx=10, pady=5)
+        self.status_label.pack(side="left")
+        
+        # Initial display
+        self._update_level_display(0.0)
     
     # =========================================================================
     # Audio Initialization
@@ -1094,13 +1104,13 @@ class AudioAnalyzerWindow:
         if canvas_width < 10:
             canvas_width = 400
         if canvas_height < 5:
-            canvas_height = 20
+            canvas_height = 12
         
         # Track drawn width for resize detection
         self._canvas_drawn_width = canvas_width
         
-        bar_top = 2
-        bar_bottom = canvas_height - 2
+        bar_top = 1
+        bar_bottom = canvas_height - 1
         
         # Clear existing drawings before redrawing
         self.level_canvas.delete("gradient")
@@ -1166,9 +1176,9 @@ class AudioAnalyzerWindow:
             elif self.level_canvas:
                 # Efficient canvas update: just move the cover rectangle
                 canvas_width = self.level_canvas.winfo_width() or 400
-                canvas_height = self.level_canvas.winfo_height() or 20
-                bar_top = 2
-                bar_bottom = canvas_height - 2
+                canvas_height = self.level_canvas.winfo_height() or 12
+                bar_top = 1
+                bar_bottom = canvas_height - 1
                 
                 # Calculate where the cover should start (reveals gradient up to this point)
                 reveal_x = int(level * canvas_width)
@@ -1548,6 +1558,11 @@ class AudioAnalyzerWindow:
                 self.compression_preset = key
                 self.compressed_audio = None  # Clear cached
                 self._update_size_estimate()
+                
+                # Update description label
+                desc = preset.get("description", "")
+                if self.preset_desc_label:
+                    self.preset_desc_label.configure(text=f"• {desc}" if desc else "")
                 break
     
     def _update_size_estimate(self):
@@ -1570,10 +1585,10 @@ class AudioAnalyzerWindow:
             ext = preset.get("output_ext", ".ogg").upper().lstrip(".")
             
             self.size_label.configure(
-                text=f"Original: {original_mb:.1f} MB → ~{estimated_mb:.2f} MB ({ext})"
+                text=f"{original_mb:.1f} MB → ~{estimated_mb:.2f} MB ({ext})"
             )
         else:
-            self.size_label.configure(text=f"Original: {original_mb:.1f} MB (WAV)")
+            self.size_label.configure(text=f"{original_mb:.1f} MB (WAV)")
     
     # =========================================================================
     # Event Handlers

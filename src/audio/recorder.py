@@ -47,7 +47,7 @@ COMPRESSION_PRESETS = {
     },
     "preserve_audio": {
         "name": "Preserve Audio",
-        "description": "No silence removal, preserves original audio",
+        "description": "Compress but no silence removal, preserves original audio",
         "ffmpeg_args": "-c:a libopus -b:a 32k -ar 16000 -ac 1 -compression_level 10",
         "output_ext": ".ogg"
     },
