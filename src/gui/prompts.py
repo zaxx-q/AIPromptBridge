@@ -471,8 +471,8 @@ DEFAULT_SNIP_ACTIONS = {
 # =============================================================================
 
 DEFAULT_AUDIO_SETTINGS = {
-    "popup_use_groups": False,
-    "popup_items_per_page": 6,
+    "use_groups": False,
+    "items_per_page": 3,
     "custom_task_template": "Regarding this audio: {custom_input}"
 }
 

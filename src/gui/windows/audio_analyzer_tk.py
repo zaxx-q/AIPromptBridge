@@ -486,6 +486,50 @@ def _create_prompt_section_tk(window, parent, row, col):
     content = tk.Frame(frame, bg=colors.surface0)
     content.pack(fill="x", padx=12, pady=(0, 10))
     
+    # Custom Input with Set Button
+    input_frame = tk.Frame(content, bg=colors.surface0)
+    input_frame.pack(fill="x", pady=(0, 10))
+    
+    window.custom_input = tk.Entry(
+        input_frame,
+        font=("Segoe UI", 10),
+        bg=colors.surface1,
+        fg=colors.text,
+        relief="flat",
+        insertbackground=colors.text
+    )
+    window.custom_input.pack(side="left", fill="x", expand=True, padx=(0, 5), ipady=4)
+    window.custom_input.bind('<Return>', window._on_custom_input_set)
+    
+    placeholder = "Custom task or question..."
+    window.custom_input.insert(0, placeholder)
+    window.custom_input.configure(fg=colors.overlay0)
+    
+    def on_focus_in(event):
+        if window.custom_input.get() == placeholder:
+            window.custom_input.delete(0, tk.END)
+            window.custom_input.configure(fg=colors.text)
+    
+    def on_focus_out(event):
+        if not window.custom_input.get():
+            window.custom_input.insert(0, placeholder)
+            window.custom_input.configure(fg=colors.overlay0)
+            
+    window.custom_input.bind("<FocusIn>", on_focus_in)
+    window.custom_input.bind("<FocusOut>", on_focus_out)
+    
+    set_btn = tk.Button(
+        input_frame,
+        text="Set",
+        font=("Segoe UI", 9),
+        bg=colors.surface1,
+        fg=colors.text,
+        relief="flat",
+        command=window._on_custom_input_set,
+        width=4
+    )
+    set_btn.pack(side="right")
+    
     # Carousel (Handles fallback internally)
     actions = window.prompts.get_audio_actions()
     items = []
@@ -493,9 +537,11 @@ def _create_prompt_section_tk(window, parent, row, col):
         if key.startswith("_"): continue
         items.append((key, key, action.get("icon", ""), action.get("task", "")))
         
+    items_per_page = window.prompts.get_audio_setting("items_per_page", 6)
+        
     if items:
         window.carousel = CarouselButtonList(
-            content, items=items, on_click=window._on_action_click, items_per_page=4
+            content, items=items, on_click=window._on_action_click, items_per_page=items_per_page
         )
         window.carousel.pack(fill="x", pady=(0, 8))
         
@@ -589,5 +635,13 @@ def _create_bottom_bar_tk(window):
         bg=colors.surface0, fg=colors.overlay0, anchor="w"
     )
     window.status_label.pack(side="left")
+    
+    # Action Indicator (Right aligned)
+    window.action_indicator_label = tk.Label(
+        status_row, text=f"Action: {window.selected_action_key}",
+        font=("Segoe UI", 9, "bold"),
+        bg=colors.surface0, fg=colors.accent, anchor="e"
+    )
+    window.action_indicator_label.pack(side="right")
     
     window._update_level_display(0.0)

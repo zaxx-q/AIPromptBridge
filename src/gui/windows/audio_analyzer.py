@@ -133,6 +133,9 @@ class AudioAnalyzerWindow:
     
     def _init_ui_refs(self):
         """Initialize UI element references."""
+        self.selected_action_key = "Transcribe"
+        self.custom_input = None
+        self.action_indicator_label = None
         self.provider_dropdown = None
         self.model_dropdown = None
         self.device_dropdown = None
@@ -674,6 +677,26 @@ class AudioAnalyzerWindow:
         """Create prompt selection section."""
         content = self._create_section_frame_grid(parent, "Prompt Selection", row, col)
         
+        # Custom Task Input with Button
+        input_frame = ctk.CTkFrame(content, fg_color="transparent")
+        input_frame.pack(fill="x", pady=(0, 10))
+        
+        self.custom_input = ctk.CTkEntry(
+            input_frame,
+            placeholder_text="Custom task or question...",
+            font=get_ctk_font(size=12),
+            height=32,
+            border_color=self.colors.surface2
+        )
+        self.custom_input.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        self.custom_input.bind('<Return>', self._on_custom_input_set)
+        
+        from ..custom_widgets import create_emoji_button
+        create_emoji_button(
+            input_frame, "Set", "⚡", self.colors, "secondary", width=60, height=32,
+            command=self._on_custom_input_set
+        ).pack(side="right")
+        
         # Get audio actions
         actions = self.prompts.get_audio_actions()
         
@@ -686,15 +709,18 @@ class AudioAnalyzerWindow:
             tooltip = action.get("task", "")
             items.append((key, key, icon, tooltip))
         
+        # Get items per page from config
+        items_per_page = self.prompts.get_audio_setting("items_per_page", 6)
+        
         if items:
             self.carousel = CarouselButtonList(
                 content,
                 items=items,
                 on_click=self._on_action_click,
-                items_per_page=4
+                items_per_page=items_per_page
             )
             self.carousel.pack(fill="x", pady=(0, 8))
-        
+            
         # Modifier bar
         global_modifiers = self.prompts.get_modifiers()
         if global_modifiers:
@@ -826,6 +852,15 @@ class AudioAnalyzerWindow:
             text_color=self.colors.overlay0
         )
         self.status_label.pack(side="left")
+
+        # Action Indicator (Right aligned)
+        self.action_indicator_label = ctk.CTkLabel(
+            status_container,
+            text=f"Action: {self.selected_action_key}",
+            font=get_ctk_font(size=10, weight="bold"),
+            text_color=self.colors.accent
+        )
+        self.action_indicator_label.pack(side="right")
         
         # Initial display
         self._update_level_display(0.0)
@@ -1630,8 +1665,37 @@ class AudioAnalyzerWindow:
         self._refresh_devices()
     
     def _on_action_click(self, action_key: str):
-        """Handle action button click."""
-        self._send_audio(action_key)
+        """Handle action button click (selects action, does not send)."""
+        self.selected_action_key = action_key
+        
+        # Update indicator text
+        if self.action_indicator_label:
+            try:
+                if HAVE_CTK:
+                    self.action_indicator_label.configure(text=f"Action: {action_key}")
+                else:
+                    self.action_indicator_label.configure(text=f"Action: {action_key}")
+            except Exception:
+                pass
+        
+        # Focus custom input if custom action selected
+        if action_key in ["_Custom", "_Ask"] and self.custom_input:
+            try:
+                self.custom_input.focus_set()
+            except Exception:
+                pass
+
+    def _on_custom_input_set(self, event=None):
+        """Handle custom input set action."""
+        if self.custom_input:
+            try:
+                text = self.custom_input.get().strip()
+                if text:
+                    self.selected_action_key = "_Custom"
+                    if self.action_indicator_label:
+                        self.action_indicator_label.configure(text="Action: Custom Task")
+            except Exception:
+                pass
     
     def _on_modifiers_changed(self, active_modifiers: List[str]):
         """Handle modifier toggle changes."""
@@ -1745,8 +1809,12 @@ class AudioAnalyzerWindow:
     # Send Audio for Analysis
     # =========================================================================
     
-    def _send_audio(self, action_key: str = "Transcribe"):
+    def _send_audio(self, action_key: str = None):
         """Send audio to AI for analysis."""
+        # Use selected action if not provided
+        if action_key is None:
+            action_key = self.selected_action_key
+            
         if not self.recorded_wav or self.is_processing:
             return
         
@@ -1845,9 +1913,24 @@ class AudioAnalyzerWindow:
             task = action.get("task", "Analyze this audio.")
             
             # Handle custom input
-            if action_key == "_Custom":
-                # For now, use default task (could add input field later)
-                task = "Analyze this audio and provide insights."
+            custom_text = None
+            if self.custom_input:
+                try:
+                    custom_text = self.custom_input.get().strip()
+                except Exception:
+                    pass
+
+            if action_key in ["_Custom", "_Ask"]:
+                # Use custom task template
+                template = self.prompts.get_audio_setting("custom_task_template", "Regarding this audio: {custom_input}")
+                if custom_text:
+                    task = template.replace("{custom_input}", custom_text)
+                else:
+                    task = "Analyze this audio."
+            elif custom_text:
+                # Optionally append custom text to other tasks if needed,
+                # but currently only _Custom/_Ask uses it explicitly.
+                pass
             
             # Apply modifier injections
             if self.active_modifiers:
