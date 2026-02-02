@@ -32,7 +32,7 @@ from ..themes import (
 )
 from ..core import get_next_window_id, register_window, unregister_window, GUICoordinator
 from ..custom_widgets import ScrollableComboBox
-from ..popups import Tooltip, CarouselButtonList, ModifierBar
+from ..popups import Tooltip, CarouselButtonList, ModifierBar, GroupedButtonList
 from ..prompts import get_prompts_config
 from ..emoji_renderer import prepare_emoji_content
 from .utils import set_window_icon
@@ -51,7 +51,7 @@ class AudioAnalyzerWindow:
     - Result display with copy functionality
     """
     
-    LEVEL_UPDATE_INTERVAL = 50  # ms between level meter updates
+    LEVEL_UPDATE_INTERVAL = 20  # ms between level meter updates
     DURATION_UPDATE_INTERVAL = 100  # ms between duration display updates
     
     # Level meter sensitivity settings
@@ -255,36 +255,8 @@ class AudioAnalyzerWindow:
     
     def _build_tk_ui(self):
         """Build standard Tkinter UI (fallback)."""
-        # Simplified tk version - just key elements
-        main_frame = tk.Frame(self.root, bg=self.colors.base)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
-        
-        # Basic info label
-        tk.Label(
-            main_frame,
-            text="Audio Analyzer - Tkinter Fallback Mode",
-            font=("Arial", 14, "bold"),
-            bg=self.colors.base,
-            fg=self.colors.text
-        ).pack(pady=10)
-        
-        tk.Label(
-            main_frame,
-            text="For full functionality, please install CustomTkinter:\npip install customtkinter",
-            font=("Arial", 11),
-            bg=self.colors.base,
-            fg=self.colors.overlay0
-        ).pack(pady=10)
-        
-        # Close button
-        tk.Button(
-            main_frame,
-            text="Close",
-            font=("Arial", 11),
-            bg=self.colors.surface0,
-            fg=self.colors.text,
-            command=self._close
-        ).pack(pady=20)
+        from .audio_analyzer_tk import build_tk_ui
+        build_tk_ui(self)
     
     def _create_section_frame_grid(self, parent, title: str, row: int, col: int, rowspan: int = 1) -> ctk.CTkFrame:
         """Create a titled section frame using grid layout."""
@@ -896,14 +868,23 @@ class AudioAnalyzerWindow:
                 default = get_default_input_device()
             
             if not devices:
-                self.device_dropdown.configure(values=["(no devices found)"])
-                self.device_dropdown.set("(no devices found)")
+                if self.device_dropdown:
+                    try:
+                        self.device_dropdown.configure(values=["(no devices found)"])
+                        self.device_dropdown.set("(no devices found)")
+                    except Exception:
+                        pass
                 self.current_device = None
                 return
             
             # Build device name list
             device_names = [d.get_display_name() for d in devices]
-            self.device_dropdown.configure(values=device_names)
+            
+            if self.device_dropdown:
+                try:
+                    self.device_dropdown.configure(values=device_names)
+                except Exception:
+                    pass
             
             # Store device mapping
             self._device_map = {d.get_display_name(): d for d in devices}
@@ -911,15 +892,21 @@ class AudioAnalyzerWindow:
             # Select default or first
             if default:
                 default_name = default.get_display_name()
-                if default_name in device_names:
-                    self.device_dropdown.set(default_name)
-                    self.current_device = default
-                else:
+                try:
+                    if default_name in device_names and self.device_dropdown:
+                        self.device_dropdown.set(default_name)
+                        self.current_device = default
+                    elif self.device_dropdown:
+                        self.device_dropdown.set(device_names[0])
+                        self.current_device = devices[0]
+                except Exception:
+                    pass
+            elif self.device_dropdown:
+                try:
                     self.device_dropdown.set(device_names[0])
                     self.current_device = devices[0]
-            else:
-                self.device_dropdown.set(device_names[0])
-                self.current_device = devices[0]
+                except Exception:
+                    pass
             
             # Update recorder device
             self._update_recorder_device()
@@ -1026,6 +1013,8 @@ class AudioAnalyzerWindow:
         if self._destroyed:
             return
         
+        start_t = time.time()
+        
         try:
             # Get level from recorder (always available when stream is active)
             level = self.recorder.get_level() if self.recorder else 0.0
@@ -1041,6 +1030,11 @@ class AudioAnalyzerWindow:
             
             # Schedule next update (runs continuously while window is open)
             self.root.after(self.LEVEL_UPDATE_INTERVAL, self._start_continuous_level_updates)
+            
+            # Performance check
+            duration = (time.time() - start_t) * 1000
+            if duration > 15:  # If update takes more than 15ms
+                print(f"[Perf] Level update lagging: {duration:.1f}ms")
             
         except Exception as e:
             logging.debug(f"[AudioAnalyzer] Level update error: {e}")
@@ -1081,6 +1075,8 @@ class AudioAnalyzerWindow:
         if not self.level_canvas or self._destroyed:
             return
         
+        # print(f"[Perf] Canvas resize event: {event.width}x{event.height}")
+        
         new_width = event.width
         # Only redraw if width changed by more than 10 pixels (avoid excessive redraws)
         if abs(new_width - self._canvas_drawn_width) > 10:
@@ -1117,9 +1113,13 @@ class AudioAnalyzerWindow:
         self.level_canvas.delete("level_cover")
         self.level_canvas.delete("grid")
         
-        # Draw gradient as thin vertical rectangles (1px each for smooth gradient)
-        # This is done once at init - very efficient since we just move cover later
-        for x in range(canvas_width):
+        # Grid settings - optimization: use larger step for gradient to reduce object count
+        step = 4
+        
+        # Draw gradient as vertical rectangles
+        # This is done once at init/resize
+        for x in range(0, canvas_width, step):
+            # Calculate color for the start of the block
             ratio = x / max(canvas_width - 1, 1)
             if ratio < 0.5:
                 # Green to Yellow (0-50%)
@@ -1136,9 +1136,11 @@ class AudioAnalyzerWindow:
                     (ratio - 0.5) * 2
                 )
             
-            self.level_canvas.create_line(
-                x, bar_top, x, bar_bottom,
-                fill=color, width=1, tags="gradient"
+            # Draw rectangle for this segment
+            # Extend width by step to fill gaps
+            self.level_canvas.create_rectangle(
+                x, bar_top, x + step, bar_bottom,
+                fill=color, outline="", tags="gradient"
             )
         
         # Create cover rectangle (initially covers everything - shows no level)
@@ -1377,14 +1379,15 @@ class AudioAnalyzerWindow:
     
     def _enable_audio_controls(self):
         """Enable playback and send controls after recording."""
-        self.play_btn.configure(state="normal")
-        self.seek_slider.configure(state="normal")
-        self.send_btn.configure(state="normal")
-        self.clear_btn.configure(state="normal")
+        if self.play_btn: self.play_btn.configure(state="normal")
+        if self.seek_slider: self.seek_slider.configure(state="normal")
+        if self.send_btn: self.send_btn.configure(state="normal")
+        if self.clear_btn: self.clear_btn.configure(state="normal")
         
         # Update position label
-        duration_str = self._format_short_duration(self.audio_duration)
-        self.position_label.configure(text=f"00:00 / {duration_str}")
+        if self.position_label:
+            duration_str = self._format_short_duration(self.audio_duration)
+            self.position_label.configure(text=f"00:00 / {duration_str}")
     
     def _clear_audio(self):
         """Clear recorded audio."""
@@ -1573,6 +1576,7 @@ class AudioAnalyzerWindow:
         original_size = len(self.recorded_wav)
         original_mb = original_size / (1024 * 1024)
         
+        text = ""
         if self.compression_enabled and self.recorder:
             estimated = self.recorder.estimate_compressed_size(
                 self.recorded_wav,
@@ -1584,11 +1588,16 @@ class AudioAnalyzerWindow:
             preset = COMPRESSION_PRESETS.get(self.compression_preset, {})
             ext = preset.get("output_ext", ".ogg").upper().lstrip(".")
             
-            self.size_label.configure(
-                text=f"{original_mb:.1f} MB → ~{estimated_mb:.2f} MB ({ext})"
-            )
+            text = f"{original_mb:.1f} MB → ~{estimated_mb:.2f} MB ({ext})"
         else:
-            self.size_label.configure(text=f"{original_mb:.1f} MB (WAV)")
+            text = f"{original_mb:.1f} MB (WAV)"
+            
+        # Handle label update
+        try:
+            self.size_label.configure(text=text)
+        except Exception:
+            # Fallback for standard Tk label if configure fails differently
+            pass
     
     # =========================================================================
     # Event Handlers
@@ -1664,29 +1673,32 @@ class AudioAnalyzerWindow:
                     self.available_models = ["(no audio models found)"]
                 
                 def update_dropdown():
-                    if self._destroyed:
+                    if self._destroyed or not self.model_dropdown:
                         return
                     
                     # Log for debugging
                     logging.info(f"[AudioAnalyzer] Updating dropdown with {len(self.available_models)} models")
                     
-                    self.model_dropdown.configure(values=self.available_models)
-                    
-                    # If current model is in list, keep it. If not, pick first.
-                    # Also support keeping manually entered model if it's not in the list but valid context
-                    if self.model and self.model in self.available_models:
-                        self.model_dropdown.set(self.model)
-                    elif self.available_models:
-                        # Auto-select first if current invalid
-                        # But skip if current is "user typed" (we don't strictly validate that here yet,
-                        # relying on it being non-empty. But if they switch provider, we probably want to reset.)
-                        self.model_dropdown.set(self.available_models[0])
-                        self.model = self.available_models[0]
-                    
-                    # Handle empty/helper selection
-                    if self.available_models == ["(no audio models found)"]:
-                        self.model_dropdown.set("(no audio models found)")
-                        self.model = ""
+                    try:
+                        self.model_dropdown.configure(values=self.available_models)
+                        
+                        # If current model is in list, keep it. If not, pick first.
+                        # Also support keeping manually entered model if it's not in the list but valid context
+                        if self.model and self.model in self.available_models:
+                            self.model_dropdown.set(self.model)
+                        elif self.available_models:
+                            # Auto-select first if current invalid
+                            # But skip if current is "user typed" (we don't strictly validate that here yet,
+                            # relying on it being non-empty. But if they switch provider, we probably want to reset.)
+                            self.model_dropdown.set(self.available_models[0])
+                            self.model = self.available_models[0]
+                        
+                        # Handle empty/helper selection
+                        if self.available_models == ["(no audio models found)"]:
+                            self.model_dropdown.set("(no audio models found)")
+                            self.model = ""
+                    except Exception:
+                        pass
                 
                 # Use GUICoordinator for thread-safe UI update
                 GUICoordinator.get_instance().run_on_gui_thread(update_dropdown)
@@ -1695,8 +1707,12 @@ class AudioAnalyzerWindow:
                 self.available_models = [self.model]
                 
                 def set_fallback():
-                    self.model_dropdown.configure(values=self.available_models)
-                    self.model_dropdown.set(self.model)
+                    if self.model_dropdown:
+                        try:
+                            self.model_dropdown.configure(values=self.available_models)
+                            self.model_dropdown.set(self.model)
+                        except Exception:
+                            pass
                 
                 GUICoordinator.get_instance().run_on_gui_thread(set_fallback)
                 
@@ -1709,8 +1725,12 @@ class AudioAnalyzerWindow:
             if self.model:
                 self.available_models = [self.model]
                 def set_fallback_exc():
-                    self.model_dropdown.configure(values=self.available_models)
-                    self.model_dropdown.set(self.model)
+                    if self.model_dropdown:
+                        try:
+                            self.model_dropdown.configure(values=self.available_models)
+                            self.model_dropdown.set(self.model)
+                        except Exception:
+                            pass
                 
                 GUICoordinator.get_instance().run_on_gui_thread(set_fallback_exc)
     
@@ -1944,10 +1964,21 @@ class AudioAnalyzerWindow:
         """Update status bar."""
         if self.status_label and not self._destroyed:
             self.status_label.configure(text=text)
+            
+            # Map CTk text_color to Tk fg for compatibility
+            kwargs = {}
             if color:
-                self.status_label.configure(text_color=color)
+                if HAVE_CTK:
+                    kwargs["text_color"] = color
+                else:
+                    kwargs["fg"] = color
             else:
-                self.status_label.configure(text_color=self.colors.overlay0)
+                if HAVE_CTK:
+                    kwargs["text_color"] = self.colors.overlay0
+                else:
+                    kwargs["fg"] = self.colors.overlay0
+            
+            self.status_label.configure(**kwargs)
     
     def _close(self):
         """Close window and cleanup."""
