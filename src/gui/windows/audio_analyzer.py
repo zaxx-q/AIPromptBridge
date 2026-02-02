@@ -485,16 +485,16 @@ class AudioAnalyzerWindow:
         
         # Check config for meter style
         if self.meter_style == "progressbar":
-            # Simple CTkProgressBar (smooth, performant)
+            # Simple CTkProgressBar like transcription_popup.py
+            # (slider-like appearance, fixed accent color)
             self.level_bar = ctk.CTkProgressBar(
                 meter_row,
-                width=400,
-                height=18,
-                corner_radius=8,
+                width=300,
+                height=15,
                 progress_color=self.colors.accent,
                 fg_color=self.colors.surface1
             )
-            self.level_bar.pack(side="left", fill="x", expand=True)
+            self.level_bar.pack(side="left", fill="x", expand=True, pady=5)
             self.level_bar.set(0)
             self.level_canvas = None  # Not used in this mode
         else:
@@ -509,8 +509,11 @@ class AudioAnalyzerWindow:
             )
             self.level_canvas.pack(side="left", fill="x", expand=True)
             self.level_bar = None  # Not used in this mode
-            # Draw initial static grid lines once
-            self._draw_level_grid()
+            self._canvas_drawn_width = 0  # Track drawn width for resize detection
+            # Bind to resize event to redraw gradient when canvas expands
+            self.level_canvas.bind("<Configure>", self._on_canvas_resize)
+            # Draw initial gradient after canvas is mapped (deferred)
+            self.level_canvas.after(50, self._draw_level_grid)
         
         # Initial display
         self._update_level_display(0.0)
@@ -1045,16 +1048,98 @@ class AudioAnalyzerWindow:
         except Exception as e:
             logging.debug(f"[AudioAnalyzer] Error stopping level monitor: {e}")
     
+    def _hex_to_rgb(self, hex_color: str) -> tuple:
+        """Convert hex color to RGB tuple."""
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    
+    def _rgb_to_hex(self, rgb: tuple) -> str:
+        """Convert RGB tuple to hex color."""
+        return f"#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}"
+    
+    def _interpolate_color(self, color1: str, color2: str, ratio: float) -> str:
+        """Interpolate between two hex colors."""
+        rgb1 = self._hex_to_rgb(color1)
+        rgb2 = self._hex_to_rgb(color2)
+        r = int(rgb1[0] + (rgb2[0] - rgb1[0]) * ratio)
+        g = int(rgb1[1] + (rgb2[1] - rgb1[1]) * ratio)
+        b = int(rgb1[2] + (rgb2[2] - rgb1[2]) * ratio)
+        return self._rgb_to_hex((r, g, b))
+    
+    def _on_canvas_resize(self, event):
+        """Handle canvas resize - redraw gradient if width changed significantly."""
+        if not self.level_canvas or self._destroyed:
+            return
+        
+        new_width = event.width
+        # Only redraw if width changed by more than 10 pixels (avoid excessive redraws)
+        if abs(new_width - self._canvas_drawn_width) > 10:
+            self._draw_level_grid()
+    
     def _draw_level_grid(self):
-        """Draw static grid lines on canvas (called once)."""
+        """Draw gradient background and grid lines on canvas (called once or on resize).
+        
+        Uses pre-rendered gradient rectangles for efficient updates.
+        The gradient goes: green (0%) -> yellow (50%) -> red (100%)
+        A cover rectangle is moved during updates to reveal the gradient.
+        """
         if not self.level_canvas:
             return
         
-        canvas_width = 400  # Initial width
-        canvas_height = 20
-        segment_width = canvas_width // 10
+        # Get actual canvas dimensions
+        canvas_width = self.level_canvas.winfo_width()
+        canvas_height = self.level_canvas.winfo_height()
         
-        for i in range(10):
+        # Fallback if not yet mapped
+        if canvas_width < 10:
+            canvas_width = 400
+        if canvas_height < 5:
+            canvas_height = 20
+        
+        # Track drawn width for resize detection
+        self._canvas_drawn_width = canvas_width
+        
+        bar_top = 2
+        bar_bottom = canvas_height - 2
+        
+        # Clear existing drawings before redrawing
+        self.level_canvas.delete("gradient")
+        self.level_canvas.delete("level_cover")
+        self.level_canvas.delete("grid")
+        
+        # Draw gradient as thin vertical rectangles (1px each for smooth gradient)
+        # This is done once at init - very efficient since we just move cover later
+        for x in range(canvas_width):
+            ratio = x / max(canvas_width - 1, 1)
+            if ratio < 0.5:
+                # Green to Yellow (0-50%)
+                color = self._interpolate_color(
+                    self.colors.green,
+                    self.colors.accent_yellow,
+                    ratio * 2
+                )
+            else:
+                # Yellow to Red (50-100%)
+                color = self._interpolate_color(
+                    self.colors.accent_yellow,
+                    self.colors.red,
+                    (ratio - 0.5) * 2
+                )
+            
+            self.level_canvas.create_line(
+                x, bar_top, x, bar_bottom,
+                fill=color, width=1, tags="gradient"
+            )
+        
+        # Create cover rectangle (initially covers everything - shows no level)
+        self.level_canvas.create_rectangle(
+            0, bar_top, canvas_width, bar_bottom,
+            fill=self.colors.surface1, outline="", tags="level_cover"
+        )
+        
+        # Draw grid lines on top of everything
+        segment_width = canvas_width // 10
+        for i in range(11):  # 11 lines for 10 segments (0 to 10 inclusive)
             x = i * segment_width
             self.level_canvas.create_line(
                 x, 0, x, canvas_height,
@@ -1062,54 +1147,38 @@ class AudioAnalyzerWindow:
             )
     
     def _update_level_display(self, level: float):
-        """Update the level meter display."""
+        """Update the level meter display.
+        
+        For canvas style: Uses efficient cover-moving approach.
+        The gradient is pre-rendered once in _draw_level_grid().
+        We just move the cover rectangle to reveal the appropriate portion.
+        This is O(1) per frame - only one coordinate change.
+        """
         if self._destroyed:
             return
         
         try:
             if self.meter_style == "progressbar" and self.level_bar:
-                # Simple progressbar update - very fast
+                # Simple progressbar update - just set value, no color change
+                # (matches transcription_popup.py style - fixed accent color)
                 self.level_bar.set(level)
                 
-                # Update color based on level
-                if level < 0.5:
-                    color = self.colors.green
-                elif level < 0.75:
-                    color = self.colors.accent_yellow
-                else:
-                    color = self.colors.red
-                self.level_bar.configure(progress_color=color)
-                
             elif self.level_canvas:
-                # Canvas-based update - more expensive
-                # Only delete the level bar, not the grid
-                self.level_canvas.delete("level")
-                
+                # Efficient canvas update: just move the cover rectangle
                 canvas_width = self.level_canvas.winfo_width() or 400
                 canvas_height = self.level_canvas.winfo_height() or 20
-                bar_width = int(level * canvas_width)
+                bar_top = 2
+                bar_bottom = canvas_height - 2
                 
-                # Determine color based on level
-                if level < 0.5:
-                    color = self.colors.green
-                elif level < 0.75:
-                    color = self.colors.accent_yellow
-                else:
-                    color = self.colors.red
+                # Calculate where the cover should start (reveals gradient up to this point)
+                reveal_x = int(level * canvas_width)
                 
-                # Draw level bar
-                if bar_width > 0:
-                    self.level_canvas.create_rectangle(
-                        0, 2, bar_width, canvas_height - 2,
-                        fill=color, outline="", tags="level"
-                    )
-                
-                # Peak indicator
-                if level > 0.9:
-                    self.level_canvas.create_rectangle(
-                        bar_width - 3, 0, bar_width, canvas_height,
-                        fill=self.colors.red, outline="", tags="level"
-                    )
+                # Move cover to reveal the gradient up to reveal_x
+                # Cover starts at reveal_x and goes to canvas_width
+                self.level_canvas.coords(
+                    "level_cover",
+                    reveal_x, bar_top, canvas_width, bar_bottom
+                )
                     
         except Exception:
             pass
