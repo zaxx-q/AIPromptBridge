@@ -1860,14 +1860,23 @@ class AudioAnalyzerWindow:
             
         except Exception as e:
             logging.error(f"[AudioAnalyzer] Compression error: {e}")
-            self.root.after(0, lambda: self._update_status(f"Compression error: {e}", self.colors.red))
+            GUICoordinator.get_instance().run_on_gui_thread(
+                lambda: self._update_status(f"Compression error: {e}", self.colors.red)
+            )
             self.is_processing = False
-            self.root.after(0, lambda: self.send_btn.configure(state="normal"))
+            GUICoordinator.get_instance().run_on_gui_thread(
+                lambda: self.send_btn.configure(state="normal")
+            )
 
     def _process_or_callback(self, action_key, audio_data, mime_type):
         """Delegate to callback or process internally."""
-        if self.on_action_callback:
-            # Delegate to callback (GUI Controller mode)
+        # Check action config for show_chat_window preference
+        actions = self.prompts.get_audio_actions()
+        action = actions.get(action_key, {})
+        show_chat = action.get("show_chat_window", True)
+
+        if self.on_action_callback and show_chat:
+            # Delegate to callback (GUI Controller mode) - ONLY if show_chat_window is True
             try:
                 # Need to run on main thread if callback updates UI, but typically
                 # callbacks are handled gracefully. AudioToolApp._on_action_selected
@@ -1883,21 +1892,26 @@ class AudioAnalyzerWindow:
                     compressed=self.compression_enabled
                 )
                 
-                # Close window or reset state?
-                # SnipTool keeps popup open until action.
-                # Here we might want to keep window open.
                 # Reset processing state
                 self.is_processing = False
-                self.root.after(0, lambda: self.send_btn.configure(state="normal"))
-                self.root.after(0, lambda: self._update_status("Sent to AI", self.colors.green))
+                GUICoordinator.get_instance().run_on_gui_thread(
+                    lambda: self.send_btn.configure(state="normal")
+                )
+                GUICoordinator.get_instance().run_on_gui_thread(
+                    lambda: self._update_status("Sent to AI", self.colors.green)
+                )
                 
             except Exception as e:
                 logging.error(f"[AudioAnalyzer] Callback error: {e}")
                 self.is_processing = False
-                self.root.after(0, lambda: self.send_btn.configure(state="normal"))
-                self.root.after(0, lambda: self._update_status(f"Error: {e}", self.colors.red))
+                GUICoordinator.get_instance().run_on_gui_thread(
+                    lambda: self.send_btn.configure(state="normal")
+                )
+                GUICoordinator.get_instance().run_on_gui_thread(
+                    lambda: self._update_status(f"Error: {e}", self.colors.red)
+                )
         else:
-            # Process internally (Standalone mode)
+            # Process internally (Standalone mode OR show_chat_window=False)
             self._process_audio_internal(action_key, audio_data, mime_type)
 
     def _process_audio_internal(self, action_key: str, audio_data: bytes, mime_type: str):
@@ -1985,7 +1999,7 @@ class AudioAnalyzerWindow:
                 self.is_processing = False
                 self.send_btn.configure(state="normal")
             
-            self.root.after(0, update_result)
+            GUICoordinator.get_instance().run_on_gui_thread(update_result)
             
         except Exception as e:
             logging.error(f"[AudioAnalyzer] Processing error: {e}")
@@ -1996,7 +2010,7 @@ class AudioAnalyzerWindow:
                     self.is_processing = False
                     self.send_btn.configure(state="normal")
             
-            self.root.after(0, show_error)
+            GUICoordinator.get_instance().run_on_gui_thread(show_error)
     
     def _build_audio_message(
         self,
@@ -2005,13 +2019,21 @@ class AudioAnalyzerWindow:
         task: str,
         system_prompt: str
     ) -> List[Dict[str, Any]]:
-        """Build multimodal message with audio."""
-        data_url = f"data:{mime_type};base64,{audio_b64}"
+        """
+        Build multimodal message with audio.
         
+        Uses 'inline_data' for Gemini Native compatibility.
+        """
         return [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": [
-                {"type": "input_audio", "input_audio": {"data": audio_b64, "format": mime_type.split("/")[1]}},
+                {
+                    "type": "inline_data",
+                    "inline_data": {
+                        "mime_type": mime_type,
+                        "data": audio_b64
+                    }
+                },
                 {"type": "text", "text": task}
             ]}
         ]

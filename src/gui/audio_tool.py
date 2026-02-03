@@ -241,15 +241,18 @@ class AudioToolApp:
         """
         Build multimodal message with audio.
         
-        Format follows OpenAI/Gemini multimodal message structure.
-        Audio is placed BEFORE text content (Context -> Question).
+        Uses 'inline_data' for Gemini Native compatibility.
         """
-        data_url = f"data:{mime_type};base64,{audio_b64}"
-        
         return [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": [
-                {"type": "input_audio", "input_audio": {"data": audio_b64, "format": self._get_audio_format(mime_type)}},
+                {
+                    "type": "inline_data",
+                    "inline_data": {
+                        "mime_type": mime_type,
+                        "data": audio_b64
+                    }
+                },
                 {"type": "text", "text": task}
             ]}
         ]
