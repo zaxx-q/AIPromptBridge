@@ -299,12 +299,12 @@ class GUICoordinator:
     
     def _create_settings_window(self, request):
         """Create a settings window on the GUI thread"""
-        from .settings_window import create_attached_settings_window
+        from .windows import create_attached_settings_window
         create_attached_settings_window(self._root)
-    
+
     def _create_prompt_editor_window(self, request):
         """Create a prompt editor window on the GUI thread"""
-        from .prompt_editor import create_attached_prompt_editor_window
+        from .windows import create_attached_prompt_editor_window
         create_attached_prompt_editor_window(self._root)
     
     def _create_error_popup(self, request):

@@ -20,7 +20,7 @@ from ...session_manager import add_session, get_session, ChatSession
 from ..core import register_window
 from ..custom_widgets import create_emoji_button
 from ..themes import ThemeColors, get_colors, get_ctk_font, sync_ctk_appearance
-from .base import BrowserWindowBase
+from .chat_base import BrowserWindowBase
 from .utils import set_window_icon
 
 

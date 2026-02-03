@@ -14,7 +14,7 @@ from typing import Optional
 
 from ..platform import HAVE_CTK, ctk
 from ..themes import sync_ctk_appearance
-from .base import ChatWindowBase
+from .chat_base import ChatWindowBase
 from .utils import set_window_icon
 
 

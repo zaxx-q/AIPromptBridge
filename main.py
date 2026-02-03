@@ -579,7 +579,7 @@ def main():
                 print()
             
             # Open Settings Window directly (blocking)
-            from src.gui.settings_window import SettingsWindow
+            from src.gui.windows import SettingsWindow
             settings = SettingsWindow()
             settings.show(initial_tab="API Keys")
             

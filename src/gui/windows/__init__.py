@@ -5,14 +5,18 @@ Windows package - modular GUI window implementations.
 This package provides:
 - Chat windows (StandaloneChatWindow, AttachedChatWindow)
 - Session browser windows (StandaloneSessionBrowserWindow, AttachedBrowserWindow)
+- Settings window (SettingsWindow, show_settings_window)
+- Prompt editor window (PromptEditorWindow, show_prompt_editor)
+- Audio analyzer window (AudioAnalyzerWindow)
 - Utility functions (get_icon_path, set_window_icon)
-- List components (SessionListItem, SessionListHeader)
-
-All exports are backward-compatible with the original monolithic windows.py.
+- Base classes for extension
 """
 
 # Utility functions
 from .utils import get_icon_path, set_window_icon
+
+# Base classes (for extension)
+from .chat_base import ChatWindowBase, BrowserWindowBase
 
 # Session list components
 from .session_browser import SessionListItem, SessionListHeader
@@ -31,8 +35,19 @@ from .session_browser import (
     create_attached_browser_window
 )
 
-# Base classes (for extension)
-from .base import ChatWindowBase, BrowserWindowBase
+# Settings window
+from .settings_window import (
+    SettingsWindow,
+    create_attached_settings_window,
+    show_settings_window
+)
+
+# Prompt editor window
+from .prompt_editor import (
+    PromptEditorWindow,
+    create_attached_prompt_editor_window,
+    show_prompt_editor
+)
 
 # Audio analyzer window
 from .audio_analyzer import (
@@ -44,6 +59,10 @@ __all__ = [
     # Utils
     'get_icon_path',
     'set_window_icon',
+    
+    # Base classes
+    'ChatWindowBase',
+    'BrowserWindowBase',
     
     # List components
     'SessionListItem',
@@ -59,11 +78,17 @@ __all__ = [
     'AttachedBrowserWindow',
     'create_attached_browser_window',
     
+    # Settings window
+    'SettingsWindow',
+    'create_attached_settings_window',
+    'show_settings_window',
+    
+    # Prompt editor window
+    'PromptEditorWindow',
+    'create_attached_prompt_editor_window',
+    'show_prompt_editor',
+    
     # Audio analyzer
     'AudioAnalyzerWindow',
     'create_audio_analyzer_window',
-    
-    # Base classes
-    'ChatWindowBase',
-    'BrowserWindowBase',
 ]

@@ -29,25 +29,25 @@ import pyperclip
 
 import threading
 
-from .platform import HAVE_CTK, ctk
-from .prompts import PROMPTS_FILE, reload_prompts
+from ..platform import HAVE_CTK, ctk
+from ..prompts import PROMPTS_FILE, reload_prompts
 
 # Note: For class definitions that inherit from ctk or tk, we use HAVE_CTK
 # since inheritance is determined at import time. For runtime widget creation,
 # call HAVE_CTK to check both availability AND main thread.
 
-from .themes import (
+from ..themes import (
     ThemeRegistry, ThemeColors, get_colors, sync_ctk_appearance,
     get_ctk_button_colors, get_ctk_frame_colors, get_ctk_entry_colors,
     get_ctk_textbox_colors, get_ctk_combobox_colors, get_ctk_label_colors,
     get_ctk_font
 )
-from .core import get_next_window_id, register_window, unregister_window
-from .custom_widgets import ScrollableButtonList, upgrade_tabview_with_icons, create_section_header, create_emoji_button
+from ..core import get_next_window_id, register_window, unregister_window
+from ..custom_widgets import ScrollableButtonList, upgrade_tabview_with_icons, create_section_header, create_emoji_button
 
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
 try:
-    from .emoji_renderer import get_emoji_renderer, HAVE_PIL
+    from ..emoji_renderer import get_emoji_renderer, HAVE_PIL
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
@@ -66,7 +66,7 @@ def load_options(filepath: str = PROMPTS_FILE) -> Dict:
     Load and parse options JSON.
     Uses centralized PromptsConfig which handles defaults if file is missing.
     """
-    from .prompts import get_prompts_config
+    from ..prompts import get_prompts_config
     try:
         # Simply get the config from PromptsConfig which handles loading/defaults
         return get_prompts_config()._config

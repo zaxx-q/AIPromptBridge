@@ -25,7 +25,7 @@ from typing import Dict, Optional, List, Callable, Any
 from pathlib import Path
 
 # Import CustomTkinter with fallback
-from .platform import HAVE_CTK, ctk
+from ..platform import HAVE_CTK, ctk
 _CTK_AVAILABLE = HAVE_CTK
 
 
@@ -35,18 +35,18 @@ def _can_use_ctk() -> bool:
     """
     return _CTK_AVAILABLE
 
-from .themes import (
+from ..themes import (
     ThemeRegistry, ThemeColors, get_colors, list_themes, sync_ctk_appearance,
     get_ctk_button_colors, get_ctk_frame_colors, get_ctk_entry_colors,
     get_ctk_textbox_colors, get_ctk_combobox_colors, get_ctk_label_colors,
     get_ctk_font
 )
-from .core import get_next_window_id, register_window, unregister_window
-from .custom_widgets import ScrollableButtonList, ScrollableComboBox, upgrade_tabview_with_icons, create_section_header, create_emoji_button
+from ..core import get_next_window_id, register_window, unregister_window
+from ..custom_widgets import ScrollableButtonList, ScrollableComboBox, upgrade_tabview_with_icons, create_section_header, create_emoji_button
 
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
 try:
-    from .emoji_renderer import get_emoji_renderer, HAVE_PIL
+    from ..emoji_renderer import get_emoji_renderer, HAVE_PIL
     HAVE_EMOJI = HAVE_PIL and _CTK_AVAILABLE
 except ImportError:
     HAVE_EMOJI = False
@@ -1549,7 +1549,7 @@ class SettingsWindow:
     def _create_endpoints_tab(self, frame):
         """Create the Endpoints settings tab with prompts.json support."""
         # Load endpoint prompts from prompts.json
-        from .prompts import PromptsConfig
+        from ..prompts import PromptsConfig
         self._prompts_config = PromptsConfig.get_instance()
         self._endpoint_prompts = dict(self._prompts_config.get_endpoint_prompts())
         
