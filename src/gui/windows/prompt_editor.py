@@ -1787,7 +1787,7 @@ class PromptEditorWindow:
 
         # Load defaults
         try:
-            from ..config import load_config
+            from ...config import load_config
             config, _, _, _ = load_config()
             default_provider = config.get("default_provider", "google")
             self.playground_provider_var.set(default_provider)

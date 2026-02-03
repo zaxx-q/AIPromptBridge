@@ -606,8 +606,8 @@ class SettingsWindow:
             # When attached to a master, use GUICoordinator to run on GUI thread
             # (calling self.root.after() from a background thread would fail)
             try:
-                from .core import GUICoordinator
-                
+                from ..core import GUICoordinator
+
                 def safe_wrapper():
                     if not self._destroyed:
                         try:
@@ -1385,11 +1385,11 @@ class SettingsWindow:
         
         # Create temporary KeyManager and fetch
         try:
-            from ..key_manager import KeyManager
+            from ...key_manager import KeyManager
             temp_key_manager = KeyManager(key_strings, provider)
-            
+
             # Create provider and fetch
-            from ..api_client import get_provider_for_type
+            from ...api_client import get_provider_for_type
             provider_instance = get_provider_for_type(provider, temp_key_manager, temp_config)
             models, error = provider_instance.fetch_models()
             
