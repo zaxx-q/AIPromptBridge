@@ -480,6 +480,29 @@ class GeminiNativeProvider(BaseProvider):
     # ERROR HANDLING
     # =========================================================================
     
+    def detect_empty_response(
+        self,
+        content: str,
+        thinking: str,
+        tool_calls: List,
+        output_tokens: int
+    ) -> bool:
+        """
+        Detect an empty response.
+        
+        Overridden for Gemini to treat "Thinking only" responses as empty/failed.
+        Sometimes the model streams thinking but cuts off before the actual response
+        (upstream issue). This ensures we retry in those cases.
+        """
+        # A valid response must have either actual text content OR tool calls.
+        # Thinking content alone is not enough to be considered successful.
+        has_actual_content = bool(
+            content.strip() or
+            tool_calls
+        )
+        
+        return not has_actual_content
+
     def _extract_error_brief(self, error_text: str, status_code: int = 0) -> str:
         """
         Extract a brief, readable error message from API error response.
@@ -922,7 +945,7 @@ class GeminiNativeProvider(BaseProvider):
                 accumulated_tool_calls,
                 output_tokens
             ):
-                self.log("warn", "Empty response detected (no content, 0 output tokens)")
+                self.log("warn", "Empty or incomplete response detected (no text/tools)")
                 
                 if self.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
                     delay = self.get_retry_delay(RetryReason.EMPTY_RESPONSE)
@@ -1138,7 +1161,7 @@ class GeminiNativeProvider(BaseProvider):
                 tool_calls,
                 usage_data.completion_tokens
             ):
-                self.log("warn", "Empty response detected")
+                self.log("warn", "Empty or incomplete response detected")
                 
                 if self.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
                     delay = self.get_retry_delay(RetryReason.EMPTY_RESPONSE)
