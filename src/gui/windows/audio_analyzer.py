@@ -1822,6 +1822,17 @@ class AudioAnalyzerWindow:
         self._update_status("Processing...", self.colors.accent)
         self.send_btn.configure(state="disabled")
         
+        # Get custom input text (must be done on main thread)
+        custom_text = None
+        if self.custom_input:
+            try:
+                raw_text = self.custom_input.get()
+                # Filter out placeholder text
+                if raw_text and raw_text != "Custom task or question...":
+                    custom_text = raw_text.strip()
+            except Exception:
+                pass
+        
         # Determine audio data and mime type
         audio_data = self.recorded_wav
         mime_type = "audio/wav"
@@ -1830,18 +1841,18 @@ class AudioAnalyzerWindow:
             # Compress in background if needed
             threading.Thread(
                 target=self._prepare_and_send_audio,
-                args=(action_key,),
+                args=(action_key, custom_text),
                 daemon=True
             ).start()
         else:
             # Run in background thread
             threading.Thread(
                 target=self._process_or_callback,
-                args=(action_key, audio_data, mime_type),
+                args=(action_key, audio_data, mime_type, custom_text),
                 daemon=True
             ).start()
 
-    def _prepare_and_send_audio(self, action_key: str):
+    def _prepare_and_send_audio(self, action_key: str, custom_text: Optional[str] = None):
         """Compress audio then process."""
         try:
             if not self.compressed_audio:
@@ -1856,7 +1867,7 @@ class AudioAnalyzerWindow:
             preset = COMPRESSION_PRESETS.get(self.compression_preset, {})
             mime_type = "audio/ogg" if preset.get("output_ext", ".ogg") == ".ogg" else "audio/mpeg"
             
-            self._process_or_callback(action_key, audio_data, mime_type)
+            self._process_or_callback(action_key, audio_data, mime_type, custom_text)
             
         except Exception as e:
             logging.error(f"[AudioAnalyzer] Compression error: {e}")
@@ -1868,7 +1879,7 @@ class AudioAnalyzerWindow:
                 lambda: self.send_btn.configure(state="normal")
             )
 
-    def _process_or_callback(self, action_key, audio_data, mime_type):
+    def _process_or_callback(self, action_key, audio_data, mime_type, custom_text: Optional[str] = None):
         """Delegate to callback or process internally."""
         # Check action config for show_chat_window preference
         actions = self.prompts.get_audio_actions()
@@ -1878,14 +1889,6 @@ class AudioAnalyzerWindow:
         if self.on_action_callback and show_chat:
             # Delegate to callback (GUI Controller mode) - ONLY if show_chat_window is True
             try:
-                # Get custom input if available
-                custom_text = None
-                if self.custom_input:
-                    try:
-                        custom_text = self.custom_input.get().strip()
-                    except Exception:
-                        pass
-
                 self.on_action_callback(
                     action_key=action_key,
                     audio_data=audio_data,
@@ -1917,9 +1920,9 @@ class AudioAnalyzerWindow:
                 )
         else:
             # Process internally (Standalone mode OR show_chat_window=False)
-            self._process_audio_internal(action_key, audio_data, mime_type)
+            self._process_audio_internal(action_key, audio_data, mime_type, custom_text)
 
-    def _process_audio_internal(self, action_key: str, audio_data: bytes, mime_type: str):
+    def _process_audio_internal(self, action_key: str, audio_data: bytes, mime_type: str, custom_text: Optional[str] = None):
         """Process audio internally."""
         temp_file_path = None
         try:
@@ -1937,14 +1940,6 @@ class AudioAnalyzerWindow:
             system_prompt = action.get("system_prompt", "You are an audio analysis assistant.")
             task = action.get("task", "Analyze this audio.")
             
-            # Handle custom input
-            custom_text = None
-            if self.custom_input:
-                try:
-                    custom_text = self.custom_input.get().strip()
-                except Exception:
-                    pass
-
             if action_key in ["_Custom", "_Ask"]:
                 # Use custom task template
                 template = self.prompts.get_audio_setting("custom_task_template", "Regarding this audio: {custom_input}")

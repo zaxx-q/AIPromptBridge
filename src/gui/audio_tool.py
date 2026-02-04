@@ -190,12 +190,16 @@ class AudioToolApp:
             task = action.get("task", "Analyze this audio.")
             
             # Handle custom input
-            if action_key == "_Custom" and custom_input:
-                template = settings.get(
-                    "custom_task_template",
-                    "Regarding this audio: {custom_input}"
-                )
-                task = template.format(custom_input=custom_input)
+            if action_key in ["_Custom", "_Ask"]:
+                if custom_input:
+                    template = settings.get(
+                        "custom_task_template",
+                        "Regarding this audio: {custom_input}"
+                    )
+                    task = template.format(custom_input=custom_input)
+                else:
+                    # Fallback if custom input is empty
+                    task = "Analyze this audio."
             
             # Build multimodal message with audio
             audio_b64 = base64.b64encode(audio_data).decode('utf-8')
