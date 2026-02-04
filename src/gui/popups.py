@@ -491,9 +491,10 @@ class ModifierBar:
             font_size=10,
             command=lambda k=key: self._toggle_modifier(k)
         )
-        # Override colors to match original design (surface0 base)
+        # Use surface1 for better contrast against surface0 containers
         btn.configure(
-            fg_color=self.colors.surface0,
+            fg_color=self.colors.surface1,
+            hover_color=self.colors.surface2,
             text_color=self.colors.text
         )
         btn.pack(side="left", padx=3, pady=2)
@@ -520,7 +521,7 @@ class ModifierBar:
             self.inner_frame,
             text=f"{icon} {label}",
             font=("Arial", 9),
-            bg=self.colors.surface0,
+            bg=self.colors.surface1,
             fg=self.colors.text,
             padx=10,
             pady=8,
@@ -578,9 +579,9 @@ class ModifierBar:
             return
         
         if entering:
-            btn.config(bg=self.colors.surface1)
+            btn.config(bg=self.colors.surface2)
         else:
-            btn.config(bg=self.colors.surface0)
+            btn.config(bg=self.colors.surface1)
     
     def _on_inner_configure(self, event):
         """Update scroll region (tk fallback)."""
@@ -790,7 +791,8 @@ class GroupedButtonList:
                 )
                 # Override colors
                 btn.configure(
-                    fg_color=self.colors.surface0,
+                    fg_color=self.colors.surface1,
+                    hover_color=self.colors.surface2,
                     text_color=self.colors.text
                 )
                 btn.pack(fill="x", pady=1)
@@ -816,17 +818,25 @@ class GroupedButtonList:
                 icon = item[2] if len(item) > 2 else ""
                 tooltip_text = item[3] if len(item) > 3 else None
                 
-                row = tk.Frame(self.buttons_container, bg=self.colors.surface0, cursor="hand2")
+                row = tk.Frame(self.buttons_container, bg=self.colors.surface1, cursor="hand2")
                 row.pack(fill=tk.X, pady=1)
                 
-                icon_lbl = tk.Label(row, text=icon, bg=self.colors.surface0, fg=self.colors.text, width=3, pady=8)
+                icon_lbl = tk.Label(row, text=icon, bg=self.colors.surface1, fg=self.colors.text, width=3, pady=8)
                 icon_lbl.pack(side=tk.LEFT, padx=(8, 0))
                 
-                text_lbl = tk.Label(row, text=display_text, bg=self.colors.surface0, fg=self.colors.text, anchor=tk.W, pady=8)
+                text_lbl = tk.Label(row, text=display_text, bg=self.colors.surface1, fg=self.colors.text, anchor=tk.W, pady=8)
                 text_lbl.pack(side=tk.LEFT, padx=(4, 8), fill=tk.X, expand=True)
                 
+                def on_enter(e, widgets=[row, icon_lbl, text_lbl]):
+                    for w in widgets: w.configure(bg=self.colors.surface2)
+                
+                def on_leave(e, widgets=[row, icon_lbl, text_lbl]):
+                    for w in widgets: w.configure(bg=self.colors.surface1)
+
                 for widget in (row, icon_lbl, text_lbl):
                     widget.bind('<Button-1>', lambda e, k=key: self.on_click(k))
+                    widget.bind('<Enter>', on_enter)
+                    widget.bind('<Leave>', on_leave)
                 
                 if tooltip_text:
                     tooltip = Tooltip(text_lbl, tooltip_text)
@@ -1033,7 +1043,8 @@ class CarouselButtonList:
                 )
                 # Override colors
                 btn.configure(
-                    fg_color=self.colors.surface0,
+                    fg_color=self.colors.surface1,
+                    hover_color=self.colors.surface2,
                     text_color=self.colors.text
                 )
                 btn.pack(fill="x", pady=1)
@@ -1042,17 +1053,25 @@ class CarouselButtonList:
                     tooltip = Tooltip(btn, tooltip_text)
                     self.tooltips.append(tooltip)
             else:
-                row = tk.Frame(self.buttons_frame, bg=self.colors.surface0, cursor="hand2")
+                row = tk.Frame(self.buttons_frame, bg=self.colors.surface1, cursor="hand2")
                 row.pack(fill=tk.X, pady=1)
                 
-                icon_lbl = tk.Label(row, text=icon, bg=self.colors.surface0, fg=self.colors.text, width=3, pady=10)
+                icon_lbl = tk.Label(row, text=icon, bg=self.colors.surface1, fg=self.colors.text, width=3, pady=10)
                 icon_lbl.pack(side=tk.LEFT, padx=(8, 0))
                 
-                text_lbl = tk.Label(row, text=display_text, bg=self.colors.surface0, fg=self.colors.text, anchor=tk.W, pady=10)
+                text_lbl = tk.Label(row, text=display_text, bg=self.colors.surface1, fg=self.colors.text, anchor=tk.W, pady=10)
                 text_lbl.pack(side=tk.LEFT, padx=(4, 8))
                 
+                def on_enter(e, widgets=[row, icon_lbl, text_lbl]):
+                    for w in widgets: w.configure(bg=self.colors.surface2)
+                
+                def on_leave(e, widgets=[row, icon_lbl, text_lbl]):
+                    for w in widgets: w.configure(bg=self.colors.surface1)
+
                 for widget in (row, icon_lbl, text_lbl):
                     widget.bind('<Button-1>', lambda e, k=key: self.on_click(k))
+                    widget.bind('<Enter>', on_enter)
+                    widget.bind('<Leave>', on_leave)
                 
                 if tooltip_text:
                     tooltip = Tooltip(text_lbl, tooltip_text)
