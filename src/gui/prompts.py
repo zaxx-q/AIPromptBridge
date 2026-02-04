@@ -171,6 +171,10 @@ DEFAULT_TEXT_EDIT_SETTINGS = {
             "items": ["Proofread", "Refine", "Rewrite", "Paraphrase", "Professional", "Friendly", "Casual", "Concise"]
         },
         {
+            "name": "Code",
+            "items": ["Explain Code", "Debug", "Refactor", "Document"]
+        },
+        {
             "name": "Suggestor",
             "items": ["Table", "Continue", "Reply Suggest", "Emojify", "Kaomojify", "Kaomoji Suggest"]
         }
@@ -332,6 +336,34 @@ DEFAULT_TEXT_EDIT_ACTIONS = {
         "task": "Translate the following text into Indonesian (Bahasa Indonesia). Preserve the original meaning and tone.",
         "show_chat_window_instead_of_replace": True
     },
+    "Explain Code": {
+        "icon": "💻",
+        "prompt_type": "general",
+        "system_prompt": "You are an expert software engineer and educator. Explain the provided code clearly.",
+        "task": "Explain this code. Describe what it does, how it works, and any important logic or patterns used.",
+        "show_chat_window_instead_of_replace": True
+    },
+    "Debug": {
+        "icon": "🐛",
+        "prompt_type": "general",
+        "system_prompt": "You are an expert debugger. Analyze the code for errors, bugs, and potential issues.",
+        "task": "Identify any bugs, errors, or potential issues in this code. Explain why they are a problem and suggest fixes.",
+        "show_chat_window_instead_of_replace": True
+    },
+    "Refactor": {
+        "icon": "🛠️",
+        "prompt_type": "edit",
+        "system_prompt": "You are a clean code specialist. Refactor the code to improve readability, maintainability, and efficiency without changing its behavior.",
+        "task": "Refactor this code. Improve variable names, structure, and efficiency while maintaining the original functionality.",
+        "show_chat_window_instead_of_replace": False
+    },
+    "Document": {
+        "icon": "📝",
+        "prompt_type": "edit",
+        "system_prompt": "You are a documentation engineer.",
+        "task": "Add comprehensive comments and docstrings to this code. Document arguments, return values, and complex logic.",
+        "show_chat_window_instead_of_replace": False
+    },
     "_Custom": {
         "icon": "⚡",
         "prompt_type": "edit",
@@ -356,16 +388,22 @@ DEFAULT_SNIP_SETTINGS = {
     "popup_use_groups": True,
     "popup_items_per_page": 6,
     "popup_groups": [
-        {"name": "Analysis", "items": ["Describe", "Summarize", "Extract Text"]},
-        {"name": "Code", "items": ["Explain Code", "Debug", "Convert"]},
-        {"name": "Data", "items": ["Extract Data", "Transcribe"]},
-        {"name": "Compare", "items": ["Compare Images", "Spot Differences", "Before/After", "Code Diff", "Which is Better"]}
+        {"name": "Analysis", "items": ["Explain", "Describe", "Summarize"]},
+        {"name": "Text/Data", "items": ["Extract Text", "Extract Data", "Transcribe", "Translate to English"]},
+        {"name": "Compare", "items": ["Compare Images", "Spot Differences", "Before/After", "Which is Better"]}
     ],
     "custom_task_template": "Regarding this image: {custom_input}",
     "allow_text_edit_actions": True
 }
 
 DEFAULT_SNIP_ACTIONS = {
+    "Explain": {
+        "icon": "💡",
+        "system_prompt": "You are a clear, direct explainer.",
+        "task": "Explain the content of this image. Start with the core meaning, then add context if needed.",
+        "show_chat_window": True,
+        "compare_prompts": False
+    },
     "Describe": {
         "icon": "🖼️",
         "system_prompt": "You are an image analysis expert who provides detailed, accurate descriptions.",
@@ -373,25 +411,18 @@ DEFAULT_SNIP_ACTIONS = {
         "show_chat_window": True,
         "compare_prompts": False
     },
+    "Summarize": {
+        "icon": "📝",
+        "system_prompt": "You are a summarization expert.",
+        "task": "Summarize the content of this image. Capture the main points concisely.",
+        "show_chat_window": True,
+        "compare_prompts": False
+    },
     "Extract Text": {
         "icon": "📄",
         "system_prompt": "You are an OCR specialist who extracts text with high accuracy.",
-        "task": "Extract all text from this image. Preserve the original formatting, line breaks, and layout as closely as possible.",
-        "show_chat_window": True,
-        "compare_prompts": False
-    },
-    "Explain Code": {
-        "icon": "💻",
-        "system_prompt": "You are a code analysis expert who explains code clearly and concisely.",
-        "task": "Analyze the code in this screenshot. Explain what it does, its purpose, and any notable patterns or techniques used.",
-        "show_chat_window": True,
-        "compare_prompts": False
-    },
-    "Debug": {
-        "icon": "🐛",
-        "system_prompt": "You are a debugging expert who identifies issues in code with precision.",
-        "task": "Examine this code screenshot carefully. Identify any bugs, errors, potential issues, anti-patterns, or improvements. Be specific about line numbers or locations if visible.",
-        "show_chat_window": True,
+        "task": "Extract all text from this image. Preserve the original formatting, line breaks, and layout as closely as possible. Do not use code blocks.",
+        "show_chat_window": False,
         "compare_prompts": False
     },
     "Extract Data": {
@@ -401,31 +432,24 @@ DEFAULT_SNIP_ACTIONS = {
         "show_chat_window": True,
         "compare_prompts": False
     },
-    "Summarize": {
-        "icon": "📝",
-        "system_prompt": "You are a summarization expert who distills information to its essence.",
-        "task": "Summarize the key information visible in this image concisely. Focus on the most important points.",
-        "show_chat_window": True,
-        "compare_prompts": False
-    },
     "Transcribe": {
         "icon": "✍️",
         "system_prompt": "You are a transcription specialist for handwritten text and documents.",
-        "task": "Transcribe any handwritten or printed text in this image as accurately as possible. Note any unclear parts.",
-        "show_chat_window": True,
+        "task": "Transcribe any handwritten or printed text in this image as accurately as possible. Output ONLY the raw text.",
+        "show_chat_window": False,
         "compare_prompts": False
     },
-    "Convert": {
-        "icon": "🔄",
-        "system_prompt": "You are a code formatting specialist who produces clean, idiomatic code.",
-        "task": "Convert the code in this screenshot to clean, well-formatted code. Fix any obvious issues and follow best practices.",
+    "Translate to English": {
+        "icon": "🇬🇧",
+        "system_prompt": "You are a professional translator.",
+        "task": "Translate all visible text in this image into natural, fluent English. Preserve original formatting. Return only the translation.",
         "show_chat_window": True,
         "compare_prompts": False
     },
     "Compare Images": {
         "icon": "🔀",
-        "system_prompt": "You are an image comparison expert who analyzes differences and similarities between two images.",
-        "task": "Compare these two images. Identify and describe: 1) Key differences 2) Similarities 3) Any notable changes between them.",
+        "system_prompt": "You are an image comparison expert.",
+        "task": "Compare these two images. Identify key differences and similarities.",
         "show_chat_window": True,
         "compare_prompts": True
     },
@@ -438,22 +462,15 @@ DEFAULT_SNIP_ACTIONS = {
     },
     "Before/After": {
         "icon": "⏮️",
-        "system_prompt": "You are a change documentation specialist who analyzes before/after states to explain what was done.",
-        "task": "Analyze these before (Image 1) and after (Image 2) images. Describe: 1) What changes were made 2) The likely purpose or goal of these changes 3) The overall impact or improvement. Focus on documenting the transformation.",
-        "show_chat_window": True,
-        "compare_prompts": True
-    },
-    "Code Diff": {
-        "icon": "💻",
-        "system_prompt": "You are a code review specialist who analyzes differences between two code screenshots.",
-        "task": "Compare these two code screenshots. Identify: 1) Lines added, removed, or modified 2) Functional changes in the code 3) Whether the changes fix bugs, add features, or refactor. Present as a clear diff summary.",
+        "system_prompt": "You are a change documentation specialist.",
+        "task": "Analyze these before (Image 1) and after (Image 2) images. Describe what changed, the likely purpose, and the overall impact or improvement.",
         "show_chat_window": True,
         "compare_prompts": True
     },
     "Which is Better": {
         "icon": "⚖️",
         "system_prompt": "You are an evaluator who provides objective analysis and recommendations when comparing two options.",
-        "task": "Compare these two images and evaluate which is better. Consider: 1) Quality and clarity 2) Design/presentation 3) Effectiveness for its purpose. Provide a clear recommendation with reasoning.",
+        "task": "Compare these two images and evaluate which is better based on quality, design, or effectiveness. Provide a clear recommendation with reasoning.",
         "show_chat_window": True,
         "compare_prompts": True
     },
