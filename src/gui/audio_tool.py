@@ -132,7 +132,9 @@ class AudioToolApp:
         mime_type: str,
         custom_input: Optional[str] = None,
         duration: float = 0.0,
-        compressed: bool = False
+        compressed: bool = False,
+        provider: Optional[str] = None,
+        model: Optional[str] = None
     ):
         """
         Handle action selection from window.
@@ -144,6 +146,8 @@ class AudioToolApp:
             custom_input: Custom question text (if any)
             duration: Duration in seconds
             compressed: Whether audio is compressed
+            provider: Selected provider override
+            model: Selected model override
         """
         logging.debug(f'Action selected: key={action_key}, custom={bool(custom_input)}, duration={duration:.1f}s, compressed={compressed}')
         
@@ -156,7 +160,7 @@ class AudioToolApp:
         # Process in background thread
         threading.Thread(
             target=self._process_action,
-            args=(action_key, audio_data, mime_type, custom_input, duration),
+            args=(action_key, audio_data, mime_type, custom_input, duration, provider, model),
             daemon=True
         ).start()
     
@@ -166,7 +170,9 @@ class AudioToolApp:
         audio_data: bytes,
         mime_type: str,
         custom_input: Optional[str],
-        duration: float
+        duration: float,
+        provider: Optional[str] = None,
+        model: Optional[str] = None
     ):
         """Process the selected action with audio context."""
         try:
@@ -215,7 +221,9 @@ class AudioToolApp:
                 origin=RequestOrigin.AUDIO_TOOL,
                 audio_data=audio_data,
                 mime_type=mime_type,
-                duration=duration
+                duration=duration,
+                provider=provider,
+                model=model
             )
             
             print(f"{'─'*60}\n")
@@ -242,7 +250,9 @@ class AudioToolApp:
         origin,
         audio_data: bytes,
         mime_type: str,
-        duration: float
+        duration: float,
+        provider: Optional[str] = None,
+        model: Optional[str] = None
     ):
         """
         Open a chat window and stream API response into it.
@@ -254,6 +264,8 @@ class AudioToolApp:
             audio_data: Audio bytes for attachment
             mime_type: Audio MIME type
             duration: Audio duration in seconds
+            provider: Selected provider override
+            model: Selected model override
         """
         from .core import GUICoordinator
         from ..session_manager import ChatSession
@@ -312,13 +324,15 @@ class AudioToolApp:
             full_response = []
             full_thinking = []
             
-            provider = self.config.get("default_provider", "google")
+            # Use provided settings or fallback to config defaults
+            req_provider = provider or self.config.get("default_provider", "google")
+            req_model = model or self.config.get(f"{req_provider}_model")
             
             # Setup context
             ctx = RequestContext(
                 origin=origin,
-                provider=provider,
-                model=self.config.get(f"{provider}_model"),
+                provider=req_provider,
+                model=req_model,
                 streaming=True,
                 thinking_enabled=self.config.get("thinking_enabled", False)
             )
@@ -375,12 +389,13 @@ class AudioToolApp:
             print(f"  ✅ Response streamed to chat window ({len(response_text)} chars)")
         else:
             # Non-streaming: execute simple request, then show window
-            provider = self.config.get("default_provider", "google")
+            req_provider = provider or self.config.get("default_provider", "google")
+            req_model = model or self.config.get(f"{req_provider}_model")
             
             ctx = RequestContext(
                 origin=origin,
-                provider=provider,
-                model=self.config.get(f"{provider}_model"),
+                provider=req_provider,
+                model=req_model,
                 streaming=False,
                 thinking_enabled=self.config.get("thinking_enabled", False)
             )

@@ -1878,18 +1878,23 @@ class AudioAnalyzerWindow:
         if self.on_action_callback and show_chat:
             # Delegate to callback (GUI Controller mode) - ONLY if show_chat_window is True
             try:
-                # Need to run on main thread if callback updates UI, but typically
-                # callbacks are handled gracefully. AudioToolApp._on_action_selected
-                # starts its own thread, so we can call it directly.
-                # But to be safe and update OUR UI state:
-                
+                # Get custom input if available
+                custom_text = None
+                if self.custom_input:
+                    try:
+                        custom_text = self.custom_input.get().strip()
+                    except Exception:
+                        pass
+
                 self.on_action_callback(
                     action_key=action_key,
                     audio_data=audio_data,
                     mime_type=mime_type,
-                    custom_input=None, # Todo: Add custom input support
+                    custom_input=custom_text,
                     duration=self.audio_duration,
-                    compressed=self.compression_enabled
+                    compressed=self.compression_enabled,
+                    provider=self.provider,
+                    model=self.model
                 )
                 
                 # Reset processing state
