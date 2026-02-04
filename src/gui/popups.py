@@ -3073,18 +3073,20 @@ class ErrorPopup:
             
             # Copy to clipboard button (if details)
             if self.details:
-                copy_btn = ctk.CTkButton(
+                copy_btn = create_emoji_button(
                     btn_frame,
-                    text="📋 Copy",
+                    text="Copy",
+                    icon="📋",
+                    colors=self.colors,
+                    hover_color=self.colors.accent_green,
+                    variant="secondary",
                     width=80,
                     height=32,
-                    corner_radius=6,
-                    fg_color=self.colors.surface0,
-                    hover_color=self.colors.surface1,
-                    text_color=self.colors.text,
-                    font=get_ctk_font(size=11),
+                    font_size=11,
                     command=self._copy_to_clipboard
                 )
+                # Override to match surface0 background of details area
+                copy_btn.configure(fg_color=self.colors.surface0)
                 copy_btn.pack(side="left", padx=(0, 8))
             
             # OK button
@@ -3095,7 +3097,7 @@ class ErrorPopup:
                 height=32,
                 corner_radius=6,
                 fg_color=self.colors.blue,
-                hover_color=self.colors.lavender,
+                hover_color=self.colors.accent_green,
                 text_color="#ffffff",
                 font=get_ctk_font(size=11),
                 command=self._close
