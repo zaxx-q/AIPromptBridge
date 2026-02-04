@@ -1916,9 +1916,14 @@ class AudioAnalyzerWindow:
 
     def _process_audio_internal(self, action_key: str, audio_data: bytes, mime_type: str):
         """Process audio internally."""
+        temp_file_path = None
         try:
             from ...request_pipeline import RequestPipeline, RequestContext, RequestOrigin, StreamCallback
-            from ...messages import build_audio_message
+            from ...messages import build_audio_message, build_file_message
+            from ...api_client import get_provider_for_type
+            import tempfile
+            import os
+            from pathlib import Path
             
             # Get action config
             actions = self.prompts.get_audio_actions()
@@ -1953,9 +1958,58 @@ class AudioAnalyzerWindow:
                 if modifier_injections:
                     system_prompt = system_prompt + "\n\n" + modifier_injections
             
-            # Build message with audio
-            audio_b64 = base64.b64encode(audio_data).decode('utf-8')
-            messages = build_audio_message(audio_b64, mime_type, task, system_prompt)
+            messages = []
+            
+            # Check for large file support if provider is google
+            # Gemini Native limit for inline data is ~15MB (safety margin)
+            is_large_file = len(audio_data) > 15 * 1024 * 1024
+            
+            if self.provider == "google" and is_large_file:
+                GUICoordinator.get_instance().run_on_gui_thread(
+                    lambda: self._update_status("Uploading large file...", self.colors.accent)
+                )
+                
+                # Determine extension based on mime_type
+                ext = ".wav"
+                if "ogg" in mime_type:
+                    ext = ".ogg"
+                elif "mpeg" in mime_type or "mp3" in mime_type:
+                    ext = ".mp3"
+                
+                # Create temp file
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as f:
+                        f.write(audio_data)
+                        temp_file_path = f.name
+                    
+                    # Get provider to use upload_file
+                    key_manager = self.key_managers.get("google")
+                    if key_manager:
+                        provider = get_provider_for_type("google", key_manager, self.config)
+                        
+                        # Upload
+                        uploaded_file, error = provider.upload_file(Path(temp_file_path))
+                        
+                        if uploaded_file:
+                            messages = build_file_message(uploaded_file.uri, mime_type, task, system_prompt)
+                            logging.info(f"[AudioAnalyzer] Uploaded large file: {uploaded_file.uri}")
+                        else:
+                            logging.error(f"[AudioAnalyzer] Upload failed: {error}")
+                            # Will fallback to inline below
+                except Exception as e:
+                    logging.error(f"[AudioAnalyzer] File upload preparation failed: {e}")
+                finally:
+                    # Clean up temp file
+                    if temp_file_path and os.path.exists(temp_file_path):
+                        try:
+                            os.unlink(temp_file_path)
+                        except Exception:
+                            pass
+            
+            if not messages:
+                # Build message with inline audio (fallback or small file)
+                audio_b64 = base64.b64encode(audio_data).decode('utf-8')
+                messages = build_audio_message(audio_b64, mime_type, task, system_prompt)
             
             # Create request context
             ctx = RequestContext(
