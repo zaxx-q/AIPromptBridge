@@ -2468,7 +2468,7 @@ class PromptEditorWindow:
         
         # We need GUICoordinator to trigger overlay
         try:
-            from .core import GUICoordinator
+            from ..core import GUICoordinator
             GUICoordinator.get_instance().request_snip_overlay(
                 on_capture=self._on_playground_snip_captured,
                 on_cancel=self._on_playground_snip_cancelled
@@ -2532,16 +2532,24 @@ class PromptEditorWindow:
         else:
             prompt = self.playground_user_preview.get("1.0", "end").strip()
             
-        messages = []
+        from ...messages import build_text_message, build_image_message
+        
+        # Endpoints typically don't use a system prompt in this context (playground sets it to note)
+        system_prompt = "You are a helpful AI assistant."
+        
         if self.playground_image_base64:
-            data_url = f"data:{self.playground_image_mime};base64,{self.playground_image_base64}"
-            content = [
-                {"type": "image_url", "image_url": {"url": data_url}},
-                {"type": "text", "text": prompt}
-            ]
-            messages.append({"role": "user", "content": content})
+            messages = build_image_message(
+                image_b64=self.playground_image_base64,
+                mime_type=self.playground_image_mime,
+                task=prompt,
+                system_prompt=system_prompt
+            )
+            # Remove system prompt if it was just the default placeholder
+            if messages[0]["role"] == "system" and messages[0]["content"] == system_prompt:
+                messages.pop(0)
         else:
-            messages.append({"role": "user", "content": prompt})
+            # Text-only endpoint
+            messages = [{"role": "user", "content": prompt}]
         
         return self._get_request_config(messages)
 
@@ -2557,17 +2565,13 @@ class PromptEditorWindow:
             system_prompt = self.playground_system_preview.get("1.0", "end").strip()
             user_message = self.playground_user_preview.get("1.0", "end").strip()
             
-        data_url = f"data:{self.playground_image_mime};base64,{self.playground_image_base64}"
-        messages = []
-        
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-            
-        user_content = [
-            {"type": "image_url", "image_url": {"url": data_url}},
-            {"type": "text", "text": user_message}
-        ]
-        messages.append({"role": "user", "content": user_content})
+        from ...messages import build_image_message
+        messages = build_image_message(
+            image_b64=self.playground_image_base64,
+            mime_type=self.playground_image_mime,
+            task=user_message,
+            system_prompt=system_prompt
+        )
         
         return self._get_request_config(messages)
     
@@ -2580,18 +2584,16 @@ class PromptEditorWindow:
             system_prompt = self.playground_system_preview.get("1.0", "end").strip()
             user_message = self.playground_user_preview.get("1.0", "end").strip()
         
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": user_message})
+        from ...messages import build_text_message
+        messages = build_text_message(user_message, system_prompt)
         
         return self._get_request_config(messages)
         
     def _get_request_config(self, messages) -> Dict:
         """Helper to get common request config."""
-        from ..config import load_config
-        from ..key_manager import KeyManager
-        
+        from ...config import load_config
+        from ...key_manager import KeyManager
+
         config, ai_params_loaded, endpoints, loaded_keys = load_config()
         
         key_managers = {}
@@ -2622,8 +2624,8 @@ class PromptEditorWindow:
         # Define thread target
         def _target():
             try:
-                from ..api_client import call_api_stream_unified
-                
+                from ...api_client import call_api_stream_unified
+
                 # Check for thinking support in config to show proper UI
                 thinking_enabled = params["config"].get("thinking_enabled", False)
                 if thinking_enabled:

@@ -171,6 +171,7 @@ class AudioToolApp:
         """Process the selected action with audio context."""
         try:
             import base64
+            from ..messages import build_audio_message
             
             # Get action config
             actions = self.prompts.get_audio_actions()
@@ -192,7 +193,7 @@ class AudioToolApp:
             
             # Build multimodal message with audio
             audio_b64 = base64.b64encode(audio_data).decode('utf-8')
-            messages = self._build_audio_message(
+            messages = build_audio_message(
                 audio_b64=audio_b64,
                 mime_type=mime_type,
                 task=task,
@@ -231,45 +232,8 @@ class AudioToolApp:
         finally:
             self.is_processing = False
     
-    def _build_audio_message(
-        self,
-        audio_b64: str,
-        mime_type: str,
-        task: str,
-        system_prompt: str
-    ) -> List[Dict[str, Any]]:
-        """
-        Build multimodal message with audio.
-        
-        Uses 'inline_data' for Gemini Native compatibility.
-        """
-        return [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": [
-                {
-                    "type": "inline_data",
-                    "inline_data": {
-                        "mime_type": mime_type,
-                        "data": audio_b64
-                    }
-                },
-                {"type": "text", "text": task}
-            ]}
-        ]
-    
-    def _get_audio_format(self, mime_type: str) -> str:
-        """Get audio format string from MIME type."""
-        mime_to_format = {
-            "audio/wav": "wav",
-            "audio/x-wav": "wav",
-            "audio/ogg": "ogg",
-            "audio/opus": "ogg",
-            "audio/mpeg": "mp3",
-            "audio/mp3": "mp3",
-            "audio/webm": "webm",
-            "audio/flac": "flac",
-        }
-        return mime_to_format.get(mime_type, "wav")
+    # _build_audio_message removed in favor of src/gui/messages.py
+    # _get_audio_format removed as it's no longer needed for inline_data
     
     def _stream_to_chat_window(
         self,

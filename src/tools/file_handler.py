@@ -279,54 +279,27 @@ class FileHandler:
         Returns:
             Message dict in OpenAI format (for images) or Gemini format (for audio)
         """
+        from src.messages import build_image_message, build_inline_message, build_text_message
+        
         content_type, content, mime_type = self.read_file(filepath)
         
         if content_type == "image":
-            # Image message with vision
-            # Text prompt first, then image (best practice for multimodal)
-            data_url = f"data:{mime_type};base64,{content}"
-            return {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": data_url}}
-                ]
-            }
+            # Returns list of messages, we extract the user message
+            msgs = build_image_message(content, mime_type, prompt, None)
+            return msgs[0]
         
         elif content_type == "audio":
-            # Audio message - uses inline_data format
-            # Text prompt first, then audio (best practice for multimodal)
-            # GeminiNativeProvider handles inline_data natively
-            # OpenAICompatibleProvider translates inline_data -> input_audio
-            return {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "inline_data",
-                        "inline_data": {
-                            "mime_type": mime_type,
-                            "data": content
-                        }
-                    }
-                ]
-            }
+            # Returns list of messages, we extract the user message
+            msgs = build_inline_message(content, mime_type, prompt, None)
+            return msgs[0]
         
         elif content_type == "document":
             # Document (PDF) message - use generic file format
-            # Text prompt first, then document (best practice for multimodal)
-            # OpenAICompatible handles via internal translation, GeminiNative handles natively
-            data_url = f"data:{mime_type};base64,{content}"
-            return {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "file",
-                        "file": {"url": data_url}
-                    }
-                ]
-            }
+            # Currently src.messages doesn't have a specific document builder that returns 'file',
+            # so we'll keep this logic local or map it to inline_data (preferred for Gemini)
+            # Gemini Native accepts PDF as inline_data
+            msgs = build_inline_message(content, mime_type, prompt, None)
+            return msgs[0]
         
         else:
             # Text/code message - use TextEditTool-style delimiters
@@ -357,10 +330,15 @@ class FileHandler:
             else:
                 full_prompt = f"{prompt}\n\n<file_content>\n{file_content}\n</file_content>"
             
-            return {
-                "role": "user",
-                "content": full_prompt
-            }
+            msgs = build_text_message(full_prompt, "You are a helper.")
+            
+            # Extract user message
+            for m in msgs:
+                if m["role"] == "user":
+                    return m
+            
+            # Fallback
+            return {"role": "user", "content": full_prompt}
     
     def get_output_path(
         self,

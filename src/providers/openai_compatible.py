@@ -316,8 +316,38 @@ class OpenAICompatibleProvider(BaseProvider):
                                 "format": audio_format
                             }
                         })
+                    
+                    elif mime_type.startswith("image/"):
+                        # Handle inline images -> image_url (data URI)
+                        # This bridges the gap for FileProcessor which uses build_inline_message for images
+                        data_url = f"data:{mime_type};base64,{inline.get('data', '')}"
+                        new_content.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": data_url
+                            }
+                        })
+                        
+                    elif mime_type.startswith("text/") or mime_type in (
+                        "application/json", "application/xml", "application/javascript",
+                        "application/x-python-code", "application/x-sh"
+                    ):
+                        # Handle inline text/code -> decode to text content
+                        # This allows FileProcessor to use build_inline_message for code files
+                        try:
+                            # It was base64 encoded for inline_data, decode it back to text
+                            import base64
+                            text_content = base64.b64decode(inline.get("data", "")).decode("utf-8")
+                            new_content.append({
+                                "type": "text",
+                                "text": f"\n\n[File Content: {mime_type}]\n{text_content}"
+                            })
+                        except Exception:
+                            # If decoding fails, pass through or warn
+                            new_content.append(item)
+                    
                     else:
-                        # Non-audio inline data - pass through (may be handled by server)
+                        # Non-supported inline data - pass through (may be handled by server or fail)
                         new_content.append(item)
                 
                 else:

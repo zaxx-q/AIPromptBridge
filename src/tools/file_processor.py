@@ -2559,27 +2559,20 @@ class FileProcessor(BaseTool):
             print(f"   ✅ Uploaded: {uploaded.name}")
         
         try:
-            # Build message with file reference
-            file_type = self.file_handler.detect_type(filepath)
+            from src.messages import build_file_message
             
-            message = {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "file_data",
-                        "file_data": {
-                            "mime_type": uploaded.mime_type,
-                            "file_uri": uploaded.uri
-                        }
-                    },
-                    {"type": "text", "text": prompt}
-                ]
-            }
+            messages = build_file_message(
+                file_uri=uploaded.uri,
+                mime_type=uploaded.mime_type,
+                task=prompt
+                # system_prompt is handled via checkpoint.prompt_text if it was part of it,
+                # FileProcessor just uses prompt as user prompt usually.
+            )
             
             # Call API
             response, error = call_api_with_retry(
                 provider=checkpoint.provider,
-                messages=[message],
+                messages=messages,
                 model_override=checkpoint.model if checkpoint.model else None,
                 config=web_server.CONFIG,
                 ai_params=web_server.AI_PARAMS,
@@ -2989,22 +2982,22 @@ class FileProcessor(BaseTool):
         import mimetypes
         mime_type = mimetypes.guess_type(filepath)[0] or "application/octet-stream"
         
-        file_part = {}
+        from src.messages import build_file_message, build_inline_message
         
-        if is_large or "video" in mime_type: # Video always prefers Files API usually
-             # Upload first
-             # We can reuse logic from `_process_with_files_api` but that method does the generation too.
-             # We should probably call provider.upload_file directly.
+        if is_large or "video" in mime_type:
+             # Upload first (Files API)
              if hasattr(provider, "upload_file"):
                  if interactive:
                      print(f"   📤 Uploading to Files API (Batch requirement)...")
                  uploaded, error = provider.upload_file(filepath)
                  if error:
                      raise Exception(error)
-                 file_part = {
-                     "type": "file_data",
-                     "file_data": {"mime_type": uploaded.mime_type, "file_uri": uploaded.uri}
-                 }
+                 
+                 msgs = build_file_message(
+                     file_uri=uploaded.uri,
+                     mime_type=uploaded.mime_type,
+                     task=prompt
+                 )
              else:
                  raise Exception("Provider does not support file upload")
         else:
@@ -3012,26 +3005,19 @@ class FileProcessor(BaseTool):
              import base64
              with open(filepath, "rb") as f:
                  data = base64.b64encode(f.read()).decode("utf-8")
-             file_part = {
-                 "type": "inline_data",
-                 "inline_data": {"mime_type": mime_type, "data": data}
-             }
-        
-        # Put text prompt first (best practice)
-        msgs = [{
-            "role": "user",
-            "content": [
-                {"type": "text", "text": prompt},
-                file_part
-            ]
-        }]
+             
+             msgs = build_inline_message(
+                 data_b64=data,
+                 mime_type=mime_type,
+                 task=prompt
+             )
         
         if interactive:
             print("   ⏳ Submitting batch job...")
             
         result, error = provider.create_batch(
-            messages=msgs, 
-            model=checkpoint.model, 
+            messages=msgs,
+            model=checkpoint.model,
             params={"temperature": 0.7}, # defaults?
             display_name=f"Batch: {filepath.name}"
         )

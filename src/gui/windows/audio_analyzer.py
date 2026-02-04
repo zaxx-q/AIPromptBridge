@@ -1918,6 +1918,7 @@ class AudioAnalyzerWindow:
         """Process audio internally."""
         try:
             from ...request_pipeline import RequestPipeline, RequestContext, RequestOrigin, StreamCallback
+            from ...messages import build_audio_message
             
             # Get action config
             actions = self.prompts.get_audio_actions()
@@ -1954,7 +1955,7 @@ class AudioAnalyzerWindow:
             
             # Build message with audio
             audio_b64 = base64.b64encode(audio_data).decode('utf-8')
-            messages = self._build_audio_message(audio_b64, mime_type, task, system_prompt)
+            messages = build_audio_message(audio_b64, mime_type, task, system_prompt)
             
             # Create request context
             ctx = RequestContext(
@@ -2011,32 +2012,6 @@ class AudioAnalyzerWindow:
                     self.send_btn.configure(state="normal")
             
             GUICoordinator.get_instance().run_on_gui_thread(show_error)
-    
-    def _build_audio_message(
-        self,
-        audio_b64: str,
-        mime_type: str,
-        task: str,
-        system_prompt: str
-    ) -> List[Dict[str, Any]]:
-        """
-        Build multimodal message with audio.
-        
-        Uses 'inline_data' for Gemini Native compatibility.
-        """
-        return [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": [
-                {
-                    "type": "inline_data",
-                    "inline_data": {
-                        "mime_type": mime_type,
-                        "data": audio_b64
-                    }
-                },
-                {"type": "text", "text": task}
-            ]}
-        ]
     
     def _build_modifier_injections(self) -> str:
         """Build modifier injection text."""

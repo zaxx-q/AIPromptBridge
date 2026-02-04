@@ -521,16 +521,15 @@ class TextEditToolApp:
                 - "default": Use show_ai_response_in_chat_window config setting
         """
         try:
+            from ..messages import build_text_message
+
             # Get system instruction from settings
             chat_system_instruction = self._get_setting(
                 "chat_system_instruction",
                 "You are a helpful AI assistant."
             )
             
-            messages = [
-                {"role": "system", "content": chat_system_instruction},
-                {"role": "user", "content": user_input}
-            ]
+            messages = build_text_message(user_input, chat_system_instruction)
             
             # Determine display mode based on hierarchy:
             # 1. Radio button (if not "default")
@@ -784,10 +783,8 @@ class TextEditToolApp:
             
             logging.debug(f'Getting AI response for {option_key}')
             
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ]
+            from ..messages import build_text_message
+            messages = build_text_message(user_message, system_prompt)
             
             from ..request_pipeline import RequestOrigin
             

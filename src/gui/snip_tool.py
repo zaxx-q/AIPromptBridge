@@ -239,6 +239,8 @@ class SnipToolApp:
             active_modifiers = []
         
         try:
+            from ..messages import build_image_message, build_comparison_message
+
             # Handle File Processor source separately
             if source == "file_processor":
                 system_prompt, task = self._get_file_processor_prompt(action_key)
@@ -273,7 +275,7 @@ class SnipToolApp:
             
             # Build multimodal message (single or comparison)
             if compare_mode and compare_capture:
-                messages = self._build_comparison_message(
+                messages = build_comparison_message(
                     image1_b64=self.current_capture.image_base64,
                     image2_b64=compare_capture.image_base64,
                     mime_type=self.current_capture.mime_type,
@@ -283,7 +285,7 @@ class SnipToolApp:
                 window_title = f"🔀 {action_key}"
                 image_info = f"{self.current_capture.width}x{self.current_capture.height} vs {compare_capture.width}x{compare_capture.height}"
             else:
-                messages = self._build_image_message(
+                messages = build_image_message(
                     image_b64=self.current_capture.image_base64,
                     mime_type=self.current_capture.mime_type,
                     task=task,
@@ -352,60 +354,7 @@ class SnipToolApp:
         # Fallback
         return "You are a helpful AI assistant.", "Analyze this image."
     
-    def _build_image_message(
-        self,
-        image_b64: str,
-        mime_type: str,
-        task: str,
-        system_prompt: str
-    ) -> List[Dict[str, Any]]:
-        """
-        Build multimodal message with image.
-        
-        Format follows OpenAI multimodal message structure which is
-        compatible with both OpenAI-compatible and Gemini Native providers.
-        
-        Note: image_url is placed BEFORE text content (Context -> Question).
-        """
-        data_url = f"data:{mime_type};base64,{image_b64}"
-        
-        return [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": [
-                {"type": "image_url", "image_url": {"url": data_url}},
-                {"type": "text", "text": task}
-            ]}
-        ]
-    
-    def _build_comparison_message(
-        self,
-        image1_b64: str,
-        image2_b64: str,
-        mime_type: str,
-        task: str,
-        system_prompt: str
-    ) -> List[Dict[str, Any]]:
-        """
-        Build multimodal message with two images for comparison.
-        
-        Format follows OpenAI multimodal message structure which is
-        compatible with both OpenAI-compatible and Gemini Native providers.
-        
-        Images are labeled and placed before the task text.
-        """
-        data_url1 = f"data:{mime_type};base64,{image1_b64}"
-        data_url2 = f"data:{mime_type};base64,{image2_b64}"
-        
-        return [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": [
-                {"type": "text", "text": "Image 1:"},
-                {"type": "image_url", "image_url": {"url": data_url1}},
-                {"type": "text", "text": "Image 2:"},
-                {"type": "image_url", "image_url": {"url": data_url2}},
-                {"type": "text", "text": task}
-            ]}
-        ]
+    # _build_image_message and _build_comparison_message removed in favor of src/gui/messages.py
     
     def _stream_to_chat_window(
         self,
