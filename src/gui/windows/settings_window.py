@@ -43,6 +43,7 @@ from ..themes import (
 )
 from ..core import get_next_window_id, register_window, unregister_window
 from ..custom_widgets import ScrollableButtonList, ScrollableComboBox, upgrade_tabview_with_icons, create_section_header, create_emoji_button
+from .utils import set_window_icon
 
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
 try:
@@ -471,23 +472,8 @@ class SettingsWindow:
         self.root.geometry("1000x700")
         self.root.minsize(900, 600)
         
-        # Set icon - use repeated after() calls to override CTk's default icon
-        if getattr(sys, 'frozen', False):
-            self._icon_path = Path(sys.executable).parent / "icon.ico"
-        else:
-            self._icon_path = Path(__file__).parent.parent.parent / "icon.ico"
-            
-        def _set_icon():
-            try:
-                if self._icon_path.exists() and self.root and not self._destroyed:
-                    self.root.iconbitmap(str(self._icon_path))
-            except Exception:
-                pass
-        
-        # Apply icon multiple times to override CTk default
-        self.root.after(50, _set_icon)
-        self.root.after(150, _set_icon)
-        self.root.after(300, _set_icon)
+        # Set icon
+        set_window_icon(self.root)
         
         # Position window
         offset = (self.window_id % 3) * 30
