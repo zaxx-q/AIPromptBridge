@@ -261,7 +261,7 @@ class AudioAnalyzerWindow:
         from .audio_analyzer_tk import build_tk_ui
         build_tk_ui(self)
     
-    def _create_section_frame_grid(self, parent, title: str, row: int, col: int, rowspan: int = 1) -> ctk.CTkFrame:
+    def _create_section_frame_grid(self, parent, title: str, row: int, col: int, rowspan: int = 1) -> Any:
         """Create a titled section frame using grid layout."""
         frame = ctk.CTkFrame(
             parent,
@@ -379,7 +379,7 @@ class AudioAnalyzerWindow:
     # Pack-based section methods for left column
     # =========================================================================
     
-    def _create_section_frame_pack(self, parent, title: str) -> ctk.CTkFrame:
+    def _create_section_frame_pack(self, parent, title: str) -> Any:
         """Create a titled section frame using pack layout."""
         frame = ctk.CTkFrame(
             parent,
