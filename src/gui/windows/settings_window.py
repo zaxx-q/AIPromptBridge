@@ -1043,6 +1043,64 @@ class SettingsWindow:
                              self.config_data.config.get("screen_snip_hotkey", "ctrl+shift+x"),
                              width=200, hint="⚠️ Restart required")
         
+        # Audio Tool section
+        create_section_header(scroll_frame, "🎤 Audio Tool", self.colors, top_padding=20)
+        
+        self._add_toggle_field(scroll_frame, "audio_tool_enabled",
+                              "Enable Audio Tool",
+                              self.config_data.config.get("audio_tool_enabled", True),
+                              hint="⚠️ Restart required")
+        
+        self._add_entry_field(scroll_frame, "audio_tool_hotkey", "Audio Tool hotkey:",
+                             self.config_data.config.get("audio_tool_hotkey", "ctrl+shift+a"),
+                             width=200, hint="⚠️ Restart required")
+        
+        self._add_entry_field(scroll_frame, "audio_default_device", "Default device:",
+                             self.config_data.config.get("audio_default_device", "") or "",
+                             width=300, hint="Partial name match (blank = system default)")
+        
+        self._add_toggle_field(scroll_frame, "audio_default_loopback",
+                              "Default to loopback (system audio)",
+                              self.config_data.config.get("audio_default_loopback", True),
+                              hint="Record what you hear instead of microphone")
+        
+        # Level meter style section
+        create_section_header(scroll_frame, "📊 Display", self.colors, top_padding=20)
+        
+        # Level meter style dropdown
+        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row.pack(fill="x", pady=8)
+        
+        self.vars["audio_level_meter_style"] = tk.StringVar(
+            master=self.root, value=self.config_data.config.get("audio_level_meter_style", "canvas"))
+        
+        if self.use_ctk:
+            ctk.CTkLabel(row, text="Level meter style:", font=get_ctk_font(13), width=180, anchor="w",
+                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            self.widgets["audio_level_meter_style"] = ctk.CTkComboBox(
+                row, variable=self.vars["audio_level_meter_style"],
+                values=["canvas", "progressbar"],
+                width=150, height=34, state="readonly", font=get_ctk_font(13),
+                **get_ctk_combobox_colors(self.colors)
+            )
+            self.widgets["audio_level_meter_style"].pack(side="left", padx=(12, 0))
+            
+            ctk.CTkLabel(row, text="Visual style of recording meter, use canvas for gradient effect, progressbar for simple slider-like style", font=get_ctk_font(11),
+                        **get_ctk_label_colors(self.colors, muted=True)).pack(side="left", padx=(15, 0))
+        else:
+            from tkinter import ttk
+            tk.Label(row, text="Level meter style:", font=("Segoe UI", 10), width=18, anchor="w",
+                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            self.widgets["audio_level_meter_style"] = ttk.Combobox(
+                row, textvariable=self.vars["audio_level_meter_style"],
+                values=["canvas", "progressbar"],
+                state="readonly", width=15
+            )
+            self.widgets["audio_level_meter_style"].pack(side="left", padx=(10, 0))
+            
+            tk.Label(row, text="Visual style of recording meter, use canvas for gradient effect, progressbar for simple slider-like style", font=("Segoe UI", 9),
+                    bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
+        
         # Typing settings section
         create_section_header(scroll_frame, "🖱️ Typing Settings", self.colors, top_padding=20)
         

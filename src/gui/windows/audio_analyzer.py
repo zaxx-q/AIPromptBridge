@@ -108,9 +108,9 @@ class AudioAnalyzerWindow:
         self.is_playing = False
         self.playback_position = 0.0
         
-        # Compression settings
-        self.compression_enabled = config.get("audio_compression_enabled", True)
-        self.compression_preset = config.get("audio_compression_preset", "recommended")
+        # Compression settings (always enabled with recommended preset by default)
+        self.compression_enabled = True
+        self.compression_preset = "recommended"
         
         # Provider/Model state
         self.provider = config.get("default_provider", "google")

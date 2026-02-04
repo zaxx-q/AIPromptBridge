@@ -88,12 +88,10 @@ DEFAULT_CONFIG = {
     "audio_tool_hotkey": "ctrl+shift+a",
     "audio_default_device": "",
     "audio_default_loopback": True,
-    "audio_compression_enabled": True,
-    "audio_compression_preset": "recommended",
     # Level meter display style
-    # - progressbar: Smooth, simple progress bar (recommended)
-    # - canvas: Custom canvas with grid lines and color gradient
-    "audio_level_meter_style": "progressbar",
+    # - canvas: Custom canvas with grid lines and color gradient (default)
+    # - progressbar: Smooth, simple progress bar
+    "audio_level_meter_style": "canvas",
 }
 
 # API URLs
@@ -380,18 +378,10 @@ audio_default_device =
 # false = Record microphone input
 audio_default_loopback = true
 
-# Enable audio compression (Opus/OGG) to reduce token usage
-# Highly recommended as raw WAV files can be very large
-audio_compression_enabled = true
-
-# Compression preset (controls trade-off between quality and size)
-# Options: recommended, preserve_audio, smallest, mp3_compat, music
-audio_compression_preset = recommended
-
 # Level meter display style
-# - progressbar: Smooth, simple progress bar (recommended)
-# - canvas: Custom canvas with grid lines and color gradient
-audio_level_meter_style = progressbar
+# - canvas: Custom canvas with grid lines and color gradient (default)
+# - progressbar: Smooth, simple progress bar
+audio_level_meter_style = canvas
 
 # ============================================================
 # FLASK API ENDPOINTS (Optional)
