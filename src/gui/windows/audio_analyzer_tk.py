@@ -531,19 +531,49 @@ def _create_prompt_section_tk(window, parent, row, col):
     set_btn.pack(side="right")
     
     # Carousel (Handles fallback internally)
-    actions = window.prompts.get_audio_actions()
-    items = []
-    for key, action in actions.items():
-        if key.startswith("_"): continue
-        items.append((key, key, action.get("icon", ""), action.get("task", "")))
+    from ..popups import GroupedButtonList
+    
+    settings = window.prompts.get_audio_tool().get("_settings", {})
+    use_groups = settings.get("popup_use_groups", True) or settings.get("use_groups", True)
+    
+    if use_groups:
+        popup_groups = settings.get("popup_groups", [])
+        actions = window.prompts.get_audio_actions()
         
-    items_per_page = window.prompts.get_audio_setting("items_per_page", 6)
-        
-    if items:
-        window.carousel = CarouselButtonList(
-            content, items=items, on_click=window._on_action_click, items_per_page=items_per_page
-        )
-        window.carousel.pack(fill="x", pady=(0, 8))
+        groups = []
+        for group_def in popup_groups:
+            group_name = group_def.get("name", "")
+            item_keys = group_def.get("items", [])
+            
+            group_items = []
+            for key in item_keys:
+                action = actions.get(key)
+                if action:
+                    group_items.append((key, key, action.get("icon", ""), action.get("task", "")))
+            
+            if group_items:
+                groups.append({"name": group_name, "items": group_items})
+                
+        if groups:
+            window.carousel = GroupedButtonList(
+                content, groups=groups, on_click=window._on_action_click
+            )
+            window.carousel.pack(fill="x", pady=(0, 8))
+    else:
+        # Flat fallback
+        actions = window.prompts.get_audio_actions()
+        items = []
+        for key, action in actions.items():
+            if key.startswith("_"): continue
+            items.append((key, key, action.get("icon", ""), action.get("task", "")))
+            
+        items_per_page = settings.get("items_per_page", 6)
+            
+        if items:
+            window.carousel = CarouselButtonList(
+                content, items=items, on_click=window._on_action_click, items_per_page=items_per_page
+            )
+            window.carousel.pack(fill="x", pady=(0, 8))
         
     # Modifier Bar (Handles fallback internally)
     global_modifiers = window.prompts.get_modifiers()

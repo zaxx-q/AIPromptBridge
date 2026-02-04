@@ -697,31 +697,61 @@ class AudioAnalyzerWindow:
             command=self._on_custom_input_set
         ).pack(side="right")
         
-        # Get audio actions
-        actions = self.prompts.get_audio_actions()
+        settings = self.prompts.get_audio_tool().get("_settings", {})
+        use_groups = settings.get("use_groups", True)
         
-        # Create action button items
-        items = []
-        for key, action in actions.items():
-            if key.startswith("_"):
-                continue
-            icon = action.get("icon", "")
-            tooltip = action.get("task", "")
-            items.append((key, key, icon, tooltip))
-        
-        # Get items per page from config
-        items_per_page = self.prompts.get_audio_setting("items_per_page", 6)
-        
-        if items:
-            self.carousel = CarouselButtonList(
-                content,
-                items=items,
-                on_click=self._on_action_click,
-                items_per_page=items_per_page
-            )
-            self.carousel.pack(fill="x", pady=(0, 8))
+        if use_groups and settings.get("popup_groups"):
+            popup_groups = settings.get("popup_groups", [])
+            actions = self.prompts.get_audio_actions()
             
-        # Modifier bar
+            # Construct group data for GroupedButtonList
+            groups = []
+            for group_def in popup_groups:
+                group_name = group_def.get("name", "")
+                item_keys = group_def.get("items", [])
+                
+                group_items = []
+                for key in item_keys:
+                    action = actions.get(key)
+                    if action:
+                        icon = action.get("icon", "")
+                        tooltip = action.get("task", "")
+                        group_items.append((key, key, icon, tooltip))
+                
+                if group_items:
+                    groups.append({"name": group_name, "items": group_items})
+            
+            if groups:
+                # Use GroupedButtonList instead of flat CarouselButtonList
+                self.carousel = GroupedButtonList(
+                    content,
+                    groups=groups,
+                    on_click=self._on_action_click
+                )
+                self.carousel.pack(fill="x", pady=(0, 8))
+        else:
+            # Flat list fallback
+            actions = self.prompts.get_audio_actions()
+            items = []
+            for key, action in actions.items():
+                if key.startswith("_"):
+                    continue
+                icon = action.get("icon", "")
+                tooltip = action.get("task", "")
+                items.append((key, key, icon, tooltip))
+            
+            items_per_page = settings.get("items_per_page", 6)
+            
+            if items:
+                self.carousel = CarouselButtonList(
+                    content,
+                    items=items,
+                    on_click=self._on_action_click,
+                    items_per_page=items_per_page
+                )
+                self.carousel.pack(fill="x", pady=(0, 8))
+            
+        # Modifier bar (Fixed position at bottom of prompt section)
         global_modifiers = self.prompts.get_modifiers()
         if global_modifiers:
             self.modifier_bar = ModifierBar(

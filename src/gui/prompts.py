@@ -471,9 +471,13 @@ DEFAULT_SNIP_ACTIONS = {
 # =============================================================================
 
 DEFAULT_AUDIO_SETTINGS = {
-    "use_groups": False,
-    "items_per_page": 3,
-    "custom_task_template": "Regarding this audio: {custom_input}"
+    "use_groups": True,
+    "items_per_page": 6,
+    "custom_task_template": "Regarding this audio: {custom_input}",
+    "popup_groups": [
+        {"name": "Transcription", "items": ["Transcribe", "Transcribe with Timestamps", "Identify Speakers", "Translate to English"]},
+        {"name": "Analysis", "items": ["Analyze", "Describe", "Summarize", "Extract Key Points"]}
+    ]
 }
 
 DEFAULT_AUDIO_ACTIONS = {
