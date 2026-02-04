@@ -9,7 +9,7 @@ from tkinter import ttk
 from typing import Callable, Any, Optional
 
 from ..custom_widgets import ScrollableComboBox
-from ..popups import ModifierBar, Tooltip, CarouselButtonList
+from ..popups import ModifierBar, Tooltip, CarouselButtonList, SegmentedToggle
 from ..themes import get_colors
 
 class TkOptionMenuWrapper:
@@ -160,6 +160,7 @@ def build_tk_ui(window):
     _create_recording_section_tk(window, left_container)
     _create_compression_section_tk(window, left_container)
     _create_preview_section_tk(window, left_container)
+    _create_display_options_section_tk(window, left_container)
     
     # === Right Column: Prompt & Result ===
     _create_prompt_section_tk(window, main_frame, row=1, col=1)
@@ -463,6 +464,30 @@ def _create_preview_section_tk(window, parent):
         bg=colors.surface0, fg=colors.overlay0
     )
     window.position_label.pack(side="left")
+
+def _create_display_options_section_tk(window, parent):
+    """Create display options section (pack layout)."""
+    colors = get_colors()
+    content = _create_section_frame_tk(parent, "Response Mode", colors)
+    
+    # Segmented toggle
+    window.response_mode_toggle = SegmentedToggle(
+        content,
+        options=[("Default", "default"), ("Result Panel", "result"), ("Chat Window", "show")],
+        default_value="default"
+    )
+    window.response_mode_toggle.pack(pady=(0, 5))
+    
+    # Description
+    tk.Label(
+        content,
+        text="Override where the AI response is shown.",
+        font=("Segoe UI", 8),
+        bg=colors.surface0,
+        fg=colors.overlay0,
+        justify="center",
+        wraplength=200
+    ).pack(fill="x", padx=5)
 
 def _create_prompt_section_tk(window, parent, row, col):
     """Create prompt section (Right column)."""

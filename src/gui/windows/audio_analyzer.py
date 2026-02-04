@@ -32,7 +32,7 @@ from ..themes import (
 )
 from ..core import get_next_window_id, register_window, unregister_window, GUICoordinator
 from ..custom_widgets import ScrollableComboBox
-from ..popups import Tooltip, CarouselButtonList, ModifierBar, GroupedButtonList
+from ..popups import Tooltip, CarouselButtonList, ModifierBar, GroupedButtonList, SegmentedToggle
 from ..prompts import get_prompts_config
 from ..emoji_renderer import prepare_emoji_content
 from .utils import set_window_icon
@@ -162,6 +162,7 @@ class AudioAnalyzerWindow:
         self.result_text_widget = None
         self.copy_btn = None
         self.status_label = None
+        self.response_mode_toggle = None
         self._use_unified_stream = True  # Use new unified stream architecture
     
     def _get_window_tag(self) -> str:
@@ -248,6 +249,9 @@ class AudioAnalyzerWindow:
         
         # Preview
         self._create_preview_section_pack(left_container)
+        
+        # Response Mode
+        self._create_display_options_section_pack(left_container)
         
         # === Right Column (Prompt Selection + Result) ===
         # Row 1: Prompt Selection
@@ -669,6 +673,28 @@ class AudioAnalyzerWindow:
         )
         self.position_label.pack(side="left")
     
+    def _create_display_options_section_pack(self, parent):
+        """Create display options section (pack layout)."""
+        content = self._create_section_frame_pack(parent, "Response Mode")
+        
+        # Segmented toggle
+        self.response_mode_toggle = SegmentedToggle(
+            content,
+            options=[("Default", "default"), ("Result Panel", "result"), ("Chat Window", "show")],
+            default_value="default"
+        )
+        self.response_mode_toggle.pack(pady=(0, 5))
+        
+        # Description
+        ctk.CTkLabel(
+            content,
+            text="Override where the AI response is shown.",
+            font=get_ctk_font(size=10),
+            text_color=self.colors.overlay0,
+            justify="center",
+            wraplength=200
+        ).pack(fill="x", padx=5)
+
     # =========================================================================
     # Grid-based section methods (for right column)
     # =========================================================================
@@ -1914,7 +1940,21 @@ class AudioAnalyzerWindow:
         # Check action config for show_chat_window preference
         actions = self.prompts.get_audio_actions()
         action = actions.get(action_key, {})
-        show_chat = action.get("show_chat_window", True)
+        
+        # Determine strict response mode
+        show_chat = True # Default fallback
+        
+        mode = "default"
+        if self.response_mode_toggle:
+            mode = self.response_mode_toggle.get()
+            
+        if mode == "result":
+            show_chat = False
+        elif mode == "show":
+            show_chat = True
+        else:
+            # Default behavior (follow config)
+            show_chat = action.get("show_chat_window", True)
 
         if self.on_action_callback and show_chat:
             # Delegate to callback (GUI Controller mode) - ONLY if show_chat_window is True
