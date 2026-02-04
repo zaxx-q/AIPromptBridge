@@ -102,6 +102,7 @@ build_exe_options = {
         (os.path.dirname(customtkinter.__file__), "lib/customtkinter"),
         # Emoji assets for color emoji support in GUI
         ("assets/emojis.zip", "assets/emojis.zip"),
+        ("assets/snip.wav", "assets/snip.wav"),
         # Note: config.ini is generated on first run if not exists
     ],
     

@@ -175,7 +175,8 @@ class SnipToolApp:
         custom_input: Optional[str],
         active_modifiers: List[str] = None,
         compare_mode: bool = False,
-        compare_capture: Optional[CaptureResult] = None
+        compare_capture: Optional[CaptureResult] = None,
+        response_mode: str = "default"
     ):
         """
         Handle action selection from popup.
@@ -187,11 +188,12 @@ class SnipToolApp:
             active_modifiers: List of active modifier keys
             compare_mode: Whether compare mode is enabled
             compare_capture: Second capture result (if compare mode)
+            response_mode: "default", "copy", or "show"
         """
         if active_modifiers is None:
             active_modifiers = []
         
-        logging.debug(f'Action selected: source={source}, key={action_key}, custom={bool(custom_input)}, modifiers={active_modifiers}, compare={compare_mode}')
+        logging.debug(f'Action selected: source={source}, key={action_key}, custom={bool(custom_input)}, modifiers={active_modifiers}, compare={compare_mode}, mode={response_mode}')
         
         if not self.current_capture:
             logging.error('No capture available for action')
@@ -202,7 +204,7 @@ class SnipToolApp:
         # Process in background thread
         threading.Thread(
             target=self._process_action,
-            args=(source, action_key, custom_input, active_modifiers, compare_mode, compare_capture),
+            args=(source, action_key, custom_input, active_modifiers, compare_mode, compare_capture, response_mode),
             daemon=True
         ).start()
     
@@ -232,7 +234,8 @@ class SnipToolApp:
         custom_input: Optional[str],
         active_modifiers: List[str] = None,
         compare_mode: bool = False,
-        compare_capture: Optional[CaptureResult] = None
+        compare_capture: Optional[CaptureResult] = None,
+        response_mode: str = "default"
     ):
         """Process the selected action with image context."""
         if active_modifiers is None:
@@ -244,6 +247,7 @@ class SnipToolApp:
             # Handle File Processor source separately
             if source == "file_processor":
                 system_prompt, task = self._get_file_processor_prompt(action_key)
+                action = {}
             else:
                 # Get action config based on source
                 if source == "text_edit":
@@ -267,6 +271,21 @@ class SnipToolApp:
                     )
                     task = template.format(custom_input=custom_input)
             
+            # Determine display mode
+            if response_mode == "show":
+                show_in_chat = True
+            elif response_mode == "copy":
+                show_in_chat = False
+            else:  # "default"
+                # Check action config
+                # Default for SnipTool actions is usually show_chat_window=True
+                # But we should respect the config if present
+                show_in_chat = action.get("show_chat_window", True)
+                
+                # Check modifiers (some might force chat window)
+                if not show_in_chat and self._modifiers_force_chat_window(active_modifiers):
+                    show_in_chat = True
+
             # Apply modifier injections to system prompt
             if active_modifiers:
                 modifier_injections = self._build_modifier_injections(active_modifiers)
@@ -302,15 +321,18 @@ class SnipToolApp:
                 print(f"[SnipTool] Compare Mode: Enabled")
             if active_modifiers:
                 print(f"[SnipTool] Modifiers: {', '.join(active_modifiers)}")
+            print(f"[SnipTool] Mode: {response_mode} (Output: {'Chat Window' if show_in_chat else 'Clipboard'})")
             
-            # Always stream to chat window for image results
-            from ..request_pipeline import RequestOrigin
-            self._stream_to_chat_window(
-                messages=messages,
-                window_title=window_title,
-                origin=RequestOrigin.SNIP_TOOL,
-                compare_capture=compare_capture
-            )
+            if show_in_chat:
+                from ..request_pipeline import RequestOrigin
+                self._stream_to_chat_window(
+                    messages=messages,
+                    window_title=window_title,
+                    origin=RequestOrigin.SNIP_TOOL,
+                    compare_capture=compare_capture
+                )
+            else:
+                self._copy_to_clipboard_with_notification(messages, action_key)
             
             print(f"{'─'*60}\n")
             
@@ -356,6 +378,57 @@ class SnipToolApp:
     
     # _build_image_message and _build_comparison_message removed in favor of src/gui/messages.py
     
+    def _copy_to_clipboard_with_notification(self, messages, action_key):
+        """Execute non-streaming request, copy to clipboard, show notification."""
+        from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
+        import pyperclip
+        
+        provider = self.config.get("default_provider", "google")
+        
+        ctx = RequestContext(
+            origin=RequestOrigin.SNIP_TOOL,
+            provider=provider,
+            model=self.config.get(f"{provider}_model"),
+            streaming=False,  # Must be non-streaming for copy mode
+            thinking_enabled=self.config.get("thinking_enabled", False)
+        )
+        
+        ctx = RequestPipeline.execute_simple(
+            ctx, messages, self.config, self.ai_params, self.key_managers
+        )
+        
+        if ctx.error:
+            logging.error(f'Copy mode request failed: {ctx.error}')
+            print(f"  [Error] {ctx.error}")
+            from .popups import show_error_popup
+            show_error_popup(
+                title="API Request Failed",
+                message="Failed to process image for copy.",
+                details=ctx.error
+            )
+            return
+        
+        if ctx.response_text:
+            # Copy to clipboard
+            try:
+                pyperclip.copy(ctx.response_text)
+                
+                # Play sound
+                from ..utils import play_sound
+                play_sound("assets/snip.wav")
+                
+                # Show toast notification
+                from .core import GUICoordinator
+                GUICoordinator.get_instance().request_toast_notification(
+                    title=f"{action_key}",
+                    message=ctx.response_text
+                )
+                
+                print(f"  ✅ Copied to clipboard ({len(ctx.response_text)} chars)")
+            except Exception as e:
+                logging.error(f"Failed to copy to clipboard: {e}")
+                print(f"  [Error] Failed to copy: {e}")
+
     def _stream_to_chat_window(
         self,
         messages: List[Dict[str, Any]],

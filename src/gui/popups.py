@@ -3325,3 +3325,257 @@ def show_error_popup(title: str, message: str, details: Optional[str] = None):
         'message': message,
         'details': details
     })
+
+
+# =============================================================================
+# Toast Notification - Temporary bottom-right message
+# =============================================================================
+
+class ToastNotification:
+    """
+    A toast notification that appears at the bottom-right corner.
+    Shows a preview of copied content and auto-dismisses.
+    Matches the theme and style of other popups.
+    """
+    
+    PREVIEW_MAX_CHARS = 150
+    DEFAULT_TIMEOUT_MS = 3000
+    MARGIN_X = 20
+    MARGIN_Y = 20
+    
+    def __init__(
+        self,
+        parent_root,
+        title: str,
+        message: str,
+        timeout_ms: int = DEFAULT_TIMEOUT_MS,
+        on_dismiss: Optional[Callable[[], None]] = None
+    ):
+        self.parent_root = parent_root
+        self.title = title
+        self.message = message
+        self.timeout_ms = timeout_ms
+        self.on_dismiss = on_dismiss
+        
+        self.colors = get_colors()
+        self.root = None
+        self.after_id = None
+        
+        self._create_window()
+    
+    def _create_window(self):
+        """Create the toast window."""
+        if HAVE_CTK:
+            self.root = ctk.CTkToplevel(self.parent_root)
+        else:
+            self.root = tk.Toplevel(self.parent_root)
+        
+        # Hide window while building
+        self.root.withdraw()
+        
+        self.root.overrideredirect(True)
+        self.root.attributes('-topmost', True)
+        
+        # Set up transparent corners on Windows
+        setup_transparent_popup(self.root, self.colors)
+        
+        # Hide from taskbar
+        hide_from_taskbar(self.root)
+        
+        if HAVE_CTK:
+            self._build_ctk_ui()
+        else:
+            self._build_tk_ui()
+        
+        # Position and show
+        self._position_window()
+        self.root.update_idletasks()
+        self.root.after(10, self._show)
+    
+    def _build_ctk_ui(self):
+        """Build CustomTkinter UI."""
+        main_frame = ctk.CTkFrame(
+            self.root,
+            corner_radius=10,
+            fg_color=self.colors.surface0,
+            border_color=self.colors.green,  # Green border for success
+            border_width=2
+        )
+        main_frame.pack(fill="both", expand=True, padx=1, pady=1)
+        
+        # Click closes the toast
+        main_frame.bind("<Button-1>", lambda e: self.dismiss())
+        
+        content = ctk.CTkFrame(main_frame, fg_color="transparent")
+        content.pack(fill="both", expand=True, padx=12, pady=10)
+        content.bind("<Button-1>", lambda e: self.dismiss())
+        
+        # Header
+        header = ctk.CTkFrame(content, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 4))
+        header.bind("<Button-1>", lambda e: self.dismiss())
+        
+        # Icon and Title
+        icon_frame = ctk.CTkFrame(header, fg_color="transparent")
+        icon_frame.pack(side="left")
+        icon_frame.bind("<Button-1>", lambda e: self.dismiss())
+        
+        # Try to use emoji image
+        icon_text = "📋 " + self.title
+        label_kwargs = {
+            "text": icon_text,
+            "font": get_ctk_font(size=12, weight="bold"),
+            "text_color": self.colors.text
+        }
+        
+        if HAVE_EMOJI:
+            try:
+                renderer = get_emoji_renderer()
+                # Use checkmark or clipboard based on content
+                icon_char = "✅"
+                icon_img = renderer.get_ctk_image(icon_char, size=16)
+                if icon_img:
+                    label_kwargs["text"] = " " + self.title
+                    label_kwargs["image"] = icon_img
+                    label_kwargs["compound"] = "left"
+            except Exception:
+                pass
+        
+        title_lbl = ctk.CTkLabel(icon_frame, **label_kwargs)
+        title_lbl.pack(side="left")
+        title_lbl.bind("<Button-1>", lambda e: self.dismiss())
+        
+        # Message preview
+        preview_text = self.message
+        if len(preview_text) > self.PREVIEW_MAX_CHARS:
+            preview_text = preview_text[:self.PREVIEW_MAX_CHARS] + "..."
+            
+        msg_lbl = ctk.CTkLabel(
+            content,
+            text=preview_text,
+            font=get_ctk_font(size=11),
+            text_color=self.colors.overlay0,
+            wraplength=300,
+            justify="left"
+        )
+        msg_lbl.pack(anchor="w")
+        msg_lbl.bind("<Button-1>", lambda e: self.dismiss())
+        
+        # Footer text (click to dismiss)
+        footer = ctk.CTkLabel(
+            content,
+            text="Click to dismiss",
+            font=get_ctk_font(size=9),
+            text_color=self.colors.surface2
+        )
+        footer.pack(anchor="e", pady=(4, 0))
+        footer.bind("<Button-1>", lambda e: self.dismiss())
+
+    def _build_tk_ui(self):
+        """Build standard Tkinter UI."""
+        self.root.configure(bg=self.colors.base)
+        
+        main_frame = tk.Frame(
+            self.root,
+            bg=self.colors.surface0,
+            highlightbackground=self.colors.green,
+            highlightthickness=2
+        )
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.bind("<Button-1>", lambda e: self.dismiss())
+        
+        content = tk.Frame(main_frame, bg=self.colors.surface0)
+        content.pack(fill=tk.BOTH, expand=True, padx=12, pady=10)
+        content.bind("<Button-1>", lambda e: self.dismiss())
+        
+        # Header
+        header = tk.Frame(content, bg=self.colors.surface0)
+        header.pack(fill=tk.X, pady=(0, 4))
+        header.bind("<Button-1>", lambda e: self.dismiss())
+        
+        tk.Label(
+            header,
+            text="✅ " + self.title,
+            font=("Arial", 11, "bold"),
+            bg=self.colors.surface0,
+            fg=self.colors.text
+        ).pack(side=tk.LEFT)
+        
+        # Message preview
+        preview_text = self.message
+        if len(preview_text) > self.PREVIEW_MAX_CHARS:
+            preview_text = preview_text[:self.PREVIEW_MAX_CHARS] + "..."
+            
+        msg_lbl = tk.Label(
+            content,
+            text=preview_text,
+            font=("Arial", 10),
+            bg=self.colors.surface0,
+            fg=self.colors.overlay0,
+            wraplength=300,
+            justify=tk.LEFT
+        )
+        msg_lbl.pack(anchor="w")
+        msg_lbl.bind("<Button-1>", lambda e: self.dismiss())
+
+    def _position_window(self):
+        """Position at bottom right of screen."""
+        self.root.update_idletasks()
+        
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        window_width = self.root.winfo_reqwidth()
+        window_height = self.root.winfo_reqheight()
+        
+        # Position with margin from bottom-right corner
+        x = screen_width - window_width - self.MARGIN_X
+        y = screen_height - window_height - self.MARGIN_Y - 40 # Account for taskbar approx
+        
+        self.root.geometry(f"+{x}+{y}")
+    
+    def _show(self):
+        """Show the window and schedule dismissal."""
+        if not self.root:
+            return
+        
+        try:
+            self.root.deiconify()
+            self.root.lift()
+            
+            # Schedule auto-dismiss
+            self.after_id = self.root.after(self.timeout_ms, self.dismiss)
+            
+        except tk.TclError:
+            pass
+    
+    def dismiss(self):
+        """Dismiss the toast."""
+        if self.after_id and self.root:
+            try:
+                self.root.after_cancel(self.after_id)
+            except Exception:
+                pass
+            self.after_id = None
+            
+        if self.root:
+            try:
+                self.root.destroy()
+            except tk.TclError:
+                pass
+            self.root = None
+        
+        if self.on_dismiss:
+            try:
+                self.on_dismiss()
+            except Exception:
+                pass
+
+
+def create_toast_notification(
+    parent_root,
+    title: str,
+    message: str,
+    timeout_ms: int = 3000
+):
+    """Create and show a toast notification."""
+    ToastNotification(parent_root, title, message, timeout_ms)

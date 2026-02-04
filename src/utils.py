@@ -88,3 +88,41 @@ def is_invalid_key_error(error_msg, status_code=None):
     patterns = ["invalid api key", "invalid key", "api key invalid",
                 "unauthorized", "authentication", "forbidden", "not authorized"]
     return any(p in error_str for p in patterns)
+
+
+def play_sound(path: str, async_play: bool = True) -> bool:
+    """
+    Play a WAV sound file using Windows native winsound.
+    
+    Args:
+        path: Path to the .wav file
+        async_play: If True, play asynchronously (non-blocking)
+        
+    Returns:
+        True if sound played successfully, False otherwise
+    """
+    import sys
+    import logging
+    
+    if sys.platform != "win32":
+        return False
+    
+    try:
+        import winsound
+        from pathlib import Path
+        
+        sound_path = Path(path)
+        if not sound_path.exists():
+            logging.debug(f"[Sound] File not found: {path}")
+            return False
+        
+        flags = winsound.SND_FILENAME
+        if async_play:
+            flags |= winsound.SND_ASYNC
+        
+        winsound.PlaySound(str(sound_path), flags)
+        return True
+        
+    except Exception as e:
+        logging.debug(f"[Sound] Failed to play {path}: {e}")
+        return False

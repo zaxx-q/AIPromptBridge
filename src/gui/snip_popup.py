@@ -36,7 +36,7 @@ from .custom_widgets import create_emoji_button
 from .popups import (
     Tooltip, GroupedButtonList, CarouselButtonList,
     setup_transparent_popup, TRANSPARENCY_COLOR,
-    ModifierBar
+    ModifierBar, SegmentedToggle
 )
 from .screen_snip import CaptureResult
 from .prompts import get_prompts_config
@@ -283,6 +283,17 @@ class AttachedSnipPopup:
         )
         self.source_dropdown.pack(side="left")
         
+        # Response mode toggle
+        toggle_frame = ctk.CTkFrame(right_side, fg_color="transparent")
+        toggle_frame.pack(fill="x", pady=(0, 8))
+        
+        self.response_toggle = SegmentedToggle(
+            toggle_frame,
+            options=[("Default", "default"), ("Copy", "copy"), ("Show", "show")],
+            default_value="default"
+        )
+        self.response_toggle.pack(anchor="center")
+        
         # Custom input with send button
         input_frame = ctk.CTkFrame(
             right_side,
@@ -477,6 +488,17 @@ class AttachedSnipPopup:
         )
         self.source_label.pack(side=tk.LEFT)
         self.source_label.bind('<Button-1>', self._toggle_source_tk)
+        
+        # Response mode toggle
+        toggle_frame = tk.Frame(right_side, bg=self.colors.base)
+        toggle_frame.pack(fill=tk.X, pady=(0, 8))
+        
+        self.response_toggle = SegmentedToggle(
+            toggle_frame,
+            options=[("Default", "default"), ("Copy", "copy"), ("Show", "show")],
+            default_value="default"
+        )
+        self.response_toggle.pack(anchor=tk.CENTER)
         
         # Input
         input_container = tk.Frame(
@@ -981,15 +1003,30 @@ class AttachedSnipPopup:
     
     def _execute_action(self, source: str, action_key: str, custom_input: Optional[str]):
         """Execute the action with current state."""
+        response_mode = self.response_toggle.get() if hasattr(self, 'response_toggle') and self.response_toggle else "default"
+        
         self._close()
-        self.on_action(
-            source,
-            action_key,
-            custom_input,
-            self.active_modifiers,
-            self.compare_mode_enabled,
-            self.compare_capture
-        )
+        # on_action signature: (source, action_key, custom_input, active_modifiers, compare_mode, compare_capture, response_mode)
+        if hasattr(self.on_action, '__code__') and self.on_action.__code__.co_argcount >= 7:
+             self.on_action(
+                source,
+                action_key,
+                custom_input,
+                self.active_modifiers,
+                self.compare_mode_enabled,
+                self.compare_capture,
+                response_mode
+            )
+        else:
+            # Backward compatibility
+             self.on_action(
+                source,
+                action_key,
+                custom_input,
+                self.active_modifiers,
+                self.compare_mode_enabled,
+                self.compare_capture
+            )
     
     def _on_custom_submit(self):
         """Handle custom question submission."""
