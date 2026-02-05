@@ -40,6 +40,12 @@ DEFAULT_CONFIG = {
     # For TextEditTool: overridden by show_chat_window_instead_of_replace per-action setting,
     #                   which is further overridden by popup radio button selection
     "show_ai_response_in_chat_window": "no",
+    # Session Auto-Save Setting:
+    # controls when sessions are persisted to disk.
+    # - "on_followup" (default): Save only when user sends a follow-up message in chat window.
+    # - "always_window": Save whenever a new chat window is opened.
+    # - "on_attachment": Save whenever a window is opened AND has attachments.
+    "auto_save_session": "on_followup",
     # Streaming and thinking settings
     "streaming_enabled": True,
     "thinking_enabled": False,
@@ -273,6 +279,13 @@ default_provider = google
 #   4. This global setting (show_ai_response_in_chat_window)
 show_ai_response_in_chat_window = no
 
+# Session Auto-Save Setting:
+# controls when sessions are persisted to disk.
+# - "on_followup" (default): Save only when user sends a follow-up message in chat window.
+# - "always_window": Save whenever a new chat window is opened.
+# - "on_attachment": Save whenever a window is opened AND has attachments.
+auto_save_session = on_followup
+
 # Custom API configuration
 custom_url = https://api.openai.com/v1/chat/completions
 custom_model = gpt-5.1
@@ -436,19 +449,4 @@ session_image_quality = 85
 # Your Google Gemini API keys here (one per line)
 # Get keys at: https://aistudio.google.com/app/apikey
 # AIzaSyXXXXXXXXXXXXXXXXXXXXXXX
-
-
-
-# ============================================================
-# PROMPTS CONFIGURATION
-# ============================================================
-# All prompts are now unified in prompts.json:
-# - text_edit_tool: Text manipulation prompts (Ctrl+Space hotkey)
-# - snip_tool: Screen snipping image analysis prompts (Ctrl+Shift+X)
-# - audio_tool: Audio analysis prompts (Ctrl+Shift+A)
-# - endpoints: Flask API endpoint prompts (if flask_endpoints_enabled=true)
-#
-# Edit prompts.json directly or use the Prompt Editor
 '''
-
-

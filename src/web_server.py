@@ -138,10 +138,26 @@ def create_endpoint_handler(endpoint_name, prompt_template):
         if show_gui and HAVE_GUI:
             session = ChatSession(
                 endpoint=endpoint_name,
-                image_base64=base64_image,
                 mime_type=mime_type
             )
-            session.add_message("user", prompt)
+            
+            # Save attachment so it's available in chat history
+            from .attachment_manager import AttachmentManager
+            attachment_path = AttachmentManager.save_image(
+                session_id=session.session_id,
+                image_base64=base64_image,
+                mime_type=mime_type,
+                message_index=0
+            )
+            
+            attachments = []
+            if attachment_path:
+                attachments.append({
+                    "path": attachment_path,
+                    "mime_type": mime_type
+                })
+            
+            session.add_message("user", prompt, attachments=attachments)
             session.add_message("assistant", result)
             add_session(session, CONFIG.get("max_sessions", 50))
             show_chat_gui(session, initial_response=result)

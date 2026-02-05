@@ -390,6 +390,14 @@ class AudioToolApp:
             thinking_text = ''.join(full_thinking) or ctx.reasoning_text or ""
             
             callbacks.finalize(response_text, thinking_text)
+
+            # Explicitly add assistant message to session before auto-save
+            # The streaming window displays it, but we need to ensure it's in the session object for persistence
+            if response_text and not any(m["role"] == "assistant" and m["content"] == response_text for m in session.messages):
+                session.add_message("assistant", response_text)
+
+            # Auto-save session if confgured
+            self._handle_auto_save(session)
             
             print(f"  ✅ Response streamed to chat window ({len(response_text)} chars)")
         else:
@@ -431,9 +439,31 @@ class AudioToolApp:
                 
                 from .core import show_chat_gui
                 show_chat_gui(session, initial_response=ctx.response_text)
+
+                # Auto-save session if confgured
+                self._handle_auto_save(session)
                 
                 print(f"  ✅ Response received ({len(ctx.response_text)} chars)")
     
+    def _handle_auto_save(self, session):
+        """Handle auto-saving session based on configuration."""
+        auto_save = self.config.get("auto_save_session", "on_followup")
+        
+        should_save = False
+        if auto_save == "always_window":
+            should_save = True
+        elif auto_save == "on_attachment":
+            # Check if any message has attachments
+            for msg in session.messages:
+                if msg.get("attachments"):
+                    should_save = True
+                    break
+                    
+        if should_save:
+            from ..session_manager import add_session
+            add_session(session, self.config.get("max_sessions", 50))
+            logging.debug(f"Auto-saved session {session.session_id} (mode: {auto_save})")
+
     def is_running(self) -> bool:
         """Check if AudioTool is running."""
         return self.hotkey_listener is not None and self.hotkey_listener.is_running()

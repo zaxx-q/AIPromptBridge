@@ -66,8 +66,19 @@ class StreamingChatCallbacks:
                 # Stop streaming mode
                 self.window.is_streaming = False
                 
-                # Add assistant message to session
-                self.window.session.add_message("assistant", response_text)
+                # Add assistant message to session IF NOT ALREADY THERE
+                # Streaming handlers might have already added it to ensure persistence before autosave
+                # Check for duplication carefully to avoid duplicate messages
+                already_exists = False
+                if self.window.session.messages:
+                    last_msg = self.window.session.messages[-1]
+                    if last_msg["role"] == "assistant" and last_msg["content"] == response_text:
+                        already_exists = True
+                
+                if not already_exists:
+                    self.window.session.add_message("assistant", response_text)
+                
+                # Always ensure thinking content is attached if available
                 if thinking_text and len(self.window.session.messages) > 0:
                     self.window.session.messages[-1]["thinking"] = thinking_text
                 
