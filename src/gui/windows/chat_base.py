@@ -826,7 +826,12 @@ class ChatWindowBase(ABC):
         
         # Streaming message index for thinking toggle
         streaming_idx = len(self.session.messages)
-        is_collapsed = self.thinking_collapsed_states.get(streaming_idx, True)
+        
+        # Default to expanded during streaming if not explicitly collapsed
+        if streaming_idx not in self.thinking_collapsed_states:
+            self.thinking_collapsed_states[streaming_idx] = False
+            
+        is_collapsed = self.thinking_collapsed_states.get(streaming_idx, False)
         
         if self.streaming_thinking:
             thinking_header = "▶ Thinking..." if is_collapsed else "▼ Thinking:"

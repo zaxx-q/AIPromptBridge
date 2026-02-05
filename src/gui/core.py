@@ -66,6 +66,11 @@ class StreamingChatCallbacks:
                 # Stop streaming mode
                 self.window.is_streaming = False
                 
+                # Automatically collapse thinking when streaming is done
+                # This affects the NEXT message added (which will be at the current length position)
+                msg_idx = len(self.window.session.messages)
+                self.window.thinking_collapsed_states[msg_idx] = True
+                
                 # Add assistant message to session IF NOT ALREADY THERE
                 # Streaming handlers might have already added it to ensure persistence before autosave
                 # Check for duplication carefully to avoid duplicate messages
