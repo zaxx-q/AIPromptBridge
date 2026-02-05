@@ -95,37 +95,84 @@ class ChatSession:
             msg_attachments = msg.get("attachments", [])
             
             if role == "user":
-                # Check if we need to include images for this user message
-                # 1. Session-level image (legacy, on first message only)
-                needs_session_image = i == 0 and include_image and self.image_base64
-                # 2. Per-message attachments
-                has_attachments = bool(msg_attachments) and include_image
+                # Check if we need to include images/audio for this user message
+                # 1. Session-level image/audio (on first message only)
+                #    Includes legacy self.image_base64 and new self.attachments
+                #    Important: If the first message uses attachments (new system),
+                #    we must ensure we don't duplicate them if they are also set as
+                #    session-level attachments (which happens for snip tool/audio tool).
+                #    The convention is: session.attachments is the master record for
+                #    session-wide context, while msg.attachments is for specific message uploads.
                 
-                if needs_session_image or has_attachments:
-                    # Use array format with images and text
+                has_session_attachments = (i == 0 and include_image and
+                                          (self.image_base64 or self.attachments))
+                
+                # Check for duplications: if all session attachments are present in msg_attachments,
+                # ignore session attachments to avoid double inclusion.
+                if i == 0 and self.attachments and msg_attachments:
+                    # Check if session attachments are a subset of message attachments (by path)
+                    session_paths = set(a.get("path") for a in self.attachments)
+                    msg_paths = set(a.get("path") for a in msg_attachments)
+                    if session_paths.issubset(msg_paths):
+                        has_session_attachments = False  # They are already in msg_attachments
+                
+                # 2. Per-message attachments
+                has_msg_attachments = bool(msg_attachments) and include_image
+                
+                if has_session_attachments or has_msg_attachments:
+                    # Use array format with media and text
                     content_parts = []
                     
-                    # Add session-level image first (legacy backward compat)
-                    if needs_session_image:
-                        data_url = f"data:{self.mime_type};base64,{self.image_base64}"
-                        content_parts.append({"type": "image_url", "image_url": {"url": data_url}})
+                    # Helper to add media part
+                    def add_media_part(b64_data, mime_type):
+                        if mime_type.startswith("audio/"):
+                            # Audio uses inline_data
+                            content_parts.append({
+                                "type": "inline_data",
+                                "inline_data": {
+                                    "mime_type": mime_type,
+                                    "data": b64_data
+                                }
+                            })
+                        else:
+                            # Images use image_url (standard abstraction)
+                            # Note: RequestPipeline converts this if needed for specific providers
+                            data_url = f"data:{mime_type};base64,{b64_data}"
+                            content_parts.append({"type": "image_url", "image_url": {"url": data_url}})
+
+                    # Add session-level legacy image
+                    if i == 0 and include_image and self.image_base64:
+                        add_media_part(self.image_base64, self.mime_type)
                     
+                    from .attachment_manager import AttachmentManager
+
+                    # Add session-level attachments (new system)
+                    if i == 0 and include_image and self.attachments:
+                        for attach in self.attachments:
+                            attach_path = attach.get("path", "")
+                            if attach_path:
+                                # load_image works for any file (returns base64)
+                                b64, mime = AttachmentManager.load_image(attach_path)
+                                if b64:
+                                    # Prefer mime from attachment metadata if available
+                                    mime = attach.get("mime_type", mime)
+                                    add_media_part(b64, mime)
+
                     # Add per-message attachments
-                    if has_attachments:
-                        from .attachment_manager import AttachmentManager
+                    if has_msg_attachments:
                         for attach in msg_attachments:
                             attach_path = attach.get("path", "")
                             if attach_path:
                                 b64, mime = AttachmentManager.load_image(attach_path)
                                 if b64:
-                                    data_url = f"data:{mime};base64,{b64}"
-                                    content_parts.append({"type": "image_url", "image_url": {"url": data_url}})
+                                    mime = attach.get("mime_type", mime)
+                                    add_media_part(b64, mime)
                     
                     # Add text content last (context -> question ordering)
                     content_parts.append({"type": "text", "text": content})
                     messages.append({"role": "user", "content": content_parts})
                 else:
-                    # Simple string format for user messages without image
+                    # Simple string format for user messages without media
                     messages.append({"role": "user", "content": content})
             else:
                 # Preserve original role (system, assistant, etc.)
@@ -147,7 +194,6 @@ class ChatSession:
             "title": self.title,
             "messages": self.messages,  # Now includes attachments per-message
             "attachments": self.attachments,  # Session-level attachments
-            "has_image": bool(self.image_base64) or bool(self.attachments),
             "mime_type": self.mime_type
         }
     

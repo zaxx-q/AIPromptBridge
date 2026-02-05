@@ -279,6 +279,7 @@ class AudioToolApp:
         # Create session with audio info
         session = ChatSession(endpoint="audio")
         session.title = window_title
+        session.mime_type = mime_type
         
         # Save audio to external file for persistence
         attachment_path = AttachmentManager.save_audio(
@@ -294,7 +295,6 @@ class AudioToolApp:
                 "mime_type": mime_type,
                 "duration": duration
             })
-            session.attachments = attachments
         
         # Add user message (just the task text, audio is in session)
         # Extract text from multimodal message
@@ -307,7 +307,8 @@ class AudioToolApp:
         else:
             task_text = user_content
         
-        session.add_message("user", task_text)
+        # Add message with attachments (attachments belong to message, not session)
+        session.add_message("user", task_text, attachments=attachments)
         
         # Set system instruction for follow-ups
         session.system_instruction = self.prompts.get_chat_window_system_instruction()

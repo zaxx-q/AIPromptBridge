@@ -735,8 +735,8 @@ class ChatWindowBase(ABC):
             self.chat_text.insert(tk.END, "▌ ", (accent_tag, message_tag))
             self.chat_text.insert(tk.END, f"{label_text}\n", (label_tag, message_tag))
             
-            # Render session-level image for first user message (snip tool captures)
-            if i == 0 and role == "user" and self.session.image_base64:
+            # Render session-level image/audio for first user message
+            if i == 0 and role == "user" and (self.session.image_base64 or self.session.attachments):
                 self._render_session_image(message_tag)
             
             # Render per-message attachments
@@ -1334,61 +1334,90 @@ class ChatWindowBase(ABC):
                 self.chat_text.insert(tk.END, f"  📎 {attach.get('filename', 'image')}\n", ("normal", message_tag))
     
     def _render_session_image(self, message_tag: str):
-        """Render the session-level image (for snip tool captures)."""
-        if not self.session.image_base64:
+        """Render the session-level image or audio (for snip/audio tool captures)."""
+        # Supports both legacy image_base64 and new attachments list
+        if not self.session.image_base64 and not self.session.attachments:
             return
         
         try:
             from PIL import Image, ImageTk
+            from ...attachment_manager import AttachmentManager
             import base64
             import io
             
-            image_data = base64.b64decode(self.session.image_base64)
-            with io.BytesIO(image_data) as buffer:
-                img = Image.open(buffer)
-                # Create thumbnail (max 200x200 for first message image)
-                img.thumbnail((200, 200), Image.Resampling.LANCZOS)
-                thumbnail = ImageTk.PhotoImage(img)
-            
-            # Store reference
-            if not hasattr(self, '_chat_thumbnails'):
-                self._chat_thumbnails = []
-            self._chat_thumbnails.append(thumbnail)
-            
-            # Insert indentation
-            self.chat_text.insert(tk.END, "  ", (message_tag,))
-            
-            # Insert image
-            self.chat_text.image_create(tk.END, image=thumbnail)
-            
-            # Create tag for click handling
-            img_tag = f"session_img_{id(thumbnail)}"
-            current_pos = self.chat_text.index(tk.INSERT)
-            line = int(current_pos.split('.')[0])
-            img_start = f"{line}.2"
-            img_end = f"{line}.3"
-            self.chat_text.tag_add(img_tag, img_start, img_end)
-            
-            # Bind click events (use session attachments path if available)
+            # Determine what to render
+            image_data = None
             attach_path = ""
+            is_audio = False
+            
             if self.session.attachments:
+                # Use first attachment
                 attach_path = self.session.attachments[0].get("path", "")
+                mime_type = self.session.attachments[0].get("mime_type", "")
+                
+                if mime_type.startswith("audio/"):
+                    is_audio = True
+                elif attach_path:
+                    b64, _ = AttachmentManager.load_image(attach_path)
+                    if b64:
+                        image_data = base64.b64decode(b64)
             
-            if attach_path:
-                self.chat_text.tag_bind(img_tag, "<Button-1>",
-                    lambda e, path=attach_path: self._on_image_left_click(e, path))
-                self.chat_text.tag_bind(img_tag, "<Button-3>",
-                    lambda e, path=attach_path: self._on_image_right_click(e, path))
+            # Fallback to legacy inline image
+            if not image_data and not is_audio and self.session.image_base64:
+                image_data = base64.b64decode(self.session.image_base64)
             
-            self.chat_text.tag_bind(img_tag, "<Enter>",
-                lambda e: self.chat_text.config(cursor="hand2"))
-            self.chat_text.tag_bind(img_tag, "<Leave>",
-                lambda e: self.chat_text.config(cursor=""))
-            
-            self.chat_text.insert(tk.END, "\n", (message_tag,))
+            # Render Audio Indicator
+            if is_audio:
+                # Insert indentation
+                self.chat_text.insert(tk.END, "  ", (message_tag,))
+                # Audio Icon/Text
+                self.chat_text.insert(tk.END, "🔊 Audio Clip attached", ("bold", message_tag))
+                self.chat_text.insert(tk.END, "\n", (message_tag,))
+                return
+
+            # Render Image
+            if image_data:
+                with io.BytesIO(image_data) as buffer:
+                    img = Image.open(buffer)
+                    # Create thumbnail (max 200x200 for first message image)
+                    img.thumbnail((200, 200), Image.Resampling.LANCZOS)
+                    thumbnail = ImageTk.PhotoImage(img)
+                
+                # Store reference
+                if not hasattr(self, '_chat_thumbnails'):
+                    self._chat_thumbnails = []
+                self._chat_thumbnails.append(thumbnail)
+                
+                # Insert indentation
+                self.chat_text.insert(tk.END, "  ", (message_tag,))
+                
+                # Insert image
+                self.chat_text.image_create(tk.END, image=thumbnail)
+                
+                # Create tag for click handling
+                img_tag = f"session_img_{id(thumbnail)}"
+                current_pos = self.chat_text.index(tk.INSERT)
+                line = int(current_pos.split('.')[0])
+                img_start = f"{line}.2"
+                img_end = f"{line}.3"
+                self.chat_text.tag_add(img_tag, img_start, img_end)
+                
+                # Bind click events (if we have a file path)
+                if attach_path:
+                    self.chat_text.tag_bind(img_tag, "<Button-1>",
+                        lambda e, path=attach_path: self._on_image_left_click(e, path))
+                    self.chat_text.tag_bind(img_tag, "<Button-3>",
+                        lambda e, path=attach_path: self._on_image_right_click(e, path))
+                
+                self.chat_text.tag_bind(img_tag, "<Enter>",
+                    lambda e: self.chat_text.config(cursor="hand2"))
+                self.chat_text.tag_bind(img_tag, "<Leave>",
+                    lambda e: self.chat_text.config(cursor=""))
+                
+                self.chat_text.insert(tk.END, "\n", (message_tag,))
             
         except Exception as e:
-            print(f"[ChatWindow] Failed to render session image: {e}")
+            print(f"[ChatWindow] Failed to render session media: {e}")
     
     def _on_image_left_click(self, event, file_path: str):
         """Show enlarged image in a modal window on left click."""

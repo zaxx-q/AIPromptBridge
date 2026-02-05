@@ -497,7 +497,6 @@ class SnipToolApp:
                 })
         
         if attachments:
-            session.attachments = attachments
             # Update session mime type to match first attachment if available
             if len(attachments) > 0:
                 session.mime_type = attachments[0]["mime_type"]
@@ -514,7 +513,7 @@ class SnipToolApp:
         else:
             task_text = user_content
         
-        # Include ALL attachments in the message since we aren't using session.image_base64
+        # Add message with attachments (attachments belong to message, not session)
         session.add_message("user", task_text, attachments=attachments)
         
         # Set system instruction for follow-ups (use global setting)
