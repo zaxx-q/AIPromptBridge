@@ -450,14 +450,24 @@ class SnipToolApp:
         from ..attachment_manager import AttachmentManager
         from ..request_pipeline import RequestPipeline, RequestContext, StreamCallback
         
-        # Create session with image attached
+        # Create session (empty image initially, properly utilizing attachments)
         session = ChatSession(
             endpoint="snip",
-            image_base64=self.current_capture.image_base64,
-            mime_type=self.current_capture.mime_type
+            image_base64=None,  # Do not set inline image, use attachments to ensure consistent formatting
+            mime_type=None
         )
         session.title = window_title
         
+        attachments = []
+        
+        # Helper to detect mime from path
+        def get_mime_from_path(path):
+            if path.lower().endswith(".avif"): return "image/avif"
+            if path.lower().endswith(".webp"): return "image/webp"
+            if path.lower().endswith(".png"): return "image/png"
+            if path.lower().endswith(".jpg") or path.lower().endswith(".jpeg"): return "image/jpeg"
+            return "application/octet-stream"
+
         # Save primary image to external file for persistence
         attachment_path = AttachmentManager.save_image(
             session_id=session.session_id,
@@ -465,9 +475,12 @@ class SnipToolApp:
             mime_type=self.current_capture.mime_type,
             message_index=0
         )
-        attachments = []
+        
         if attachment_path:
-            attachments.append({"path": attachment_path, "mime_type": self.current_capture.mime_type})
+            attachments.append({
+                "path": attachment_path,
+                "mime_type": get_mime_from_path(attachment_path)
+            })
         
         # Save comparison image if present
         if compare_capture:
@@ -478,23 +491,31 @@ class SnipToolApp:
                 message_index=1
             )
             if compare_path:
-                attachments.append({"path": compare_path, "mime_type": compare_capture.mime_type})
+                attachments.append({
+                    "path": compare_path,
+                    "mime_type": get_mime_from_path(compare_path)
+                })
         
         if attachments:
             session.attachments = attachments
+            # Update session mime type to match first attachment if available
+            if len(attachments) > 0:
+                session.mime_type = attachments[0]["mime_type"]
         
-        # Add user message (just the task text, image is in session)
+        # Add user message
         # Extract text from multimodal message
         user_content = messages[1]["content"]
         if isinstance(user_content, list):
-            task_text = next(
-                (item["text"] for item in user_content if item.get("type") == "text"),
-                "Analyze this image."
-            )
+            # In comparison mode, there are multiple text parts ("Image 1:", "Image 2:", Task)
+            # We want the last one which is the actual task
+            text_parts = [item["text"] for item in user_content if item.get("type") == "text"]
+            raw_task = text_parts[-1] if text_parts else "Analyze this image."
+            task_text = raw_task
         else:
             task_text = user_content
         
-        session.add_message("user", task_text)
+        # Include ALL attachments in the message since we aren't using session.image_base64
+        session.add_message("user", task_text, attachments=attachments)
         
         # Set system instruction for follow-ups (use global setting)
         session.system_instruction = self.prompts.get_chat_window_system_instruction()
