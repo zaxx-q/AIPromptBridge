@@ -178,8 +178,8 @@ class AudioAnalyzerWindow:
             self.root = tk.Toplevel(self.parent_root)
         
         self.root.title("🎤 Audio Analyzer")
-        self.root.geometry("800x600")
-        self.root.minsize(700, 550)
+        self.root.geometry("800x676")
+        self.root.minsize(700, 675)
         
         # Position window
         offset = (self.window_id % 5) * 30
