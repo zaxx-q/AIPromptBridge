@@ -3339,7 +3339,7 @@ class ToastNotification:
     """
     
     PREVIEW_MAX_CHARS = 150
-    DEFAULT_TIMEOUT_MS = 3000
+    DEFAULT_TIMEOUT_MS = 4000
     MARGIN_X = 20
     MARGIN_Y = 20
     
@@ -3359,7 +3359,13 @@ class ToastNotification:
         
         self.colors = get_colors()
         self.root = None
-        self.after_id = None
+        
+        # Animation state
+        self.target_x = 0
+        self.target_y = 0
+        self.timeout_job = None
+        self.fade_job = None
+        self.hover_job = None
         
         self._create_window()
     
@@ -3376,6 +3382,12 @@ class ToastNotification:
         self.root.overrideredirect(True)
         self.root.attributes('-topmost', True)
         
+        # Start transparent for fade-in
+        try:
+            self.root.attributes('-alpha', 0.0)
+        except tk.TclError:
+            pass
+        
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
         
@@ -3387,7 +3399,7 @@ class ToastNotification:
         else:
             self._build_tk_ui()
         
-        # Position and show
+        # Position and show with animation
         self._position_window()
         self.root.update_idletasks()
         self.root.after(10, self._show)
@@ -3403,22 +3415,23 @@ class ToastNotification:
         )
         main_frame.pack(fill="both", expand=True, padx=1, pady=1)
         
-        # Click closes the toast
-        main_frame.bind("<Button-1>", lambda e: self.dismiss())
+        # Bind verify hover to main elements to be responsive
+        def on_click(e): self.dismiss()
+        main_frame.bind("<Button-1>", on_click)
         
         content = ctk.CTkFrame(main_frame, fg_color="transparent")
         content.pack(fill="both", expand=True, padx=12, pady=10)
-        content.bind("<Button-1>", lambda e: self.dismiss())
+        content.bind("<Button-1>", on_click)
         
         # Header
         header = ctk.CTkFrame(content, fg_color="transparent")
         header.pack(fill="x", pady=(0, 4))
-        header.bind("<Button-1>", lambda e: self.dismiss())
+        header.bind("<Button-1>", on_click)
         
         # Icon and Title
         icon_frame = ctk.CTkFrame(header, fg_color="transparent")
         icon_frame.pack(side="left")
-        icon_frame.bind("<Button-1>", lambda e: self.dismiss())
+        icon_frame.bind("<Button-1>", on_click)
         
         # Try to use emoji image
         icon_text = "📋 " + self.title
@@ -3443,7 +3456,7 @@ class ToastNotification:
         
         title_lbl = ctk.CTkLabel(icon_frame, **label_kwargs)
         title_lbl.pack(side="left")
-        title_lbl.bind("<Button-1>", lambda e: self.dismiss())
+        title_lbl.bind("<Button-1>", on_click)
         
         # Message preview
         preview_text = self.message
@@ -3459,7 +3472,7 @@ class ToastNotification:
             justify="left"
         )
         msg_lbl.pack(anchor="w")
-        msg_lbl.bind("<Button-1>", lambda e: self.dismiss())
+        msg_lbl.bind("<Button-1>", on_click)
         
         # Footer text (click to dismiss)
         footer = ctk.CTkLabel(
@@ -3469,7 +3482,7 @@ class ToastNotification:
             text_color=self.colors.surface2
         )
         footer.pack(anchor="e", pady=(4, 0))
-        footer.bind("<Button-1>", lambda e: self.dismiss())
+        footer.bind("<Button-1>", on_click)
 
     def _build_tk_ui(self):
         """Build standard Tkinter UI."""
@@ -3519,7 +3532,7 @@ class ToastNotification:
         msg_lbl.bind("<Button-1>", lambda e: self.dismiss())
 
     def _position_window(self):
-        """Position at bottom right of screen."""
+        """Calculate target position at bottom right of screen."""
         self.root.update_idletasks()
         
         screen_width = self.root.winfo_screenwidth()
@@ -3528,13 +3541,17 @@ class ToastNotification:
         window_height = self.root.winfo_reqheight()
         
         # Position with margin from bottom-right corner
-        x = screen_width - window_width - self.MARGIN_X
-        y = screen_height - window_height - self.MARGIN_Y - 40 # Account for taskbar approx
+        self.target_x = screen_width - window_width - self.MARGIN_X
+        # Target Y is the final resting position
+        self.target_y = screen_height - window_height - self.MARGIN_Y - 40 # Account for taskbar
         
-        self.root.geometry(f"+{x}+{y}")
+        # Start from bottom of screen (off-screen)
+        self.start_rise_y = screen_height
+        
+        self.root.geometry(f"+{self.target_x}+{self.start_rise_y}")
     
     def _show(self):
-        """Show the window and schedule dismissal."""
+        """Show the window and start entry animation."""
         if not self.root:
             return
         
@@ -3542,20 +3559,116 @@ class ToastNotification:
             self.root.deiconify()
             self.root.lift()
             
-            # Schedule auto-dismiss
-            self.after_id = self.root.after(self.timeout_ms, self.dismiss)
+            # Start entry animation (rise + fade in)
+            self._animate_entry()
+            
+            # Start hover monitor
+            self._start_hover_monitor()
             
         except tk.TclError:
             pass
     
+    def _animate_entry(self, step=0):
+        """Animate window entering (rise up from bottom)."""
+        if not self.root: return
+        
+        total_steps = 15
+        progress = (step + 1) / total_steps
+        if progress > 1.0: progress = 1.0
+        
+        try:
+            # Fade in (Alpha 0 -> 1)
+            self.root.attributes('-alpha', progress)
+            
+            # Rise up (from bottom screen to target)
+            # Use sinusoidal easing for smooth pop-up
+            ease = math.sin(progress * math.pi / 2)
+            
+            dist = self.start_rise_y - self.target_y
+            current_y = int(self.start_rise_y - (dist * ease))
+            self.root.geometry(f"+{self.target_x}+{current_y}")
+            
+            if progress < 1.0:
+                self.root.after(16, lambda: self._animate_entry(step + 1))
+            else:
+                self._start_gradual_fade()
+        except tk.TclError:
+            pass
+
+    def _start_gradual_fade(self):
+        """Start fading out continuously over timeout duration."""
+        if self.fade_job:
+            self.root.after_cancel(self.fade_job)
+            self.fade_job = None
+            
+        # Update every 50ms
+        interval = 50
+        total_steps = int(self.timeout_ms / interval)
+        if total_steps < 1: total_steps = 1
+        
+        self._run_fade_step(total_steps, total_steps)
+        
+    def _run_fade_step(self, remaining_steps, total_steps):
+        """Run single step of fade out."""
+        if not self.root: return
+        
+        try:
+            alpha = remaining_steps / total_steps
+            self.root.attributes('-alpha', alpha)
+            
+            if remaining_steps > 0:
+                self.fade_job = self.root.after(50, lambda: self._run_fade_step(remaining_steps - 1, total_steps))
+            else:
+                self.dismiss()
+        except tk.TclError:
+            pass
+
+    def _start_hover_monitor(self):
+        """Start checking for mouse hover position."""
+        if not self.root: return
+        self._check_hover()
+        self.hover_job = self.root.after(100, self._start_hover_monitor)
+        
+    def _check_hover(self):
+        """Check if mouse is over window and manage state."""
+        if not self.root: return
+        
+        try:
+            x, y = self.root.winfo_pointerxy()
+            wx = self.root.winfo_rootx()
+            wy = self.root.winfo_rooty()
+            ww = self.root.winfo_width()
+            wh = self.root.winfo_height()
+            
+            # Check collision
+            is_hovering = (wx <= x <= wx + ww) and (wy <= y <= wy + wh)
+            
+            if is_hovering:
+                # Cancel fade out, restore full opacity
+                if self.fade_job:
+                    self.root.after_cancel(self.fade_job)
+                    self.fade_job = None
+                    self.root.attributes('-alpha', 1.0)
+                elif self.root.attributes('-alpha') < 1.0:
+                    self.root.attributes('-alpha', 1.0)
+            else:
+                # If not hovering and no fade job, start fading
+                if self.fade_job is None:
+                    self._start_gradual_fade()
+                    
+        except Exception:
+            pass
+
     def dismiss(self):
-        """Dismiss the toast."""
-        if self.after_id and self.root:
-            try:
-                self.root.after_cancel(self.after_id)
-            except Exception:
-                pass
-            self.after_id = None
+        """Dismiss the toast immediately."""
+        # Cancel all jobs
+        if self.timeout_job: self.root.after_cancel(self.timeout_job)
+        if self.fade_job: self.root.after_cancel(self.fade_job)
+        if self.hover_job: self.root.after_cancel(self.hover_job)
+        
+        self.timeout_job = None
+        self.fade_job = None
+        self.hover_job = None
             
         if self.root:
             try:
@@ -3575,7 +3688,7 @@ def create_toast_notification(
     parent_root,
     title: str,
     message: str,
-    timeout_ms: int = 3000
+    timeout_ms: int = 4000
 ):
     """Create and show a toast notification."""
     ToastNotification(parent_root, title, message, timeout_ms)
