@@ -62,48 +62,61 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14.2'
+          python-version: '3.13.12'
           cache: 'pip'
 
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install cx_Freeze
 
-      - name: Patch Version in setup.py
+      - name: Patch Version in src/version.py
         shell: pwsh
         run: |
           # Use the variable we calculated in step 1
           $fullVersion = "$env:RELEASE_VERSION"
           
-          # Strip 'v' prefix for setup.py (e.g., v2.8.0 -> 2.8.0)
+          # Strip 'v' prefix for version.py (e.g., v2.8.0 -> 2.8.0)
           $cleanVersion = $fullVersion.TrimStart('vV')
           
-          Write-Host "Patching setup.py to version: $cleanVersion"
+          Write-Host "Patching src/version.py to version: $cleanVersion"
           
-          $filePath = "setup.py"
+          $filePath = "src/version.py"
           $content = Get-Content $filePath -Raw
           
-          $pattern = 'version\s*=\s*["'']([^"'']+)["'']'
+          # Match __version__ = "..."
+          $pattern = '__version__\s*=\s*["'']([^"'']+)["'']'
           
           if ($content -match $pattern) {
-              $newContent = $content -replace $pattern, "version=""$cleanVersion"""
+              $newContent = $content -replace $pattern, "__version__ = ""$cleanVersion"""
               [System.IO.File]::WriteAllText((Get-Item $filePath).FullName, $newContent)
           } else {
-              Write-Warning "Could not find version string in setup.py! Proceeding with existing version."
+              Write-Warning "Could not find version string in src/version.py! Proceeding with existing version."
           }
 
-      - name: Build Executable
-        run: python setup.py build
+      - name: Build Executable with Nuitka
+        uses: Nuitka/Nuitka-Action@main
+        with:
+          nuitka-version: main
+          script-name: main.py
+          mode: standalone
+          output-dir: build
+          # Extra flags or options can go here if not in main.py logic
 
       - name: Zip Build Output
         id: zip_build
         shell: pwsh
         run: |
-          $buildDir = Get-ChildItem -Path "build" -Filter "exe.*" | Select-Object -First 1 -ExpandProperty FullName
+          # Nuitka-Action outputs to build/main.dist for standalone
+          $buildDir = "build/main.dist"
           
-          if (-not $buildDir) { Write-Error "Build directory not found!"; exit 1 }
+          if (-not (Test-Path $buildDir)) { Write-Error "Build directory 'build/main.dist' not found!"; exit 1 }
+
+          # Rename the executable specifically? Nuitka names it 'main.exe'.
+          # Let's rename it to AIPromptBridge.exe inside the folder before zipping.
+          if (Test-Path "$buildDir/main.exe") {
+              Rename-Item "$buildDir/main.exe" "AIPromptBridge.exe"
+          }
 
           # Use the environment variable for consistent naming
           $zipName = "AIPromptBridge-$env:RELEASE_VERSION.zip"

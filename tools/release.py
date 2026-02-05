@@ -39,7 +39,7 @@ except ImportError:
         def add_row(self, *args): pass
     console = Console()
 
-SETUP_PY_PATH = Path("setup.py")
+VERSION_PY_PATH = Path("src/version.py")
 
 def run_command(cmd):
     """Run a shell command and return output."""
@@ -50,13 +50,13 @@ def run_command(cmd):
         return None
 
 def get_current_version():
-    """Extract version from setup.py."""
-    if not SETUP_PY_PATH.exists():
-        console.print("[red]Error: setup.py not found![/red]")
+    """Extract version from src/version.py."""
+    if not VERSION_PY_PATH.exists():
+        console.print("[red]Error: src/version.py not found![/red]")
         sys.exit(1)
     
-    content = SETUP_PY_PATH.read_text(encoding='utf-8')
-    match = re.search(r'version\s*=\s*["\']([^"\"]+)["\"]', content)
+    content = VERSION_PY_PATH.read_text(encoding='utf-8')
+    match = re.search(r'__version__\s*=\s*["\']([^"\"]+)["\"]', content)
     if match:
         return match.group(1)
     return None
@@ -92,7 +92,7 @@ def analyze_changes(commits):
 def bump_version(current_ver, major_bump, minor_bump, patch_bump):
     """Calculate new version."""
     try:
-        # Handle "v" prefix if present in setup.py (though it shouldn't be there usually)
+        # Handle "v" prefix if present in version.py (though it shouldn't be there usually)
         clean_ver = current_ver.lstrip('v')
         parts = [int(p) for p in clean_ver.split('.')]
         while len(parts) < 3: parts.append(0)
@@ -117,21 +117,21 @@ def bump_version(current_ver, major_bump, minor_bump, patch_bump):
         console.print(f"[red]Error parsing version '{current_ver}': {e}[/red]")
         return None, None
 
-def update_setup_py(new_version):
-    """Update setup.py with the new version."""
-    content = SETUP_PY_PATH.read_text(encoding='utf-8')
+def update_version_py(new_version):
+    """Update src/version.py with the new version."""
+    content = VERSION_PY_PATH.read_text(encoding='utf-8')
     # Robust regex to find version line
     new_content = re.sub(
-        r'(version\s*=\s*["\"])([^"\"]*)(["\"])',
+        r'(__version__\s*=\s*["\"])([^"\"]*)(["\"])',
         f'\g<1>{new_version}\g<3>',
         content
     )
     
     if content == new_content:
-        console.print("[red]Could not update setup.py. Pattern not found.[/red]")
+        console.print("[red]Could not update src/version.py. Pattern not found.[/red]")
         return False
         
-    SETUP_PY_PATH.write_text(new_content, encoding='utf-8')
+    VERSION_PY_PATH.write_text(new_content, encoding='utf-8')
     return True
 
 def main():
@@ -142,10 +142,10 @@ def main():
     last_tag = get_last_tag()
     
     if not current_version:
-        console.print("[red]Could not determine current version from setup.py[/red]")
+        console.print("[red]Could not determine current version from src/version.py[/red]")
         return
 
-    console.print(f"Current setup.py version: [bold cyan]{current_version}[/bold cyan]")
+    console.print(f"Current src/version.py version: [bold cyan]{current_version}[/bold cyan]")
     console.print(f"Last Git Tag: [bold cyan]{last_tag or 'None'}[/bold cyan]")
     
     # 2. Analyze Commits
@@ -182,17 +182,17 @@ def main():
     # Ensure clean version string for python
     clean_version = target_version.lstrip('v')
     
-    if Confirm.ask(f"Update setup.py to version {clean_version}?"):
-        if update_setup_py(clean_version):
-            console.print("[green]Updated setup.py successfully.[/green]")
+    if Confirm.ask(f"Update src/version.py to version {clean_version}?"):
+        if update_version_py(clean_version):
+            console.print("[green]Updated src/version.py successfully.[/green]")
         else:
             return
 
     # 5. Git Operations
     console.rule("[bold blue]Git Operations[/bold blue]")
     
-    if Confirm.ask("Commit 'setup.py' change?"):
-        run_command(f"git add setup.py")
+    if Confirm.ask("Commit 'src/version.py' change?"):
+        run_command(f"git add src/version.py")
         run_command(f"git commit -m \"chore(release): bump version to {clean_version}\" ")
         console.print("[green]Committed.[/green]")
     

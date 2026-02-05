@@ -8,6 +8,27 @@ Usage:
     python main.py --no-tray    # Start in terminal mode (no tray)
     python main.py --show-console   # Start with tray + console visible
     python main.py --no-wt      # Skip Windows Terminal auto-detection
+
+Nuitka Configuration:
+# nuitka-project: --mode=standalone
+# nuitka-project: --windows-icon-from-ico={MAIN_DIRECTORY}/icon.ico
+# nuitka-project: --include-data-dir={MAIN_DIRECTORY}/assets=assets
+# nuitka-project: --include-data-files={MAIN_DIRECTORY}/icon.ico=icon.ico
+# nuitka-project: --enable-plugin=tk-inter
+# nuitka-project: --windows-disable-console
+# nuitka-project: --nofollow-import-to=pytest,unittest,notebook
+# nuitka-project: --include-package-data=customtkinter
+# nuitka-project: --include-package-data=emoji
+# nuitka-project: --output-filename=AIPromptBridge.exe
+# nuitka-project: --noinclude-unittest-mode=nofollow
+# nuitka-project: --nofollow-import-to=numpy
+# nuitka-project: --nofollow-import-to=pandas
+# nuitka-project: --nofollow-import-to=scipy
+# nuitka-project: --nofollow-import-to=matplotlib
+# nuitka-project: --nofollow-import-to=cv2
+# nuitka-project: --nofollow-import-to=xmlrpc
+# nuitka-project: --nofollow-import-to=curses
+# nuitka-project: --clean-cache=all
 """
 
 import sys
@@ -23,6 +44,7 @@ from pathlib import Path
 
 from src.console import console, Panel, Table, print_panel, print_success, print_error, print_warning, HAVE_RICH
 from src.config import load_config, generate_example_config, CONFIG_FILE, OPENROUTER_URL
+from src.version import __version__
 from src.key_manager import KeyManager
 from src.session_manager import load_sessions, list_sessions
 from src.terminal import terminal_session_manager, print_commands_box
@@ -89,14 +111,14 @@ def initialize():
     if HAVE_RICH:
         console.print()
         print_panel(
-            "[bold cyan]🌉 AIPromptBridge[/bold cyan]\n[dim]AI Desktop Tools & Integration Bridge[/dim]",
+            f"[bold cyan]🌉 AIPromptBridge v{__version__}[/bold cyan]\n[dim]AI Desktop Tools & Integration Bridge[/dim]",
             border_style="cyan"
         )
         console.print()
     else:
         print()
         print("┌" + "─" * 62 + "┐")
-        print("│  🌉 AIPromptBridge                                            │")
+        print(f"│  🌉 AIPromptBridge v{__version__}".ljust(63) + "│")
         print("│  AI Desktop Tools & Integration Bridge                        │")
         print("└" + "─" * 62 + "┘")
         print()
