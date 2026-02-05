@@ -29,7 +29,7 @@ def get_next_session_id():
 class ChatSession:
     """Represents a chat session with history"""
     
-    def __init__(self, session_id=None, endpoint=None, image_base64=None, mime_type=None):
+    def __init__(self, session_id=None, endpoint=None, mime_type=None):
         # Use provided ID or generate sequential one
         if session_id is None:
             self.session_id = get_next_session_id()
@@ -38,15 +38,7 @@ class ChatSession:
         self.endpoint = endpoint or "chat"
         self.created_at = datetime.now().isoformat()
         self.updated_at = self.created_at
-        
-        # Legacy in-memory image (for backward compatibility)
-        # New code should use attachments instead
-        self.image_base64 = image_base64
         self.mime_type = mime_type or "image/png"
-        
-        # Session-level attachments (paths to external files)
-        # Structure: [{"path": "session_attachments/5/0_img.webp", "mime_type": "image/webp"}]
-        self.attachments = []
         
         self.messages = []
         self.title = None
@@ -80,7 +72,7 @@ class ChatSession:
         Convert session messages to API format.
         
         Args:
-            include_image: Whether to include image data in the first user message
+            include_image: Whether to include image data in messages
             include_system_instruction: Whether to prepend system instruction if available
         """
         messages = []
@@ -89,84 +81,42 @@ class ChatSession:
         if include_system_instruction and self.system_instruction:
             messages.append({"role": "system", "content": self.system_instruction})
         
-        for i, msg in enumerate(self.messages):
+        for msg in self.messages:
             role = msg["role"]
             content = msg["content"]
             msg_attachments = msg.get("attachments", [])
             
             if role == "user":
-                # Check if we need to include images/audio for this user message
-                # 1. Session-level image/audio (on first message only)
-                #    Includes legacy self.image_base64 and new self.attachments
-                #    Important: If the first message uses attachments (new system),
-                #    we must ensure we don't duplicate them if they are also set as
-                #    session-level attachments (which happens for snip tool/audio tool).
-                #    The convention is: session.attachments is the master record for
-                #    session-wide context, while msg.attachments is for specific message uploads.
+                # Per-message attachments only
+                has_attachments = bool(msg_attachments) and include_image
                 
-                has_session_attachments = (i == 0 and include_image and
-                                          (self.image_base64 or self.attachments))
-                
-                # Check for duplications: if all session attachments are present in msg_attachments,
-                # ignore session attachments to avoid double inclusion.
-                if i == 0 and self.attachments and msg_attachments:
-                    # Check if session attachments are a subset of message attachments (by path)
-                    session_paths = set(a.get("path") for a in self.attachments)
-                    msg_paths = set(a.get("path") for a in msg_attachments)
-                    if session_paths.issubset(msg_paths):
-                        has_session_attachments = False  # They are already in msg_attachments
-                
-                # 2. Per-message attachments
-                has_msg_attachments = bool(msg_attachments) and include_image
-                
-                if has_session_attachments or has_msg_attachments:
+                if has_attachments:
                     # Use array format with media and text
                     content_parts = []
-                    
-                    # Helper to add media part
-                    def add_media_part(b64_data, mime_type):
-                        if mime_type.startswith("audio/"):
-                            # Audio uses inline_data
-                            content_parts.append({
-                                "type": "inline_data",
-                                "inline_data": {
-                                    "mime_type": mime_type,
-                                    "data": b64_data
-                                }
-                            })
-                        else:
-                            # Images use image_url (standard abstraction)
-                            # Note: RequestPipeline converts this if needed for specific providers
-                            data_url = f"data:{mime_type};base64,{b64_data}"
-                            content_parts.append({"type": "image_url", "image_url": {"url": data_url}})
-
-                    # Add session-level legacy image
-                    if i == 0 and include_image and self.image_base64:
-                        add_media_part(self.image_base64, self.mime_type)
-                    
                     from .attachment_manager import AttachmentManager
-
-                    # Add session-level attachments (new system)
-                    if i == 0 and include_image and self.attachments:
-                        for attach in self.attachments:
-                            attach_path = attach.get("path", "")
-                            if attach_path:
-                                # load_image works for any file (returns base64)
-                                b64, mime = AttachmentManager.load_image(attach_path)
-                                if b64:
-                                    # Prefer mime from attachment metadata if available
-                                    mime = attach.get("mime_type", mime)
-                                    add_media_part(b64, mime)
-
-                    # Add per-message attachments
-                    if has_msg_attachments:
-                        for attach in msg_attachments:
-                            attach_path = attach.get("path", "")
-                            if attach_path:
-                                b64, mime = AttachmentManager.load_image(attach_path)
-                                if b64:
-                                    mime = attach.get("mime_type", mime)
-                                    add_media_part(b64, mime)
+                    
+                    # Add attachments
+                    for attach in msg_attachments:
+                        attach_path = attach.get("path", "")
+                        if attach_path:
+                            # load_image works for any file (returns base64)
+                            b64, mime = AttachmentManager.load_image(attach_path)
+                            if b64:
+                                mime = attach.get("mime_type", mime)
+                                
+                                if mime.startswith("audio/"):
+                                    # Audio uses inline_data
+                                    content_parts.append({
+                                        "type": "inline_data",
+                                        "inline_data": {
+                                            "mime_type": mime,
+                                            "data": b64
+                                        }
+                                    })
+                                else:
+                                    # Images use image_url (standard abstraction)
+                                    data_url = f"data:{mime};base64,{b64}"
+                                    content_parts.append({"type": "image_url", "image_url": {"url": data_url}})
                     
                     # Add text content last (context -> question ordering)
                     content_parts.append({"type": "text", "text": content})
@@ -182,40 +132,15 @@ class ChatSession:
     
     def to_dict(self):
         """Convert session to dictionary for serialization"""
-        # Save any in-memory image to file first (migration)
-        if self.image_base64 and not self.attachments:
-            self._migrate_inline_image()
-        
         return {
             "session_id": self.session_id,
             "endpoint": self.endpoint,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "title": self.title,
-            "messages": self.messages,  # Now includes attachments per-message
-            "attachments": self.attachments,  # Session-level attachments
+            "messages": self.messages,
             "mime_type": self.mime_type
         }
-    
-    def _migrate_inline_image(self):
-        """Migrate in-memory base64 image to external file storage."""
-        if not self.image_base64:
-            return
-        
-        try:
-            from .attachment_manager import AttachmentManager
-            path = AttachmentManager.save_image(
-                session_id=self.session_id,
-                image_base64=self.image_base64,
-                mime_type=self.mime_type,
-                message_index=0
-            )
-            if path:
-                self.attachments = [{"path": path, "mime_type": self.mime_type}]
-                # Keep image_base64 in memory for immediate use, but don't serialize it
-        except Exception as e:
-            import logging
-            logging.warning(f"[ChatSession] Failed to migrate image: {e}")
     
     @classmethod
     def from_dict(cls, data):
@@ -237,27 +162,6 @@ class ChatSession:
         session.title = data.get("title")
         session.messages = data.get("messages", [])
         session.mime_type = data.get("mime_type", "image/png")
-        
-        # Load attachments
-        session.attachments = data.get("attachments", [])
-        
-        # Backward compatibility logic:
-        # If there are attachments, we rely on them and do NOT auto-load into image_base64
-        # unless it was a legacy session without attachments where we might need to restore it.
-        # But here, we explicitly avoid setting image_base64 if attachments exist,
-        # to prevent duplication in get_conversation_for_api.
-        if session.attachments:
-            # We have attachments, so we don't need image_base64.
-            # The get_conversation_for_api method checks `needs_session_image` which is
-            # `i == 0 and include_image and self.image_base64`.
-            # If we set image_base64 here, it duplicates the first attachment.
-            session.image_base64 = None
-            
-            # Use the mime type from the first attachment if available
-            if session.attachments:
-                session.mime_type = session.attachments[0].get("mime_type", session.mime_type)
-        else:
-            session.image_base64 = None
         
         return session
 
