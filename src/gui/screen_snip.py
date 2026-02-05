@@ -291,15 +291,14 @@ class ScreenSnipOverlay:
             self.on_cancel()
             return
         
-        # Hide overlay before capturing (so it's not in the screenshot)
+        # Hide overlay before capturing
         self.root.withdraw()
-        self.root.update_idletasks()
         
-        # Small delay to ensure overlay is hidden, then capture
-        self.root.after(100, lambda: self._finish_capture(x1, y1, x2, y2))
+        # Capture immediately from frozen background
+        self._finish_capture(x1, y1, x2, y2)
     
     def _finish_capture(self, x1: int, y1: int, x2: int, y2: int):
-        """Complete the capture after overlay is hidden."""
+        """Complete the capture using the frozen background."""
         result = self._capture_region(x1, y1, x2, y2)
         self._close()
         
@@ -312,17 +311,18 @@ class ScreenSnipOverlay:
     
     def _capture_region(self, x1: int, y1: int, x2: int, y2: int) -> Optional[CaptureResult]:
         """
-        Capture a screen region and encode to base64.
+        Capture a screen region from the frozen background.
         
-        Takes a fresh screenshot (not from the frozen background) to ensure
-        we get the actual current screen content without the overlay.
+        Uses the background image captured when the overlay was created to ensure
+        consistency with what the user saw during selection.
         """
         try:
-            # Capture the region fresh
-            img = ImageGrab.grab(
-                bbox=(x1, y1, x2, y2),
-                include_layered_windows=True
-            )
+            if not self.background_image:
+                logging.error("[ScreenSnip] No background image available for capture")
+                return None
+
+            # Crop from frozen background
+            img = self.background_image.crop((x1, y1, x2, y2))
             
             # Convert to PNG bytes
             buffer = io.BytesIO()
