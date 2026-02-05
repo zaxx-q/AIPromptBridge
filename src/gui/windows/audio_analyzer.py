@@ -55,7 +55,7 @@ class AudioAnalyzerWindow:
     DURATION_UPDATE_INTERVAL = 100  # ms between duration display updates
     
     # Level meter sensitivity settings
-    LEVEL_AMPLIFICATION = 8.0  # Amplify raw RMS levels for better visibility
+    LEVEL_AMPLIFICATION = 6.0  # Amplify raw RMS levels for better visibility
     LEVEL_SMOOTHING = 0.3  # Smoothing factor (0 = no smoothing, 1 = max smoothing)
     
     def __init__(
