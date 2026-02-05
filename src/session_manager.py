@@ -195,19 +195,21 @@ class ChatSession:
         # Load attachments
         session.attachments = data.get("attachments", [])
         
-        # Load first attachment into memory for backward compatibility
+        # Backward compatibility logic:
+        # If there are attachments, we rely on them and do NOT auto-load into image_base64
+        # unless it was a legacy session without attachments where we might need to restore it.
+        # But here, we explicitly avoid setting image_base64 if attachments exist,
+        # to prevent duplication in get_conversation_for_api.
         if session.attachments:
-            try:
-                from .attachment_manager import AttachmentManager
-                first_attach = session.attachments[0]
-                b64, mime = AttachmentManager.load_image(first_attach.get("path", ""))
-                if b64:
-                    session.image_base64 = b64
-                    session.mime_type = mime
-                else:
-                    session.image_base64 = None
-            except Exception:
-                session.image_base64 = None
+            # We have attachments, so we don't need image_base64.
+            # The get_conversation_for_api method checks `needs_session_image` which is
+            # `i == 0 and include_image and self.image_base64`.
+            # If we set image_base64 here, it duplicates the first attachment.
+            session.image_base64 = None
+            
+            # Use the mime type from the first attachment if available
+            if session.attachments:
+                session.mime_type = session.attachments[0].get("mime_type", session.mime_type)
         else:
             session.image_base64 = None
         
