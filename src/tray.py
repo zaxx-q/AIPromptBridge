@@ -307,17 +307,19 @@ def enable_console_close_button():
 class TrayApp:
     """System tray application for AIPromptBridge"""
     
-    def __init__(self, icon_path=None, on_exit_callback=None):
+    def __init__(self, icon_path=None, on_exit_callback=None, allow_console_toggle=True):
         """
         Initialize the tray application
         
         Args:
             icon_path: Path to the .ico file (default: icon.ico in project root)
             on_exit_callback: Function to call when exiting
+            allow_console_toggle: Whether to show "Toggle Console" option
         """
         self.systray = None
         self.on_exit_callback = on_exit_callback
         self.console_visible = True
+        self.allow_console_toggle = allow_console_toggle
         
         # Find icon path
         if icon_path is None:
@@ -477,16 +479,8 @@ class TrayApp:
     
     def _on_edit_config(self, systray):
         """Open config.ini in default editor"""
-        if getattr(sys, 'frozen', False):
-            config_path = Path(sys.executable).parent / "config.ini"
-        else:
-            config_path = Path(__file__).parent.parent / "config.ini"
-            
-        # Try CWD fallback if standard paths fail
-        if not config_path.exists():
-            cwd_path = Path.cwd() / "config.ini"
-            if cwd_path.exists():
-                config_path = cwd_path
+        # WorkspaceManager ensures CWD is correct
+        config_path = Path.cwd() / "config.ini"
             
         if config_path.exists():
             self._open_file(config_path)
@@ -495,17 +489,9 @@ class TrayApp:
     
     def _on_edit_options(self, systray):
         """Open prompts.json in default editor"""
-        if getattr(sys, 'frozen', False):
-            options_path = Path(sys.executable).parent / "prompts.json"
-        else:
-            options_path = Path(__file__).parent.parent / "prompts.json"
+        # WorkspaceManager ensures CWD is correct
+        options_path = Path.cwd() / "prompts.json"
         
-        # Try CWD fallback if standard paths fail
-        if not options_path.exists():
-            cwd_path = Path.cwd() / "prompts.json"
-            if cwd_path.exists():
-                options_path = cwd_path
-                
         if options_path.exists():
             self._open_file(options_path)
         else:
@@ -566,15 +552,19 @@ class TrayApp:
         self._enable_dark_mode()
         
         # Define menu options with dynamic emoji icon support
-        raw_options = [
-            ("💻 Toggle Console", self._on_toggle_console),
+        raw_options = []
+        
+        if self.allow_console_toggle:
+            raw_options.append(("💻 Toggle Console", self._on_toggle_console))
+            
+        raw_options.extend([
             ("🔍 Session Browser", self._on_session_browser),
             ("⚙️ Settings", self._on_settings),
             ("✏️ Prompt Editor", self._on_prompt_editor),
             ("📝 Edit config.ini (file)", self._on_edit_config),
             ("📄 Edit prompts.json (file)", self._on_edit_options),
             ("🔄 Restart", self._on_restart),
-        ]
+        ])
         
         menu_options = []
         

@@ -20,7 +20,7 @@ Nuitka Configuration:
 # nuitka-project: --include-package-data=customtkinter
 # nuitka-project: --include-package-data=emoji
 # nuitka-project: --include-package=rich
-# nuitka-project: --output-filename=AIPromptBridge.exe
+# nuitka-project: --output-filename=AIPromptBridge_Internal.exe
 # nuitka-project: --noinclude-unittest-mode=nofollow
 # nuitka-project: --nofollow-import-to=numpy
 # nuitka-project: --nofollow-import-to=pandas
@@ -50,6 +50,7 @@ from src.key_manager import KeyManager
 from src.session_manager import load_sessions, list_sessions
 from src.terminal import terminal_session_manager, print_commands_box
 from src.gui.core import HAVE_GUI
+from src.workspace_manager import WorkspaceManager
 from src import web_server
 
 # System tray support
@@ -410,6 +411,10 @@ Examples:
         action='store_true',
         help='Dummy argument (does nothing)'
     )
+    parser.add_argument(
+        '--launched-mode',
+        help=argparse.SUPPRESS  # Hidden argument used by launchers
+    )
     return parser.parse_args()
 
 
@@ -510,35 +515,6 @@ def check_port_available(host: str, port: int) -> bool:
         return False
 
 
-def setup_working_directory():
-    """
-    Ensure the working directory is set to the application's directory.
-    This fixes issues when launching from Windows Search or other contexts
-    where the CWD might be System32 or elsewhere.
-    """
-    try:
-        if getattr(sys, 'frozen', False):
-            # If frozen (PyInstaller, cx_Freeze, etc.)
-            application_path = os.path.dirname(sys.executable)
-        else:
-            # If running as a script
-            application_path = os.path.dirname(os.path.abspath(__file__))
-
-        current_cwd = os.getcwd()
-        
-        # Log directory diagnosis for debugging
-        # print(f"[Debug] Launch CWD: {current_cwd}")
-        # print(f"[Debug] App Path:   {application_path}")
-        
-        if os.path.normpath(current_cwd).lower() != os.path.normpath(application_path).lower():
-            # print(f"[Debug] CWD mismatch detected. Switching to App Path...")
-            os.chdir(application_path)
-            # print(f"[Debug] New CWD:    {os.getcwd()}")
-            
-    except Exception as e:
-        print(f"Warning: Failed to set working directory: {e}")
-
-
 def run_server(config, ai_params, endpoints):
     """Run the Flask server (used by both tray and terminal modes)"""
     host = web_server.CONFIG.get('host', '127.0.0.1')
@@ -553,14 +529,16 @@ def run_server(config, ai_params, endpoints):
 
 def main():
     """Main entry point"""
-    # Ensure correct working directory before doing anything else
-    setup_working_directory()
+    # Initialize workspace (handle file migration and CWD)
+    target_cwd = WorkspaceManager.initialize()
+    os.chdir(target_cwd)
 
     # Parse command line arguments
     args = parse_args()
     
     # Try to relaunch in Windows Terminal for emoji support (unless --no-wt)
-    if not args.no_wt and ensure_windows_terminal():
+    # Skip if running via launcher (launcher handles console mode)
+    if not args.launched_mode and not args.no_wt and ensure_windows_terminal():
         sys.exit(0)  # Exit this instance, new one launched in WT
     
     # Suppress Flask/werkzeug logging (only show errors)
@@ -717,12 +695,14 @@ def main():
         if HAVE_RICH:
             console.print("[bold blue]🔲 Starting in tray mode...[/bold blue]")
             console.print("   Right-click tray icon for menu")
-            console.print("   Double-click tray icon to show console")
+            if not args.launched_mode == "gui":
+                console.print("   Double-click tray icon to show console")
             console.print()
         else:
             print("🔲 Starting in tray mode...")
             print("   Right-click tray icon for menu")
-            print("   Double-click tray icon to show console")
+            if not args.launched_mode == "gui":
+                print("   Double-click tray icon to show console")
             print()
         
         # Start terminal session manager
@@ -739,8 +719,12 @@ def main():
         )
         server_thread.start()
         
+        # Determine if console toggling is allowed
+        # GUI Launcher: No console toggle (it's hidden/disabled)
+        allow_console_toggle = args.launched_mode != "gui"
+        
         # Start tray (this blocks until exit)
-        tray = TrayApp(on_exit_callback=cleanup)
+        tray = TrayApp(on_exit_callback=cleanup, allow_console_toggle=allow_console_toggle)
         hide_on_start = not args.show_console
         tray.start(hide_console_on_start=hide_on_start)
         
