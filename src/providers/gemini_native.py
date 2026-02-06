@@ -8,7 +8,6 @@ Uses the native Gemini API format (camelCase) with full feature support:
 - Full retry logic matching reverse-proxy behavior
 - Files API for large file uploads (>15 MB)
 
-Reference: JSON-request-reference.md and reverse-proxy/src/upstream/gemini.js
 """
 
 import json

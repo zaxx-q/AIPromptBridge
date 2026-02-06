@@ -6,7 +6,6 @@ Supports:
 - OpenRouter
 - Google's OpenAI-compatible endpoint (with extra_body.google for safety/thinking)
 
-Reference: JSON-request-reference.md and reverse-proxy/src/upstream/openai-compatible.js
 """
 
 import json
