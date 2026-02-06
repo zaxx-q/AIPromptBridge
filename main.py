@@ -10,15 +10,16 @@ Usage:
     python main.py --no-wt      # Skip Windows Terminal auto-detection
 
 Nuitka Configuration:
-# nuitka-project: --mode=standalone
+# nuitka-project: --standalone
 # nuitka-project: --windows-icon-from-ico={MAIN_DIRECTORY}/icon.ico
 # nuitka-project: --include-data-dir={MAIN_DIRECTORY}/assets=assets
 # nuitka-project: --include-data-files={MAIN_DIRECTORY}/icon.ico=icon.ico
 # nuitka-project: --enable-plugin=tk-inter
-# nuitka-project: --windows-disable-console
+# nuitka-project: --windows-console-mode=attach
 # nuitka-project: --nofollow-import-to=pytest,unittest,notebook
 # nuitka-project: --include-package-data=customtkinter
 # nuitka-project: --include-package-data=emoji
+# nuitka-project: --include-package=rich
 # nuitka-project: --output-filename=AIPromptBridge.exe
 # nuitka-project: --noinclude-unittest-mode=nofollow
 # nuitka-project: --nofollow-import-to=numpy
@@ -443,12 +444,6 @@ def ensure_windows_terminal() -> bool:
     print("🔄 Relaunching in Windows Terminal for full emoji support...")
     
     # Build the command to relaunch
-    # Determine script/executable path safely
-    if getattr(sys, 'frozen', False):
-        script_path = sys.executable
-    else:
-        script_path = os.path.abspath(__file__)
-    
     args = sys.argv[1:]
     
     # Set environment variable to prevent loops
@@ -461,11 +456,35 @@ def ensure_windows_terminal() -> bool:
         # -d: set working directory
         cmd = [wt_path, "-w", "0", "-d", os.getcwd()]
         
-        if script_path.endswith('.py'):
-            cmd.extend([sys.executable, script_path] + args)
+        # Robust detection of compiled state
+        # 1. Nuitka sets __compiled__ in globals
+        # 2. PyInstaller/cx_Freeze set sys.frozen
+        # 3. Fallback: Check if sys.executable is NOT python.exe (renamed binary)
+        is_compiled = (
+            "__compiled__" in globals() or
+            getattr(sys, 'frozen', False) or
+            (sys.executable.lower().endswith(".exe") and "python" not in os.path.basename(sys.executable).lower())
+        )
+        
+        if is_compiled:
+            # Nuitka Standalone: sys.executable is often reliable,
+            # but sys.executable might still point to python.exe
+            # in some Nuitka versions or environment setups.
+            # safe_exe uses sys.argv[0] which is generally the invoked executable path.
+            exe_path = sys.argv[0]
+            # Ensure we're not accidentally picking up python.exe if something weird happened
+            if "python" in os.path.basename(exe_path).lower() and sys.executable.lower().endswith(".exe"):
+                 # Fallback to sys.executable if sys.argv[0] somehow lied, but unlikely in compiled
+                 pass
+            
+            # print(f"DEBUG: Relaunching compiled: {exe_path}")
+            cmd.append(exe_path)
         else:
-            # Frozen executable
-            cmd.extend([script_path] + args)
+            # Running from source: python.exe script.py
+            cmd.append(sys.executable)
+            cmd.append(os.path.abspath(__file__))
+            
+        cmd.extend(args)
         
         subprocess.Popen(cmd, env=env, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
         return True
@@ -640,7 +659,12 @@ def main():
             print(f"Check if port {port} is in use: netstat -an | findstr {port}")
             print()
             print("Press Enter to exit...")
-        input()
+        
+        # Avoid input() in detached/nuitka mode if no console
+        try:
+            input()
+        except EOFError:
+            pass
         sys.exit(1)
     
     # Show endpoint status based on flask_endpoints_enabled
