@@ -4,7 +4,7 @@
   <strong>• AI Desktop Tools & Integration Bridge •</strong>
 </p>
 
-**AIPromptBridge** is a Windows desktop application that brings AI assistance to your fingertips. Use global hotkeys to edit text using AI, capture and analyze screen content, and chat with models—all from a lightweight system tray app.
+**AIPromptBridge** is a Windows desktop application that brings AI assistance to your fingertips. Use global hotkeys to edit text using AI, capture and analyze audio or screen content, and chat with models—all from a lightweight system tray app.
 
 ## 📽️ Demo
 
@@ -23,11 +23,19 @@ Works in any application: browsers, IDEs, Notepad, Word, everywhere.
 
 ### 📸 Screen Snip (SnipTool)
 Press **Ctrl+Shift+X** to capture a region of your screen and analyze it with AI:
-- **OCR** - Extract text formatting and structure
+- **OCR** - **Extract Text** or **OCR to Markdown** for clean formatting
 - **Analysis** - **Describe**, **Summarize**, or **Explain Code**
-- **Data** - **Extract Data** to tables or **Transcribe** handwriting
+- **Data** - **Extract Data** to tables, **Transcribe** handwriting, or **Smart Cleanup** notes
 - **Compare** - **Compare Images** to analyze differences between two screenshots
-- **Chat** - Ask follow-up questions about the captured image
+- **Response Modes** - Choose to show result in Chat Window, Result Panel, or Copy to Clipboard
+
+### 🎤 Audio Analyzer
+Press **Ctrl+Shift+A** to record and analyze audio:
+- **Record** - Capture microphone input or system audio (loopback)
+- **Transcribe** - High-fidelity transcription with timestamps and speaker identification
+- **Analyze** - Summarize meetings, extract key points, or analyze tone
+- **Controls** - Visual level meter, compression settings (Opus/MP3), and preview
+- **Integration** - Send audio directly to chat context for follow-up questions
 
 ### 💬 Chat Interface
 Lightweight chat windows with:
@@ -50,7 +58,7 @@ Customizable appearance with:
 - **Empty response detection** - Automatically retries with next key
 - **Streaming support** - Real-time responses
 - **Batch Processing** - Async processing for large workloads (Gemini Batch API)
-- **Attachment Manager** - Efficient external storage for session images and files
+- **Attachment Manager** - Efficient external storage for session images, audio, and files
 
 ### 🧰 Tools System
 The **File Processor** tool enables bulk operations:
@@ -101,6 +109,9 @@ sk-or-v1-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX # Project Backup
 Right-click the tray icon for:
 - **Show/Hide Console** - Toggle console visibility
 - **Session Browser** - View chat history
+- **Direct Chat** - Open text input popup (Ctrl+Space)
+- **Screen Snip** - Trigger screen capture (Ctrl+Shift+X)
+- **Audio Analyzer** - Open audio tool (Ctrl+Shift+A)
 - **Settings** - Open GUI settings editor
 - **Prompt Editor** - Edit TextEditTool prompts
 - **Edit config.ini** - Open configuration file
@@ -121,7 +132,15 @@ Right-click the tray icon for:
 1. Press **Ctrl+Shift+X**
 2. Click and drag to select a screen region
 3. Choose an action (Describe, Extract Text, etc.) or ask a question
-4. Results open in a chat window with the image attached
+4. Results open in a chat window with the image attached, can also directly copied to clipboard.
+
+### Audio Tool
+
+1. Press **Ctrl+Shift+A** to open the Audio Analyzer
+2. Select input device (Microphone or System Audio)
+3. Click **Record** to capture audio
+4. Choose an action (Transcribe, Analyze, etc.)
+5. Results are streamed to a chat window or displayed in the result panel
 
 ### API Endpoints
 
@@ -255,6 +274,7 @@ Configure the UI theme in Settings or `config.ini`:
 [config]
 ui_theme = catppuccin
 ui_theme_mode = auto  # auto, dark, light
+auto_save_session = on_followup # on_followup, always_window, on_attachment
 ```
 
 Available themes: `catppuccin`, `dracula`, `nord`, `gruvbox`, `onedark`, `minimal`, `highcontrast`
@@ -302,8 +322,8 @@ AIPromptBridge.exe --no-wt            # Skip Windows Terminal detection
 - [x] **Settings Window** - GUI for editing config.ini
 - [x] **Theme System** - Multiple color schemes with dark/light modes
 - [x] **Colored Emoji** - Twemoji-based color emoji rendering in chat and UI widgets
-- [ ] **Localization** - Multi-language support for UI
 - [x] **Modern UI** - Migrated to CustomTkinter for modern UI, rounded corners, and other GUI improvements
+- [x] **Audio Tool** - Recording and analysis of system/mic audio
 
 ## 📝 Requirements
 

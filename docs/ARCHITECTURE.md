@@ -27,6 +27,7 @@ flowchart TB
         Flask["Flask Server<br/>(web_server.py)"]
         TET["TextEditTool<br/>(text_edit_tool.py)"]
         Snip["SnipTool<br/>(snip_tool.py)"]
+        Audio["AudioTool<br/>(audio_tool.py)"]
         Popups["Popups<br/>(popups.py)"]
         Modifiers["Scrollable ModifierBar<br/>(popups.py)"]
         TypingInd["TypingIndicator<br/>(popups.py)"]
@@ -56,6 +57,7 @@ flowchart TB
     Tools --> Pipeline
     TET --> Popups
     Snip --> Popups
+    Audio --> Popups
     Popups --> Modifiers
     TET --> TypingInd
     Popups --> Pipeline
@@ -117,6 +119,7 @@ flowchart LR
         Browser["SessionBrowser (windows/session_browser.py)"]
         Popup["PopupWindow (popups.py)"]
         SnipUI["SnipPopup (snip_popup.py)"]
+        AudioUI["AudioAnalyzerWindow (windows/audio_analyzer.py)"]
     end
     
     subgraph OtherThreads["Other Threads"]
@@ -130,6 +133,7 @@ flowchart LR
     Root --> Browser
     Root --> Popup
     Root --> SnipUI
+    Root --> AudioUI
 ```
 
 ### Rules
@@ -155,6 +159,7 @@ To ensure robustness across different environments, AIPromptBridge includes a ce
 | `SessionBrowserWindow` | Browse and restore saved sessions |
 | `PopupWindow` | TextEditTool selection/input dialogs with dual input (Edit/Ask) and scrollable ModifierBar |
 | `SnipPopup` | Result dialog for screen snipping with image preview and action carousel |
+| `AudioAnalyzerWindow` | Audio recording, playback, and analysis interface |
 | `ErrorPopup` | Dialog for displaying API failures to user |
 | `TypingIndicator` | Tooltip showing typing status and abort hotkey |
 | `SettingsWindow` | GUI editor for config.ini with tabbed interface |
@@ -214,6 +219,7 @@ Prompts are managed centrally via `PromptsConfig` (loading `prompts.json` or def
 #### Unified Configuration
 - `text_edit_tool`: Configuration for text selection actions (Ctrl+Space)
 - `snip_tool`: Configuration for screen snipping actions (Ctrl+Shift+X)
+- `audio_tool`: Configuration for audio analysis actions (Ctrl+Shift+A)
 - `endpoints`: Flask API endpoint prompts
 - `_global_settings`: Shared modifiers and system instructions
 
@@ -416,3 +422,15 @@ show_prompt_editor()    # Opens Prompt Editor
 ```
 
 Both windows are accessible from the system tray menu.
+
+## Workspace Management (Deployment)
+
+To support clean deployment with Nuitka, the application uses a split structure managed by `src/workspace_manager.py`:
+
+- **Root**: Contains lightweight launchers (`AIPromptBridge.exe`, `AIPromptBridge-Console.exe`) and user config files.
+- **Bin**: Contains the heavy standalone application (`bin/AIPromptBridge_Internal.exe`) and dependencies.
+
+**`src/workspace_manager.py`** manages file migration:
+- **Initialization**: Called early in `main.py` via `WorkspaceManager.initialize()`.
+- **File Migration**: Automatically moves managed files (`config.ini`, `prompts.json`, sessions) between Root and Bin depending on the mode.
+- **CWD Resolution**: Ensures the application always operates in the correct directory (Root for launchers, Bin for direct execution) so relative paths work as expected.

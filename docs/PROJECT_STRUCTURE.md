@@ -4,8 +4,9 @@ AIPromptBridge follows a modular architecture separating the web server, GUI, sy
 
 ```
 AIPromptBridge/
-├── main.py                     # Main entry point (--no-tray, --show-console flags)
-├── setup.py                    # cx_Freeze build configuration for Windows executable
+├── main.py                     # Main entry point (Internal logic)
+├── launcher_gui.py             # GUI Launcher (Nuitka Onefile)
+├── launcher_console.py         # Console Launcher (Nuitka Onefile)
 ├── requirements.txt            # Python dependencies
 ├── config.ini                  # Configuration (auto-generated on first run)
 ├── chat_sessions.json          # Saved chat sessions (auto-created)
@@ -13,6 +14,9 @@ AIPromptBridge/
 ├── tools_config.json           # Tools configuration (auto-generated on demand)
 ├── session_attachments/        # Directory for message attachment files
 ├── icon.ico                    # System tray icon
+├── assets/
+│   ├── emojis.zip              # Twemoji assets
+│   └── snip.wav                # Screen snip sound effect
 ├── LICENSE
 ├── README.md
 │
@@ -28,20 +32,28 @@ AIPromptBridge/
     ├── config.py               # Custom INI parser, configuration management
     ├── console.py              # Centralized Rich console configuration
     ├── key_manager.py          # API key rotation with exhaustion tracking
+    ├── messages.py             # Multimodal message construction factory
     ├── request_pipeline.py     # Unified request processing with logging
     ├── session_manager.py      # Session persistence with sequential IDs
     ├── terminal.py             # Interactive terminal commands (includes Tools menu)
     ├── tray.py                 # System tray application (Windows)
     ├── utils.py                # Utility functions (strip_markdown, etc.)
+    ├── version.py              # Application version source of truth
     ├── web_server.py           # Flask server and API endpoints
+    ├── workspace_manager.py    # Path management for Nuitka deployments
+    │
+    ├── audio/                  # Audio Subsystem
+    │   ├── __init__.py
+    │   ├── devices.py          # PyAudioWPatch device enumeration
+    │   └── recorder.py         # Recorder class with voice activity detection
     │
     ├── gui/                    # GUI Package (CustomTkinter)
     │   ├── __init__.py
+    │   ├── audio_tool.py       # Audio Tool application controller
     │   ├── core.py             # GUICoordinator singleton for thread-safe GUI
     │   ├── custom_widgets.py   # Reusable UI components (ScrollableButtonList, ScrollableComboBox)
     │   ├── emoji_renderer.py   # Twemoji-based color emoji support for Windows
     │   ├── hotkey.py           # Global hotkey listener (pynput)
-    │   ├── options.py          # Default options and settings constants (Deprecated)
     │   ├── platform.py         # UI toolkit authority (HAVE_CTK and fallback logic)
     │   ├── popups.py           # Modern themed popups with scrollable ModifierBar
     │   ├── prompt_editor.py    # GUI editor for prompts.json
@@ -56,10 +68,12 @@ AIPromptBridge/
     │   ├── utils.py            # GUI utilities (clipboard, markdown render)
     │   └── windows/            # Modular window implementations
     │       ├── __init__.py
-    │       ├── base.py         # Base class for CTk windows
-    │       ├── chat_window.py  # Interactive chat window
-    │       ├── session_browser.py # Session history browser
-    │       └── utils.py        # Window management utilities
+    │       ├── audio_analyzer.py   # Audio recording and analysis UI
+    │       ├── audio_analyzer_tk.py # Tkinter fallback for Audio Analyzer
+    │       ├── chat_base.py        # Base classes for chat windows
+    │       ├── chat_window.py      # Interactive chat window
+    │       ├── session_browser.py  # Session history browser
+    │       └── utils.py            # Window management utilities
     │
     ├── providers/              # AI Provider Implementations
     │   ├── __init__.py         # Provider exports and factory
