@@ -17,6 +17,48 @@ HAVE_SYSTRAY = False
 SysTrayIcon = None
 try:
     from infi.systray import SysTrayIcon
+    from infi.systray.win32_adapter import (
+        MENUITEMINFO,
+        PackMENUITEMINFO,
+        InsertMenuItem,
+        CreatePopupMenu,
+        ctypes
+    )
+    # Define constants missing from win32_adapter
+    MFT_SEPARATOR = 0x00000800
+    MIIM_FTYPE = 0x00000100
+
+    class CustomSysTrayIcon(SysTrayIcon):
+        """Custom SysTrayIcon that supports separators"""
+        def _create_menu(self, menu, menu_options):
+            for option_text, option_icon, option_action, option_id in menu_options[::-1]:
+                # Check for separator
+                if option_text == "---":
+                    item = MENUITEMINFO()
+                    item.cbSize = ctypes.sizeof(item)
+                    item.fMask = MIIM_FTYPE
+                    item.fType = MFT_SEPARATOR
+                    InsertMenuItem(menu, 0, 1, ctypes.byref(item))
+                    continue
+                
+                if option_icon:
+                    option_icon = self._prep_menu_icon(option_icon)
+
+                if option_id in self._menu_actions_by_id:
+                    item = PackMENUITEMINFO(text=option_text,
+                                            hbmpItem=option_icon,
+                                            wID=option_id)
+                    InsertMenuItem(menu, 0, 1, ctypes.byref(item))
+                else:
+                    submenu = CreatePopupMenu()
+                    self._create_menu(submenu, option_action)
+                    item = PackMENUITEMINFO(text=option_text,
+                                            hbmpItem=option_icon,
+                                            hSubMenu=submenu)
+                    InsertMenuItem(menu, 0, 1,  ctypes.byref(item))
+
+    # Use our custom class instead
+    SysTrayIcon = CustomSysTrayIcon
     HAVE_SYSTRAY = True
 except ImportError:
     pass
@@ -589,22 +631,30 @@ class TrayApp:
         # Enable dark mode for menus if applicable
         self._enable_dark_mode()
         
+        # Helper for separators
+        def _separator(systray): pass
+        SEP = ("---", _separator)
+
         # Define menu options with dynamic emoji icon support
         raw_options = []
         
         if self.allow_console_toggle:
             raw_options.append(("💻 Toggle Console", self._on_toggle_console))
+            raw_options.append(SEP)
             
         raw_options.extend([
             ("🔍 Session Browser", self._on_session_browser),
             ("💬 Direct Chat", self._on_direct_chat),
             ("📸 Screen Snip", self._on_snip_tool),
             ("🎤 Audio Analyzer", self._on_audio_analyzer),
+            SEP,
             ("⚙️ Settings", self._on_settings),
             ("✏️ Prompt Editor", self._on_prompt_editor),
             ("📝 Edit config.ini (file)", self._on_edit_config),
             ("📄 Edit prompts.json (file)", self._on_edit_options),
+            SEP,
             ("🔄 Restart", self._on_restart),
+            SEP # Separator before "Quit" (which is added automatically)
         ])
         
         menu_options = []
@@ -615,6 +665,10 @@ class TrayApp:
             renderer = get_emoji_renderer()
             
             for text, callback in raw_options:
+                if text == "---":
+                    menu_options.append((text, None, callback))
+                    continue
+
                 # Extract emoji
                 emoji_char, clean_text = renderer.extract_leading_emoji(text)
                 icon_path = None
