@@ -736,6 +736,40 @@ class SettingsWindow:
                               str(self.config_data.config.get("show_ai_response_in_chat_window", "no")).lower() == "yes",
                               hint="For direct chat popup and endpoint requests. Actions/modifiers override this.")
         
+        # Session Auto-Save
+        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row.pack(fill="x", pady=8)
+        
+        self.vars["auto_save_session"] = tk.StringVar(
+            master=self.root, value=self.config_data.config.get("auto_save_session", "on_followup"))
+        
+        if self.use_ctk:
+            ctk.CTkLabel(row, text="New session auto-creation:", font=get_ctk_font(13), width=180, anchor="w",
+                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            self.widgets["auto_save_session"] = ctk.CTkComboBox(
+                row, variable=self.vars["auto_save_session"],
+                values=["on_followup", "always_window", "on_attachment"],
+                width=160, height=34, state="readonly", font=get_ctk_font(13),
+                **get_ctk_combobox_colors(self.colors)
+            )
+            self.widgets["auto_save_session"].pack(side="left", padx=(12, 0))
+            
+            ctk.CTkLabel(row, text="Save trigger: reply (on_followup), open (always_window), or has files (on_attachment)", font=get_ctk_font(11),
+                        **get_ctk_label_colors(self.colors, muted=True)).pack(side="left", padx=(15, 0))
+        else:
+            from tkinter import ttk
+            tk.Label(row, text="New session auto-creation:", font=("Segoe UI", 10), width=18, anchor="w",
+                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            self.widgets["auto_save_session"] = ttk.Combobox(
+                row, textvariable=self.vars["auto_save_session"],
+                values=["on_followup", "always_window", "on_attachment"],
+                state="readonly", width=18
+            )
+            self.widgets["auto_save_session"].pack(side="left", padx=(10, 0))
+            
+            tk.Label(row, text="Save trigger: reply (on_followup), open (always_window), or has files (on_attachment)", font=("Segoe UI", 9),
+                    bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
+
         # Limits section
         create_section_header(scroll_frame, "🚦 Limits", self.colors, top_padding=20)
         
