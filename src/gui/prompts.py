@@ -164,7 +164,7 @@ DEFAULT_TEXT_EDIT_SETTINGS = {
     "popup_groups": [
         {
             "name": "Understanding",
-            "items": ["Explain", "ELI5", "Explain Slang/Meme", "ESL Breakdown", "Summary", "Key Points", "Translate to English", "Translate to Indonesian"]
+            "items": ["Explain", "ELI5", "Explain Slang/Meme", "ESL Breakdown", "Summary", "Extract Data", "Key Points", "Translate to English", "Translate to Indonesian"]
         },
         {
             "name": "Text Edit",
@@ -172,7 +172,7 @@ DEFAULT_TEXT_EDIT_SETTINGS = {
         },
         {
             "name": "Code",
-            "items": ["Explain Code", "Debug", "Refactor", "Document"]
+            "items": ["Explain Code", "Code Review", "Debug", "Refactor", "Document"]
         },
         {
             "name": "Suggestor",
@@ -215,6 +215,13 @@ DEFAULT_TEXT_EDIT_ACTIONS = {
         "prompt_type": "general",
         "system_prompt": "You are a summarization expert who distills text to its essential points.\n\n<format>\n- Use Markdown: bold for key terms, bullet points for main ideas.\n- Add line spacing between logical sections.\n- Use small headings (###) only if the content has distinct sections.\n</format>\n\n<constraints>\n- Capture all key insights—nothing important should be lost.\n- Be succinct but not cryptic.\n- Never add information not present in the original.\n</constraints>",
         "task": "Summarize this text, highlighting the most important points and insights.",
+        "show_chat_window_instead_of_replace": True
+    },
+    "Extract Data": {
+        "icon": "📊",
+        "prompt_type": "general",
+        "system_prompt": "You are a data extraction specialist.\n\n<integrity_rule>\nMaintain strict fidelity to original terminology. Do not 'correct' or normalize domain-specific terms, codes, or identifiers.\n</integrity_rule>\n\n<guidelines>\n- **Tables**: Preserve headers and alignment (Markdown).\n- **Lists**: Preserve hierarchy.\n- **Key-Value**: Format as `**Key**: Value`.\n- **Mixed**: Organize by type.\n</guidelines>",
+        "task": "Extract all structured data (tables, lists, key-value pairs) from this text and format it clearly in Markdown.",
         "show_chat_window_instead_of_replace": True
     },
     "Key Points": {
@@ -343,6 +350,13 @@ DEFAULT_TEXT_EDIT_ACTIONS = {
         "task": "Explain this code. Describe what it does, how it works, and any important logic or patterns used.",
         "show_chat_window_instead_of_replace": True
     },
+    "Code Review": {
+        "icon": "🔍",
+        "prompt_type": "general",
+        "system_prompt": "You are an expert code reviewer. Review the provided code for quality, issues, best practices, and improvements.\n\n<analysis_areas>\n1. **Code Quality**: Readability, maintainability, naming, organization.\n2. **Potential Issues**: Bugs, logic errors, edge cases, security, performance.\n3. **Best Practices**: Conventions, design patterns, error handling.\n4. **Suggestions**: Specific improvements, refactoring, documentation.\n</analysis_areas>\n\n<constraints>\n- Provide actionable feedback with examples.\n- Use Markdown formatting.\n</constraints>",
+        "task": "Review this code comprehensively. Analyze quality, issues, and best practices, and provide suggestions.",
+        "show_chat_window_instead_of_replace": True
+    },
     "Debug": {
         "icon": "🐛",
         "prompt_type": "general",
@@ -389,7 +403,7 @@ DEFAULT_SNIP_SETTINGS = {
     "popup_items_per_page": 6,
     "popup_groups": [
         {"name": "Analysis", "items": ["Explain", "Describe", "Summarize"]},
-        {"name": "Text/Data", "items": ["Extract Text", "Extract Data", "Transcribe", "Translate to English"]},
+        {"name": "Text/Data", "items": ["Extract Text", "OCR to Markdown", "Extract Data", "Transcribe", "Smart Cleanup", "Translate to English"]},
         {"name": "Compare", "items": ["Compare Images", "Spot Differences", "Before/After", "Which is Better"]}
     ],
     "custom_task_template": "Regarding this image: {custom_input}",
@@ -437,6 +451,20 @@ DEFAULT_SNIP_ACTIONS = {
         "system_prompt": "You are a transcription specialist for handwritten text and documents.",
         "task": "Transcribe any handwritten or printed text in this image as accurately as possible. Output ONLY the raw text.",
         "show_chat_window": False,
+        "compare_prompts": False
+    },
+    "Smart Cleanup": {
+        "icon": "🧹",
+        "system_prompt": "You are tasked with performing intelligent Handwriting Text Recognition (HTR) with active reconstruction. The objective is to transform messy, abbreviated, or fragmented handwritten notes into clean, readable text.\n\n<reconstruction_approach>\nThis mode PRIORITIZES READABILITY over strict fidelity. Actively:\n- Expand abbreviations and shorthand (w/ -> with, b/c -> because)\n- Complete truncated words\n- Fix obvious spelling errors\n- Infer missing words from context\n- Reconstruct fragmented thoughts into coherent sentences\n</reconstruction_approach>\n\n<guidelines>\n- Detect and use the source language(s) for expansion.\n- Convert fragments into complete sentences where intent is clear.\n- Use [?] for low confidence, [illegible] for unreadable.\n- Identify document type/structure and match it.\n</guidelines>\n\n<formatting>\n- Use Markdown structure (#, ##, - lists).\n- *Italic* for reconstructed text requiring inference.\n- **Bold** for emphasis.\n</formatting>\n\n<output_rules>\n- Provide ONLY the cleaned, formatted Markdown.\n- No preamble.\n- The output should read as if the notes were carefully written, not hastily jotted.\n</output_rules>",
+        "task": "Transcribe this handwriting with smart cleanup. Reconstruct messy notes into a clean, readable document.",
+        "show_chat_window": True,
+        "compare_prompts": False
+    },
+    "OCR to Markdown": {
+        "icon": "📄",
+        "system_prompt": "You are tasked with performing high-fidelity Optical Character Recognition (OCR) with intelligent Markdown formatting. Extract all text from the image and format it as clean, well-structured Markdown.\n\n<formatting_rules>\n1. **Structure**: Use # for headings, ## for sections. Use --- for separators.\n2. **Emphasis**: Use **Bold**, *Italic*, `code`.\n3. **Lists**: Use - for bullets, 1. for numbered lists. Preserve nesting.\n4. **Tables**: Convert tabular data to Markdown tables.\n5. **Code Blocks**: Use ```language for code.\n</formatting_rules>\n\n<constraints>\n- Transcribe ALL text with high accuracy.\n- PRIORITIZE VISUAL EVIDENCE: Do not 'autocorrect' technical terms or proper nouns.\n- Handle unclear text with [unclear] markers.\n- Provide ONLY the formatted Markdown.\n</constraints>",
+        "task": "Extract all text from this image and format it as clean Markdown, preserving structure and layout.",
+        "show_chat_window": True,
         "compare_prompts": False
     },
     "Translate to English": {
@@ -492,16 +520,16 @@ DEFAULT_AUDIO_SETTINGS = {
     "items_per_page": 6,
     "custom_task_template": "Regarding this audio: {custom_input}",
     "popup_groups": [
-        {"name": "Transcription", "items": ["Transcribe", "Transcribe with Timestamps", "Identify Speakers", "Translate to English"]},
-        {"name": "Analysis", "items": ["Analyze", "Describe", "Summarize", "Extract Key Points"]}
+        {"name": "Transcription", "items": ["Transcribe", "Transcribe with Timestamps", "Transcribe (Markdown)", "Translate to English"]},
+        {"name": "Analysis", "items": ["Analyze", "Describe", "Summarize", "Extract Key Points", "Identify Speakers"]}
     ]
 }
 
 DEFAULT_AUDIO_ACTIONS = {
     "Transcribe": {
         "icon": "📝",
-        "system_prompt": "You are an expert transcriptionist who converts audio to accurate text.",
-        "task": "Transcribe this audio accurately. Preserve speaker changes if detectable. Output only the transcription.",
+        "system_prompt": "You are tasked with performing high-fidelity audio transcription.\n\n<guidelines>\n1. **Accuracy**: Transcribe speech EXACTLY as spoken. Preserve non-standard grammar and filler words (um, uh) if present.\n2. **Speakers**: Label speakers (Speaker 1, etc.) if multiple. Note changes with line breaks.\n3. **Non-Speech**: Note [laughter], [applause], [long pause].\n4. **Formatting**: Natural paragraph breaks.\n</guidelines>",
+        "task": "Transcribe this audio exactly as spoken. Output only the transcript text.",
         "show_chat_window": False
     },
     "Transcribe with Timestamps": {
@@ -509,6 +537,12 @@ DEFAULT_AUDIO_ACTIONS = {
         "system_prompt": "You are an expert transcriptionist who converts audio to accurate text with timestamps.",
         "task": "Transcribe this audio with timestamps at natural breaks (every 10-30 seconds or at speaker changes). Format: [MM:SS] text",
         "show_chat_window": False
+    },
+    "Transcribe (Markdown)": {
+        "icon": "🎧",
+        "system_prompt": "You are a high-fidelity audio transcription specialist who formats output as clean Markdown.\n\n<formatting>\n- Speaker labels in **bold**.\n- *Italics* for non-speech sounds (laughter, music).\n- Markdown structure (#, ##) for sections.\n- Blockquotes (>) for notable statements.\n</formatting>\n\n<constraints>\n- Transcribe EXACTLY as spoken.\n- Do not clean up grammar/speech errors (unless specifically asked).\n- Maintain strict fidelity.\n</constraints>",
+        "task": "Transcribe this audio with Markdown formatting. Identify speakers and structure the content.",
+        "show_chat_window": True
     },
     "Analyze": {
         "icon": "🔍",
