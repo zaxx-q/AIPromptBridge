@@ -508,6 +508,69 @@ def run_server(config, ai_params, endpoints):
         cleanup()
 
 
+def configure_logging(debug_mode: bool = False):
+    """
+    Configure global logging with Rich handler if available.
+    
+    By default (no --show-console), no logging configuration is done,
+    keeping Python's default WARNING level for a clean console.
+    
+    When debug_mode is True (--show-console), enables DEBUG level logging
+    with Rich formatting for better visibility.
+    
+    Args:
+        debug_mode: If True, configure DEBUG level logging. Otherwise, minimal setup.
+    """
+    # Always suppress noisy third-party loggers
+    noisy_loggers = ['werkzeug', 'PIL', 'PIL.PngImagePlugin', 'PIL.Image']
+    for logger_name in noisy_loggers:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
+    
+    # If not debug mode, just suppress noise and leave Python's default WARNING level
+    if not debug_mode:
+        return
+    
+    # Debug mode: configure INFO/DEBUG level with Rich handler
+    level = logging.DEBUG
+    
+    # Try to use Rich's logging handler for better output
+    if HAVE_RICH:
+        try:
+            from rich.logging import RichHandler
+            
+            # Configure with Rich handler - use force=True to reconfigure
+            logging.basicConfig(
+                level=level,
+                format="%(message)s",
+                datefmt="[%X]",
+                handlers=[RichHandler(
+                    console=console,
+                    show_time=False,  # Cleaner output
+                    show_level=True,
+                    show_path=False,  # Reduce noise
+                    markup=True,
+                    rich_tracebacks=True
+                )],
+                force=True  # Override any existing configuration
+            )
+        except ImportError:
+            # Fallback to basic config
+            logging.basicConfig(
+                level=level,
+                format="[%(levelname)s] %(name)s: %(message)s",
+                force=True
+            )
+    else:
+        # Basic config without Rich
+        logging.basicConfig(
+            level=level,
+            format="[%(levelname)s] %(name)s: %(message)s",
+            force=True
+        )
+    
+    logging.debug("Debug logging enabled (--show-console)")
+
+
 def main():
     """Main entry point"""
     # Initialize workspace (handle file migration and CWD)
@@ -517,13 +580,13 @@ def main():
     # Parse command line arguments
     args = parse_args()
     
+    # Configure global logging (DEBUG if --show-console, otherwise INFO)
+    configure_logging(debug_mode=args.show_console)
+    
     # Try to relaunch in Windows Terminal for emoji support (unless --no-wt)
     # Skip if running via launcher (launcher handles console mode)
     if not args.launched_mode and not args.no_wt and ensure_windows_terminal():
         sys.exit(0)  # Exit this instance, new one launched in WT
-    
-    # Suppress Flask/werkzeug logging (only show errors)
-    logging.getLogger('werkzeug').setLevel(logging.ERROR)
     
     # Suppress Flask startup banner
     import flask.cli
