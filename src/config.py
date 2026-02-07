@@ -39,7 +39,7 @@ DEFAULT_CONFIG = {
     # For API endpoints: overridden by ?show=yes/no URL parameter
     # For TextEditTool: overridden by show_chat_window_instead_of_replace per-action setting,
     #                   which is further overridden by popup radio button selection
-    "show_ai_response_in_chat_window": "no",
+    "show_ai_response_in_chat_window": False,
     # Session Auto-Save Setting:
     # controls when sessions are persisted to disk.
     # - "on_followup" (default): Save only when user sends a follow-up message in chat window.
@@ -277,7 +277,7 @@ default_provider = google
 #   2. Popup radio button selection (TextEditTool, if not "Default")
 #   3. show_chat_window_instead_of_replace per-action setting (TextEditTool)
 #   4. This global setting (show_ai_response_in_chat_window)
-show_ai_response_in_chat_window = no
+show_ai_response_in_chat_window = false
 
 # Session Auto-Save Setting:
 # controls when sessions are persisted to disk.

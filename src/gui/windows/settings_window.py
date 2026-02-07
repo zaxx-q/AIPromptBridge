@@ -445,7 +445,7 @@ class SettingsWindow:
         
         # Load from web_server if available (in-memory values)
         try:
-            from .. import web_server
+            from ... import web_server
             for key, value in web_server.CONFIG.items():
                 self.config_data.config[key] = value
         except (ImportError, AttributeError):
@@ -733,7 +733,7 @@ class SettingsWindow:
         # Show AI response in chat window
         self._add_toggle_field(scroll_frame, "show_ai_response_in_chat_window",
                               "Show AI response in chat window",
-                              str(self.config_data.config.get("show_ai_response_in_chat_window", "no")).lower() == "yes",
+                              self.config_data.config.get("show_ai_response_in_chat_window", False),
                               hint="For direct chat popup and endpoint requests. Actions/modifiers override this.")
         
         # Session Auto-Save
@@ -754,7 +754,7 @@ class SettingsWindow:
             )
             self.widgets["auto_save_session"].pack(side="left", padx=(12, 0))
             
-            ctk.CTkLabel(row, text="Save trigger: reply (on_followup), open (always_window), or has files (on_attachment)", font=get_ctk_font(11),
+            ctk.CTkLabel(row, text="Creation trigger: reply (on_followup), open (always_window), or has files (on_attachment)", font=get_ctk_font(11),
                         **get_ctk_label_colors(self.colors, muted=True)).pack(side="left", padx=(15, 0))
         else:
             from tkinter import ttk
@@ -767,7 +767,7 @@ class SettingsWindow:
             )
             self.widgets["auto_save_session"].pack(side="left", padx=(10, 0))
             
-            tk.Label(row, text="Save trigger: reply (on_followup), open (always_window), or has files (on_attachment)", font=("Segoe UI", 9),
+            tk.Label(row, text="Creation trigger: reply (on_followup), open (always_window), or has files (on_attachment)", font=("Segoe UI", 9),
                     bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
 
         # Limits section
@@ -1801,7 +1801,7 @@ class SettingsWindow:
             
             # Also update web_server ENDPOINTS if available
             try:
-                from .. import web_server
+                from ... import web_server
                 for endpoint_name, prompt in self._endpoint_prompts.items():
                     web_server.ENDPOINTS[endpoint_name] = prompt
                 print(f"[Settings] Reloaded {len(self._endpoint_prompts)} endpoint prompt(s)")
@@ -2181,9 +2181,7 @@ class SettingsWindow:
                     value = self.widgets[f"{key}_default"]
             
             # Handle special cases
-            if key == "show_ai_response_in_chat_window":
-                value = "yes" if value else "no"
-            elif key == "port":
+            if key == "port":
                 try:
                     value = int(value)
                 except (ValueError, TypeError):
@@ -2209,7 +2207,7 @@ class SettingsWindow:
         if save_config_full(self.config_data):
             # Update in-memory config
             try:
-                from .. import web_server
+                from ... import web_server
                 for key, value in self.config_data.config.items():
                     web_server.CONFIG[key] = value
                 

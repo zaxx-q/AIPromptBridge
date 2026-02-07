@@ -89,7 +89,7 @@ def create_endpoint_handler(endpoint_name, prompt_template):
         
         # Show parameter: yes/true/1 = show chat window, anything else = no
         # Uses show_ai_response_in_chat_window
-        default_show = CONFIG.get('show_ai_response_in_chat_window', 'no')
+        default_show = CONFIG.get('show_ai_response_in_chat_window', False)
         show_param = request.args.get('show', default_show)
         if isinstance(show_param, bool):
             show_gui = show_param
