@@ -85,9 +85,9 @@ DEFAULT_CONFIG = {
     # Force use of standard Tkinter even if CustomTkinter is available (fallback mode)
     "ui_force_standard_tk": False,
     # Session attachment settings
-    # Image format for saving session attachments: png, jpg, webp (default), avif
+    # Image format for saving session attachments: png, jpg, webp (default)
     "session_image_format": "webp",
-    # Image quality for lossy formats (jpg, webp, avif): 1-100
+    # Image quality for lossy formats (jpg, webp): 1-100
     "session_image_quality": 85,
     # Audio Tool settings
     "audio_tool_enabled": True,
@@ -424,7 +424,7 @@ ui_force_standard_tk = false
 # SESSION ATTACHMENT SETTINGS
 # ============================================================
 # Image format for saving session attachments
-# Options: png, jpg, webp (default), avif
+# Options: png, jpg, webp (default)
 session_image_format = webp
 
 # Image quality for lossy formats (1-100)

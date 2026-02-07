@@ -16,7 +16,6 @@ Supported Formats:
     - WebP (default) - best compression/quality ratio
     - PNG - lossless, larger files
     - JPEG - lossy, smaller files
-    - AVIF - modern format, excellent compression (requires pillow-avif-plugin)
 """
 
 import base64
@@ -61,7 +60,6 @@ class AttachmentManager:
         "jpg": "image/jpeg",
         "jpeg": "image/jpeg",
         "webp": "image/webp",
-        "avif": "image/avif",
         "gif": "image/gif",
         "bmp": "image/bmp",
         # Documents
@@ -83,7 +81,6 @@ class AttachmentManager:
         "image/png": "png",
         "image/jpeg": "jpg",
         "image/webp": "webp",
-        "image/avif": "avif",
         "image/gif": "gif",
         "image/bmp": "bmp",
         # Documents
@@ -106,7 +103,7 @@ class AttachmentManager:
     DEFAULT_QUALITY = 85
     
     # Formats that should be treated as images for conversion/thumbnailing
-    IMAGE_FORMATS = {"png", "jpg", "jpeg", "webp", "avif", "gif", "bmp", "tiff", "tif"}
+    IMAGE_FORMATS = {"png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif"}
     
     @classmethod
     def _get_config(cls) -> Tuple[str, int]:
@@ -227,7 +224,7 @@ class AttachmentManager:
                 
                 # Save with quality setting for lossy formats
                 with _FILE_LOCK:
-                    if target_format in ("jpg", "jpeg", "webp", "avif"):
+                    if target_format in ("jpg", "jpeg", "webp"):
                         img.save(file_path, quality=quality, optimize=True)
                     elif target_format == "png":
                         img.save(file_path, optimize=True)

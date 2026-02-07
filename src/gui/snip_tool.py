@@ -461,7 +461,6 @@ class SnipToolApp:
         
         # Helper to detect mime from path
         def get_mime_from_path(path):
-            if path.lower().endswith(".avif"): return "image/avif"
             if path.lower().endswith(".webp"): return "image/webp"
             if path.lower().endswith(".png"): return "image/png"
             if path.lower().endswith(".jpg") or path.lower().endswith(".jpeg"): return "image/jpeg"

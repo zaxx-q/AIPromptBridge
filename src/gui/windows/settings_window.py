@@ -813,7 +813,7 @@ class SettingsWindow:
                         **get_ctk_label_colors(self.colors)).pack(side="left")
             self.widgets["session_image_format"] = ctk.CTkComboBox(
                 row, variable=self.vars["session_image_format"],
-                values=["webp", "png", "jpg", "avif"],
+                values=["webp", "png", "jpg"],
                 width=120, height=34, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
@@ -827,7 +827,7 @@ class SettingsWindow:
                     bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
             self.widgets["session_image_format"] = ttk.Combobox(
                 row, textvariable=self.vars["session_image_format"],
-                values=["webp", "png", "jpg", "avif"],
+                values=["webp", "png", "jpg"],
                 state="readonly", width=12
             )
             self.widgets["session_image_format"].pack(side="left", padx=(10, 0))
@@ -838,7 +838,7 @@ class SettingsWindow:
         # Image Quality
         self._add_spinbox_field(scroll_frame, "session_image_quality", "Quality (1-100):",
                                self.config_data.config.get("session_image_quality", 85),
-                               1, 100, hint="Compression level for webp/jpg/avif")
+                               1, 100, hint="Compression level for webp/jpg")
     
     def _create_provider_tab(self, frame):
         """Create the Provider settings tab."""
