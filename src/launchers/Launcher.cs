@@ -1,14 +1,14 @@
 /*
  * AIPromptBridge Launcher
- * 
+ *
  * A lightweight native launcher that starts the internal Python application.
  * Compiled with conditional symbols to create two variants:
- *   - GUI Mode (/define:GUI): No console window, fire-and-forget launch
+ *   - No Console Mode (/define:GUI): No console window, fire-and-forget launch
  *   - Console Mode (/define:CONSOLE): With console, waits for exit
- * 
+ *
  * Build Commands:
- *   GUI:     csc /target:winexe /out:AIPromptBridge.exe /win32icon:icon.ico /define:GUI Launcher.cs
- *   Console: csc /target:exe /out:AIPromptBridge-Console.exe /win32icon:icon.ico /define:CONSOLE Launcher.cs
+ *   Console:    csc /target:exe /out:AIPromptBridge.exe /win32icon:icon.ico /define:CONSOLE Launcher.cs
+ *   No Console: csc /target:winexe /out:AIPromptBridge-NoConsole.exe /win32icon:icon.ico /define:GUI Launcher.cs
  */
 
 using System;
@@ -53,7 +53,7 @@ class Launcher
 #if GUI
         string modeArgs = "--launched-mode=gui";
 #else
-        string modeArgs = "--launched-mode=console --show-console";
+        string modeArgs = "--launched-mode=console";
 #endif
         
         string allArgs = modeArgs;

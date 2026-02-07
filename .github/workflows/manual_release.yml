@@ -143,25 +143,10 @@ jobs:
           # Create output directory
           New-Item -ItemType Directory -Force -Path "build_launchers" | Out-Null
           
-          # Build GUI Launcher (no console window)
-          Write-Host "Building GUI Launcher..."
-          & $cscPath.FullName /target:winexe `
-                              /out:build_launchers/AIPromptBridge.exe `
-                              /win32icon:icon.ico `
-                              /define:GUI `
-                              /optimize+ `
-                              src/launchers/Launcher.cs
-          
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to build GUI launcher!"
-            exit 1
-          }
-          Write-Host "✓ GUI Launcher built successfully"
-          
-          # Build Console Launcher (with console window)
-          Write-Host "Building Console Launcher..."
+          # Build Console Launcher (with console window) - Primary launcher
+          Write-Host "Building Console Launcher (AIPromptBridge.exe)..."
           & $cscPath.FullName /target:exe `
-                              /out:build_launchers/AIPromptBridge-Console.exe `
+                              /out:build_launchers/AIPromptBridge.exe `
                               /win32icon:icon.ico `
                               /define:CONSOLE `
                               /optimize+ `
@@ -172,6 +157,21 @@ jobs:
             exit 1
           }
           Write-Host "✓ Console Launcher built successfully"
+          
+          # Build No-Console Launcher (no console window)
+          Write-Host "Building No-Console Launcher (AIPromptBridge-NoConsole.exe)..."
+          & $cscPath.FullName /target:winexe `
+                              /out:build_launchers/AIPromptBridge-NoConsole.exe `
+                              /win32icon:icon.ico `
+                              /define:GUI `
+                              /optimize+ `
+                              src/launchers/Launcher.cs
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to build No-Console launcher!"
+            exit 1
+          }
+          Write-Host "✓ No-Console Launcher built successfully"
           
           # Show file sizes (should be ~10KB each vs ~7MB for Nuitka)
           Get-ChildItem build_launchers/*.exe | ForEach-Object {
@@ -198,23 +198,22 @@ jobs:
           Copy-Item -Path "$internalSource/*" -Destination $binDir -Recurse -Force
           
           # 2. Move Launchers to Root
-          # Onefile outputs are directly in output-dir
-          $launcherGui = "build_launchers/AIPromptBridge.exe"
-          $launcherConsole = "build_launchers/AIPromptBridge-Console.exe"
-          
-          if (Test-Path $launcherGui) {
-              Copy-Item -Path $launcherGui -Destination $distRoot
-              Write-Host "GUI Launcher copied."
-          } else {
-              Write-Error "GUI Launcher not found!"
-              exit 1
-          }
+          $launcherConsole = "build_launchers/AIPromptBridge.exe"
+          $launcherNoConsole = "build_launchers/AIPromptBridge-NoConsole.exe"
           
           if (Test-Path $launcherConsole) {
               Copy-Item -Path $launcherConsole -Destination $distRoot
               Write-Host "Console Launcher copied."
           } else {
               Write-Error "Console Launcher not found!"
+              exit 1
+          }
+          
+          if (Test-Path $launcherNoConsole) {
+              Copy-Item -Path $launcherNoConsole -Destination $distRoot
+              Write-Host "No-Console Launcher copied."
+          } else {
+              Write-Error "No-Console Launcher not found!"
               exit 1
           }
 
