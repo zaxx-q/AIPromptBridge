@@ -480,6 +480,18 @@ class GeminiNativeProvider(BaseProvider):
     # ERROR HANDLING
     # =========================================================================
     
+    def get_retry_reason(self, status_code: int, error_text: str = "") -> RetryReason:
+        """
+        Override to handle Google's specific 400 error for invalid keys.
+        """
+        if status_code == 400:
+            # Check for Google's specific API key invalid reason
+            if "API_KEY_INVALID" in error_text or "API key not valid" in error_text:
+                return RetryReason.AUTH_ERROR
+                
+        # Fallback to base logic for 429, 401, 403, 5xx, etc.
+        return super().get_retry_reason(status_code, error_text)
+
     def detect_empty_response(
         self,
         content: str,
