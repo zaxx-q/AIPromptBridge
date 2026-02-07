@@ -2140,6 +2140,11 @@ class SettingsWindow:
             self.status_label = tk.Label(btn_frame, text="", font=("Segoe UI", 10),
                                         bg=self.colors.bg, fg=self.colors.accent_green)
         self.status_label.pack(side="left", padx=20)
+        
+        # Reset button on the right side
+        create_emoji_button(
+            btn_frame, "Reset to Defaults", "🔄", self.colors, "danger", 160, 42, self._reset_to_defaults
+        ).pack(side="right", padx=6)
     
     def _validate(self) -> tuple:
         """
@@ -2256,6 +2261,58 @@ class SettingsWindow:
                 self.status_label.configure(text="❌ Failed to save", text_color=self.colors.accent_red)
             else:
                 self.status_label.configure(text="❌ Failed to save", fg=self.colors.accent_red)
+    
+    def _reset_to_defaults(self):
+        """Reset configuration to default values after confirmation."""
+        from ...config import DEFAULT_CONFIG
+        
+        # Ask for confirmation
+        confirm = messagebox.askyesno(
+            "Reset to Defaults",
+            "Are you sure you want to reset all settings to their default values?\n\n"
+            "This will NOT delete your API keys, but all other settings will be restored to defaults.\n\n"
+            "⚠️ This action cannot be undone!",
+            icon="warning",
+            parent=self.root
+        )
+        
+        if not confirm:
+            return
+        
+        try:
+            # Reset config values to defaults (but preserve keys)
+            for key, default_value in DEFAULT_CONFIG.items():
+                self.config_data.config[key] = default_value
+                
+                # Update UI widget if it exists
+                if key in self.vars:
+                    var = self.vars[key]
+                    if isinstance(var, tk.BooleanVar):
+                        var.set(default_value if isinstance(default_value, bool) else False)
+                    elif isinstance(var, tk.StringVar):
+                        if isinstance(default_value, (int, float)):
+                            var.set(str(default_value))
+                        else:
+                            var.set(str(default_value) if default_value is not None else "")
+            
+            # Update theme preview if on theme tab
+            if self.preview_frame:
+                self._update_theme_preview()
+            
+            # Show success message
+            if self.use_ctk:
+                self.status_label.configure(text="🔄 Reset to defaults. Click Save to apply.", text_color=self.colors.accent_yellow)
+            else:
+                self.status_label.configure(text="🔄 Reset to defaults. Click Save to apply.", fg=self.colors.accent_yellow)
+            
+            print("[Settings] Configuration reset to defaults. Save to apply changes.")
+            
+        except Exception as e:
+            print(f"[Settings] Error resetting to defaults: {e}")
+            if self.use_ctk:
+                self.status_label.configure(text=f"❌ Reset failed: {e}", text_color=self.colors.accent_red)
+            else:
+                self.status_label.configure(text=f"❌ Reset failed: {e}", fg=self.colors.accent_red)
     
     def _safe_destroy(self):
         """Safely destroy the window and cleanup."""
