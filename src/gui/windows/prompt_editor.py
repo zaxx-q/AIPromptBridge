@@ -634,7 +634,7 @@ class PromptEditorWindow:
             
             ctk.CTkLabel(
                 title_frame,
-                text="Edit text_edit_tool_options.json",
+                text="Edit prompts.json",
                 font=get_ctk_font(14),
                 **get_ctk_label_colors(self.colors, muted=True)
             ).pack(side="left", padx=(20, 0))
@@ -642,7 +642,7 @@ class PromptEditorWindow:
             tk.Label(title_frame, text="✏️ Prompt Editor",
                     font=("Segoe UI", 16, "bold"),
                     bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
-            tk.Label(title_frame, text="Edit text_edit_tool_options.json",
+            tk.Label(title_frame, text="Edit prompts.json",
                     font=("Segoe UI", 10),
                     bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
     
@@ -664,18 +664,18 @@ class PromptEditorWindow:
             
             # Create tabs
             self.tabview.add("⚡ Actions")
+            self.tabview.add("📁 Groups")
             self.tabview.add("⚙️ Settings")
             self.tabview.add("🎛️ Modifiers")
-            self.tabview.add("📁 Groups")
             self.tabview.add("🧪 Playground")
             
             # Upgrade tabs with images and larger font
             upgrade_tabview_with_icons(self.tabview)
             
             self._create_actions_tab(self.tabview.tab("⚡ Actions"))
+            self._create_groups_tab(self.tabview.tab("📁 Groups"))
             self._create_settings_tab(self.tabview.tab("⚙️ Settings"))
             self._create_modifiers_tab(self.tabview.tab("🎛️ Modifiers"))
-            self._create_groups_tab(self.tabview.tab("📁 Groups"))
             self._create_playground_tab(self.tabview.tab("🧪 Playground"))
         else:
             # Fallback to ttk.Notebook
@@ -686,21 +686,21 @@ class PromptEditorWindow:
             self.tabview.pack(fill="both", expand=True, pady=(0, 2))
             
             actions_frame = tk.Frame(self.tabview, bg=self.colors.bg)
+            groups_frame = tk.Frame(self.tabview, bg=self.colors.bg)
             settings_frame = tk.Frame(self.tabview, bg=self.colors.bg)
             modifiers_frame = tk.Frame(self.tabview, bg=self.colors.bg)
-            groups_frame = tk.Frame(self.tabview, bg=self.colors.bg)
             playground_frame = tk.Frame(self.tabview, bg=self.colors.bg)
             
             self.tabview.add(actions_frame, text="Actions")
+            self.tabview.add(groups_frame, text="Groups")
             self.tabview.add(settings_frame, text="Settings")
             self.tabview.add(modifiers_frame, text="Modifiers")
-            self.tabview.add(groups_frame, text="Groups")
             self.tabview.add(playground_frame, text="🧪 Playground")
             
             self._create_actions_tab(actions_frame)
+            self._create_groups_tab(groups_frame)
             self._create_settings_tab(settings_frame)
             self._create_modifiers_tab(modifiers_frame)
-            self._create_groups_tab(groups_frame)
             self._create_playground_tab(playground_frame)
     
     def _refresh_action_list(self):
@@ -734,22 +734,63 @@ class PromptEditorWindow:
         self.editor_widgets["prompt_type_var"].set("edit")
         self.editor_widgets["task_var"].set("")
         self.editor_widgets["show_chat_var"].set(False)
+        if "compare_prompts_var" in self.editor_widgets:
+            self.editor_widgets["compare_prompts_var"].set(False)
         
         if self.use_ctk:
             self.editor_widgets["system_prompt"].delete("0.0", "end")
         else:
             self.editor_widgets["system_prompt"].delete("1.0", "end")
 
+    def _update_editor_visibility(self):
+        """Show/hide editor fields based on current tool."""
+        if not hasattr(self, 'prompt_type_frame'):
+            return
+            
+        is_text_edit = self.current_tool == "text_edit_tool"
+        is_snip = self.current_tool == "snip_tool"
+        is_audio = self.current_tool == "audio_tool"
+        
+        # prompt_type: Text Edit only
+        if is_text_edit:
+            self.prompt_type_frame.pack(fill="x", pady=8)
+        else:
+            self.prompt_type_frame.pack_forget()
+        
+        # compare_prompts: Snip only
+        if hasattr(self, 'compare_prompts_frame'):
+            if is_snip:
+                self.compare_prompts_frame.pack(fill="x", pady=10)
+            else:
+                self.compare_prompts_frame.pack_forget()
+        
+        # Update checkbox label based on tool (per user requirement)
+        if hasattr(self, 'editor_widgets') and "show_chat" in self.editor_widgets:
+            if is_text_edit:
+                new_text = "Show response in chat window instead of typing/replacing text"
+            elif is_snip:
+                new_text = "Show response in chat window instead of copy to clipboard"
+            else:  # audio_tool
+                new_text = "Show response in chat window instead of in result panel"
+            
+            if self.use_ctk:
+                self.editor_widgets["show_chat"].configure(text=new_text)
+            else:
+                self.editor_widgets["show_chat"].configure(text=new_text)
+
     def _on_tool_switch(self, value):
         """Handle tool switching."""
         if value == "Text Edit Tool":
             self.current_tool = "text_edit_tool"
-        else:
+        elif value == "Snip Tool":
             self.current_tool = "snip_tool"
+        else:  # Audio Tool
+            self.current_tool = "audio_tool"
         
         # Clear current selection and refresh list
         self.current_action = None
         self._refresh_action_list()
+        self._update_editor_visibility()
 
     def _create_actions_tab(self, frame):
         """Create the Actions editing tab."""
@@ -768,7 +809,7 @@ class PromptEditorWindow:
         if self.use_ctk:
             self.tool_switcher = ctk.CTkSegmentedButton(
                 left_panel,
-                values=["Text Edit Tool", "Snip Tool"],
+                values=["Text Edit Tool", "Snip Tool", "Audio Tool"],
                 command=self._on_tool_switch,
                 font=get_ctk_font(12, "bold"),
                 fg_color=self.colors.bg,
@@ -871,27 +912,27 @@ class PromptEditorWindow:
                      bg=self.colors.surface1, fg=self.colors.fg,
                      command=self._pick_icon).pack(side="left")
         
-        # Prompt type dropdown
-        row_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
-        row_frame.pack(fill="x", pady=8)
+        # Prompt type dropdown (Text Edit Tool only)
+        self.prompt_type_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        self.prompt_type_frame.pack(fill="x", pady=8)
         
         if self.use_ctk:
-            ctk.CTkLabel(row_frame, text="Type:", font=get_ctk_font(13), width=120, anchor="w",
+            ctk.CTkLabel(self.prompt_type_frame, text="Type:", font=get_ctk_font(13), width=120, anchor="w",
                         **get_ctk_label_colors(self.colors)).pack(side="left")
             self.editor_widgets["prompt_type_var"] = tk.StringVar(master=self.root, value="edit")
             self.editor_widgets["prompt_type"] = ctk.CTkComboBox(
-                row_frame, variable=self.editor_widgets["prompt_type_var"],
+                self.prompt_type_frame, variable=self.editor_widgets["prompt_type_var"],
                 values=["edit", "general"], width=180, height=34, state="readonly",
                 font=get_ctk_font(13), **get_ctk_combobox_colors(self.colors)
             )
             self.editor_widgets["prompt_type"].pack(side="left", padx=(12, 0))
         else:
             from tkinter import ttk
-            tk.Label(row_frame, text="Type:", font=("Segoe UI", 10), width=12, anchor="w",
+            tk.Label(self.prompt_type_frame, text="Type:", font=("Segoe UI", 10), width=12, anchor="w",
                     bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
             self.editor_widgets["prompt_type_var"] = tk.StringVar(master=self.root, value="edit")
             self.editor_widgets["prompt_type"] = ttk.Combobox(
-                row_frame, textvariable=self.editor_widgets["prompt_type_var"],
+                self.prompt_type_frame, textvariable=self.editor_widgets["prompt_type_var"],
                 values=["edit", "general"], state="readonly", width=15
             )
             self.editor_widgets["prompt_type"].pack(side="left", padx=(10, 0))
@@ -940,26 +981,47 @@ class PromptEditorWindow:
             )
             self.editor_widgets["task"].pack(side="left", fill="x", expand=True, padx=(10, 0))
         
-        # Show in chat checkbox
-        row_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
-        row_frame.pack(fill="x", pady=10)
+        # Show in chat checkbox (label varies by tool)
+        self.show_chat_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        self.show_chat_frame.pack(fill="x", pady=10)
         
         self.editor_widgets["show_chat_var"] = tk.BooleanVar()
         if self.use_ctk:
             self.editor_widgets["show_chat"] = ctk.CTkCheckBox(
-                row_frame, text="Show response in chat window instead of replacing text",
+                self.show_chat_frame, text="Show response in chat window instead of typing/replacing text",
                 variable=self.editor_widgets["show_chat_var"],
                 font=get_ctk_font(13), text_color=self.colors.fg,
                 fg_color=self.colors.accent
             )
         else:
             self.editor_widgets["show_chat"] = tk.Checkbutton(
-                row_frame, text="Show response in chat window instead of replacing text",
+                self.show_chat_frame, text="Show response in chat window instead of typing/replacing text",
                 variable=self.editor_widgets["show_chat_var"],
                 font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
                 selectcolor=self.colors.input_bg
             )
         self.editor_widgets["show_chat"].pack(anchor="w")
+        
+        # Compare prompts checkbox (Snip Tool only)
+        self.compare_prompts_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        # Initially hidden - shown only for snip_tool
+        
+        self.editor_widgets["compare_prompts_var"] = tk.BooleanVar()
+        if self.use_ctk:
+            self.editor_widgets["compare_prompts"] = ctk.CTkCheckBox(
+                self.compare_prompts_frame, text="Compare mode (expects 2 images)",
+                variable=self.editor_widgets["compare_prompts_var"],
+                font=get_ctk_font(13), text_color=self.colors.fg,
+                fg_color=self.colors.accent
+            )
+        else:
+            self.editor_widgets["compare_prompts"] = tk.Checkbutton(
+                self.compare_prompts_frame, text="Compare mode (expects 2 images)",
+                variable=self.editor_widgets["compare_prompts_var"],
+                font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
+                selectcolor=self.colors.input_bg
+            )
+        self.editor_widgets["compare_prompts"].pack(anchor="w")
         
         # Save action button
         btn_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
@@ -1171,6 +1233,55 @@ class PromptEditorWindow:
         else:
             tk.Checkbutton(row, text="Use Groups", variable=snip_grp_var).pack(anchor="w")
         self.settings_widgets["snip_tool:popup_use_groups"] = ("bool", snip_grp_var)
+
+        # =====================================================================
+        # Audio Tool Settings
+        # =====================================================================
+        if self.use_ctk: ctk.CTkFrame(scroll_frame, height=20, fg_color="transparent").pack()
+        create_section_header(scroll_frame, "Audio Tool", self.colors, "🎤")
+        
+        add_setting_row("audio_tool", "custom_task_template", "Custom Task Template", False)
+        
+        # Popup settings for Audio
+        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row.pack(fill="x", pady=(8, 0))
+        if self.use_ctk:
+            ctk.CTkLabel(row, text="Popup Layout:", font=get_ctk_font(12, "bold"),
+                        **get_ctk_label_colors(self.colors)).pack(anchor="w")
+        else:
+            tk.Label(row, text="Popup Layout:", font=("Segoe UI", 9, "bold"),
+                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w")
+
+        # Items per page
+        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row.pack(fill="x", pady=4)
+        if self.use_ctk:
+             ctk.CTkLabel(row, text="Items per page:", font=get_ctk_font(12),
+                        **get_ctk_label_colors(self.colors)).pack(side="left")
+        else:
+             tk.Label(row, text="Items per page:", font=("Segoe UI", 10),
+                     bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+        
+        audio_val = self.options_data.get("audio_tool", {}).get("_settings", {}).get("popup_items_per_page", 6)
+        audio_items_var = tk.IntVar(master=scroll_frame, value=audio_val)
+        if self.use_ctk:
+             ctk.CTkEntry(row, textvariable=audio_items_var, width=60, font=get_ctk_font(12),
+                        **get_ctk_entry_colors(self.colors)).pack(side="left", padx=10)
+        else:
+             tk.Entry(row, textvariable=audio_items_var, width=5).pack(side="left", padx=10)
+        self.settings_widgets["audio_tool:popup_items_per_page"] = ("int", audio_items_var)
+
+        # Use groups (audio_tool is a window, not popup, so uses "use_groups")
+        audio_grp_val = self.options_data.get("audio_tool", {}).get("_settings", {}).get("use_groups", True)
+        audio_grp_var = tk.BooleanVar(master=scroll_frame, value=audio_grp_val)
+        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row.pack(fill="x", pady=4)
+        if self.use_ctk:
+            ctk.CTkCheckBox(row, text="Use Groups", variable=audio_grp_var, font=get_ctk_font(12),
+                           text_color=self.colors.fg, fg_color=self.colors.accent).pack(anchor="w")
+        else:
+            tk.Checkbutton(row, text="Use Groups", variable=audio_grp_var).pack(anchor="w")
+        self.settings_widgets["audio_tool:use_groups"] = ("bool", audio_grp_var)
     
     def _create_modifiers_tab(self, frame):
         """Create the Modifiers editing tab."""
@@ -1321,8 +1432,10 @@ class PromptEditorWindow:
         """Handle tool switching in Groups tab."""
         if value == "Text Edit Tool":
             self.current_tool = "text_edit_tool"
-        else:
+        elif value == "Snip Tool":
             self.current_tool = "snip_tool"
+        else:  # Audio Tool
+            self.current_tool = "audio_tool"
         
         self._refresh_group_list()
         # Clear editor fields
@@ -1348,7 +1461,7 @@ class PromptEditorWindow:
         if self.use_ctk:
             self.group_tool_switcher = ctk.CTkSegmentedButton(
                 left_panel,
-                values=["Text Edit Tool", "Snip Tool"],
+                values=["Text Edit Tool", "Snip Tool", "Audio Tool"],
                 command=self._on_group_tool_switch,
                 font=get_ctk_font(12, "bold"),
                 fg_color=self.colors.bg,
@@ -1360,7 +1473,12 @@ class PromptEditorWindow:
                 text_color_disabled=self.colors.surface2
             )
             # Sync with current tool if possible, defaulting to Text Edit
-            current_val = "Text Edit Tool" if self.current_tool == "text_edit_tool" else "Snip Tool"
+            if self.current_tool == "text_edit_tool":
+                current_val = "Text Edit Tool"
+            elif self.current_tool == "snip_tool":
+                current_val = "Snip Tool"
+            else:
+                current_val = "Audio Tool"
             self.group_tool_switcher.set(current_val)
             self.group_tool_switcher.pack(fill="x", pady=(0, 10))
 
@@ -1415,6 +1533,27 @@ class PromptEditorWindow:
             tk.Entry(row, textvariable=self.group_widgets["name_var"],
                     font=("Segoe UI", 10), width=25,
                     bg=self.colors.input_bg, fg=self.colors.fg).pack(side="left", padx=(10, 0))
+        
+        # Enabled checkbox
+        row = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
+        row.pack(fill="x", pady=8)
+        
+        self.group_widgets["enabled_var"] = tk.BooleanVar(value=True)
+        if self.use_ctk:
+            self.group_widgets["enabled_checkbox"] = ctk.CTkCheckBox(
+                row, text="Enabled (show this group in the corresponding tool)",
+                variable=self.group_widgets["enabled_var"],
+                font=get_ctk_font(13), text_color=self.colors.fg,
+                fg_color=self.colors.accent
+            )
+        else:
+            self.group_widgets["enabled_checkbox"] = tk.Checkbutton(
+                row, text="Enabled (show this group in the corresponding tool)",
+                variable=self.group_widgets["enabled_var"],
+                font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
+                selectcolor=self.colors.input_bg
+            )
+        self.group_widgets["enabled_checkbox"].pack(anchor="w")
         
         # Items (one per line)
         row = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
@@ -1475,8 +1614,8 @@ class PromptEditorWindow:
                               font=get_ctk_font(13), text_color=self.colors.fg,
                               fg_color=self.colors.accent,
                               command=self._on_playground_mode_change).pack(side="left", padx=(0, 15))
-            ctk.CTkRadioButton(mode_frame, text="Endpoint",
-                              variable=self.playground_mode_var, value="endpoint",
+            ctk.CTkRadioButton(mode_frame, text="Audio Action",
+                              variable=self.playground_mode_var, value="action_audio",
                               font=get_ctk_font(13), text_color=self.colors.fg,
                               fg_color=self.colors.accent,
                               command=self._on_playground_mode_change).pack(side="left")
@@ -1489,8 +1628,8 @@ class PromptEditorWindow:
                           variable=self.playground_mode_var, value="action_snip",
                           font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
                           command=self._on_playground_mode_change).pack(side="left", padx=(0, 15))
-            tk.Radiobutton(mode_frame, text="Endpoint",
-                          variable=self.playground_mode_var, value="endpoint",
+            tk.Radiobutton(mode_frame, text="Audio Action",
+                          variable=self.playground_mode_var, value="action_audio",
                           font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
                           command=self._on_playground_mode_change).pack(side="left")
         
@@ -1603,64 +1742,30 @@ class PromptEditorWindow:
                         command=self._update_playground_preview
                     ).pack(anchor="w")
 
-        # Endpoint Config Frame (initially hidden)
-        self.endpoint_config_frame = ctk.CTkFrame(scroll_left, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_left, bg=self.colors.bg)
+        # Snip Image Frame (inside action_config_frame, shown only for Snip mode)
+        self.snip_image_frame = ctk.CTkFrame(self.action_config_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.action_config_frame, bg=self.colors.bg)
+        # Initially hidden - shown only for action_snip mode
         
-        # Endpoint selector
         if self.use_ctk:
-            ctk.CTkLabel(self.endpoint_config_frame, text="Select Endpoint:", font=get_ctk_font(13),
-                        **get_ctk_label_colors(self.colors)).pack(anchor="w", pady=(0, 8))
+            snip_img_header = None
+            if HAVE_EMOJI:
+                renderer = get_emoji_renderer()
+                snip_img_header = renderer.get_ctk_image("🖼️", size=18)
+            ctk.CTkLabel(self.snip_image_frame, text=" Image for Snip Test:", image=snip_img_header, compound="left",
+                        font=get_ctk_font(13), **get_ctk_label_colors(self.colors)).pack(anchor="w", pady=(8, 8))
         else:
-            tk.Label(self.endpoint_config_frame, text="Select Endpoint:", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w", pady=(0, 5))
-            
-        self.playground_endpoint_var = tk.StringVar()
-        if self.use_ctk:
-            self.playground_endpoint_combo = ctk.CTkComboBox(
-                self.endpoint_config_frame, variable=self.playground_endpoint_var,
-                values=[], width=340, height=34, state="readonly", font=get_ctk_font(13),
-                **get_ctk_combobox_colors(self.colors),
-                command=lambda x: self._update_endpoint_preview()
-            )
-        else:
-            self.playground_endpoint_combo = ttk.Combobox(
-                self.endpoint_config_frame, textvariable=self.playground_endpoint_var,
-                values=[], state="readonly", width=35
-            )
-            self.playground_endpoint_combo.bind('<<ComboboxSelected>>', lambda e: self._update_endpoint_preview())
-        self.playground_endpoint_combo.pack(anchor="w", pady=(0, 10))
-        
-        # Language input
-        if self.use_ctk:
-            ctk.CTkLabel(self.endpoint_config_frame, text="Language (for {lang}):", font=get_ctk_font(13),
-                        **get_ctk_label_colors(self.colors)).pack(anchor="w", pady=(0, 8))
-            self.playground_lang_var = tk.StringVar(value="English")
-            lang_entry = ctk.CTkEntry(
-                self.endpoint_config_frame, textvariable=self.playground_lang_var,
-                font=get_ctk_font(13), height=34, **get_ctk_entry_colors(self.colors)
-            )
-            lang_entry.pack(fill="x", pady=(0, 10))
-            lang_entry.bind('<KeyRelease>', lambda e: self._update_endpoint_preview())
-        else:
-            tk.Label(self.endpoint_config_frame, text="Language (for {lang}):", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w", pady=(0, 5))
-            self.playground_lang_var = tk.StringVar(value="English")
-            lang_entry = tk.Entry(
-                self.endpoint_config_frame, textvariable=self.playground_lang_var,
-                font=("Segoe UI", 10), bg=self.colors.input_bg, fg=self.colors.fg
-            )
-            lang_entry.pack(fill="x", pady=(0, 10))
-            lang_entry.bind('<KeyRelease>', lambda e: self._update_endpoint_preview())
+            tk.Label(self.snip_image_frame, text="🖼️ Image for Snip Test:", font=("Segoe UI", 10),
+                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w", pady=(5, 5))
         
         # Image container
         if self.use_ctk:
             self.image_container_frame = ctk.CTkFrame(
-                self.endpoint_config_frame, fg_color=self.colors.surface0,
+                self.snip_image_frame, fg_color=self.colors.surface0,
                 corner_radius=6, border_width=1, border_color=self.colors.border
             )
         else:
             self.image_container_frame = tk.Frame(
-                self.endpoint_config_frame, bg=self.colors.surface0,
+                self.snip_image_frame, bg=self.colors.surface0,
                 highlightbackground=self.colors.border, highlightthickness=1
             )
         self.image_container_frame.pack(fill="x", pady=(0, 10))
@@ -1684,12 +1789,101 @@ class PromptEditorWindow:
         self.image_drop_zone.pack(fill="both", expand=True, padx=10, pady=20)
         
         # Image buttons
-        btn_row = ctk.CTkFrame(self.endpoint_config_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.endpoint_config_frame, bg=self.colors.bg)
+        btn_row = ctk.CTkFrame(self.snip_image_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.snip_image_frame, bg=self.colors.bg)
         btn_row.pack(fill="x", pady=(0, 10))
         
-        create_emoji_button(btn_row, "Select", "📁", self.colors, "secondary", 100, 34, self._select_playground_image).pack(side="left", padx=4)
-        create_emoji_button(btn_row, "Paste", "📋", self.colors, "secondary", 100, 34, self._paste_playground_image).pack(side="left", padx=4)
-        create_emoji_button(btn_row, "Clear", "🗑️", self.colors, "danger", 100, 34, self._clear_playground_image).pack(side="left", padx=4)
+        create_emoji_button(btn_row, "Select", "📁", self.colors, "secondary", 90, 34, self._select_playground_image).pack(side="left", padx=3)
+        create_emoji_button(btn_row, "Snip", "✂️", self.colors, "primary", 90, 34, self._snip_playground_image).pack(side="left", padx=3)
+        create_emoji_button(btn_row, "Paste", "📋", self.colors, "secondary", 90, 34, self._paste_playground_image).pack(side="left", padx=3)
+        create_emoji_button(btn_row, "Clear", "🗑️", self.colors, "danger", 80, 34, self._clear_playground_image).pack(side="left", padx=3)
+        
+        # Audio Recording Frame (inside action_config_frame, shown only for Audio mode)
+        self.audio_record_frame = ctk.CTkFrame(self.action_config_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.action_config_frame, bg=self.colors.bg)
+        # Initially hidden - shown only for action_audio mode
+        
+        if self.use_ctk:
+            audio_header_img = None
+            if HAVE_EMOJI:
+                renderer = get_emoji_renderer()
+                audio_header_img = renderer.get_ctk_image("🎙️", size=18)
+            ctk.CTkLabel(self.audio_record_frame, text=" Audio Recording:", image=audio_header_img, compound="left",
+                        font=get_ctk_font(13), **get_ctk_label_colors(self.colors)).pack(anchor="w", pady=(8, 8))
+        else:
+            tk.Label(self.audio_record_frame, text="🎙️ Audio Recording:", font=("Segoe UI", 10),
+                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w", pady=(5, 5))
+        
+        # Device selection row
+        device_row = ctk.CTkFrame(self.audio_record_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.audio_record_frame, bg=self.colors.bg)
+        device_row.pack(fill="x", pady=(0, 8))
+        
+        if self.use_ctk:
+            ctk.CTkLabel(device_row, text="Device:", font=get_ctk_font(12), width=60,
+                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            self.playground_audio_device_var = tk.StringVar()
+            self.playground_audio_device_combo = ctk.CTkComboBox(
+                device_row, variable=self.playground_audio_device_var,
+                values=["(Loading...)"], width=280, height=32, state="readonly",
+                font=get_ctk_font(12), **get_ctk_combobox_colors(self.colors)
+            )
+            self.playground_audio_device_combo.pack(side="left", padx=(8, 8), fill="x", expand=True)
+            
+            # Refresh button
+            refresh_img = None
+            if HAVE_EMOJI:
+                renderer = get_emoji_renderer()
+                refresh_img = renderer.get_ctk_image("🔄", size=16)
+            ctk.CTkButton(device_row, text="", image=refresh_img, width=32, height=32,
+                         **get_ctk_button_colors(self.colors, "secondary"),
+                         command=self._refresh_audio_devices).pack(side="left")
+        else:
+            tk.Label(device_row, text="Device:", font=("Segoe UI", 10),
+                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            self.playground_audio_device_var = tk.StringVar()
+            from tkinter import ttk
+            self.playground_audio_device_combo = ttk.Combobox(
+                device_row, textvariable=self.playground_audio_device_var,
+                values=["(Loading...)"], state="readonly", width=35
+            )
+            self.playground_audio_device_combo.pack(side="left", padx=(8, 8), fill="x", expand=True)
+            tk.Button(device_row, text="🔄", command=self._refresh_audio_devices,
+                     bg=self.colors.surface1, fg=self.colors.fg).pack(side="left")
+        
+        # Recording controls row
+        record_row = ctk.CTkFrame(self.audio_record_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.audio_record_frame, bg=self.colors.bg)
+        record_row.pack(fill="x", pady=(0, 8))
+        
+        self.playground_record_btn = create_emoji_button(record_row, "Record", "🔴", self.colors, "primary", 100, 36, self._toggle_playground_recording)
+        self.playground_record_btn.pack(side="left", padx=(0, 8))
+        
+        # Duration label
+        if self.use_ctk:
+            self.playground_audio_duration = ctk.CTkLabel(record_row, text="00:00", font=get_ctk_font(14, "bold"),
+                                                          text_color=self.colors.fg)
+        else:
+            self.playground_audio_duration = tk.Label(record_row, text="00:00", font=("Segoe UI", 12, "bold"),
+                                                      bg=self.colors.bg, fg=self.colors.fg)
+        self.playground_audio_duration.pack(side="left", padx=(0, 15))
+        
+        # Clear button
+        self.playground_audio_clear_btn = create_emoji_button(record_row, "Clear", "🗑️", self.colors, "danger", 80, 36, self._clear_playground_audio)
+        self.playground_audio_clear_btn.pack(side="left")
+        
+        # Audio status label
+        if self.use_ctk:
+            self.playground_audio_status = ctk.CTkLabel(self.audio_record_frame, text="No audio recorded",
+                                                        font=get_ctk_font(12), text_color=self.colors.blockquote)
+        else:
+            self.playground_audio_status = tk.Label(self.audio_record_frame, text="No audio recorded",
+                                                    font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.blockquote)
+        self.playground_audio_status.pack(anchor="w", pady=(0, 5))
+        
+        # Initialize audio state
+        self.playground_audio_data = None
+        self.playground_audio_mime = None
+        self.playground_is_recording = False
+        self.playground_recorder = None
+        self.playground_record_start = None
+        self.playground_audio_devices = []
         
         # Sample text container (for hiding/showing)
         self.sample_text_container = ctk.CTkFrame(scroll_left, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_left, bg=self.colors.bg)
@@ -1926,10 +2120,12 @@ class PromptEditorWindow:
     
     def _populate_playground_actions(self, mode):
         """Populate the action combo box based on selected mode."""
-        if mode == "endpoint":
-            return
-            
-        tool_key = "text_edit_tool" if mode == "action_text" else "snip_tool"
+        if mode == "action_text":
+            tool_key = "text_edit_tool"
+        elif mode == "action_snip":
+            tool_key = "snip_tool"
+        else:  # action_audio
+            tool_key = "audio_tool"
         tool_data = self.options_data.get(tool_key, {})
         
         # Get actions (exclude _settings)
@@ -1954,29 +2150,28 @@ class PromptEditorWindow:
         self._on_playground_action_change()
 
     def _on_playground_mode_change(self):
-        """Handle mode switch between action and endpoint."""
+        """Handle mode switch between text, snip, and audio actions."""
         mode = self.playground_mode_var.get()
         
-        # Show/Hide config frames
-        if mode in ("action_text", "action_snip"):
-            self.action_config_frame.pack(fill="x", pady=(0, 10))
-            self.endpoint_config_frame.pack_forget()
-            self._populate_playground_actions(mode)
-        else:
-            self.action_config_frame.pack_forget()
-            self.endpoint_config_frame.pack(fill="x", pady=(0, 10))
-            self._populate_endpoint_list()
-            self._update_endpoint_preview()
-            
-        # Show/Hide Input containers
+        # Always show action config frame (endpoint mode is removed)
+        self.action_config_frame.pack(fill="x", pady=(0, 10))
+        self._populate_playground_actions(mode)
+        
+        # Show/Hide mode-specific containers
         if mode == "action_text":
             self.sample_text_container.pack(fill="x", pady=(15, 0))
+            self.snip_image_frame.pack_forget()
+            self.audio_record_frame.pack_forget()
         elif mode == "action_snip":
             self.sample_text_container.pack_forget()
-            # Snip mode: no inputs initially, snip triggered by Test
-        elif mode == "endpoint":
+            self.snip_image_frame.pack(fill="x", pady=(8, 0))
+            self.audio_record_frame.pack_forget()
+        elif mode == "action_audio":
             self.sample_text_container.pack_forget()
-            # Endpoint has its own inputs in config frame
+            self.snip_image_frame.pack_forget()
+            self.audio_record_frame.pack(fill="x", pady=(8, 0))
+            # Initialize audio devices on first switch to audio mode
+            self._refresh_audio_devices()
             
         self._update_playground_preview()
 
@@ -2089,9 +2284,6 @@ class PromptEditorWindow:
         Matches logic in text_edit_tool.py _process_option.
         """
         mode = self.playground_mode_var.get()
-        if mode == "endpoint":
-            return
-        
         action_name = self.playground_action_var.get()
         if not action_name:
             return
@@ -2104,7 +2296,12 @@ class PromptEditorWindow:
         # _populate_playground_actions used tool_data = self.options_data.get(tool_key, {})
         # So we must fetch from the correct tool!
         
-        tool_key = "text_edit_tool" if mode == "action_text" else "snip_tool"
+        if mode == "action_text":
+            tool_key = "text_edit_tool"
+        elif mode == "action_snip":
+            tool_key = "snip_tool"
+        else:  # action_audio
+            tool_key = "audio_tool"
         tool_data = self.options_data.get(tool_key, {})
         action_data = tool_data.get(action_name, {})
         
@@ -2211,22 +2408,37 @@ class PromptEditorWindow:
         total_chars = len(full_system) + len(user_message)
         token_estimate = total_chars // 4
         
-        # Determine show_chat status
+        # Determine show_chat status based on tool type
         if self.current_action == action_name:
-             show_chat = self.editor_widgets["show_chat_var"].get()
+            show_chat = self.editor_widgets["show_chat_var"].get()
         else:
-             show_chat = action_data.get("show_chat_window_instead_of_replace", False)
+            # Use correct field name based on tool
+            if mode == "action_text":
+                show_chat = action_data.get("show_chat_window_instead_of_replace", False)
+            else:  # snip_tool or audio_tool
+                show_chat = action_data.get("show_chat_window", True)
 
-        response_mode = "Chat Window" if show_chat else "Replace"
+        # Determine response mode label based on tool type
+        if show_chat:
+            response_mode = "Chat Window"
+        else:
+            if mode == "action_text":
+                response_mode = "Replace"
+            elif mode == "action_snip":
+                response_mode = "Copy"
+            else:  # action_audio
+                response_mode = "Result Panel"
+        
+        # Build metadata text - Type is only for TextEditTool
+        if mode == "action_text":
+            meta_text = f"📊 Tokens: ~{token_estimate} | Type: {prompt_type} | Mode: {response_mode}"
+        else:
+            meta_text = f"📊 Tokens: ~{token_estimate} | Mode: {response_mode}"
         
         if self.use_ctk:
-            self.playground_meta_label.configure(
-                text=f"📊 Tokens: ~{token_estimate} | Type: {prompt_type} | Mode: {response_mode}"
-            )
+            self.playground_meta_label.configure(text=meta_text)
         else:
-            self.playground_meta_label.configure(
-                text=f"📊 Tokens: ~{token_estimate} | Type: {prompt_type} | Mode: {response_mode}"
-            )
+            self.playground_meta_label.configure(text=meta_text)
     
     def _update_endpoint_preview(self):
         """Update endpoint mode preview."""
@@ -2328,7 +2540,7 @@ class PromptEditorWindow:
                 self.playground_image_name = "Pasted Image"
                 
                 self._show_image_preview(img)
-                self._update_endpoint_preview()
+                self._update_playground_preview()
             else:
                 messagebox.showinfo("Paste", "No image in clipboard", parent=self.root)
         except Exception as e:
@@ -2353,7 +2565,7 @@ class PromptEditorWindow:
             self.playground_image_name = os.path.basename(filepath)
             
             self._show_image_preview(img)
-            self._update_endpoint_preview()
+            self._update_playground_preview()
         except ImportError:
             with open(filepath, "rb") as f:
                 img_bytes = f.read()
@@ -2361,7 +2573,7 @@ class PromptEditorWindow:
                 self.playground_image_mime = "image/jpeg"
                 self.playground_image_name = os.path.basename(filepath)
                 self._show_image_preview_text_only(os.path.basename(filepath), f"{len(img_bytes)//1024} KB")
-                self._update_endpoint_preview()
+                self._update_playground_preview()
         except Exception as e:
             messagebox.showerror("Image Error", f"Failed to load image: {e}", parent=self.root)
     
@@ -2397,7 +2609,210 @@ class PromptEditorWindow:
             self.image_drop_zone.configure(image='', text="📷 No image selected")
             if hasattr(self.image_drop_zone, 'image'):
                 self.image_drop_zone.image = None
-        self._update_endpoint_preview()
+        self._update_playground_preview()
+    
+    # --- Audio Recording Methods ---
+    
+    def _refresh_audio_devices(self):
+        """Refresh the list of available audio input devices."""
+        try:
+            from ...audio import list_input_devices, get_default_input_device
+            
+            devices = list_input_devices()
+            self.playground_audio_devices = devices
+            
+            device_names = [d.get_display_name() for d in devices]
+            
+            if self.use_ctk:
+                self.playground_audio_device_combo.configure(values=device_names if device_names else ["(No devices found)"])
+            else:
+                self.playground_audio_device_combo['values'] = device_names if device_names else ["(No devices found)"]
+            
+            # Try to set default device
+            if devices:
+                try:
+                    default = get_default_input_device()
+                    if default:
+                        default_name = default.get_display_name()
+                        if default_name in device_names:
+                            self.playground_audio_device_var.set(default_name)
+                        else:
+                            self.playground_audio_device_var.set(device_names[0])
+                    else:
+                        self.playground_audio_device_var.set(device_names[0])
+                except Exception:
+                    self.playground_audio_device_var.set(device_names[0])
+            else:
+                self.playground_audio_device_var.set("(No devices found)")
+                
+        except ImportError:
+            if self.use_ctk:
+                self.playground_audio_device_combo.configure(values=["(Audio module not available)"])
+            else:
+                self.playground_audio_device_combo['values'] = ["(Audio module not available)"]
+            self.playground_audio_device_var.set("(Audio module not available)")
+        except Exception as e:
+            print(f"[PromptEditor] Error loading audio devices: {e}")
+            if self.use_ctk:
+                self.playground_audio_device_combo.configure(values=[f"(Error: {str(e)[:30]})"])
+            else:
+                self.playground_audio_device_combo['values'] = [f"(Error: {str(e)[:30]})"]
+    
+    def _toggle_playground_recording(self):
+        """Toggle audio recording on/off."""
+        if self.playground_is_recording:
+            self._stop_playground_recording()
+        else:
+            self._start_playground_recording()
+    
+    def _start_playground_recording(self):
+        """Start audio recording."""
+        try:
+            from ...audio import AudioRecorder, list_input_devices
+            
+            # Find selected device
+            selected_name = self.playground_audio_device_var.get()
+            device = None
+            for d in self.playground_audio_devices:
+                if d.get_display_name() == selected_name:
+                    device = d
+                    break
+            
+            if not device:
+                messagebox.showerror("Recording Error", "Please select an audio device.", parent=self.root)
+                return
+            
+            # Create recorder with device
+            self.playground_recorder = AudioRecorder(device)
+            
+            # Start recording
+            self.playground_recorder.start_recording()
+            self.playground_is_recording = True
+            self.playground_record_start = time.time()
+            
+            # Update UI
+            if self.use_ctk:
+                self.playground_record_btn.configure(text="⏹️ Stop")
+                self.playground_audio_status.configure(text="Recording...", text_color=self.colors.accent_red)
+            else:
+                self.playground_record_btn.configure(text="⏹️ Stop")
+                self.playground_audio_status.configure(text="Recording...", fg=self.colors.accent_red)
+            
+            # Start duration update
+            self._update_playground_recording_duration()
+            
+        except ImportError as e:
+            messagebox.showerror("Recording Error", f"Audio module not available: {e}", parent=self.root)
+        except Exception as e:
+            messagebox.showerror("Recording Error", f"Failed to start recording: {e}", parent=self.root)
+    
+    def _stop_playground_recording(self):
+        """Stop audio recording and save data."""
+        if not self.playground_recorder:
+            return
+        
+        try:
+            # Stop recording and get audio data (stop_recording returns the bytes directly)
+            audio_data = self.playground_recorder.stop_recording()
+            self.playground_is_recording = False
+            if audio_data:
+                self.playground_audio_data = audio_data
+                self.playground_audio_mime = "audio/wav"
+                
+                # Calculate duration
+                duration = time.time() - self.playground_record_start if self.playground_record_start else 0
+                size_kb = len(audio_data) // 1024
+                
+                # Update UI
+                status_text = f"Recorded: {self._format_playground_duration(duration)} ({size_kb} KB)"
+                if self.use_ctk:
+                    self.playground_record_btn.configure(text="🔴 Record")
+                    self.playground_audio_status.configure(text=status_text, text_color=self.colors.accent_green)
+                else:
+                    self.playground_record_btn.configure(text="🔴 Record")
+                    self.playground_audio_status.configure(text=status_text, fg=self.colors.accent_green)
+            else:
+                if self.use_ctk:
+                    self.playground_record_btn.configure(text="🔴 Record")
+                    self.playground_audio_status.configure(text="Recording failed - no audio data", text_color=self.colors.accent_red)
+                else:
+                    self.playground_record_btn.configure(text="🔴 Record")
+                    self.playground_audio_status.configure(text="Recording failed - no audio data", fg=self.colors.accent_red)
+                    
+        except Exception as e:
+            print(f"[PromptEditor] Error stopping recording: {e}")
+            if self.use_ctk:
+                self.playground_record_btn.configure(text="🔴 Record")
+                self.playground_audio_status.configure(text=f"Error: {str(e)[:40]}", text_color=self.colors.accent_red)
+            else:
+                self.playground_record_btn.configure(text="🔴 Record")
+                self.playground_audio_status.configure(text=f"Error: {str(e)[:40]}", fg=self.colors.accent_red)
+        finally:
+            self.playground_recorder = None
+    
+    def _update_playground_recording_duration(self):
+        """Update the recording duration display."""
+        if not self.playground_is_recording:
+            return
+        
+        duration = time.time() - self.playground_record_start if self.playground_record_start else 0
+        duration_text = self._format_playground_duration(duration)
+        
+        if self.use_ctk:
+            self.playground_audio_duration.configure(text=duration_text)
+        else:
+            self.playground_audio_duration.configure(text=duration_text)
+        
+        # Schedule next update
+        if self.playground_is_recording and self.root:
+            self.root.after(100, self._update_playground_recording_duration)
+    
+    def _format_playground_duration(self, seconds: float) -> str:
+        """Format duration in MM:SS format."""
+        mins = int(seconds // 60)
+        secs = int(seconds % 60)
+        return f"{mins:02d}:{secs:02d}"
+    
+    def _clear_playground_audio(self):
+        """Clear recorded audio data."""
+        # Stop recording if in progress
+        if self.playground_is_recording:
+            self._stop_playground_recording()
+        
+        self.playground_audio_data = None
+        self.playground_audio_mime = None
+        
+        if self.use_ctk:
+            self.playground_audio_duration.configure(text="00:00")
+            self.playground_audio_status.configure(text="No audio recorded", text_color=self.colors.blockquote)
+        else:
+            self.playground_audio_duration.configure(text="00:00")
+            self.playground_audio_status.configure(text="No audio recorded", fg=self.colors.blockquote)
+    
+    def _prepare_audio_request(self) -> Dict:
+        """Prepare params for audio action request."""
+        if not self.playground_audio_data:
+            return {"error": "No audio recorded. Please record audio first."}
+        
+        if self.use_ctk:
+            system_prompt = self.playground_system_preview.get("0.0", "end").strip()
+            user_message = self.playground_user_preview.get("0.0", "end").strip()
+        else:
+            system_prompt = self.playground_system_preview.get("1.0", "end").strip()
+            user_message = self.playground_user_preview.get("1.0", "end").strip()
+        
+        # Convert raw audio bytes to base64 string for the API
+        audio_b64 = base64.b64encode(self.playground_audio_data).decode('utf-8')
+        
+        from ...messages import build_audio_message
+        messages = build_audio_message(
+            audio_b64=audio_b64,
+            mime_type=self.playground_audio_mime or "audio/wav",
+            task=user_message,
+            system_prompt=system_prompt
+        )
+        
+        return self._get_request_config(messages)
     
     # --- API Testing ---
     
@@ -2407,9 +2822,19 @@ class PromptEditorWindow:
         self._update_playground_preview()
         
         mode = self.playground_mode_var.get()
+        
+        # Snip mode: Use existing image (don't auto-snip)
         if mode == "action_snip":
-            # Start Snip Flow
-            self._perform_snip_test()
+            if not self.playground_image_base64:
+                messagebox.showinfo("Image Required", "Please select or snip an image before testing.", parent=self.root)
+                return
+            # Proceed directly to test with existing image
+            self._continue_snip_test()
+            return
+        
+        # Audio mode: Check for recorded audio
+        if mode == "action_audio" and not self.playground_audio_data:
+            messagebox.showinfo("Audio Required", "Please record audio before testing.", parent=self.root)
             return
 
         if self.use_ctk:
@@ -2429,9 +2854,9 @@ class PromptEditorWindow:
         params = {}
         
         try:
-            if mode == "endpoint":
-                params = self._prepare_endpoint_request()
-            else: # action_text
+            if mode == "action_audio":
+                params = self._prepare_audio_request()
+            else:  # action_text
                 params = self._prepare_text_request()
             
             if params.get("error"):
@@ -2465,9 +2890,63 @@ class PromptEditorWindow:
         """Handle snip cancellation."""
         self.root.deiconify()
         if self.use_ctk:
-            self.playground_test_status.configure(text="❌ Snipping cancelled", text_color=self.colors.surface2)
+            self.playground_test_status.configure(text="❌ Snipping cancelled", image=None, text_color=self.colors.surface2)
         else:
             self.playground_test_status.configure(text="❌ Snipping cancelled", fg=self.colors.surface2)
+    
+    def _snip_playground_image(self):
+        """Capture screen snip and store as playground image (without testing)."""
+        # Hide window to allow capture
+        self.root.iconify()
+        
+        try:
+            from ..core import GUICoordinator
+            GUICoordinator.get_instance().request_snip_overlay(
+                on_capture=self._on_playground_snip_image_captured,
+                on_cancel=self._on_playground_snip_image_cancelled
+            )
+        except Exception as e:
+            self.root.deiconify()
+            messagebox.showerror("Error", f"Failed to start snip: {e}", parent=self.root)
+    
+    def _on_playground_snip_image_cancelled(self):
+        """Handle snip image capture cancellation."""
+        self.root.deiconify()
+        if self.use_ctk:
+            self.playground_test_status.configure(text="Snip cancelled", image=None, text_color=self.colors.surface2)
+        else:
+            self.playground_test_status.configure(text="Snip cancelled", fg=self.colors.surface2)
+    
+    def _on_playground_snip_image_captured(self, result):
+        """Handle captured snip for image selection (not auto-test)."""
+        # Restore window
+        self.root.deiconify()
+        
+        # Store capture data
+        self.playground_image_base64 = result.image_base64
+        self.playground_image_mime = result.mime_type
+        self.playground_image_name = f"Snip_{int(time.time())}.png"
+        
+        # Show preview
+        try:
+            from PIL import Image
+            from io import BytesIO
+            img_data = base64.b64decode(result.image_base64)
+            pil_image = Image.open(BytesIO(img_data))
+            self._show_image_preview(pil_image)
+        except Exception:
+            # Fallback to text preview
+            self._show_image_preview_text_only(self.playground_image_name, "Captured")
+        
+        # Update preview
+        self._update_playground_preview()
+        
+        # Update status
+        if self.use_ctk:
+            self.playground_test_status.configure(text="✅ Image captured", image=None, text_color=self.colors.accent_green)
+        else:
+            self.playground_test_status.configure(text="✅ Image captured", fg=self.colors.accent_green)
+        self.root.after(2000, self._clear_test_status)
 
     def _on_playground_snip_captured(self, result):
         """Handle captured snip for Playground."""
@@ -2700,7 +3179,6 @@ class PromptEditorWindow:
             self.editor_widgets["name"].configure(text=action_name)
         
         self.editor_widgets["icon_var"].set(action_data.get("icon", ""))
-        self.editor_widgets["prompt_type_var"].set(action_data.get("prompt_type", "edit"))
         
         if self.use_ctk:
             self.editor_widgets["system_prompt"].delete("0.0", "end")
@@ -2710,8 +3188,25 @@ class PromptEditorWindow:
             self.editor_widgets["system_prompt"].insert("1.0", action_data.get("system_prompt", ""))
         
         self.editor_widgets["task_var"].set(action_data.get("task", ""))
-        self.editor_widgets["show_chat_var"].set(
-            action_data.get("show_chat_window_instead_of_replace", False))
+        
+        # Handle different field names per tool
+        if self.current_tool == "text_edit_tool":
+            self.editor_widgets["prompt_type_var"].set(action_data.get("prompt_type", "edit"))
+            self.editor_widgets["show_chat_var"].set(
+                action_data.get("show_chat_window_instead_of_replace", False)
+            )
+        else:  # snip_tool or audio_tool
+            self.editor_widgets["prompt_type_var"].set("edit")  # Not used but keep default
+            self.editor_widgets["show_chat_var"].set(
+                action_data.get("show_chat_window", True)
+            )
+            if self.current_tool == "snip_tool" and "compare_prompts_var" in self.editor_widgets:
+                self.editor_widgets["compare_prompts_var"].set(
+                    action_data.get("compare_prompts", False)
+                )
+        
+        # Update field visibility
+        self._update_editor_visibility()
     
     def _on_modifier_select(self, mod_id_str):
         """Handle modifier selection."""
@@ -2752,6 +3247,7 @@ class PromptEditorWindow:
         if 0 <= index < len(groups):
             grp = groups[index]
             self.group_widgets["name_var"].set(grp.get("name", ""))
+            self.group_widgets["enabled_var"].set(grp.get("enabled", True))
             items = grp.get("items", [])
             
             if self.use_ctk:
@@ -2884,14 +3380,26 @@ class PromptEditorWindow:
         else:
             system_prompt = self.editor_widgets["system_prompt"].get("1.0", "end").strip()
         
-        tool_data = self.options_data.setdefault(self.current_tool, {})
-        tool_data[self.current_action] = {
+        # Build action dict with common fields
+        action_dict = {
             "icon": self.editor_widgets["icon_var"].get(),
-            "prompt_type": self.editor_widgets["prompt_type_var"].get(),
             "system_prompt": system_prompt,
             "task": self.editor_widgets["task_var"].get(),
-            "show_chat_window_instead_of_replace": self.editor_widgets["show_chat_var"].get()
         }
+        
+        # Tool-specific fields
+        if self.current_tool == "text_edit_tool":
+            action_dict["prompt_type"] = self.editor_widgets["prompt_type_var"].get()
+            action_dict["show_chat_window_instead_of_replace"] = self.editor_widgets["show_chat_var"].get()
+        elif self.current_tool == "snip_tool":
+            action_dict["show_chat_window"] = self.editor_widgets["show_chat_var"].get()
+            if "compare_prompts_var" in self.editor_widgets:
+                action_dict["compare_prompts"] = self.editor_widgets["compare_prompts_var"].get()
+        else:  # audio_tool
+            action_dict["show_chat_window"] = self.editor_widgets["show_chat_var"].get()
+        
+        tool_data = self.options_data.setdefault(self.current_tool, {})
+        tool_data[self.current_action] = action_dict
         
         # Refresh UI list to update icons
         self._refresh_action_list()
@@ -3127,6 +3635,7 @@ class PromptEditorWindow:
             
             groups[index] = {
                 "name": self.group_widgets["name_var"].get(),
+                "enabled": self.group_widgets["enabled_var"].get(),
                 "items": items
             }
             
@@ -3145,6 +3654,10 @@ class PromptEditorWindow:
         create_emoji_button(
             btn_frame, "Cancel", "✖️", self.colors, "secondary", 120, 42, self._close
         ).pack(side="left", padx=6)
+        
+        create_emoji_button(
+            btn_frame, "Reset to Defaults", "🔄", self.colors, "danger", 160, 42, self._reset_to_defaults
+        ).pack(side="right", padx=6)
         
         if self.use_ctk:
              self.status_label = ctk.CTkLabel(
@@ -3209,6 +3722,56 @@ class PromptEditorWindow:
                 self.status_label.configure(text="❌ Failed to save", text_color=self.colors.accent_red)
             else:
                 self.status_label.configure(text="❌ Failed to save", fg=self.colors.accent_red)
+    
+    def _reset_to_defaults(self):
+        """Reset all prompts configuration to defaults."""
+        if not messagebox.askyesno(
+            "Reset to Defaults",
+            "This will reset ALL prompts, actions, modifiers, and settings to their default values.\n\n"
+            "Your current configuration will be backed up to prompts.json.reset_backup\n\n"
+            "Are you sure you want to continue?",
+            parent=self.root
+        ):
+            return
+        
+        try:
+            from ..prompts import get_prompts_config, PROMPTS_FILE
+            
+            # Create backup of current file
+            if Path(PROMPTS_FILE).exists():
+                backup_path = PROMPTS_FILE + ".reset_backup"
+                shutil.copy2(PROMPTS_FILE, backup_path)
+            
+            # Get fresh defaults from PromptsConfig
+            config = get_prompts_config()
+            config.reset_to_defaults()
+            
+            # Reload options data
+            self.options_data = load_options()
+            
+            # Refresh all UI elements
+            self._refresh_action_list()
+            self._clear_editor()
+            
+            # Update status
+            if self.use_ctk:
+                self.status_label.configure(text="✅ Reset to defaults complete!", text_color=self.colors.accent_green)
+            else:
+                self.status_label.configure(text="✅ Reset to defaults complete!", fg=self.colors.accent_green)
+            
+            messagebox.showinfo(
+                "Reset Complete",
+                "Configuration has been reset to defaults.\n\n"
+                "Please close and reopen the Prompt Editor to see all changes.",
+                parent=self.root
+            )
+            
+        except Exception as e:
+            if self.use_ctk:
+                self.status_label.configure(text=f"❌ Reset failed: {e}", text_color=self.colors.accent_red)
+            else:
+                self.status_label.configure(text=f"❌ Reset failed: {e}", fg=self.colors.accent_red)
+            messagebox.showerror("Reset Failed", f"Failed to reset configuration: {e}", parent=self.root)
     
     def _close(self):
         """Close the prompt editor window."""
