@@ -12,10 +12,7 @@ import subprocess
 from pathlib import Path
 
 # Nuitka Configuration:
-# nuitka-project: --onefile
-# nuitka-project: --windows-console-mode=disable
-# nuitka-project: --windows-icon-from-ico={MAIN_DIRECTORY}/icon.ico
-# nuitka-project: --output-filename=AIPromptBridge.exe
+# (Moved to .github/workflows/manual_release.yml)
 
 def main():
     # 1. Determine Root Directory (where this launcher resides)

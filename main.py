@@ -10,26 +10,7 @@ Usage:
     python main.py --no-wt      # Skip Windows Terminal auto-detection
 
 Nuitka Configuration:
-# nuitka-project: --standalone
-# nuitka-project: --windows-icon-from-ico={MAIN_DIRECTORY}/icon.ico
-# nuitka-project: --include-data-dir={MAIN_DIRECTORY}/assets=assets
-# nuitka-project: --include-data-files={MAIN_DIRECTORY}/icon.ico=icon.ico
-# nuitka-project: --enable-plugin=tk-inter
-# nuitka-project: --windows-console-mode=attach
-# nuitka-project: --nofollow-import-to=pytest,unittest,notebook
-# nuitka-project: --include-package-data=customtkinter
-# nuitka-project: --include-package-data=emoji
-# nuitka-project: --include-package=rich
-# nuitka-project: --output-filename=AIPromptBridge_Internal.exe
-# nuitka-project: --noinclude-unittest-mode=nofollow
-# nuitka-project: --nofollow-import-to=numpy
-# nuitka-project: --nofollow-import-to=pandas
-# nuitka-project: --nofollow-import-to=scipy
-# nuitka-project: --nofollow-import-to=matplotlib
-# nuitka-project: --nofollow-import-to=cv2
-# nuitka-project: --nofollow-import-to=xmlrpc
-# nuitka-project: --nofollow-import-to=curses
-# nuitka-project: --clean-cache=all
+(Moved to .github/workflows/manual_release.yml)
 """
 
 import sys

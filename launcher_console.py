@@ -13,10 +13,7 @@ import shutil
 from pathlib import Path
 
 # Nuitka Configuration:
-# nuitka-project: --onefile
-# nuitka-project: --windows-console-mode=force
-# nuitka-project: --windows-icon-from-ico={MAIN_DIRECTORY}/icon.ico
-# nuitka-project: --output-filename=AIPromptBridge-Console.exe
+# (Moved to .github/workflows/manual_release.yml)
 
 def ensure_windows_terminal() -> bool:
     """

@@ -101,7 +101,29 @@ jobs:
           script-name: main.py
           mode: standalone
           output-dir: build_internal
-          # Nuitka config in main.py specifies output-filename=AIPromptBridge_Internal.exe
+          # Migrated from main.py
+          enable-plugins: tk-inter
+          windows-console-mode: attach
+          windows-icon-from-ico: icon.ico
+          include-data-dir: assets=assets
+          include-data-files: icon.ico=icon.ico
+          include-package: rich
+          include-package-data: |
+            customtkinter
+            emoji
+          nofollow-import-to: |
+            pytest
+            unittest
+            notebook
+            numpy
+            pandas
+            scipy
+            matplotlib
+            cv2
+            xmlrpc
+            curses
+          noinclude-unittest-mode: nofollow
+          output-filename: AIPromptBridge_Internal.exe
 
       - name: Build GUI Launcher
         uses: Nuitka/Nuitka-Action@main
@@ -110,7 +132,10 @@ jobs:
           script-name: launcher_gui.py
           mode: onefile
           output-dir: build_launchers
-          # Nuitka config in launcher_gui.py specifies output-filename=AIPromptBridge.exe
+          # Migrated from launcher_gui.py
+          windows-console-mode: disable
+          windows-icon-from-ico: icon.ico
+          output-filename: AIPromptBridge.exe
 
       - name: Build Console Launcher
         uses: Nuitka/Nuitka-Action@main
@@ -119,7 +144,10 @@ jobs:
           script-name: launcher_console.py
           mode: onefile
           output-dir: build_launchers
-          # Nuitka config in launcher_console.py specifies output-filename=AIPromptBridge-Console.exe
+          # Migrated from launcher_console.py
+          windows-console-mode: force
+          windows-icon-from-ico: icon.ico
+          output-filename: AIPromptBridge-Console.exe
 
       - name: Assemble Deployment Package
         id: assemble_package
@@ -132,8 +160,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path $binDir | Out-Null
           
           # 1. Move Internal Standalone to bin/
-          # Nuitka-Action outputs standalone to {output-dir}/{script-name}.dist
-          $internalSource = "build_internal/main.dist"
+          # Nuitka-Action outputs standalone to {output-dir}/{output-filename}.dist when output-filename is provided
+          $internalSource = "build_internal/AIPromptBridge_Internal.dist"
           if (-not (Test-Path $internalSource)) { Write-Error "Internal build not found at $internalSource"; exit 1 }
           
           # Move contents of dist to bin/
