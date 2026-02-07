@@ -567,6 +567,8 @@ def _create_prompt_section_tk(window, parent, row, col):
         
         groups = []
         for group_def in popup_groups:
+            if not group_def.get("enabled", True):
+                continue
             group_name = group_def.get("name", "")
             item_keys = group_def.get("items", [])
             

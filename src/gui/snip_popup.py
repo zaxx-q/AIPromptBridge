@@ -802,6 +802,8 @@ class AttachedSnipPopup:
         if use_groups and popup_groups:
             groups = []
             for group_def in popup_groups:
+                if not group_def.get("enabled", True):
+                    continue
                 group_name = group_def.get("name", "")
                 item_keys = group_def.get("items", [])
                 

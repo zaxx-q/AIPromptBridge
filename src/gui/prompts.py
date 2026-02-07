@@ -164,18 +164,22 @@ DEFAULT_TEXT_EDIT_SETTINGS = {
     "popup_groups": [
         {
             "name": "Understanding",
+            "enabled": True,
             "items": ["Explain", "ELI5", "Explain Slang/Meme", "ESL Breakdown", "Summary", "Extract Data", "Key Points", "Translate to English", "Translate to Indonesian"]
         },
         {
             "name": "Text Edit",
+            "enabled": True,
             "items": ["Proofread", "Refine", "Rewrite", "Paraphrase", "Professional", "Friendly", "Casual", "Concise"]
         },
         {
             "name": "Code",
+            "enabled": True,
             "items": ["Explain Code", "Code Review", "Debug", "Refactor", "Document"]
         },
         {
             "name": "Suggestor",
+            "enabled": True,
             "items": ["Table", "Continue", "Reply Suggest", "Emojify", "Kaomojify", "Kaomoji Suggest"]
         }
     ]
@@ -402,9 +406,9 @@ DEFAULT_SNIP_SETTINGS = {
     "popup_use_groups": True,
     "popup_items_per_page": 6,
     "popup_groups": [
-        {"name": "Analysis", "items": ["Explain", "Describe", "Summarize"]},
-        {"name": "Text/Data", "items": ["Extract Text", "OCR to Markdown", "Extract Data", "Transcribe", "Smart Cleanup", "Translate to English"]},
-        {"name": "Compare", "items": ["Compare Images", "Spot Differences", "Before/After", "Which is Better"]}
+        {"name": "Analysis", "enabled": True, "items": ["Explain", "Describe", "Summarize"]},
+        {"name": "Text/Data", "enabled": True, "items": ["Extract Text", "OCR to Markdown", "Extract Data", "Transcribe", "Smart Cleanup", "Translate to English"]},
+        {"name": "Compare", "enabled": True, "items": ["Compare Images", "Spot Differences", "Before/After", "Which is Better"]}
     ],
     "custom_task_template": "Regarding this image: {custom_input}",
     "allow_text_edit_actions": True
@@ -520,8 +524,8 @@ DEFAULT_AUDIO_SETTINGS = {
     "items_per_page": 6,
     "custom_task_template": "Regarding this audio: {custom_input}",
     "popup_groups": [
-        {"name": "Transcription", "items": ["Transcribe", "Transcribe with Timestamps", "Transcribe (Markdown)", "Translate to English"]},
-        {"name": "Analysis", "items": ["Analyze", "Describe", "Summarize", "Extract Key Points", "Identify Speakers"]}
+        {"name": "Transcription", "enabled": True, "items": ["Transcribe", "Transcribe with Timestamps", "Transcribe (Markdown)", "Translate to English"]},
+        {"name": "Analysis", "enabled": True, "items": ["Analyze", "Describe", "Summarize", "Extract Key Points", "Identify Speakers"]}
     ]
 }
 
@@ -740,6 +744,12 @@ class PromptsConfig:
         """Reload configuration from file."""
         self._load()
         logging.info('Prompts configuration reloaded')
+    
+    def reset_to_defaults(self):
+        """Reset configuration to defaults and save to file."""
+        self._config = self._get_defaults()
+        self._save()
+        logging.info('Prompts configuration reset to defaults')
     
     # =========================================================================
     # Text Edit Tool Accessors
