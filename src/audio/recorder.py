@@ -128,21 +128,6 @@ def get_rms_level(audio_chunk: bytes, sample_width: int = 2) -> float:
     return 0.0
 
 
-@dataclass
-class RecordingState:
-    """Internal state for recording."""
-    is_recording: bool = False
-    frames: List[bytes] = None
-    start_time: float = 0.0
-    sample_rate: int = 44100
-    channels: int = 2
-    sample_width: int = 2
-    
-    def __post_init__(self):
-        if self.frames is None:
-            self.frames = []
-
-
 class AudioRecorder:
     """
     Audio recorder with unified stream architecture for recording, playback, and level monitoring.
@@ -198,15 +183,6 @@ class AudioRecorder:
         self._current_level = 0.0
         self._level_callback: Optional[Callable[[float], None]] = None
         
-        # Legacy compatibility (deprecated but kept for transition)
-        self._recording_state = RecordingState()
-        self._recording_stream = None
-        self._recording_lock = threading.Lock()
-        self._monitoring = False
-        self._monitor_stream = None
-        self._monitor_thread: Optional[threading.Thread] = None
-        self._monitor_lock = threading.Lock()
-        
         # Playback state
         self._playing = False
         self._paused = False
@@ -243,7 +219,7 @@ class AudioRecorder:
     
     def _close_pyaudio(self):
         """Close PyAudio instance if no streams are active."""
-        if self._pyaudio and not self._monitoring and not self._recording_state.is_recording and not self._playing and not self._stream_active:
+        if self._pyaudio and not self._playing and not self._stream_active:
             try:
                 self._pyaudio.terminate()
             except Exception:
@@ -472,253 +448,6 @@ class AudioRecorder:
         
         # Use elapsed time since recording started (queue-based approach)
         return time.time() - self._recording_start_time
-    
-    # =========================================================================
-    # Recording (Legacy - uses separate stream)
-    # =========================================================================
-    
-    def start_recording(self) -> bool:
-        """
-        Start recording audio from the current device.
-        
-        Returns:
-            True if recording started successfully, False otherwise.
-        """
-        with self._recording_lock:
-            if self._recording_state.is_recording:
-                logging.warning("[AudioRecorder] Already recording")
-                return False
-            
-            if not self._device:
-                logging.error("[AudioRecorder] No device set for recording")
-                return False
-            
-            try:
-                p = self._get_pyaudio()
-                
-                # Prepare recording state
-                self._recording_state = RecordingState(
-                    is_recording=True,
-                    frames=[],
-                    start_time=time.time(),
-                    sample_rate=int(self._device.sample_rate),
-                    channels=self._device.channels,
-                    sample_width=p.get_sample_size(self.FORMAT)
-                )
-                
-                # Callback for recording
-                def recording_callback(in_data, frame_count, time_info, status):
-                    if self._recording_state.is_recording:
-                        self._recording_state.frames.append(in_data)
-                        # Update level for polling via get_level() - don't call callback
-                        # to avoid flooding the GUI thread with events
-                        self._current_level = get_rms_level(in_data, self._recording_state.sample_width)
-                    return (in_data, pyaudio.paContinue)
-                
-                # Open recording stream
-                self._recording_stream = p.open(
-                    format=self.FORMAT,
-                    channels=self._device.channels,
-                    rate=int(self._device.sample_rate),
-                    input=True,
-                    input_device_index=self._device.index,
-                    frames_per_buffer=self.CHUNK_SIZE,
-                    stream_callback=recording_callback
-                )
-                
-                logging.info(f"[AudioRecorder] Recording started on {self._device.name}")
-                return True
-                
-            except Exception as e:
-                logging.error(f"[AudioRecorder] Failed to start recording: {e}")
-                self._recording_state.is_recording = False
-                return False
-    
-    def stop_recording(self) -> Optional[bytes]:
-        """
-        Stop recording and return WAV data.
-        
-        Returns:
-            WAV audio data as bytes, or None if not recording.
-        """
-        with self._recording_lock:
-            if not self._recording_state.is_recording:
-                return None
-            
-            self._recording_state.is_recording = False
-            
-            # Close stream
-            if self._recording_stream:
-                try:
-                    self._recording_stream.stop_stream()
-                    self._recording_stream.close()
-                except Exception as e:
-                    logging.debug(f"[AudioRecorder] Error closing recording stream: {e}")
-                self._recording_stream = None
-            
-            # Build WAV data
-            if not self._recording_state.frames:
-                logging.warning("[AudioRecorder] No frames recorded")
-                self._close_pyaudio()
-                return None
-            
-            try:
-                wav_buffer = io.BytesIO()
-                with wave.open(wav_buffer, 'wb') as wf:
-                    wf.setnchannels(self._recording_state.channels)
-                    wf.setsampwidth(self._recording_state.sample_width)
-                    wf.setframerate(self._recording_state.sample_rate)
-                    wf.writeframes(b''.join(self._recording_state.frames))
-                
-                wav_data = wav_buffer.getvalue()
-                duration = self.get_duration()
-                logging.info(f"[AudioRecorder] Recording stopped: {len(wav_data)} bytes, {duration:.1f}s")
-                
-                # Clear frames
-                self._recording_state.frames = []
-                self._close_pyaudio()
-                
-                return wav_data
-                
-            except Exception as e:
-                logging.error(f"[AudioRecorder] Failed to create WAV: {e}")
-                self._close_pyaudio()
-                return None
-    
-    def is_recording(self) -> bool:
-        """Check if currently recording."""
-        return self._recording_state.is_recording
-    
-    def get_duration(self) -> float:
-        """
-        Get current recording duration in seconds.
-        
-        Returns:
-            Duration in seconds (0.0 if not recording).
-        """
-        if not self._recording_state.is_recording:
-            if self._recording_state.frames:
-                # Calculate from recorded frames
-                total_bytes = sum(len(f) for f in self._recording_state.frames)
-                bytes_per_second = (
-                    self._recording_state.sample_rate *
-                    self._recording_state.channels *
-                    self._recording_state.sample_width
-                )
-                return total_bytes / bytes_per_second if bytes_per_second > 0 else 0.0
-            return 0.0
-        
-        return time.time() - self._recording_state.start_time
-    
-    # =========================================================================
-    # Level Monitoring
-    # =========================================================================
-    
-    def start_level_monitor(self, callback: Optional[Callable[[float], None]] = None) -> bool:
-        """
-        Start monitoring audio levels from the current device.
-        
-        This runs continuously, providing real-time level updates even when
-        not recording. The level meter should always reflect the selected device.
-        
-        Args:
-            callback: Function called with level (0.0-1.0) on each update
-            
-        Returns:
-            True if monitoring started, False otherwise.
-        """
-        with self._monitor_lock:
-            if self._monitoring:
-                # Already monitoring, just update callback
-                self._level_callback = callback
-                return True
-            
-            if not self._device:
-                logging.error("[AudioRecorder] No device set for monitoring")
-                return False
-            
-            self._level_callback = callback
-            self._monitoring = True
-            
-            # Start monitor thread
-            self._monitor_thread = threading.Thread(
-                target=self._monitor_loop,
-                daemon=True,
-                name="AudioLevelMonitor"
-            )
-            self._monitor_thread.start()
-            
-            logging.debug(f"[AudioRecorder] Level monitoring started on {self._device.name}")
-            return True
-    
-    def _monitor_loop(self):
-        """Background thread for level monitoring."""
-        try:
-            p = self._get_pyaudio()
-            
-            def monitor_callback(in_data, frame_count, time_info, status):
-                if not self._monitoring:
-                    return (in_data, pyaudio.paComplete)
-                
-                # Update level (only if not recording, as recording callback handles it)
-                if not self._recording_state.is_recording:
-                    self._current_level = get_rms_level(in_data, 2)
-                    if self._level_callback:
-                        try:
-                            self._level_callback(self._current_level)
-                        except Exception:
-                            pass
-                
-                return (in_data, pyaudio.paContinue)
-            
-            # Open monitor stream
-            self._monitor_stream = p.open(
-                format=self.FORMAT,
-                channels=self._device.channels,
-                rate=int(self._device.sample_rate),
-                input=True,
-                input_device_index=self._device.index,
-                frames_per_buffer=self.CHUNK_SIZE,
-                stream_callback=monitor_callback
-            )
-            
-            # Keep thread alive while monitoring
-            while self._monitoring:
-                time.sleep(0.05)
-            
-        except Exception as e:
-            logging.error(f"[AudioRecorder] Monitor loop error: {e}")
-        finally:
-            if self._monitor_stream:
-                try:
-                    self._monitor_stream.stop_stream()
-                    self._monitor_stream.close()
-                except Exception:
-                    pass
-                self._monitor_stream = None
-            
-            self._monitoring = False
-            self._close_pyaudio()
-    
-    def stop_level_monitor(self):
-        """Stop level monitoring."""
-        with self._monitor_lock:
-            if not self._monitoring:
-                return
-            
-            self._monitoring = False
-            self._current_level = 0.0
-            
-            # Wait for thread to finish
-            if self._monitor_thread and self._monitor_thread.is_alive():
-                self._monitor_thread.join(timeout=1.0)
-            
-            self._monitor_thread = None
-            logging.debug("[AudioRecorder] Level monitoring stopped")
-    
-    def is_monitoring(self) -> bool:
-        """Check if level monitoring is active."""
-        return self._monitoring
     
     def get_level(self) -> float:
         """
@@ -1077,8 +806,6 @@ class AudioRecorder:
     def cleanup(self):
         """Clean up all resources."""
         self.stop_stream()  # New unified stream
-        self.stop_level_monitor()  # Legacy
-        self.stop_recording()  # Legacy
         self.stop_playback()
         
         if self._pyaudio:

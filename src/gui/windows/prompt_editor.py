@@ -2686,8 +2686,10 @@ class PromptEditorWindow:
             # Create recorder with device
             self.playground_recorder = AudioRecorder(device)
             
-            # Start recording
-            self.playground_recorder.start_recording()
+            # Start stream and recording (Unified API)
+            self.playground_recorder.start_stream()
+            self.playground_recorder.start_recording_unified()
+            
             self.playground_is_recording = True
             self.playground_record_start = time.time()
             
@@ -2713,8 +2715,10 @@ class PromptEditorWindow:
             return
         
         try:
-            # Stop recording and get audio data (stop_recording returns the bytes directly)
-            audio_data = self.playground_recorder.stop_recording()
+            # Stop recording (Unified API)
+            audio_data = self.playground_recorder.stop_recording_unified()
+            self.playground_recorder.stop_stream()
+            
             self.playground_is_recording = False
             if audio_data:
                 self.playground_audio_data = audio_data
@@ -2749,6 +2753,11 @@ class PromptEditorWindow:
                 self.playground_record_btn.configure(text="🔴 Record")
                 self.playground_audio_status.configure(text=f"Error: {str(e)[:40]}", fg=self.colors.accent_red)
         finally:
+            if self.playground_recorder:
+                try:
+                    self.playground_recorder.cleanup()
+                except:
+                    pass
             self.playground_recorder = None
     
     def _update_playground_recording_duration(self):
