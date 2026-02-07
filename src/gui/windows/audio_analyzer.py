@@ -163,7 +163,6 @@ class AudioAnalyzerWindow:
         self.copy_btn = None
         self.status_label = None
         self.response_mode_toggle = None
-        self._use_unified_stream = True  # Use new unified stream architecture
     
     def _get_window_tag(self) -> str:
         """Return unique window tag."""
@@ -1030,25 +1029,21 @@ class AudioAnalyzerWindow:
             
             # Stop existing stream before cleanup
             if self.recorder:
-                if self._use_unified_stream:
-                    self.recorder.stop_stream()
-                else:
-                    self._stop_level_monitoring()
+                self.recorder.stop_stream()
                 self.recorder.cleanup()
             
             if self.current_device:
                 self.recorder = AudioRecorder(self.current_device)
                 print(f"[AudioAnalyzer] Created recorder for device: {self.current_device.name}")
                 
-                if self._use_unified_stream:
-                    # Start stream immediately with level callback
-                    callback = self._create_level_callback()
-                    if self.recorder.start_stream(level_callback=callback):
-                        print(f"[AudioAnalyzer] Stream started for: {self.current_device.name}")
-                        # Start continuous level updates
-                        self._start_continuous_level_updates()
-                    else:
-                        print(f"[AudioAnalyzer] Failed to start stream")
+                # Start stream immediately with level callback
+                callback = self._create_level_callback()
+                if self.recorder.start_stream(level_callback=callback):
+                    print(f"[AudioAnalyzer] Stream started for: {self.current_device.name}")
+                    # Start continuous level updates
+                    self._start_continuous_level_updates()
+                else:
+                    print(f"[AudioAnalyzer] Failed to start stream")
                 # NOTE: With unified stream, level meter works continuously!
                 
         except Exception as e:
@@ -1079,36 +1074,6 @@ class AudioAnalyzerWindow:
                 pass  # Window may be closing
         
         return level_callback
-    
-    def _try_start_standalone_monitoring(self):
-        """
-        Try to start standalone level monitoring (before recording).
-        This may fail on some devices due to WASAPI limitations.
-        """
-        if not self.recorder or self._destroyed or self._level_monitor_active:
-            logging.debug("[AudioAnalyzer] Skipping standalone monitoring: already active or no recorder")
-            return
-        
-        logging.info("[AudioAnalyzer] Attempting standalone level monitoring...")
-        
-        try:
-            callback = self._create_level_callback()
-            result = self.recorder.start_level_monitor(callback)
-            
-            if result:
-                self._level_monitor_active = True
-                logging.info("[AudioAnalyzer] ✓ Standalone level monitoring started successfully")
-            else:
-                logging.warning("[AudioAnalyzer] ✗ start_level_monitor returned False")
-                
-        except Exception as e:
-            logging.error(f"[AudioAnalyzer] ✗ Standalone monitoring failed: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def _start_level_monitoring(self):
-        """Start continuous level monitoring (wrapper for compatibility)."""
-        self._try_start_standalone_monitoring()
     
     def _start_continuous_level_updates(self):
         """Start continuous polling of level (works before and during recording).
@@ -1144,19 +1109,6 @@ class AudioAnalyzerWindow:
             
         except Exception as e:
             logging.debug(f"[AudioAnalyzer] Level update error: {e}")
-    
-    def _stop_level_monitoring(self):
-        """Stop level monitoring."""
-        if not self.recorder:
-            return
-        
-        try:
-            self.recorder.stop_level_monitor()
-            self._level_monitor_active = False
-            self._current_level = 0.0
-            logging.debug("[AudioAnalyzer] Level monitoring stopped")
-        except Exception as e:
-            logging.debug(f"[AudioAnalyzer] Error stopping level monitor: {e}")
     
     def _hex_to_rgb(self, hex_color: str) -> tuple:
         """Convert hex color to RGB tuple."""
@@ -1311,54 +1263,24 @@ class AudioAnalyzerWindow:
             return
         
         try:
-            if self._use_unified_stream:
-                # Unified stream architecture: recording is just a flag toggle
-                # Stream is already open, level meter continues working
-                if self.recorder.start_recording_unified():
-                    self.is_recording = True
-                    self.recording_start_time = time.time()
-                    
-                    # Update UI
-                    self.record_btn.configure(state="disabled")
-                    self.stop_btn.configure(state="normal")
-                    
-                    # Start duration update
-                    self._update_duration()
-                    
-                    # Level meter already running via _start_continuous_level_updates
-                    self._update_status("Recording...", self.colors.red)
-                    print("[AudioAnalyzer] Recording started (unified stream)")
-                else:
-                    self._update_status("Failed to start recording", self.colors.red)
-            else:
-                # Legacy architecture: separate streams for monitoring and recording
-                # CRITICAL: Stop standalone level monitoring before starting recording
-                # WASAPI doesn't allow multiple streams on the same device
-                if self._level_monitor_active:
-                    logging.info("[AudioAnalyzer] Stopping level monitor before recording...")
-                    self._stop_level_monitoring()
-                    # Give the stream time to close
-                    time.sleep(0.1)
+            # Unified stream architecture: recording is just a flag toggle
+            # Stream is already open, level meter continues working
+            if self.recorder.start_recording_unified():
+                self.is_recording = True
+                self.recording_start_time = time.time()
                 
-                if self.recorder.start_recording():
-                    self.is_recording = True
-                    self.recording_start_time = time.time()
-                    
-                    # Update UI
-                    self.record_btn.configure(state="disabled")
-                    self.stop_btn.configure(state="normal")
-                    
-                    # Start duration update
-                    self._update_duration()
-                    
-                    # Start level meter updates using recording callback
-                    self._start_recording_level_updates()
-                    
-                    self._update_status("Recording...", self.colors.red)
-                else:
-                    self._update_status("Failed to start recording", self.colors.red)
-                    # Try to restart level monitoring if recording failed
-                    self._try_start_standalone_monitoring()
+                # Update UI
+                self.record_btn.configure(state="disabled")
+                self.stop_btn.configure(state="normal")
+                
+                # Start duration update
+                self._update_duration()
+                
+                # Level meter already running via _start_continuous_level_updates
+                self._update_status("Recording...", self.colors.red)
+                print("[AudioAnalyzer] Recording started (unified stream)")
+            else:
+                self._update_status("Failed to start recording", self.colors.red)
                 
         except Exception as e:
             logging.error(f"[AudioAnalyzer] Recording error: {e}")
@@ -1394,62 +1316,33 @@ class AudioAnalyzerWindow:
             return
         
         try:
-            if self._use_unified_stream:
-                # Unified stream: recording is just a flag, stream stays open
-                wav_data = self.recorder.stop_recording_unified()
-                self.is_recording = False
+            # Unified stream: recording is just a flag, stream stays open
+            wav_data = self.recorder.stop_recording_unified()
+            self.is_recording = False
+            
+            # Level meter continues running via _start_continuous_level_updates
+            # No need to reset level display - it will show live input level
+            
+            if wav_data:
+                self.recorded_wav = wav_data
                 
-                # Level meter continues running via _start_continuous_level_updates
-                # No need to reset level display - it will show live input level
+                # Calculate duration from data
+                from ...audio.recorder import get_audio_duration
+                self.audio_duration = get_audio_duration(wav_data)
                 
-                if wav_data:
-                    self.recorded_wav = wav_data
-                    
-                    # Calculate duration from data
-                    from ...audio.recorder import get_audio_duration
-                    self.audio_duration = get_audio_duration(wav_data)
-                    
-                    logging.info(f"[AudioAnalyzer] Recording stopped (unified): {len(wav_data)} bytes, {self.audio_duration:.1f}s")
-                    print(f"[AudioAnalyzer] Recording stopped (unified): {len(wav_data)} bytes, {self.audio_duration:.1f}s")
-                    
-                    # Update compression estimate
-                    self._update_size_estimate()
-                    
-                    # Enable playback and send
-                    self._enable_audio_controls()
-                    
-                    self._update_status(f"Recorded {self._format_duration(self.audio_duration)}", self.colors.green)
-                else:
-                    logging.warning("[AudioAnalyzer] No WAV data returned from stop_recording_unified")
-                    self._update_status("No audio recorded", self.colors.accent_yellow)
+                logging.info(f"[AudioAnalyzer] Recording stopped (unified): {len(wav_data)} bytes, {self.audio_duration:.1f}s")
+                print(f"[AudioAnalyzer] Recording stopped (unified): {len(wav_data)} bytes, {self.audio_duration:.1f}s")
+                
+                # Update compression estimate
+                self._update_size_estimate()
+                
+                # Enable playback and send
+                self._enable_audio_controls()
+                
+                self._update_status(f"Recorded {self._format_duration(self.audio_duration)}", self.colors.green)
             else:
-                # Legacy architecture
-                wav_data = self.recorder.stop_recording()
-                self.is_recording = False
-                
-                # Reset level display
-                self._current_level = 0.0
-                self._update_level_display(0.0)
-                
-                if wav_data:
-                    self.recorded_wav = wav_data
-                    
-                    # Calculate duration from data because recorder duration resets on stop
-                    from ...audio.recorder import get_audio_duration
-                    self.audio_duration = get_audio_duration(wav_data)
-                    
-                    logging.info(f"[AudioAnalyzer] Recording stopped: {len(wav_data)} bytes, {self.audio_duration:.1f}s")
-                    
-                    # Update compression estimate
-                    self._update_size_estimate()
-                    
-                    # Enable playback and send
-                    self._enable_audio_controls()
-                    
-                    self._update_status(f"Recorded {self._format_duration(self.audio_duration)}", self.colors.green)
-                else:
-                    logging.warning("[AudioAnalyzer] No WAV data returned from stop_recording")
-                    self._update_status("No audio recorded", self.colors.accent_yellow)
+                logging.warning("[AudioAnalyzer] No WAV data returned from stop_recording_unified")
+                self._update_status("No audio recorded", self.colors.accent_yellow)
             
             # Update UI
             self.record_btn.configure(state="normal")
@@ -2203,15 +2096,10 @@ class AudioAnalyzerWindow:
         """Close window and cleanup."""
         self._destroyed = True
         
-        # Stop level monitoring / unified stream first
-        if self._use_unified_stream:
-            # Unified stream: stop the always-open stream
-            if self.recorder:
-                self.recorder.stop_stream()
-                print("[AudioAnalyzer] Unified stream stopped on close")
-        else:
-            # Legacy: stop standalone level monitoring
-            self._stop_level_monitoring()
+        # Stop unified stream first
+        if self.recorder:
+            self.recorder.stop_stream()
+            print("[AudioAnalyzer] Unified stream stopped on close")
         
         # Stop recording/playback and cleanup
         if self.recorder:
