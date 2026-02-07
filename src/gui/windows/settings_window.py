@@ -1095,8 +1095,8 @@ class SettingsWindow:
                              width=200, hint="⚠️ Restart required")
         
         self._add_entry_field(scroll_frame, "audio_default_device", "Default device:",
-                             self.config_data.config.get("audio_default_device", "") or "",
-                             width=300, hint="Partial name match (blank = system default)")
+                             self.config_data.config.get("audio_default_device") or "default",
+                             width=300, hint="Partial name match ('default' = system default)")
         
         self._add_toggle_field(scroll_frame, "audio_default_loopback",
                               "Default to loopback (system audio)",

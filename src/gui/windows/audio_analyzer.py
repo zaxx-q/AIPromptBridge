@@ -953,10 +953,10 @@ class AudioAnalyzerWindow:
             
             if device_type == "loopback":
                 devices = list_loopback_devices()
-                default = get_default_loopback_device()
+                system_default = get_default_loopback_device()
             else:
                 devices = list_input_devices()
-                default = get_default_input_device()
+                system_default = get_default_input_device()
             
             if not devices:
                 if self.device_dropdown:
@@ -980,22 +980,37 @@ class AudioAnalyzerWindow:
             # Store device mapping
             self._device_map = {d.get_display_name(): d for d in devices}
             
-            # Select default or first
-            if default:
-                default_name = default.get_display_name()
+            # Try to find device by config preference (with partial matching)
+            config_device = self.config.get("audio_default_device", "default")
+            selected_device = None
+            selected_name = None
+            
+            if config_device and config_device.lower() != "default":
+                # Partial case-insensitive matching
+                config_lower = config_device.lower()
+                for name, device in self._device_map.items():
+                    if config_lower in name.lower():
+                        selected_device = device
+                        selected_name = name
+                        logging.info(f"[AudioAnalyzer] Matched config device '{config_device}' to '{name}'")
+                        break
+            
+            # Fall back to system default if no config match
+            if not selected_device and system_default:
+                selected_name = system_default.get_display_name()
+                if selected_name in self._device_map:
+                    selected_device = system_default
+            
+            # Fall back to first device if nothing else works
+            if not selected_device and devices:
+                selected_device = devices[0]
+                selected_name = device_names[0]
+            
+            # Apply selection
+            if selected_device and selected_name and self.device_dropdown:
                 try:
-                    if default_name in device_names and self.device_dropdown:
-                        self.device_dropdown.set(default_name)
-                        self.current_device = default
-                    elif self.device_dropdown:
-                        self.device_dropdown.set(device_names[0])
-                        self.current_device = devices[0]
-                except Exception:
-                    pass
-            elif self.device_dropdown:
-                try:
-                    self.device_dropdown.set(device_names[0])
-                    self.current_device = devices[0]
+                    self.device_dropdown.set(selected_name)
+                    self.current_device = selected_device
                 except Exception:
                     pass
             

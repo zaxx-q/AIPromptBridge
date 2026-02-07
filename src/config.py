@@ -25,8 +25,8 @@ DEFAULT_CONFIG = {
     "default_provider": "google",
     # Custom URL: If it contains "google" or "googleapis.com",
     # Google-specific behavior is automatically applied
-    "custom_url": None,
-    "custom_model": None,
+    "custom_url": "https://api.openai.com/v1/chat/completions",
+    "custom_model": "gpt-5.2",
     "openrouter_model": "openai/gpt-oss-120b:free",
     "google_model": "gemma-3-27b-it",
     "gemini_endpoint": None,
@@ -92,7 +92,7 @@ DEFAULT_CONFIG = {
     # Audio Tool settings
     "audio_tool_enabled": True,
     "audio_tool_hotkey": "ctrl+shift+a",
-    "audio_default_device": "",
+    "audio_default_device": "default",
     "audio_default_loopback": True,
     # Level meter display style
     # - canvas: Custom canvas with grid lines and color gradient (default)
@@ -288,7 +288,7 @@ auto_save_session = on_attachment
 
 # Custom API configuration
 custom_url = https://api.openai.com/v1/chat/completions
-custom_model = gpt-5.1
+custom_model = gpt-5.2
 #
 # NOTE: If custom_url contains "google" or "googleapis.com", the system will
 # automatically apply Google-specific settings (safety_settings, thinking_config).
@@ -382,9 +382,10 @@ audio_tool_enabled = true
 # Hotkey combination (e.g., ctrl+shift+a)
 audio_tool_hotkey = ctrl+shift+a
 
-# Default input device (blank = system default)
-# Partial names allowed (e.g., "Microphone (Realtek)")
-audio_default_device =
+# Default input device ("default" = system default)
+# Partial names allowed for matching (e.g., "High Definition" matches "Speakers (2- High Definition Audio Device)")
+# Matching is case-insensitive
+audio_default_device = default
 
 # Default to loopback (system audio) instead of microphone?
 # true = Record what you hear (system audio)
