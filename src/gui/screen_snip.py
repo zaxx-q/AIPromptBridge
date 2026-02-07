@@ -156,7 +156,7 @@ class ScreenSnipOverlay:
         # Instructions text at top
         self.canvas.create_text(
             self.screen_width // 2, 30,
-            text="Drag to select region • Escape to cancel",
+            text="Drag to select region • Click anywhere or Press Escape to cancel",
             fill="white",
             font=("Arial", 14, "bold"),
             tags="instructions"

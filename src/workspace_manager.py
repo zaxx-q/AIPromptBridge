@@ -18,14 +18,14 @@ class WorkspaceManager:
 
     # Files managed by the workspace manager
     MANAGED_FILES = [
-        "config.ini",
         "chat_sessions.json",
-        "prompts.json",
         "tools_config.json",
     ]
     
     # Glob patterns for managed files
     MANAGED_GLOBS = [
+        "config.ini*",
+        "prompts.json*",
         "*file_processor.json",
         ".file_processor_*.json"
     ]

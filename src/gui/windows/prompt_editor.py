@@ -3731,7 +3731,7 @@ class PromptEditorWindow:
         if not messagebox.askyesno(
             "Reset to Defaults",
             "This will reset ALL prompts, actions, modifiers, and settings to their default values.\n\n"
-            "Your current configuration will be backed up to prompts.json.reset_backup\n\n"
+            "Your current configuration will be backed up to prompts.json.bak\n\n"
             "Are you sure you want to continue?",
             parent=self.root
         ):
@@ -3742,7 +3742,7 @@ class PromptEditorWindow:
             
             # Create backup of current file
             if Path(PROMPTS_FILE).exists():
-                backup_path = PROMPTS_FILE + ".reset_backup"
+                backup_path = PROMPTS_FILE + ".bak"
                 shutil.copy2(PROMPTS_FILE, backup_path)
             
             # Get fresh defaults from PromptsConfig
