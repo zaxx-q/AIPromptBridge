@@ -741,14 +741,14 @@ class SettingsWindow:
         row.pack(fill="x", pady=8)
         
         self.vars["auto_save_session"] = tk.StringVar(
-            master=self.root, value=self.config_data.config.get("auto_save_session", "on_followup"))
+            master=self.root, value=self.config_data.config.get("auto_save_session", "on_attachment"))
         
         if self.use_ctk:
             ctk.CTkLabel(row, text="New session auto-creation:", font=get_ctk_font(13), width=180, anchor="w",
                         **get_ctk_label_colors(self.colors)).pack(side="left")
             self.widgets["auto_save_session"] = ctk.CTkComboBox(
                 row, variable=self.vars["auto_save_session"],
-                values=["on_followup", "always_window", "on_attachment"],
+                values=["on_attachment", "always_window", "on_followup"],
                 width=160, height=34, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
@@ -762,7 +762,7 @@ class SettingsWindow:
                     bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
             self.widgets["auto_save_session"] = ttk.Combobox(
                 row, textvariable=self.vars["auto_save_session"],
-                values=["on_followup", "always_window", "on_attachment"],
+                values=["on_attachment", "always_window", "on_followup"],
                 state="readonly", width=18
             )
             self.widgets["auto_save_session"].pack(side="left", padx=(10, 0))

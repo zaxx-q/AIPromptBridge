@@ -45,7 +45,7 @@ DEFAULT_CONFIG = {
     # - "on_followup" (default): Save only when user sends a follow-up message in chat window.
     # - "always_window": Save whenever a new chat window is opened.
     # - "on_attachment": Save whenever a window is opened AND has attachments.
-    "auto_save_session": "on_followup",
+    "auto_save_session": "on_attachment",
     # Streaming and thinking settings
     "streaming_enabled": True,
     "thinking_enabled": False,
@@ -284,7 +284,7 @@ show_ai_response_in_chat_window = no
 # - "on_followup" (default): Save only when user sends a follow-up message in chat window.
 # - "always_window": Save whenever a new chat window is opened.
 # - "on_attachment": Save whenever a window is opened AND has attachments.
-auto_save_session = on_followup
+auto_save_session = on_attachment
 
 # Custom API configuration
 custom_url = https://api.openai.com/v1/chat/completions
