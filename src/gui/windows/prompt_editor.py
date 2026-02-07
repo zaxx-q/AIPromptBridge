@@ -548,14 +548,15 @@ class PromptEditorWindow:
         main_container = ctk.CTkFrame(self.root, fg_color=self.colors.bg) if self.use_ctk else tk.Frame(self.root, bg=self.colors.bg)
         main_container.pack(fill="both", expand=True, padx=10, pady=5)
         
-        # Title bar
+        # Title bar (pack first at top)
         self._create_title_bar(main_container)
         
-        # Main content with tabview
-        self._create_main_content(main_container)
-        
-        # Button bar
+        # Button bar (pack BEFORE main content with side="bottom" to reserve space)
+        # This ensures the button bar is visible even at minimum window size
         self._create_button_bar(main_container)
+        
+        # Main content with tabview - pack last to fill remaining space
+        self._create_main_content(main_container)
         
         # Register and bind
         register_window(self.window_tag)
@@ -3645,7 +3646,9 @@ class PromptEditorWindow:
     def _create_button_bar(self, parent):
         """Create the bottom button bar."""
         btn_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
-        btn_frame.pack(fill="x", pady=(2, 0))
+        # Pack with side="bottom" to ensure button bar is visible at all window sizes
+        # This works because _create_button_bar is called BEFORE _create_main_content
+        btn_frame.pack(fill="x", side="bottom", pady=(5, 0))
         
         create_emoji_button(
             btn_frame, "Save All", "💾", self.colors, "success", 140, 42, self._save_all

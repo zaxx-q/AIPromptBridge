@@ -487,10 +487,14 @@ class SettingsWindow:
         main_container = ctk.CTkFrame(self.root, fg_color=self.colors.bg) if self.use_ctk else tk.Frame(self.root, bg=self.colors.bg)
         main_container.pack(fill="both", expand=True, padx=10, pady=5)
         
-        # Title bar
+        # Title bar (pack first at top)
         self._create_title_bar(main_container)
         
-        # Notebook (tabs)
+        # Button bar (pack BEFORE notebook with side="bottom" to reserve space)
+        # This ensures the button bar is visible even at minimum window size
+        self._create_button_bar(main_container)
+        
+        # Notebook (tabs) - pack last to fill remaining space
         self._create_notebook(main_container)
         
         # Select initial tab if specified
@@ -518,9 +522,6 @@ class SettingsWindow:
                 
                 if not found:
                     print(f"[Settings] Could not find initial tab '{initial_tab}'")
-        
-        # Button bar
-        self._create_button_bar(main_container)
         
         # Register and bind
         register_window(self.window_tag)
@@ -2118,7 +2119,9 @@ class SettingsWindow:
     def _create_button_bar(self, parent):
         """Create the bottom button bar."""
         btn_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
-        btn_frame.pack(fill="x", pady=(2, 0))
+        # Pack with side="bottom" to ensure button bar is visible at all window sizes
+        # This works because _create_button_bar is called BEFORE _create_notebook
+        btn_frame.pack(fill="x", side="bottom", pady=(5, 0))
         
         create_emoji_button(
             btn_frame, "Save", "💾", self.colors, "success", 120, 42, self._save
