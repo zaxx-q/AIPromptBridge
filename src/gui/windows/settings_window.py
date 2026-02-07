@@ -293,6 +293,10 @@ def save_config_full(data: ConfigData, filepath: str = "config.ini") -> bool:
         new_config_lines = []
         for key, value in data.config.items():
             if key not in written_keys:
+                # Skip None values to avoid cluttering config with defaults that act as "unset"
+                # This prevents commented-out defaults (like gemini_endpoint) from reappearing
+                if value is None:
+                    continue
                 new_config_lines.append(f"{key} = {_value_to_str(value)}\n")
         if new_config_lines and config_section_end > 0:
             lines = lines[:config_section_end] + new_config_lines + lines[config_section_end:]
