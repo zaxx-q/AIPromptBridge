@@ -594,8 +594,12 @@ class SnipToolApp:
             
             callbacks.finalize(response_text, thinking_text)
 
+            # Explicitly add assistant message to session before auto-save
+            # The streaming window displays it, but we need to ensure it's in the session object for persistence
+            if response_text and not any(m["role"] == "assistant" and m["content"] == response_text for m in session.messages):
+                session.add_message("assistant", response_text)
+
             # Auto-save session if configured
-            # Note: callbacks.finalize adds the assistant message, so session is ready to save
             self._handle_auto_save(session)
             
             print(f"  ✅ Response streamed to chat window ({len(response_text)} chars)")

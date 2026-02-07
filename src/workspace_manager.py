@@ -129,17 +129,7 @@ class WorkspaceManager:
             # If we simply move, shutil.move might fail if dest exists depending on OS/impl.
             
             if dest_path.exists():
-                # For directories, we might want to merge, but for now let's assume replacement
-                # or skip if dest exists to be safe? 
-                # Plan says: "Perform necessary file moves (safely)."
-                # If I have config.ini in both, which one is newer?
-                # Let's assume the one in the "source" (where we are migrating FROM) is the one 
-                # intended to be kept if we are switching modes. 
-                # BUT, if I run Direct Mode, I want to pull files from Root. 
-                # If I already have files in Bin, maybe I should keep them?
-                # Actually, if I toggle between modes, I want the state to follow me.
-                # So if I was in Root, modified config, then ran Direct, I want that config in Bin.
-                # So Source overwrites Dest.
+                # Source overwrites Dest.
                 
                 if dest_path.is_dir():
                     shutil.rmtree(dest_path)
