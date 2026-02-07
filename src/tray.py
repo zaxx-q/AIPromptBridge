@@ -650,8 +650,16 @@ class TrayApp:
             SEP,
             ("⚙️ Settings", self._on_settings),
             ("✏️ Prompt Editor", self._on_prompt_editor),
-            ("📝 Edit config.ini (file)", self._on_edit_config),
-            ("📄 Edit prompts.json (file)", self._on_edit_options),
+        ])
+        
+        # File editing options only available in console mode
+        if self.allow_console_toggle:
+            raw_options.extend([
+                ("📝 Edit config.ini (file)", self._on_edit_config),
+                ("📄 Edit prompts.json (file)", self._on_edit_options),
+            ])
+        
+        raw_options.extend([
             SEP,
             ("🔄 Restart", self._on_restart),
             SEP # Separator before "Quit" (which is added automatically)
