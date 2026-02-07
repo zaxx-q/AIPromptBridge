@@ -143,14 +143,23 @@ jobs:
           # Create output directory
           New-Item -ItemType Directory -Force -Path "build_launchers" | Out-Null
           
+          # Debug: List files to verify source existence
+          Write-Host "Verifying source file existence:"
+          if (Test-Path "src\launchers\Launcher.cs") {
+              Write-Host "  Found src\launchers\Launcher.cs"
+          } else {
+              Write-Error "  src\launchers\Launcher.cs NOT FOUND!"
+              Get-ChildItem -Recurse src | ForEach-Object { Write-Host "  $($_.FullName)" }
+          }
+
           # Build Console Launcher (with console window) - Primary launcher
           Write-Host "Building Console Launcher (AIPromptBridge.exe)..."
           & $cscPath.FullName /target:exe `
-                              /out:build_launchers/AIPromptBridge.exe `
+                              /out:build_launchers\AIPromptBridge.exe `
                               /win32icon:icon.ico `
                               /define:CONSOLE `
                               /optimize+ `
-                              src/launchers/Launcher.cs
+                              src\launchers\Launcher.cs
           
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Failed to build Console launcher!"
@@ -161,11 +170,11 @@ jobs:
           # Build No-Console Launcher (no console window)
           Write-Host "Building No-Console Launcher (AIPromptBridge-NoConsole.exe)..."
           & $cscPath.FullName /target:winexe `
-                              /out:build_launchers/AIPromptBridge-NoConsole.exe `
+                              /out:build_launchers\AIPromptBridge-NoConsole.exe `
                               /win32icon:icon.ico `
                               /define:GUI `
                               /optimize+ `
-                              src/launchers/Launcher.cs
+                              src\launchers\Launcher.cs
           
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Failed to build No-Console launcher!"
