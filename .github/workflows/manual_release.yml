@@ -125,29 +125,59 @@ jobs:
           noinclude-unittest-mode: nofollow
           output-filename: AIPromptBridge_Internal.exe
 
-      - name: Build GUI Launcher
-        uses: Nuitka/Nuitka-Action@main
-        with:
-          nuitka-version: main
-          script-name: launcher_gui.py
-          mode: onefile
-          output-dir: build_launchers
-          # Migrated from launcher_gui.py
-          windows-console-mode: disable
-          windows-icon-from-ico: icon.ico
-          output-filename: AIPromptBridge.exe
-
-      - name: Build Console Launcher
-        uses: Nuitka/Nuitka-Action@main
-        with:
-          nuitka-version: main
-          script-name: launcher_console.py
-          mode: onefile
-          output-dir: build_launchers
-          # Migrated from launcher_console.py
-          windows-console-mode: force
-          windows-icon-from-ico: icon.ico
-          output-filename: AIPromptBridge-Console.exe
+      - name: Build C# Launchers
+        shell: pwsh
+        run: |
+          # Find csc.exe from .NET Framework (pre-installed on Windows)
+          $cscPath = Get-ChildItem -Path "C:\Windows\Microsoft.NET\Framework64\*\csc.exe" |
+                     Sort-Object { [version]($_.Directory.Name -replace 'v', '') } -Descending |
+                     Select-Object -First 1
+          
+          if (-not $cscPath) {
+            Write-Error "Could not find csc.exe!"
+            exit 1
+          }
+          
+          Write-Host "Using C# compiler: $($cscPath.FullName)"
+          
+          # Create output directory
+          New-Item -ItemType Directory -Force -Path "build_launchers" | Out-Null
+          
+          # Build GUI Launcher (no console window)
+          Write-Host "Building GUI Launcher..."
+          & $cscPath.FullName /target:winexe `
+                              /out:build_launchers/AIPromptBridge.exe `
+                              /win32icon:icon.ico `
+                              /define:GUI `
+                              /optimize+ `
+                              src/launchers/Launcher.cs
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to build GUI launcher!"
+            exit 1
+          }
+          Write-Host "✓ GUI Launcher built successfully"
+          
+          # Build Console Launcher (with console window)
+          Write-Host "Building Console Launcher..."
+          & $cscPath.FullName /target:exe `
+                              /out:build_launchers/AIPromptBridge-Console.exe `
+                              /win32icon:icon.ico `
+                              /define:CONSOLE `
+                              /optimize+ `
+                              src/launchers/Launcher.cs
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to build Console launcher!"
+            exit 1
+          }
+          Write-Host "✓ Console Launcher built successfully"
+          
+          # Show file sizes (should be ~10KB each vs ~7MB for Nuitka)
+          Get-ChildItem build_launchers/*.exe | ForEach-Object {
+            $sizeKB = [math]::Round($_.Length / 1KB, 1)
+            Write-Host "  $($_.Name): $sizeKB KB"
+          }
 
       - name: Assemble Deployment Package
         id: assemble_package
@@ -187,11 +217,6 @@ jobs:
               Write-Error "Console Launcher not found!"
               exit 1
           }
-          
-          # 3. Copy Additional Files
-          
-          if (Test-Path "LICENSE") { Copy-Item "LICENSE" $distRoot }
-          if (Test-Path "README.md") { Copy-Item "README.md" $distRoot }
 
           # Zip it up
           $zipName = "AIPromptBridge-$env:RELEASE_VERSION.zip"

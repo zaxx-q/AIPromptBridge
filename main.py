@@ -583,9 +583,27 @@ def main():
     # Configure global logging (DEBUG if --show-console, otherwise INFO)
     configure_logging(debug_mode=args.show_console)
     
+    # Determine if we have a real console (for WT relaunch and console toggle)
+    # - GUI mode: No console (skip WT, no toggle)
+    # - Console mode: Has console (WT check, toggle enabled)
+    # - No launched-mode + compiled (Internal.exe): No console (attach mode, skip WT)
+    # - No launched-mode + source (python main.py): Has console (WT check, toggle enabled)
+    is_compiled = (
+        "__compiled__" in globals() or
+        getattr(sys, 'frozen', False) or
+        (sys.executable.lower().endswith(".exe") and "python" not in os.path.basename(sys.executable).lower())
+    )
+    
+    if args.launched_mode == "gui":
+        has_real_console = False
+    elif args.launched_mode == "console":
+        has_real_console = True
+    else:
+        # No launcher: compiled (direct Internal.exe) has no console, source does
+        has_real_console = not is_compiled
+    
     # Try to relaunch in Windows Terminal for emoji support (unless --no-wt)
-    # Skip if running via launcher (launcher handles console mode)
-    if not args.launched_mode and not args.no_wt and ensure_windows_terminal():
+    if has_real_console and not args.no_wt and ensure_windows_terminal():
         sys.exit(0)  # Exit this instance, new one launched in WT
     
     # Suppress Flask startup banner
@@ -764,8 +782,8 @@ def main():
         server_thread.start()
         
         # Determine if console toggling is allowed
-        # GUI Launcher: No console toggle (it's hidden/disabled)
-        allow_console_toggle = args.launched_mode != "gui"
+        # Uses has_real_console computed earlier (handles source vs compiled)
+        allow_console_toggle = has_real_console
         
         # Start tray (this blocks until exit)
         tray = TrayApp(on_exit_callback=cleanup, allow_console_toggle=allow_console_toggle)
