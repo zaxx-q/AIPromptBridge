@@ -47,9 +47,17 @@ class WorkspaceManager:
         Returns:
             str: The target CWD that the application should switch to.
         """
+        # Robust frozen detection
+        # Nuitka usually set sys.frozen, but sometimes (e.g. some Nuitka configs)
+        # it might be missing. We also check for .exe extension without 'python' in name.
+        is_frozen = (
+            getattr(sys, 'frozen', False) or
+            (sys.executable.lower().endswith(".exe") and "python" not in os.path.basename(sys.executable).lower())
+        )
+
         # Determine paths
         # Internal executable path (where we are running from right now)
-        if getattr(sys, 'frozen', False):
+        if is_frozen:
             # Nuitka Standalone / PyInstaller
             bin_dir = Path(sys.executable).parent
         else:
@@ -76,12 +84,12 @@ class WorkspaceManager:
             # Direct Mode: We want to operate in the Bin directory (Self)
             # Files should be in Bin, moved FROM Root if they exist there
             # Exception: In development (not frozen), we typically stay in root
-            if getattr(sys, 'frozen', False):
+            if is_frozen:
                 target_cwd = bin_dir
                 WorkspaceManager._migrate_files(source=root_dir, dest=bin_dir)
             else:
                 # Dev mode: Stay in project root (bin_dir is actually project root here)
-                target_cwd = bin_dir 
+                target_cwd = bin_dir
                 # No migration needed in dev mode usually
         
         return str(target_cwd)
