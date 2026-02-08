@@ -4,15 +4,13 @@
   <strong>• AI Desktop Tools & Integration Bridge •</strong>
 </p>
 
-**AIPromptBridge** is a Windows desktop application that brings AI assistance to your fingertips. Use global hotkeys to edit text using AI, capture and analyze audio or screen content, and chat with models—all from a lightweight system tray app.
-
-## 📽️ Demo
-
-https://github.com/user-attachments/assets/a104765a-eb48-4bf7-bbe4-2f9a53d97aa5
+**AIPromptBridge** is a Windows desktop application that brings AI assistance to your fingertips. Use global hotkeys to edit text using AI, capture and analyze audio or screen content, and chat with models, all from a lightweight system tray app.
 
 ## ✨ Features
 
 ### 🎯 TextEditTool
+<img src="docs/images/feature_text_edit.png" align="right" width="200" />
+
 Press **Ctrl+Space** anywhere to invoke AI on selected text:
 - **Understand** - **Explain**, **Generate Summaries**, or **Keypoints**
 - **Edit** - **Proofread** (✏️), **Rewrite** (📝), or make it **Casual** (😎)
@@ -21,7 +19,11 @@ Press **Ctrl+Space** anywhere to invoke AI on selected text:
 
 Works in any application: browsers, IDEs, Notepad, Word, everywhere.
 
+<br clear="right"/>
+
 ### 📸 Screen Snip (SnipTool)
+<img src="docs/images/feature_snip.png" align="right" width="300" />
+
 Press **Ctrl+Shift+X** to capture a region of your screen and analyze it with AI:
 - **OCR** - **Extract Text** or **OCR to Markdown** for clean formatting
 - **Analysis** - **Describe**, **Summarize**, or **Explain Code**
@@ -29,7 +31,11 @@ Press **Ctrl+Shift+X** to capture a region of your screen and analyze it with AI
 - **Compare** - **Compare Images** to analyze differences between two screenshots
 - **Response Modes** - Choose to show result in Chat Window, Result Panel, or Copy to Clipboard
 
+<br clear="right"/>
+
 ### 🎤 Audio Analyzer
+![Audio Analyzer](docs/images/feature_audio.png)
+
 Press **Ctrl+Shift+A** to record and analyze audio:
 - **Record** - Capture microphone input or system audio (loopback)
 - **Transcribe** - High-fidelity transcription with timestamps and speaker identification
@@ -38,6 +44,8 @@ Press **Ctrl+Shift+A** to record and analyze audio:
 - **Integration** - Send audio directly to chat context for follow-up questions
 
 ### 💬 Chat Interface
+![Chat Interface](docs/images/feature_chat.png)
+
 Lightweight chat windows with:
 - Streaming responses (real-time typing)
 - Markdown rendering
@@ -45,6 +53,21 @@ Lightweight chat windows with:
 - Multi-theme UI with 7 color schemes
 
 ### 🎨 Theme System
+
+The app supports 7 distinct themes with both Dark and Light variants:
+
+| Catppuccin | Dracula | Nord |
+|------------|---------|------|
+| <img src="docs/images/themes/theme_catppuccin.png" width="250"> | <img src="docs/images/themes/theme_dracula.png" width="250"> | <img src="docs/images/themes/theme_nord.png" width="250"> |
+
+| Gruvbox | OneDark | Minimal |
+|---------|---------|---------|
+| <img src="docs/images/themes/theme_gruvbox.png" width="250"> | <img src="docs/images/themes/theme_onedark.png" width="250"> | <img src="docs/images/themes/theme_minimal.png" width="250"> |
+
+| High Contrast | | |
+|---------------|---|---|
+| <img src="docs/images/themes/theme_highcontrast.png" width="250"> | | |
+
 Customizable appearance with:
 - **7 themes**: Catppuccin, Dracula, Nord, Gruvbox, OneDark, Minimal, High Contrast
 - **Dark/Light modes**: Each theme has both variants
@@ -60,7 +83,7 @@ Customizable appearance with:
 - **Batch Processing** - Async processing for large workloads (Gemini Batch API)
 - **Attachment Manager** - Efficient external storage for session images, audio, and files
 
-### 🧰 Tools System
+### 🧰 Tools System (Not accessible in No Console mode)
 The **File Processor** tool enables bulk operations:
 - **Batch Processing**: Process folders of Images, Audio, Code, Text, or PDFs
 - **Audio Optimization**: Reduce file size (mono, sample rate) for efficient AI processing
@@ -74,10 +97,11 @@ The **File Processor** tool enables bulk operations:
 
 ### Download (Recommended)
 
-1. Download `AIPromptBridge.exe` from [GitHub Releases](https://github.com/zaxx-q/AIPromptBridge/releases)
-2. Run it - on first launch, it creates `config.ini` and automatically opens the Settings window
-3. Enter your API keys in the **API Keys** tab and click **Save**
-4. The app starts minimized to system tray
+1. Download `AIPromptBridge.zip` from [GitHub Releases](https://github.com/zaxx-q/AIPromptBridge/releases)
+2. Extract and run `AIPromptBridge.exe` (use `AIPromptBridge-NoConsole.exe` to hide console)
+3. On first launch, it automatically opens the Settings window in **API Keys** tab. Enter API keys, enter key name (Optional), and click **Add**
+4. Optionally configure selected provider, endpoint URL or models in **Provider** tab and click **Save**
+5. The app starts minimized to system tray
 
 ### From Source (Alternative)
 
@@ -88,33 +112,22 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### Configuration
-
-You can configure API keys via the **Settings** window (right-click tray icon -> Settings) or by editing `config.ini`.
-
-```ini
-[google]
-AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX  # My Primary Key
-
-[openrouter]
-sk-or-v1-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX # Project Backup
-```
-
-> 💡 **Tip**: Add multiple keys (one per line) for automatic rotation when rate limits are hit. You can name your keys using inline comments (`#`).
-
 ## 📋 Usage
 
 ### System Tray
 
+<img src="docs/images/tray.png" align="right" width="200" />
+
 Right-click the tray icon for:
-- **Show/Hide Console** - Toggle console visibility
+- **Toggle Console or Double click tray icon** - Toggle console visibility (Not visible in No Console mode)
 - **Session Browser** - View chat history
 - **Direct Chat** - Open text input popup (Ctrl+Space)
 - **Screen Snip** - Trigger screen capture (Ctrl+Shift+X)
 - **Audio Analyzer** - Open audio tool (Ctrl+Shift+A)
 - **Settings** - Open GUI settings editor
 - **Prompt Editor** - Edit TextEditTool prompts
-- **Edit config.ini** - Open configuration file
+- **Edit config.ini** - Open configuration file (only visible with `--show-console` arg)
+- **Edit prompts.json** - Open prompts file (only visible with `--show-console` arg)
 - **Restart** - Restart the application
 - **Quit** - Exit completely
 
@@ -144,27 +157,21 @@ Right-click the tray icon for:
 
 ### API Endpoints
 
-Access AI via HTTP POST (Advanced). Endpoints are disabled by default (`flask_endpoints_enabled = false`) but can be enabled in `config.ini` for integrations like ShareX.
+**Note: These endpoints are largely deprecated.**
+- **ShareX Users**: ShareX 19.0.1+ now has a native "Analyze image" feature.
+- **Desktop Users**: The built-in SnipTool (**Ctrl+Shift+X**) offers better integration.
 
-```bash
-# Basic OCR
-curl -X POST -F "image=@screenshot.png" http://127.0.0.1:5000/ocr
-
-# With chat window
-curl -X POST -F "image=@screenshot.png" "http://127.0.0.1:5000/describe?show=yes"
-```
-
-See [ShareX Setup Guide](docs/SHAREX_SETUP.md) for full endpoint documentation.
+Endpoints allow HTTP POST access (disabled by default). See [ShareX Setup Guide](docs/SHAREX_SETUP.md) if needed.
 
 ### Console Commands
 
 When console is visible, press these keys:
 
-Key | Action |
+| Key | Action |
 |-----|--------|
-`S` | Show system status |
-`O` | Open session browser |
-`M` | List available models (Use `?N` for details, e.g., `?1`) |
+| `S` | Show system status |
+| `O` | Open session browser |
+| `M` | List available models (Use `?N` for details, e.g., `?1`) |
 | `P` | Switch AI provider |
 | `T` | Toggle thinking mode |
 | `R` | Toggle streaming mode |
@@ -172,114 +179,31 @@ Key | Action |
 
 ## ⚙️ Configuration
 
-### Providers
+AIPromptBridge features a comprehensive GUI for all configuration needs, making it easy to manage settings without touching configuration files.
 
-Set your preferred provider in `config.ini`:
+### 🎛️ Settings Window
+![Settings Window](docs/images/window_settings.png)
 
-```ini
-[config]
-default_provider = google
-google_model = gemini-2.5-flash
-```
+Access via **System Tray > Settings**. This window manages the core application configuration (`config.ini`):
+- **API Keys**: Manage keys for Google Gemini, OpenRouter, and Custom providers.
+- **Providers**: Select default models and configure endpoint URLs.
+- **Tools**: Configure hotkeys and behavior for TextEditTool, SnipTool, and AudioTool.
+- **Theme**: Switch between 7 themes and toggle Dark/Light modes.
+- **System**: Configure server host/port and startup options.
 
-Available providers:
-- `google` - Native Gemini API (recommended)
-- `openrouter` - OpenRouter.ai models
-- `custom` - Any OpenAI-compatible endpoint
+### ✏️ Prompt Editor
+![Prompt Editor](docs/images/window_prompt_editor.png)
 
-### Custom Endpoints
+Access via **System Tray > Prompt Editor**. This window lets you customize how the AI responds (`prompts.json`):
+- **Actions**: Create, edit, and organize actions for Text, Snip, and Audio tools.
+- **Modifiers**: Customize the modifier bar buttons (e.g., "Shorter", "Professional").
+- **Playground**: Test your prompts in real-time with text, images, or audio before saving.
+- **Hot-Reload**: Changes apply immediately without restarting the app.
 
-Add your own endpoints in `config.ini`:
-
-```ini
-[endpoints]
-# Simple custom endpoint
-my_analyzer = Analyze this image and list all objects found.
-
-# Dynamic language endpoint using {lang} placeholder
-my_translator = Translate to {lang}. Keep formatting.
-```
-
-Access via `http://127.0.0.1:5000/my_analyzer` or `http://127.0.0.1:5000/my_translator?lang=French`
-
-### Unified Prompts
-
-Customize all prompts (TextEditTool, SnipTool, and Endpoints) in `prompts.json`. This file is automatically created from defaults if missing.
-
-#### Structure
-- `text_edit_tool`: Text manipulation prompts (Ctrl+Space)
-- `snip_tool`: Image analysis prompts (Ctrl+Shift+X)
-- `endpoints`: Flask API endpoint prompts
-- `_global_settings`: Shared settings and modifiers
-
-```json
-{
-  "text_edit_tool": {
-    "Proofread": {
-      "icon": "✏",
-      "prompt_type": "edit",
-      "system_prompt": "You are a meticulous proofreader...",
-      "task": "Proofread the following text...",
-      "show_chat_window_instead_of_replace": false
-    }
-  },
-  "snip_tool": {
-    "Describe": {
-      "icon": "🖼️",
-      "system_prompt": "You are an image analysis expert...",
-      "task": "Describe this image in detail...",
-      "show_chat_window": true
-    }
-  }
-}
-```
-    "icon": "💡",
-    "prompt_type": "general",
-    "system_prompt": "You are a knowledgeable teacher...",
-    "task": "Explain the following text...",
-    "show_chat_window_instead_of_replace": true
-  },
-  "Rewrite": {
-    "icon": "📝",
-    "prompt_type": "edit",
-    "system_prompt": "You are an expert editor...",
-    "task": "Rewrite this text to improve clarity...",
-    "show_chat_window_instead_of_replace": false
-  },
-}
-```
-
-### Text Modifiers
-
-The TextEditTool popup includes a **Modifier Bar** that lets you fine-tune the output. Toggle these modifiers to inject specific instructions into the prompt:
-
-- **Variations** (🔢): Generate 3 alternative versions.
-- **Direct** (🎯): Make output direct and concise, no fluff.
-- **Explain** (📝): Add an explanation of changes.
-- **Creative** (🎨): Take more liberties with phrasing.
-- **Literal** (📏): Stay close to the original.
-- **Shorter** (✂️): Make the result more concise.
-- **Longer** (📖): Expand with more detail.
-- **Formal** (💼): Professional/business tone.
-- **Informal** (💬): Casual/personal tone.
-- **Global** (🌐): Avoid idioms for international audience.
-
-*Note: Some modifiers (like Variations and Explain) force the output to open in a chat window.*
-
-### Theming
-
-Configure the UI theme in Settings or `config.ini`:
-
-```ini
-[config]
-ui_theme = catppuccin
-ui_theme_mode = auto  # auto, dark, light
-auto_save_session = on_followup # on_followup, always_window, on_attachment
-```
-
-Available themes: `catppuccin`, `dracula`, `nord`, `gruvbox`, `onedark`, `minimal`, `highcontrast`
-
-> 💡 **Performance Tip**: If you experience lag or UI issues with the modern interface, you can disable it by enabling **"Force Standard Tkinter"** in the **Theme** tab of Settings. This switches the app to a high-performance fallback mode using standard Windows widgets.
+### 📂 Manual Configuration
+For advanced users, configuration files are stored in the application root:
+- `config.ini`: Core settings and API keys.
+- `prompts.json`: AI system prompts and tool configurations.
 
 ## 💡 Tips
 
@@ -302,10 +226,9 @@ Available themes: `catppuccin`, `dracula`, `nord`, `gruvbox`, `onedark`, `minima
 ## 🔧 Command Line Options
 
 ```bash
-AIPromptBridge.exe                    # Normal start (tray mode, console hidden)
-AIPromptBridge.exe --no-tray          # No tray icon, console stays visible
-AIPromptBridge.exe --show-console     # Tray mode but keep console visible
-AIPromptBridge.exe --no-wt            # Skip Windows Terminal detection
+AIPromptBridge.exe --no-tray          # No tray icon
+AIPromptBridge.exe --show-console     # Doesn't automatically hide console at startup, also enable debug logs
+AIPromptBridge.exe --no-wt            # Skip Windows Terminal detection and redirection
 ```
 
 > 💡 **Console View**: For the best console experience (including full color emoji support), it is highly recommended to use [Windows Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701). AIPromptBridge will attempt to automatically relaunch in Windows Terminal if detected.
@@ -316,20 +239,11 @@ AIPromptBridge.exe --no-wt            # Skip Windows Terminal detection
 - [Architecture](docs/ARCHITECTURE.md) - Technical details
 - [ShareX Setup](docs/SHAREX_SETUP.md) - Screenshot integration
 
-## 🗺️ Roadmap
-
-- [x] **Prompt Editor** - GUI for editing text_edit_tool_options.json (includes Playground)
-- [x] **Settings Window** - GUI for editing config.ini
-- [x] **Theme System** - Multiple color schemes with dark/light modes
-- [x] **Colored Emoji** - Twemoji-based color emoji rendering in chat and UI widgets
-- [x] **Modern UI** - Migrated to CustomTkinter for modern UI, rounded corners, and other GUI improvements
-- [x] **Audio Tool** - Recording and analysis of system/mic audio
-
 ## 📝 Requirements
 
-- **Windows 10/11** (uses Windows-specific APIs for tray and console)
+- **Windows 10/11** (uses Windows-specific APIs for tray, console, snipping, and audio capture mechanims)
 - **Windows Terminal** (Highly recommended for better console view and colors)
-- **Python 3.14+** (if running from source)
+- **Python 3.13+** (if running from source)
 - API keys for at least one provider (Google Gemini recommended)
 
 ## 📄 License
