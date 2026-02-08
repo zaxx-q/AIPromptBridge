@@ -200,7 +200,8 @@ jobs:
           
           # 1. Move Internal Standalone to bin/
           # Nuitka-Action outputs standalone to {output-dir}/{output-filename}.dist when output-filename is provided
-          $internalSource = "build_internal/AIPromptBridge_Internal.dist"
+          # Update: It actually to defaults to {script-name-base}.dist despite output-filename
+          $internalSource = "build_internal/main.dist"
           if (-not (Test-Path $internalSource)) { Write-Error "Internal build not found at $internalSource"; exit 1 }
           
           # Move contents of dist to bin/
