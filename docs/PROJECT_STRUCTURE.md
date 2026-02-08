@@ -5,8 +5,8 @@ AIPromptBridge follows a modular architecture separating the web server, GUI, sy
 ```
 AIPromptBridge/
 ├── main.py                     # Main entry point (Internal logic)
-├── launcher_gui.py             # GUI Launcher (Nuitka Onefile)
-├── launcher_console.py         # Console Launcher (Nuitka Onefile)
+├── launcher_gui.py             # GUI Launcher (cx_Freeze script)
+├── launcher_console.py         # Console Launcher (cx_Freeze script)
 ├── requirements.txt            # Python dependencies
 ├── config.ini                  # Configuration (auto-generated on first run)
 ├── chat_sessions.json          # Saved chat sessions (auto-created)
@@ -23,6 +23,7 @@ AIPromptBridge/
 ├── docs/                       # Documentation
 │   ├── PROJECT_STRUCTURE.md    # This file
 │   ├── ARCHITECTURE.md         # Technical architecture details
+│   ├── BUILD_PROCESS.md        # Build system & architecture decisions
 │   └── SHAREX_SETUP.md         # ShareX integration guide
 │
 └── src/

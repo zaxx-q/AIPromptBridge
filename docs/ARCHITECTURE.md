@@ -434,3 +434,5 @@ To support clean deployment with Nuitka, the application uses a split structure 
 - **Initialization**: Called early in `main.py` via `WorkspaceManager.initialize()`.
 - **File Migration**: Automatically moves managed files (`config.ini`, `prompts.json`, sessions) between Root and Bin depending on the mode.
 - **CWD Resolution**: Ensures the application always operates in the correct directory (Root for launchers, Bin for direct execution) so relative paths work as expected.
+
+For more details on the build process and launcher architecture, see [BUILD_PROCESS.md](BUILD_PROCESS.md).

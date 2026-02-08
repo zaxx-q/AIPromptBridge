@@ -153,90 +153,30 @@ jobs:
           noinclude-unittest-mode: nofollow
           output-filename: AIPromptBridge_Internal.exe
 
-      - name: Build C# Launchers
+      - name: Build Launchers (Python cx_Freeze)
         shell: pwsh
         run: |
-          # Find csc.exe from .NET Framework (pre-installed on Windows)
-          $cscPath = Get-ChildItem -Path "C:\Windows\Microsoft.NET\Framework64\*\csc.exe" |
-                     Sort-Object { [version]($_.Directory.Name -replace 'v', '') } -Descending |
-                     Select-Object -First 1
+          Write-Host "Installing cx_Freeze..."
+          pip install cx_Freeze
           
-          if (-not $cscPath) {
-            Write-Error "Could not find csc.exe!"
-            exit 1
-          }
-          
-          Write-Host "Using C# compiler: $($cscPath.FullName)"
-          
-          # Create output directory
-          New-Item -ItemType Directory -Force -Path "build_launchers" | Out-Null
-          
-          # --- GENERATE ASSEMBLY INFO ---
-          # This gives the EXE a proper version, company name, etc. to look legitimate
-          $version = "$env:RELEASE_VERSION".TrimStart('vV')
-          $asmInfoPath = "src\launchers\AssemblyInfo.cs"
-          
-          Write-Host "Generating AssemblyInfo.cs with version: $version"
-          
-          $asmContent = @"
-          using System.Reflection;
-          using System.Runtime.InteropServices;
-          
-          [assembly: AssemblyTitle("AIPromptBridge")]
-          [assembly: AssemblyDescription("AI Assistance Bridge")]
-          [assembly: AssemblyCompany("AIPromptBridge")]
-          [assembly: AssemblyProduct("AIPromptBridge")]
-          [assembly: AssemblyCopyright("Copyright © $(Get-Date -Format 'yyyy')")]
-          [assembly: AssemblyVersion("$version")]
-          [assembly: AssemblyFileVersion("$version")]
-          [assembly: ComVisible(false)]
-          "@
-          
-          $asmContent | Out-File -FilePath $asmInfoPath -Encoding utf8
-          
-          # --- BUILD ARGS ---
-          $commonArgs = @(
-            "/win32icon:icon.ico",
-            "/optimize+",
-            "/reference:System.Windows.Forms.dll",
-            "/win32manifest:src\launchers\app.manifest",
-            "src\launchers\Launcher.cs",
-            "src\launchers\AssemblyInfo.cs"
-          )
-          
-          # 1. Build Console Launcher
-          Write-Host "Building Console Launcher (AIPromptBridge.exe)..."
-          
-          $consoleArgs = @("/target:exe", "/out:build_launchers\AIPromptBridge.exe", "/define:CONSOLE") + $commonArgs
-          
-          & $cscPath.FullName $consoleArgs
+          Write-Host "Building Launchers with cx_Freeze..."
+          python src/launchers/setup_launchers.py build
           
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to build Console launcher!"
+            Write-Error "Failed to build launchers!"
             exit 1
           }
-          Write-Host "✓ Console Launcher built successfully"
           
-          # 2. Build No-Console Launcher
-          Write-Host "Building No-Console Launcher (AIPromptBridge-NoConsole.exe)..."
+          # cx_Freeze output is in build_launchers_cx/
+          # We need to verify what's inside
+          $buildDir = "build_launchers_cx"
           
-          $guiArgs = @("/target:winexe", "/out:build_launchers\AIPromptBridge-NoConsole.exe", "/define:GUI") + $commonArgs
-          
-          & $cscPath.FullName $guiArgs
-          
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to build No-Console launcher!"
-            exit 1
-          }
-          Write-Host "✓ No-Console Launcher built successfully"
-          
-          # Cleanup temporary AssemblyInfo
-          Remove-Item $asmInfoPath -ErrorAction SilentlyContinue
-          
-          # Show file sizes
-          Get-ChildItem build_launchers/*.exe | ForEach-Object {
-            $sizeKB = [math]::Round($_.Length / 1KB, 1)
-            Write-Host "  $($_.Name): $sizeKB KB"
+          if (Test-Path $buildDir) {
+             Write-Host "✓ Build successful. Contents:"
+             Get-ChildItem -Recurse $buildDir | Select-Object Name, Length
+          } else {
+             Write-Error "Build directory not found!"
+             exit 1
           }
 
       - name: Assemble Deployment Package
@@ -259,23 +199,29 @@ jobs:
           Copy-Item -Path "$internalSource/*" -Destination $binDir -Recurse -Force
           
           # 2. Move Launchers to Root
-          $launcherConsole = "build_launchers/AIPromptBridge.exe"
-          $launcherNoConsole = "build_launchers/AIPromptBridge-NoConsole.exe"
+          # cx_Freeze creates a directory structure. Since we want the launcher at root,
+          # we move ALL contents of the build directory to the root of the distribution.
+          # This includes AIPromptBridge.exe, python DLLs, etc.
           
-          if (Test-Path $launcherConsole) {
-              Copy-Item -Path $launcherConsole -Destination $distRoot
-              Write-Host "Console Launcher copied."
+          $buildDir = "build_launchers_cx"
+          
+          # Copy everything from build_launchers_cx/* to dist_final/
+          Write-Host "Copying Launcher runtime files to root..."
+          Copy-Item -Path "$buildDir/*" -Destination $distRoot -Recurse -Force
+          
+          # Verify executables
+          if (Test-Path "$distRoot/AIPromptBridge.exe") {
+             Write-Host "✓ Console Launcher present"
           } else {
-              Write-Error "Console Launcher not found!"
-              exit 1
+             Write-Error "Console Launcher missing!"
+             exit 1
           }
           
-          if (Test-Path $launcherNoConsole) {
-              Copy-Item -Path $launcherNoConsole -Destination $distRoot
-              Write-Host "No-Console Launcher copied."
+          if (Test-Path "$distRoot/AIPromptBridge-NoConsole.exe") {
+             Write-Host "✓ GUI Launcher present"
           } else {
-              Write-Error "No-Console Launcher not found!"
-              exit 1
+             Write-Error "GUI Launcher missing!"
+             exit 1
           }
 
           # Zip it up
