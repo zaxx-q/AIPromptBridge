@@ -43,7 +43,7 @@ from ..themes import (
     get_ctk_font
 )
 from ..core import get_next_window_id, register_window, unregister_window
-from ..custom_widgets import ScrollableButtonList, upgrade_tabview_with_icons, create_section_header, create_emoji_button
+from ..custom_widgets import ScrollableButtonList, upgrade_tabview_with_icons, create_section_header, create_emoji_button, TkScrollableFrame
 from .utils import set_window_icon
 
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
@@ -858,10 +858,12 @@ class PromptEditorWindow:
         
         # Editor form in scrollable frame
         if self.use_ctk:
-            editor_scroll = ctk.CTkScrollableFrame(right_panel, fg_color="transparent")
+            editor_container = ctk.CTkScrollableFrame(right_panel, fg_color="transparent")
+            editor_scroll = editor_container
         else:
-            editor_scroll = tk.Frame(right_panel, bg=self.colors.bg)
-        editor_scroll.pack(fill="both", expand=True)
+            editor_container = TkScrollableFrame(right_panel, bg_color=self.colors.bg)
+            editor_scroll = editor_container.scrollable_frame
+        editor_container.pack(fill="both", expand=True)
         
         # Action name (read-only label)
         row_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
@@ -1050,10 +1052,12 @@ class PromptEditorWindow:
     def _create_settings_tab(self, frame):
         """Create the Settings tab for _settings object."""
         if self.use_ctk:
-            scroll_frame = ctk.CTkScrollableFrame(frame, fg_color="transparent")
+            scroll_container = ctk.CTkScrollableFrame(frame, fg_color="transparent")
+            scroll_frame = scroll_container
         else:
-            scroll_frame = tk.Frame(frame, bg=self.colors.bg)
-        scroll_frame.pack(fill="both", expand=True, padx=15, pady=15)
+            scroll_container = TkScrollableFrame(frame, bg_color=self.colors.bg)
+            scroll_frame = scroll_container.scrollable_frame
+        scroll_container.pack(fill="both", expand=True, padx=15, pady=15)
         
         self.settings_widgets = {}
         
@@ -1592,10 +1596,12 @@ class PromptEditorWindow:
         left_panel.pack_propagate(False)
         
         if self.use_ctk:
-            scroll_left = ctk.CTkScrollableFrame(left_panel, fg_color="transparent")
+            scroll_container = ctk.CTkScrollableFrame(left_panel, fg_color="transparent")
+            scroll_left = scroll_container
         else:
-            scroll_left = tk.Frame(left_panel, bg=self.colors.bg)
-        scroll_left.pack(fill="both", expand=True)
+            scroll_container = TkScrollableFrame(left_panel, bg_color=self.colors.bg)
+            scroll_left = scroll_container.scrollable_frame
+        scroll_container.pack(fill="both", expand=True)
         
         # Mode selector
         create_section_header(scroll_left, "Mode", self.colors, "🎯")
@@ -1709,10 +1715,13 @@ class PromptEditorWindow:
             self.playground_mod_scroll = ctk.CTkScrollableFrame(
                 self.action_config_frame, height=120, fg_color="transparent"
             )
+            mod_scroll_target = self.playground_mod_scroll
         else:
             tk.Label(self.action_config_frame, text="🎛️ Modifiers:", font=("Segoe UI", 10),
                     bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w", pady=(8, 5))
-            self.playground_mod_scroll = tk.Frame(self.action_config_frame, bg=self.colors.bg)
+            self.playground_mod_scroll = TkScrollableFrame(self.action_config_frame, bg_color=self.colors.bg)
+            self.playground_mod_scroll.canvas.configure(height=120)
+            mod_scroll_target = self.playground_mod_scroll.scrollable_frame
             
         self.playground_mod_scroll.pack(fill="x")
         
@@ -1730,14 +1739,14 @@ class PromptEditorWindow:
                 
                 if self.use_ctk:
                     ctk.CTkCheckBox(
-                        self.playground_mod_scroll, text=label, variable=var,
+                        mod_scroll_target, text=label, variable=var,
                         font=get_ctk_font(12), text_color=self.colors.fg,
                         fg_color=self.colors.accent,
                         command=self._update_playground_preview
                     ).pack(anchor="w", pady=3)
                 else:
                     tk.Checkbutton(
-                        self.playground_mod_scroll, text=label, variable=var,
+                        mod_scroll_target, text=label, variable=var,
                         font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
                         selectcolor=self.colors.input_bg,
                         command=self._update_playground_preview

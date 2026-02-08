@@ -42,7 +42,7 @@ from ..themes import (
     get_ctk_font
 )
 from ..core import get_next_window_id, register_window, unregister_window
-from ..custom_widgets import ScrollableButtonList, ScrollableComboBox, upgrade_tabview_with_icons, create_section_header, create_emoji_button
+from ..custom_widgets import ScrollableButtonList, ScrollableComboBox, upgrade_tabview_with_icons, create_section_header, create_emoji_button, TkScrollableFrame
 from .utils import set_window_icon
 
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
@@ -397,6 +397,8 @@ class ToggleSwitch(tk.Canvas):
             self.command()
 
 
+
+
 # =============================================================================
 # Settings Window (CTk version)
 # =============================================================================
@@ -713,36 +715,40 @@ class SettingsWindow:
     
     def _create_general_tab(self, frame):
         """Create the General settings tab."""
+        content_parent = None
         if self.use_ctk:
             scroll_frame = ctk.CTkScrollableFrame(frame, fg_color="transparent")
+            content_parent = scroll_frame
         else:
-            scroll_frame = tk.Frame(frame, bg=self.colors.bg)
+            scroll_frame = TkScrollableFrame(frame, bg_color=self.colors.bg)
+            content_parent = scroll_frame.scrollable_frame
+            
         scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         # Server settings section
-        create_section_header(scroll_frame, "🖥️ Server Settings", self.colors)
+        create_section_header(content_parent, "🖥️ Server Settings", self.colors)
         
         # Host
-        self._add_entry_field(scroll_frame, "host", "Host:",
+        self._add_entry_field(content_parent, "host", "Host:",
                              self.config_data.config.get("host", "127.0.0.1"),
-                             width=120, hint="⚠️ Restart required. IP address to bind.")
+                             width=140, hint="⚠️ Restart required. IP address to bind.")
         
         # Port
-        self._add_entry_field(scroll_frame, "port", "Port:",
+        self._add_entry_field(content_parent, "port", "Port:",
                              str(self.config_data.config.get("port", 5000)),
-                             width=50, hint="⚠️ Restart required. Port for Flask server (1-65535)")
+                             width=80, hint="⚠️ Restart required. Port for Flask server (1-65535)")
         
         # Behavior section
-        create_section_header(scroll_frame, "🧠 Behavior", self.colors, top_padding=20)
+        create_section_header(content_parent, "🧠 Behavior", self.colors, top_padding=20)
         
         # Show AI response in chat window
-        self._add_toggle_field(scroll_frame, "show_ai_response_in_chat_window",
-                              "Show AI response in chat window",
-                              self.config_data.config.get("show_ai_response_in_chat_window", False),
-                              hint="For direct chat popup and endpoint requests. Actions/modifiers override this.")
+        self._add_toggle_field(content_parent, "show_ai_response_in_chat_window",
+                               "Show AI response in chat window",
+                               self.config_data.config.get("show_ai_response_in_chat_window", False),
+                               hint="For direct chat popup and endpoint requests. Actions/modifiers override this.")
         
         # Session Auto-Save
-        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
         
         self.vars["auto_save_session"] = tk.StringVar(
@@ -754,7 +760,7 @@ class SettingsWindow:
             self.widgets["auto_save_session"] = ctk.CTkComboBox(
                 row, variable=self.vars["auto_save_session"],
                 values=["on_attachment", "always_window", "on_followup"],
-                width=140, height=34, state="readonly", font=get_ctk_font(13),
+                width=150, height=34, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
             self.widgets["auto_save_session"].pack(side="left", padx=(12, 0))
@@ -776,33 +782,33 @@ class SettingsWindow:
                     bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
 
         # Limits section
-        create_section_header(scroll_frame, "🚦 Limits", self.colors, top_padding=20)
+        create_section_header(content_parent, "🚦 Limits", self.colors, top_padding=20)
         
         # Max sessions
-        self._add_spinbox_field(scroll_frame, "max_sessions", "Max sessions:",
+        self._add_spinbox_field(content_parent, "max_sessions", "Max sessions:",
                                self.config_data.config.get("max_sessions", 50),
-                               1, 1000, hint="Maximum chat sessions to keep")
+                               1, 1000, width=80, hint="Maximum chat sessions to keep")
         
         # Max retries
-        self._add_spinbox_field(scroll_frame, "max_retries", "Max retries:",
+        self._add_spinbox_field(content_parent, "max_retries", "Max retries:",
                                self.config_data.config.get("max_retries", 3),
-                               0, 10, hint="Retries before giving up on API calls")
+                               0, 10, width=80, hint="Retries before giving up on API calls")
         
         # Retry delay
-        self._add_spinbox_field(scroll_frame, "retry_delay", "Retry delay (s):",
+        self._add_spinbox_field(content_parent, "retry_delay", "Retry delay (s):",
                                self.config_data.config.get("retry_delay", 5),
-                               1, 60, hint="Seconds to wait between retries")
+                               1, 60, width=80, hint="Seconds to wait between retries")
         
         # Request timeout
-        self._add_spinbox_field(scroll_frame, "request_timeout", "Request timeout (s):",
+        self._add_spinbox_field(content_parent, "request_timeout", "Request timeout (s):",
                                self.config_data.config.get("request_timeout", 120),
-                               10, 600, hint="Timeout for API requests")
+                               10, 600, width=80, hint="Timeout for API requests")
 
         # Image Storage section
-        create_section_header(scroll_frame, "🖼️ Session Images", self.colors, top_padding=20)
+        create_section_header(content_parent, "🖼️ Session Images", self.colors, top_padding=20)
         
         # Image Format
-        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
         
         self.vars["session_image_format"] = tk.StringVar(
@@ -814,7 +820,7 @@ class SettingsWindow:
             self.widgets["session_image_format"] = ctk.CTkComboBox(
                 row, variable=self.vars["session_image_format"],
                 values=["webp", "png", "jpg"],
-                width=85, height=34, state="readonly", font=get_ctk_font(13),
+                width=90, height=34, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
             self.widgets["session_image_format"].pack(side="left", padx=(12, 0))
@@ -836,22 +842,26 @@ class SettingsWindow:
                     bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
 
         # Image Quality
-        self._add_spinbox_field(scroll_frame, "session_image_quality", "Quality (1-100):",
+        self._add_spinbox_field(content_parent, "session_image_quality", "Quality (1-100):",
                                self.config_data.config.get("session_image_quality", 85),
-                               1, 100, hint="Compression level for webp/jpg")
+                               1, 100, width=80, hint="Compression level for webp/jpg")
     
     def _create_provider_tab(self, frame):
         """Create the Provider settings tab."""
+        content_parent = None
         if self.use_ctk:
             scroll_frame = ctk.CTkScrollableFrame(frame, fg_color="transparent")
+            content_parent = scroll_frame
         else:
-            scroll_frame = tk.Frame(frame, bg=self.colors.bg)
+            scroll_frame = TkScrollableFrame(frame, bg_color=self.colors.bg)
+            content_parent = scroll_frame.scrollable_frame
+            
         scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         # Default provider
-        create_section_header(scroll_frame, "🥇 Default Provider", self.colors)
+        create_section_header(content_parent, "🥇 Default Provider", self.colors)
         
-        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
         
         current_provider = self.config_data.config.get("default_provider", "google")
@@ -863,7 +873,7 @@ class SettingsWindow:
             self.widgets["default_provider"] = ctk.CTkComboBox(
                 row, variable=self.vars["default_provider"],
                 values=["custom", "openrouter", "google"],
-                width=110, height=32, state="readonly", font=get_ctk_font(13),
+                width=150, height=32, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
         else:
@@ -878,66 +888,70 @@ class SettingsWindow:
         self.widgets["default_provider"].pack(side="left", padx=(10, 0))
         
         if self.use_ctk:
-            ctk.CTkLabel(row, text="Provider for requests (can be overriden by endpoint parameters)", font=get_ctk_font(11),
+            ctk.CTkLabel(row, text="Selected provider to use", font=get_ctk_font(11),
                         **get_ctk_label_colors(self.colors, muted=True)).pack(side="left", padx=(15, 0))
         else:
-             tk.Label(row, text="Provider for requests (can be overriden by endpoint parameters)", font=("Segoe UI", 9),
+             tk.Label(row, text="Selected provider to use", font=("Segoe UI", 9),
                      bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
         
         # Custom provider settings
-        create_section_header(scroll_frame, "🛠️ Custom Provider", self.colors, top_padding=20)
+        create_section_header(content_parent, "🛠️ Custom Provider", self.colors, top_padding=20)
         
-        self._add_entry_field(scroll_frame, "custom_url", "URL:",
+        self._add_entry_field(content_parent, "custom_url", "URL:",
                              self.config_data.config.get("custom_url", "") or "",
                              width=300, hint="OpenAI-compatible endpoint URL")
         
         # Model dropdown with refresh button
-        self._add_model_dropdown_field(scroll_frame, "custom_model", "Model:",
+        self._add_model_dropdown_field(content_parent, "custom_model", "Model:",
                                        self.config_data.config.get("custom_model", "") or "",
                                        provider="custom", width=260)
         
         # OpenRouter settings
-        create_section_header(scroll_frame, "🚀 OpenRouter", self.colors, top_padding=20)
+        create_section_header(content_parent, "🚀 OpenRouter", self.colors, top_padding=20)
         
         # Model dropdown with refresh button
-        self._add_model_dropdown_field(scroll_frame, "openrouter_model", "Model:",
+        self._add_model_dropdown_field(content_parent, "openrouter_model", "Model:",
                                        self.config_data.config.get("openrouter_model", ""),
                                        provider="openrouter", width=260)
         
         # Google settings
-        create_section_header(scroll_frame, "💎 Google Gemini", self.colors, top_padding=20)
+        create_section_header(content_parent, "💎 Google Gemini", self.colors, top_padding=20)
         
         # Model dropdown with refresh button
-        self._add_model_dropdown_field(scroll_frame, "google_model", "Model:",
+        self._add_model_dropdown_field(content_parent, "google_model", "Model:",
                                        self.config_data.config.get("google_model", ""),
                                        provider="google", width=260)
     
     def _create_streaming_tab(self, frame):
         """Create the Streaming/Thinking settings tab."""
+        content_parent = None
         if self.use_ctk:
             scroll_frame = ctk.CTkScrollableFrame(frame, fg_color="transparent")
+            content_parent = scroll_frame
         else:
-            scroll_frame = tk.Frame(frame, bg=self.colors.bg)
+            scroll_frame = TkScrollableFrame(frame, bg_color=self.colors.bg)
+            content_parent = scroll_frame.scrollable_frame
+            
         scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         # Streaming section
-        create_section_header(scroll_frame, "🌊 Streaming", self.colors)
+        create_section_header(content_parent, "🌊 Streaming", self.colors)
         
-        self._add_toggle_field(scroll_frame, "streaming_enabled",
-                              "Enable streaming responses",
-                              self.config_data.config.get("streaming_enabled", True),
-                              hint="Type answer word-by-word instead of waiting for full response and then pasting")
+        self._add_toggle_field(content_parent, "streaming_enabled",
+                               "Enable streaming responses",
+                               self.config_data.config.get("streaming_enabled", True),
+                               hint="Type answer word-by-word instead of waiting for full response and then pasting")
         
         # Thinking section
-        create_section_header(scroll_frame, "💭 Thinking / Reasoning", self.colors, top_padding=20)
+        create_section_header(content_parent, "💭 Thinking / Reasoning", self.colors, top_padding=20)
         
-        self._add_toggle_field(scroll_frame, "thinking_enabled",
-                              "Enable thinking mode",
-                              self.config_data.config.get("thinking_enabled", False),
-                              hint="Enable sending thinking parameters")
+        self._add_toggle_field(content_parent, "thinking_enabled",
+                               "Enable thinking mode",
+                               self.config_data.config.get("thinking_enabled", False),
+                               hint="Enable sending thinking parameters")
         
         # Thinking output dropdown
-        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
         
         self.vars["thinking_output"] = tk.StringVar(
@@ -973,10 +987,10 @@ class SettingsWindow:
                      bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
         
         # Thinking config section
-        create_section_header(scroll_frame, "Thinking Configuration", self.colors, top_padding=20)
+        create_section_header(content_parent, "Thinking Configuration", self.colors, top_padding=20)
         
         # Reasoning effort (OpenAI)
-        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
         
         self.vars["reasoning_effort"] = tk.StringVar(
@@ -988,7 +1002,7 @@ class SettingsWindow:
             self.widgets["reasoning_effort"] = ctk.CTkComboBox(
                 row, variable=self.vars["reasoning_effort"],
                 values=["low", "medium", "high"],
-                width=90, height=32, state="readonly", font=get_ctk_font(13),
+                width=120, height=32, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
         else:
@@ -1009,12 +1023,12 @@ class SettingsWindow:
                      bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
         
         # Thinking budget (Gemini 2.5)
-        self._add_spinbox_field(scroll_frame, "thinking_budget", "Thinking budget:",
+        self._add_spinbox_field(content_parent, "thinking_budget", "Thinking budget:",
                                self.config_data.config.get("thinking_budget", -1),
-                               -1, 100000, hint="For Gemini 2.5 models. -1 = auto.")
+                               -1, 100000, width=80, hint="For Gemini 2.5 models. -1 = auto.")
         
         # Thinking level (Gemini 3.x)
-        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
         
         self.vars["thinking_level"] = tk.StringVar(
@@ -1026,7 +1040,7 @@ class SettingsWindow:
             self.widgets["thinking_level"] = ctk.CTkComboBox(
                 row, variable=self.vars["thinking_level"],
                 values=["low", "high"],
-                width=90, height=32, state="readonly", font=get_ctk_font(13),
+                width=100, height=32, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
         else:
@@ -1048,66 +1062,70 @@ class SettingsWindow:
     
     def _create_tools_tab(self, frame):
         """Create the Tools settings tab (TextEditTool + ScreenSnip)."""
+        content_parent = None
         if self.use_ctk:
             scroll_frame = ctk.CTkScrollableFrame(frame, fg_color="transparent")
+            content_parent = scroll_frame
         else:
-            scroll_frame = tk.Frame(frame, bg=self.colors.bg)
+            scroll_frame = TkScrollableFrame(frame, bg_color=self.colors.bg)
+            content_parent = scroll_frame.scrollable_frame
+            
         scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         # TextEditTool section
-        create_section_header(scroll_frame, "✏️ TextEditTool", self.colors)
+        create_section_header(content_parent, "✏️ TextEditTool", self.colors)
         
-        self._add_toggle_field(scroll_frame, "text_edit_tool_enabled",
-                              "Enable TextEditTool",
-                              self.config_data.config.get("text_edit_tool_enabled", True),
-                              hint="⚠️ Restart required")
+        self._add_toggle_field(content_parent, "text_edit_tool_enabled",
+                               "Enable TextEditTool",
+                               self.config_data.config.get("text_edit_tool_enabled", True),
+                               hint="⚠️ Restart required")
         
-        self._add_entry_field(scroll_frame, "text_edit_tool_hotkey", "Activation hotkey:",
+        self._add_entry_field(content_parent, "text_edit_tool_hotkey", "Activation hotkey:",
                              self.config_data.config.get("text_edit_tool_hotkey", "ctrl+space"),
                              width=140, hint="⚠️ Restart required")
         
-        self._add_entry_field(scroll_frame, "text_edit_tool_abort_hotkey", "Abort hotkey:",
+        self._add_entry_field(content_parent, "text_edit_tool_abort_hotkey", "Abort hotkey:",
                              self.config_data.config.get("text_edit_tool_abort_hotkey", "escape"),
                              width=140, hint="⚠️ Restart required")
         
         # ScreenSnip section
-        create_section_header(scroll_frame, "📸 ScreenSnip", self.colors, top_padding=20)
+        create_section_header(content_parent, "📸 ScreenSnip", self.colors, top_padding=20)
         
-        self._add_toggle_field(scroll_frame, "screen_snip_enabled",
-                              "Enable ScreenSnip",
-                              self.config_data.config.get("screen_snip_enabled", True),
-                              hint="⚠️ Restart required")
+        self._add_toggle_field(content_parent, "screen_snip_enabled",
+                               "Enable ScreenSnip",
+                               self.config_data.config.get("screen_snip_enabled", True),
+                               hint="⚠️ Restart required")
         
-        self._add_entry_field(scroll_frame, "screen_snip_hotkey", "ScreenSnip hotkey:",
+        self._add_entry_field(content_parent, "screen_snip_hotkey", "ScreenSnip hotkey:",
                              self.config_data.config.get("screen_snip_hotkey", "ctrl+shift+x"),
                              width=140, hint="⚠️ Restart required")
         
         # Audio Tool section
-        create_section_header(scroll_frame, "🎤 Audio Tool", self.colors, top_padding=20)
+        create_section_header(content_parent, "🎤 Audio Tool", self.colors, top_padding=20)
         
-        self._add_toggle_field(scroll_frame, "audio_tool_enabled",
-                              "Enable Audio Tool",
-                              self.config_data.config.get("audio_tool_enabled", True),
-                              hint="⚠️ Restart required")
+        self._add_toggle_field(content_parent, "audio_tool_enabled",
+                               "Enable Audio Tool",
+                               self.config_data.config.get("audio_tool_enabled", True),
+                               hint="⚠️ Restart required")
         
-        self._add_entry_field(scroll_frame, "audio_tool_hotkey", "Audio Tool hotkey:",
+        self._add_entry_field(content_parent, "audio_tool_hotkey", "Audio Tool hotkey:",
                              self.config_data.config.get("audio_tool_hotkey", "ctrl+shift+a"),
                              width=140, hint="⚠️ Restart required")
         
-        self._add_entry_field(scroll_frame, "audio_default_device", "Default device:",
+        self._add_entry_field(content_parent, "audio_default_device", "Default device:",
                              self.config_data.config.get("audio_default_device") or "default",
-                             width=200, hint="Partial name match ('default' = system default)")
+                             width=260, hint="Partial name match ('default' = system default)")
         
-        self._add_toggle_field(scroll_frame, "audio_default_loopback",
-                              "Default to loopback (system audio)",
-                              self.config_data.config.get("audio_default_loopback", True),
-                              hint="Record what you hear instead of microphone")
+        self._add_toggle_field(content_parent, "audio_default_loopback",
+                               "Default to loopback (system audio)",
+                               self.config_data.config.get("audio_default_loopback", True),
+                               hint="Record what you hear instead of microphone")
         
         # Level meter style section
-        create_section_header(scroll_frame, "📊 Display", self.colors, top_padding=20)
+        create_section_header(content_parent, "📊 Display", self.colors, top_padding=20)
         
         # Level meter style dropdown
-        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
         
         self.vars["audio_level_meter_style"] = tk.StringVar(
@@ -1141,16 +1159,16 @@ class SettingsWindow:
                     bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
         
         # Typing settings section
-        create_section_header(scroll_frame, "🖱️ Typing Settings", self.colors, top_padding=20)
+        create_section_header(content_parent, "🖱️ Typing Settings", self.colors, top_padding=20)
         
-        self._add_spinbox_field(scroll_frame, "streaming_typing_delay", "Typing delay (ms):",
+        self._add_spinbox_field(content_parent, "streaming_typing_delay", "Typing delay (ms):",
                                self.config_data.config.get("streaming_typing_delay", 5),
-                               1, 100, hint="Delay per character in replace mode")
+                               1, 100, width=80, hint="Delay per character in replace mode")
         
-        self._add_toggle_field(scroll_frame, "streaming_typing_uncapped",
-                              "Uncapped typing speed",
-                              self.config_data.config.get("streaming_typing_uncapped", False),
-                              hint="⚠️ No delay between chars. May overwhelm some apps.")
+        self._add_toggle_field(content_parent, "streaming_typing_uncapped",
+                               "Uncapped typing speed",
+                               self.config_data.config.get("streaming_typing_uncapped", False),
+                               hint="⚠️ No delay between chars. May overwhelm some apps.")
     
     def _create_keys_tab(self, frame):
         """Create the API Keys settings tab."""
@@ -1820,17 +1838,21 @@ class SettingsWindow:
     
     def _create_theme_tab(self, frame):
         """Create the Theme settings tab."""
+        content_parent = None
         if self.use_ctk:
             scroll_frame = ctk.CTkScrollableFrame(frame, fg_color="transparent")
+            content_parent = scroll_frame
         else:
-            scroll_frame = tk.Frame(frame, bg=self.colors.bg)
+            scroll_frame = TkScrollableFrame(frame, bg_color=self.colors.bg)
+            content_parent = scroll_frame.scrollable_frame
+            
         scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         # Theme selection
-        create_section_header(scroll_frame, "UI Theme", self.colors)
+        create_section_header(content_parent, "UI Theme", self.colors)
         
         # Theme dropdown
-        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
         
         current_theme = self.config_data.config.get("ui_theme", "catppuccin")
@@ -1841,7 +1863,7 @@ class SettingsWindow:
                         **get_ctk_label_colors(self.colors)).pack(side="left")
             self.widgets["ui_theme"] = ctk.CTkComboBox(
                 row, variable=self.vars["ui_theme"],
-                values=list_themes(), width=120, height=34, state="readonly", font=get_ctk_font(13),
+                values=list_themes(), width=140, height=34, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors),
                 command=lambda x: self._update_theme_preview()
             )
@@ -1857,7 +1879,7 @@ class SettingsWindow:
         self.widgets["ui_theme"].pack(side="left", padx=(10, 0))
         
         # Mode dropdown
-        row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
         
         current_mode = self.config_data.config.get("ui_theme_mode", "auto")
@@ -1868,7 +1890,7 @@ class SettingsWindow:
                         **get_ctk_label_colors(self.colors)).pack(side="left")
             self.widgets["ui_theme_mode"] = ctk.CTkComboBox(
                 row, variable=self.vars["ui_theme_mode"],
-                values=["auto", "dark", "light"], width=80, height=34, state="readonly", font=get_ctk_font(13),
+                values=["auto", "dark", "light"], width=100, height=34, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors),
                 command=lambda x: self._update_theme_preview()
             )
@@ -1884,24 +1906,24 @@ class SettingsWindow:
         self.widgets["ui_theme_mode"].pack(side="left", padx=(10, 0))
         
         # Framework section
-        create_section_header(scroll_frame, "🔧 Framework", self.colors, top_padding=20)
+        create_section_header(content_parent, "🔧 Framework", self.colors, top_padding=20)
         
-        self._add_toggle_field(scroll_frame, "ui_force_standard_tk",
-                              "Force Standard Tkinter (Disable Modern UI)",
-                              self.config_data.config.get("ui_force_standard_tk", False),
-                              hint="⚠️ Restart required. Use if CustomTkinter causes performance issues.")
+        self._add_toggle_field(content_parent, "ui_force_standard_tk",
+                               "Force Standard Tkinter (Disable Modern UI)",
+                               self.config_data.config.get("ui_force_standard_tk", False),
+                               hint="⚠️ Restart required. Use if CustomTkinter causes performance issues.")
         
         # Preview section
-        create_section_header(scroll_frame, "Preview", self.colors, top_padding=20)
+        create_section_header(content_parent, "Preview", self.colors, top_padding=20)
         
         # Preview frame
         if self.use_ctk:
             self.preview_frame = ctk.CTkFrame(
-                scroll_frame, fg_color=self.colors.surface0,
+                content_parent, fg_color=self.colors.surface0,
                 corner_radius=10, border_width=1, border_color=self.colors.border
             )
         else:
-            self.preview_frame = tk.Frame(scroll_frame, bg=self.colors.surface0,
+            self.preview_frame = tk.Frame(content_parent, bg=self.colors.surface0,
                                          highlightbackground=self.colors.border, highlightthickness=1)
         self.preview_frame.pack(fill="x", pady=5)
         

@@ -3,6 +3,7 @@
 Custom widgets for AIPromptBridge GUI.
 Includes ScrollableButtonList for replacing tk.Listbox with rich buttons.
 Includes ScrollableComboBox for dropdowns with scrollbar support.
+Includes TkScrollableFrame for a fallback scrollable frame for standard Tkinter.
 """
 
 import tkinter as tk
@@ -949,3 +950,73 @@ class ScrollableComboBox:
     def destroy(self):
         self._close_dropdown()
         self.frame.destroy()
+
+
+# =============================================================================
+# Tkinter Scrollable Frame (Fallback)
+# =============================================================================
+
+class TkScrollableFrame(tk.Frame):
+    """
+    A scrollable frame for standard Tkinter (fallback mode).
+    Mimics ctk.CTkScrollableFrame interface partially.
+    """
+    def __init__(self, container, bg_color=None, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+        
+        # Create a canvas
+        self.canvas = tk.Canvas(self, borderwidth=0, highlightthickness=0)
+        if bg_color:
+            self.canvas.configure(bg=bg_color)
+            
+        # Create a scrollbar
+        self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        
+        # Create the scrollable frame
+        self.scrollable_frame = tk.Frame(self.canvas)
+        if bg_color:
+            self.scrollable_frame.configure(bg=bg_color)
+            
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+        
+        self.window_id = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        
+        # Bind resize to adjust window width
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+        
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+        
+        # Bind mousewheel
+        self.bind_mousewheel(self.canvas)
+        self.bind_mousewheel(self.scrollable_frame)
+
+    def _on_canvas_configure(self, event):
+        # Adjust the width of the inner frame to match the canvas
+        self.canvas.itemconfig(self.window_id, width=event.width)
+
+    def bind_mousewheel(self, widget):
+        # Bind mousewheel to scroll
+        # Note: This might need more robust handling for nested widgets
+        widget.bind("<MouseWheel>", self._on_mousewheel)
+        # For Linux
+        widget.bind("<Button-4>", self._on_mousewheel)
+        widget.bind("<Button-5>", self._on_mousewheel)
+
+    def _on_mousewheel(self, event):
+        if self.canvas.winfo_exists():
+            # Windows/MacOS
+            if event.delta:
+                self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            # Linux (Button-4/5)
+            elif event.num == 5:
+                self.canvas.yview_scroll(1, "units")
+            elif event.num == 4:
+                self.canvas.yview_scroll(-1, "units")
