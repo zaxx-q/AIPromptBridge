@@ -725,12 +725,12 @@ class SettingsWindow:
         # Host
         self._add_entry_field(scroll_frame, "host", "Host:",
                              self.config_data.config.get("host", "127.0.0.1"),
-                             hint="⚠️ Restart required. IP address to bind.")
+                             width=120, hint="⚠️ Restart required. IP address to bind.")
         
         # Port
         self._add_entry_field(scroll_frame, "port", "Port:",
                              str(self.config_data.config.get("port", 5000)),
-                             hint="⚠️ Restart required. Port for Flask server (1-65535)")
+                             width=50, hint="⚠️ Restart required. Port for Flask server (1-65535)")
         
         # Behavior section
         create_section_header(scroll_frame, "🧠 Behavior", self.colors, top_padding=20)
@@ -754,7 +754,7 @@ class SettingsWindow:
             self.widgets["auto_save_session"] = ctk.CTkComboBox(
                 row, variable=self.vars["auto_save_session"],
                 values=["on_attachment", "always_window", "on_followup"],
-                width=160, height=34, state="readonly", font=get_ctk_font(13),
+                width=140, height=34, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
             self.widgets["auto_save_session"].pack(side="left", padx=(12, 0))
@@ -814,7 +814,7 @@ class SettingsWindow:
             self.widgets["session_image_format"] = ctk.CTkComboBox(
                 row, variable=self.vars["session_image_format"],
                 values=["webp", "png", "jpg"],
-                width=120, height=34, state="readonly", font=get_ctk_font(13),
+                width=85, height=34, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
             self.widgets["session_image_format"].pack(side="left", padx=(12, 0))
@@ -863,7 +863,7 @@ class SettingsWindow:
             self.widgets["default_provider"] = ctk.CTkComboBox(
                 row, variable=self.vars["default_provider"],
                 values=["custom", "openrouter", "google"],
-                width=220, height=32, state="readonly", font=get_ctk_font(13),
+                width=110, height=32, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
         else:
@@ -889,12 +889,12 @@ class SettingsWindow:
         
         self._add_entry_field(scroll_frame, "custom_url", "URL:",
                              self.config_data.config.get("custom_url", "") or "",
-                             width=400, hint="OpenAI-compatible endpoint URL")
+                             width=300, hint="OpenAI-compatible endpoint URL")
         
         # Model dropdown with refresh button
         self._add_model_dropdown_field(scroll_frame, "custom_model", "Model:",
                                        self.config_data.config.get("custom_model", "") or "",
-                                       provider="custom", width=300)
+                                       provider="custom", width=260)
         
         # OpenRouter settings
         create_section_header(scroll_frame, "🚀 OpenRouter", self.colors, top_padding=20)
@@ -902,7 +902,7 @@ class SettingsWindow:
         # Model dropdown with refresh button
         self._add_model_dropdown_field(scroll_frame, "openrouter_model", "Model:",
                                        self.config_data.config.get("openrouter_model", ""),
-                                       provider="openrouter", width=300)
+                                       provider="openrouter", width=260)
         
         # Google settings
         create_section_header(scroll_frame, "💎 Google Gemini", self.colors, top_padding=20)
@@ -910,7 +910,7 @@ class SettingsWindow:
         # Model dropdown with refresh button
         self._add_model_dropdown_field(scroll_frame, "google_model", "Model:",
                                        self.config_data.config.get("google_model", ""),
-                                       provider="google", width=300)
+                                       provider="google", width=260)
     
     def _create_streaming_tab(self, frame):
         """Create the Streaming/Thinking settings tab."""
@@ -949,7 +949,7 @@ class SettingsWindow:
             self.widgets["thinking_output"] = ctk.CTkComboBox(
                 row, variable=self.vars["thinking_output"],
                 values=["filter", "raw", "reasoning_content"],
-                width=200, height=32, state="readonly", font=get_ctk_font(13),
+                width=160, height=32, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
         else:
@@ -988,7 +988,7 @@ class SettingsWindow:
             self.widgets["reasoning_effort"] = ctk.CTkComboBox(
                 row, variable=self.vars["reasoning_effort"],
                 values=["low", "medium", "high"],
-                width=150, height=32, state="readonly", font=get_ctk_font(13),
+                width=90, height=32, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
         else:
@@ -1026,7 +1026,7 @@ class SettingsWindow:
             self.widgets["thinking_level"] = ctk.CTkComboBox(
                 row, variable=self.vars["thinking_level"],
                 values=["low", "high"],
-                width=150, height=32, state="readonly", font=get_ctk_font(13),
+                width=90, height=32, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
         else:
@@ -1064,11 +1064,11 @@ class SettingsWindow:
         
         self._add_entry_field(scroll_frame, "text_edit_tool_hotkey", "Activation hotkey:",
                              self.config_data.config.get("text_edit_tool_hotkey", "ctrl+space"),
-                             width=200, hint="⚠️ Restart required")
+                             width=140, hint="⚠️ Restart required")
         
         self._add_entry_field(scroll_frame, "text_edit_tool_abort_hotkey", "Abort hotkey:",
                              self.config_data.config.get("text_edit_tool_abort_hotkey", "escape"),
-                             width=200, hint="⚠️ Restart required")
+                             width=140, hint="⚠️ Restart required")
         
         # ScreenSnip section
         create_section_header(scroll_frame, "📸 ScreenSnip", self.colors, top_padding=20)
@@ -1080,7 +1080,7 @@ class SettingsWindow:
         
         self._add_entry_field(scroll_frame, "screen_snip_hotkey", "ScreenSnip hotkey:",
                              self.config_data.config.get("screen_snip_hotkey", "ctrl+shift+x"),
-                             width=200, hint="⚠️ Restart required")
+                             width=140, hint="⚠️ Restart required")
         
         # Audio Tool section
         create_section_header(scroll_frame, "🎤 Audio Tool", self.colors, top_padding=20)
@@ -1092,11 +1092,11 @@ class SettingsWindow:
         
         self._add_entry_field(scroll_frame, "audio_tool_hotkey", "Audio Tool hotkey:",
                              self.config_data.config.get("audio_tool_hotkey", "ctrl+shift+a"),
-                             width=200, hint="⚠️ Restart required")
+                             width=140, hint="⚠️ Restart required")
         
         self._add_entry_field(scroll_frame, "audio_default_device", "Default device:",
                              self.config_data.config.get("audio_default_device") or "default",
-                             width=300, hint="Partial name match ('default' = system default)")
+                             width=200, hint="Partial name match ('default' = system default)")
         
         self._add_toggle_field(scroll_frame, "audio_default_loopback",
                               "Default to loopback (system audio)",
@@ -1119,7 +1119,7 @@ class SettingsWindow:
             self.widgets["audio_level_meter_style"] = ctk.CTkComboBox(
                 row, variable=self.vars["audio_level_meter_style"],
                 values=["canvas", "progressbar"],
-                width=150, height=34, state="readonly", font=get_ctk_font(13),
+                width=120, height=34, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors)
             )
             self.widgets["audio_level_meter_style"].pack(side="left", padx=(12, 0))
@@ -1841,7 +1841,7 @@ class SettingsWindow:
                         **get_ctk_label_colors(self.colors)).pack(side="left")
             self.widgets["ui_theme"] = ctk.CTkComboBox(
                 row, variable=self.vars["ui_theme"],
-                values=list_themes(), width=200, height=34, state="readonly", font=get_ctk_font(13),
+                values=list_themes(), width=120, height=34, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors),
                 command=lambda x: self._update_theme_preview()
             )
@@ -1868,7 +1868,7 @@ class SettingsWindow:
                         **get_ctk_label_colors(self.colors)).pack(side="left")
             self.widgets["ui_theme_mode"] = ctk.CTkComboBox(
                 row, variable=self.vars["ui_theme_mode"],
-                values=["auto", "dark", "light"], width=150, height=34, state="readonly", font=get_ctk_font(13),
+                values=["auto", "dark", "light"], width=80, height=34, state="readonly", font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors),
                 command=lambda x: self._update_theme_preview()
             )
@@ -2075,7 +2075,7 @@ class SettingsWindow:
                         bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
     
     def _add_spinbox_field(self, parent, key: str, label: str, value: int,
-                          min_val: int, max_val: int, hint: str = None):
+                          min_val: int, max_val: int, width: int = 50, hint: str = None):
         """Add a spinbox field to the form."""
         row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
@@ -2094,7 +2094,7 @@ class SettingsWindow:
             # CTk doesn't have spinbox, use entry
             entry = ctk.CTkEntry(
                 row, textvariable=self.vars[key],
-                font=get_ctk_font(13), width=100, height=34,
+                font=get_ctk_font(13), width=width, height=34,
                 **get_ctk_entry_colors(self.colors)
             )
             entry.pack(side="left", padx=(12, 0))
