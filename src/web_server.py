@@ -100,11 +100,7 @@ def create_endpoint_handler(endpoint_name, prompt_template):
         from .request_pipeline import RequestPipeline, RequestContext, RequestOrigin
         
         # Determine origin based on endpoint name
-        try:
-            origin_name = f"ENDPOINT_{endpoint_name.upper()}"
-            origin = getattr(RequestOrigin, origin_name, RequestOrigin.ENDPOINT_OCR)
-        except:
-            origin = RequestOrigin.ENDPOINT_OCR
+        origin = RequestOrigin.ENDPOINT
             
         ctx = RequestContext(
             origin=origin,

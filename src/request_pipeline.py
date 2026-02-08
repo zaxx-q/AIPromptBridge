@@ -24,12 +24,7 @@ class RequestOrigin(Enum):
     POPUP_PROMPT = "popup_prompt"
     SNIP_TOOL = "snip_tool"
     AUDIO_TOOL = "audio_tool"
-    ENDPOINT_OCR = "endpoint/ocr"
-    ENDPOINT_TRANSLATE = "endpoint/translate"
-    ENDPOINT_DESCRIBE = "endpoint/describe"
-    ENDPOINT_SUMMARIZE = "endpoint/summarize"
-    ENDPOINT_TEXTEDIT = "endpoint/textedit"
-    ENDPOINT_CUSTOM = "endpoint/custom"
+    ENDPOINT = "endpoint"
 
 
 @dataclass

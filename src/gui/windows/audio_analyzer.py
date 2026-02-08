@@ -993,7 +993,7 @@ class AudioAnalyzerWindow:
                     if config_lower in name.lower():
                         selected_device = device
                         selected_name = name
-                        logging.info(f"[AudioAnalyzer] Matched config device '{config_device}' to '{name}'")
+                        print(f"[AudioAnalyzer] Matched config device '{config_device}' to '{name}'")
                         break
             
             # Fall back to system default if no config match

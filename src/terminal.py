@@ -72,7 +72,7 @@ def print_commands_box():
         col1 = create_column_table([
             ("L", "📋", "Sessions"),
             ("O", "🌐", "Browser"),
-            ("E", "📡", "Endpoints"),
+            ("A", "🎤", "Audio"),
             ("X", "🧰", "Tools"),
         ])
         
@@ -109,7 +109,7 @@ def print_commands_box():
         print("─" * 64)
         print("  [L] 📋 Sessions      [P] 🔄 Provider     [S] 📊 Status")
         print("  [O] 🌐 Browser       [M] 🤖 Models       [T] 💭 Thinking")
-        print("  [E] 📡 Endpoints     [G] 🔨 Settings     [R] 🌊 Streaming")
+        print("  [A] 🎤 Audio         [G] 🔨 Settings     [R] 🌊 Streaming")
         print("  [X] 🧰 Tools         [W] 📝 Prompts      [H] ❓ Help")
         print("─" * 64)
         print()
@@ -179,6 +179,24 @@ def terminal_session_manager(endpoints=None):
                     else:
                         print("\n✗ GUI not available\n")
             
+            elif key == 'a':
+                # Open Audio Analyzer
+                from .gui.audio_tool import get_instance
+                app = get_instance()
+                
+                if app:
+                    if HAVE_RICH:
+                        console.print("\n[bold]🎤  Opening Audio Analyzer...[/bold]\n")
+                    else:
+                        print("\n🎤  Opening Audio Analyzer...\n")
+                    # Directly trigger the window opening logic
+                    app._on_hotkey_pressed()
+                else:
+                    if HAVE_RICH:
+                        console.print("\n[red]✗ Audio Tool not initialized[/red]\n")
+                    else:
+                        print("\n✗ Audio Tool not initialized\n")
+            
             elif key == 'e':
                 # List endpoints
                 if HAVE_RICH:
@@ -206,7 +224,7 @@ def terminal_session_manager(endpoints=None):
                             print(f"   /{name}")
                             print(f"      → {preview}")
                     print(f"{'─'*64}\n")
-            
+
             elif key == 'm':
                 # Model management with two-tier display
                 from . import web_server
@@ -647,6 +665,7 @@ def terminal_session_manager(endpoints=None):
                 print("   [V] 👁️ View          View a session by ID")
                 print("   [D] 🗑️ Delete        Delete a session by ID")
                 print("   [C] 🧹 Clear         Clear all sessions")
+                print("   [A] 🎤 Audio         Open Audio Analyzer")
                 print("   [E] 📡 Endpoints     List registered endpoints")
                 print("   [X] 🧰 Tools         Open tools menu (File Processor, etc.)")
                 print("   [M] 🤖 Models        List/set models from API")
