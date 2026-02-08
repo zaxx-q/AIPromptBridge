@@ -349,7 +349,7 @@ def enable_console_close_button():
 class TrayApp:
     """System tray application for AIPromptBridge"""
     
-    def __init__(self, icon_path=None, on_exit_callback=None, allow_console_toggle=True):
+    def __init__(self, icon_path=None, on_exit_callback=None, allow_console_toggle=True, show_edit_file_items=False):
         """
         Initialize the tray application
         
@@ -357,11 +357,13 @@ class TrayApp:
             icon_path: Path to the .ico file (default: icon.ico in project root)
             on_exit_callback: Function to call when exiting
             allow_console_toggle: Whether to show "Toggle Console" option
+            show_edit_file_items: Whether to show direct file editing options (debug mode)
         """
         self.systray = None
         self.on_exit_callback = on_exit_callback
         self.console_visible = True
         self.allow_console_toggle = allow_console_toggle
+        self.show_edit_file_items = show_edit_file_items
         
         # Find icon path
         if icon_path is None:
@@ -652,8 +654,8 @@ class TrayApp:
             ("✏️ Prompt Editor", self._on_prompt_editor),
         ])
         
-        # File editing options only available in console mode
-        if self.allow_console_toggle:
+        # File editing options (debug mode)
+        if self.show_edit_file_items:
             raw_options.extend([
                 ("📝 Edit config.ini (file)", self._on_edit_config),
                 ("📄 Edit prompts.json (file)", self._on_edit_options),

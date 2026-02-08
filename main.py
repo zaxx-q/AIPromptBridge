@@ -786,7 +786,12 @@ def main():
         allow_console_toggle = has_real_console
         
         # Start tray (this blocks until exit)
-        tray = TrayApp(on_exit_callback=cleanup, allow_console_toggle=allow_console_toggle)
+        # Edit file items only show when --show-console is used
+        tray = TrayApp(
+            on_exit_callback=cleanup,
+            allow_console_toggle=allow_console_toggle,
+            show_edit_file_items=args.show_console
+        )
         hide_on_start = not args.show_console
         tray.start(hide_console_on_start=hide_on_start)
         
