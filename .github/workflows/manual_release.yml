@@ -233,6 +233,56 @@ jobs:
           
           echo "ASSET_PATH=$zipName" >> $env:GITHUB_ENV
 
+      - name: Prepare Release Notes
+        id: release_notes
+        shell: pwsh
+        env:
+          INPUT_NOTES: ${{ inputs.release_notes }}
+        run: |
+          $releaseBodyFile = "release_body.md"
+          
+          if (-not [string]::IsNullOrWhiteSpace($env:INPUT_NOTES)) {
+             Write-Host "User provided release notes."
+             $env:INPUT_NOTES | Out-File -FilePath $releaseBodyFile -Encoding utf8
+          } else {
+             Write-Host "No input notes provided. Extracting from CHANGELOG.md..."
+             $version = "$env:RELEASE_VERSION"
+             $cleanVersion = $version.TrimStart('vV')
+             $changelogPath = "CHANGELOG.md"
+             
+             if (Test-Path $changelogPath) {
+                $content = Get-Content $changelogPath -Raw
+                # Find start index of "## [$cleanVersion]"
+                $searchStr = "## [$cleanVersion]"
+                $startIndex = $content.IndexOf($searchStr)
+                
+                if ($startIndex -ge 0) {
+                   $endIndex = $content.Length
+                   
+                   # Search for next "## [" starting after the current match
+                   $nextSearchStart = $startIndex + $searchStr.Length
+                   
+                   # Regex to find next header start "## ["
+                   $regex = [regex]"(?m)^## \["
+                   $match = $regex.Match($content, $nextSearchStart)
+                   
+                   if ($match.Success) {
+                      $endIndex = $match.Index
+                   }
+                   
+                   $notes = $content.Substring($startIndex, $endIndex - $startIndex).Trim()
+                   Write-Host "Found release notes for $cleanVersion"
+                   $notes | Out-File -FilePath $releaseBodyFile -Encoding utf8
+                } else {
+                   Write-Warning "Could not find entry for '$searchStr' in CHANGELOG.md"
+                   "Release $version" | Out-File -FilePath $releaseBodyFile -Encoding utf8
+                }
+             } else {
+                Write-Warning "CHANGELOG.md not found!"
+                "Release $version" | Out-File -FilePath $releaseBodyFile -Encoding utf8
+             }
+          }
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         env:
@@ -240,8 +290,8 @@ jobs:
         with:
           # Use the determined version
           tag_name: ${{ env.RELEASE_VERSION }}
-          name: Release ${{ env.RELEASE_VERSION }}
-          body: ${{ inputs.release_notes }}
+          name: ${{ env.RELEASE_VERSION }}
+          body_path: release_body.md
           files: ${{ env.ASSET_PATH }}
           prerelease: false
           generate_release_notes: true
