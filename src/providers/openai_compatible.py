@@ -27,7 +27,7 @@ from .base import (
 
 
 # Safety settings for Google's OpenAI-compatible endpoint
-# Per JSON-request-reference.md - must use BLOCK_NONE (not OFF)
+# Must use BLOCK_NONE (not OFF)
 GOOGLE_SAFETY_SETTINGS = [
     {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
@@ -374,8 +374,7 @@ class OpenAICompatibleProvider(BaseProvider):
     ) -> Dict:
         """
         Build the request body with proper thinking/safety configuration.
-        
-        Per JSON-request-reference.md:
+
         - stream: true + stream_options: { include_usage: true } for streaming
         - reasoning_effort: "high"/"medium"/"low" for thinking
         - extra_body.google.thinking_config.include_thoughts: true for Google

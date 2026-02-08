@@ -34,7 +34,7 @@ from .base import (
 # Base URL for Gemini API
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
-# Safety settings - must use BLOCK_NONE per JSON-request-reference.md
+# Safety settings
 SAFETY_SETTINGS = [
     {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
@@ -77,7 +77,7 @@ class GeminiNativeProvider(BaseProvider):
     - Empty response detection and retry
     - Key rotation on errors
     
-    Thinking configuration (per JSON-request-reference.md):
+    Thinking configuration:
     - Gemini 2.5: thinkingBudget (integer token count, -1 = auto/unlimited)
     - Gemini 3.x: thinkingLevel ("low" or "high")
     
@@ -740,7 +740,6 @@ class GeminiNativeProvider(BaseProvider):
         """
         Build generationConfig with thinking settings.
         
-        Per JSON-request-reference.md:
         - Gemini 2.5: thinkingBudget (integer)
         - Gemini 3.x: thinkingLevel ("low" or "high")
         

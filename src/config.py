@@ -50,7 +50,7 @@ DEFAULT_CONFIG = {
     "streaming_enabled": True,
     "thinking_enabled": False,
     "thinking_output": "reasoning_content",  # filter, raw, or reasoning_content
-    # Thinking configuration (per JSON-request-reference.md)
+    # Thinking configuration
     # - reasoning_effort: For OpenAI-compatible APIs ("low", "medium", "high")
     # - thinking_budget: For Gemini 2.5 models (integer tokens, -1 = auto/unlimited)
     # - thinking_level: For Gemini 3.x models ("low", "high")

@@ -142,7 +142,7 @@ def call_google_api(key_manager, model, messages, ai_params, timeout, config=Non
     payload = {
         "contents": contents, 
         "generationConfig": {},
-        # FIXED: Use BLOCK_NONE instead of OFF (per JSON-request-reference.md)
+        # FIXED: Use BLOCK_NONE instead of OFF
         "safetySettings": [
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
