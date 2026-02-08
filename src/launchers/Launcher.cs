@@ -6,25 +6,19 @@
  *   - No Console Mode (/define:GUI): No console window, fire-and-forget launch
  *   - Console Mode (/define:CONSOLE): With console, waits for exit
  *
- * Build Commands:
- *   Console:    csc /target:exe /out:AIPromptBridge.exe /win32icon:icon.ico /define:CONSOLE Launcher.cs
- *   No Console: csc /target:winexe /out:AIPromptBridge-NoConsole.exe /win32icon:icon.ico /define:GUI Launcher.cs
+ * Build Commands (Managed by GitHub Actions):
+ *   Console:    csc /target:exe /out:AIPromptBridge.exe /win32icon:icon.ico /define:CONSOLE /reference:System.Windows.Forms.dll Launcher.cs Properties/AssemblyInfo.cs
+ *   No Console: csc /target:winexe /out:AIPromptBridge-NoConsole.exe /win32icon:icon.ico /define:GUI /reference:System.Windows.Forms.dll Launcher.cs Properties/AssemblyInfo.cs
  */
 
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
+using System.Windows.Forms; // Requires /reference:System.Windows.Forms.dll
 
 class Launcher
 {
-    // For showing error message boxes in GUI mode
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
-    
-    // MessageBox constants
-    private const uint MB_ICONERROR = 0x10;
-    
+    [STAThread] // Good practice for UI apps, even if just showing MessageBox
     static int Main(string[] args)
     {
         // 1. Determine the directory where this launcher resides
@@ -39,7 +33,7 @@ class Launcher
             string errorMsg = "Critical Error: Could not find application binary at:\n" + internalExe;
             
 #if GUI
-            MessageBoxW(IntPtr.Zero, errorMsg, "AIPromptBridge Error", MB_ICONERROR);
+            MessageBox.Show(errorMsg, "AIPromptBridge Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 #else
             Console.WriteLine("❌ " + errorMsg);
             Console.WriteLine("\nPress Enter to exit...");
@@ -78,7 +72,7 @@ class Launcher
             psi.CreateNoWindow = true;
             psi.WindowStyle = ProcessWindowStyle.Hidden;
             
-            Process process = Process.Start(psi);
+            Process.Start(psi);
             // Don't wait - exit immediately and let the app run independently
             return 0;
 #else
@@ -89,8 +83,12 @@ class Launcher
             
             // Wait for the internal process to exit
             // This keeps the console window alive
-            process.WaitForExit();
-            return process.ExitCode;
+            if (process != null)
+            {
+                process.WaitForExit();
+                return process.ExitCode;
+            }
+            return 0;
 #endif
         }
         catch (Exception ex)
@@ -98,7 +96,7 @@ class Launcher
             string errorMsg = "Failed to launch application:\n" + ex.Message;
             
 #if GUI
-            MessageBoxW(IntPtr.Zero, errorMsg, "AIPromptBridge Error", MB_ICONERROR);
+            MessageBox.Show(errorMsg, "AIPromptBridge Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 #else
             Console.WriteLine("❌ " + errorMsg);
             Console.WriteLine("\nPress Enter to exit...");

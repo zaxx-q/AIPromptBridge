@@ -171,23 +171,45 @@ jobs:
           # Create output directory
           New-Item -ItemType Directory -Force -Path "build_launchers" | Out-Null
           
-          # Debug: List files to verify source existence
-          Write-Host "Verifying source file existence:"
-          if (Test-Path "src\launchers\Launcher.cs") {
-              Write-Host "  Found src\launchers\Launcher.cs"
-          } else {
-              Write-Error "  src\launchers\Launcher.cs NOT FOUND!"
-              Get-ChildItem -Recurse src | ForEach-Object { Write-Host "  $($_.FullName)" }
-          }
-
-          # Build Console Launcher (with console window) - Primary launcher
+          # --- GENERATE ASSEMBLY INFO ---
+          # This gives the EXE a proper version, company name, etc. to look legitimate
+          $version = "$env:RELEASE_VERSION".TrimStart('vV')
+          $asmInfoPath = "src\launchers\AssemblyInfo.cs"
+          
+          Write-Host "Generating AssemblyInfo.cs with version: $version"
+          
+          $asmContent = @"
+          using System.Reflection;
+          using System.Runtime.InteropServices;
+          
+          [assembly: AssemblyTitle("AIPromptBridge")]
+          [assembly: AssemblyDescription("AI Assistance Bridge")]
+          [assembly: AssemblyCompany("AIPromptBridge")]
+          [assembly: AssemblyProduct("AIPromptBridge")]
+          [assembly: AssemblyCopyright("Copyright © $(Get-Date -Format 'yyyy')")]
+          [assembly: AssemblyVersion("$version")]
+          [assembly: AssemblyFileVersion("$version")]
+          [assembly: ComVisible(false)]
+          "@
+          
+          $asmContent | Out-File -FilePath $asmInfoPath -Encoding utf8
+          
+          # --- BUILD ARGS ---
+          $commonArgs = @(
+            "/win32icon:icon.ico",
+            "/optimize+",
+            "/reference:System.Windows.Forms.dll",
+            "/win32manifest:src\launchers\app.manifest",
+            "src\launchers\Launcher.cs",
+            "src\launchers\AssemblyInfo.cs"
+          )
+          
+          # 1. Build Console Launcher
           Write-Host "Building Console Launcher (AIPromptBridge.exe)..."
-          & $cscPath.FullName /target:exe `
-                              /out:build_launchers\AIPromptBridge.exe `
-                              /win32icon:icon.ico `
-                              /define:CONSOLE `
-                              /optimize+ `
-                              src\launchers\Launcher.cs
+          
+          $consoleArgs = @("/target:exe", "/out:build_launchers\AIPromptBridge.exe", "/define:CONSOLE") + $commonArgs
+          
+          & $cscPath.FullName $consoleArgs
           
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Failed to build Console launcher!"
@@ -195,14 +217,12 @@ jobs:
           }
           Write-Host "✓ Console Launcher built successfully"
           
-          # Build No-Console Launcher (no console window)
+          # 2. Build No-Console Launcher
           Write-Host "Building No-Console Launcher (AIPromptBridge-NoConsole.exe)..."
-          & $cscPath.FullName /target:winexe `
-                              /out:build_launchers\AIPromptBridge-NoConsole.exe `
-                              /win32icon:icon.ico `
-                              /define:GUI `
-                              /optimize+ `
-                              src\launchers\Launcher.cs
+          
+          $guiArgs = @("/target:winexe", "/out:build_launchers\AIPromptBridge-NoConsole.exe", "/define:GUI") + $commonArgs
+          
+          & $cscPath.FullName $guiArgs
           
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Failed to build No-Console launcher!"
@@ -210,7 +230,10 @@ jobs:
           }
           Write-Host "✓ No-Console Launcher built successfully"
           
-          # Show file sizes (should be ~10KB each vs ~7MB for Nuitka)
+          # Cleanup temporary AssemblyInfo
+          Remove-Item $asmInfoPath -ErrorAction SilentlyContinue
+          
+          # Show file sizes
           Get-ChildItem build_launchers/*.exe | ForEach-Object {
             $sizeKB = [math]::Round($_.Length / 1KB, 1)
             Write-Host "  $($_.Name): $sizeKB KB"
