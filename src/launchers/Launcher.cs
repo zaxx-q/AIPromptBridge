@@ -36,7 +36,7 @@ class Launcher
         // 3. Validate internal executable exists
         if (!File.Exists(internalExe))
         {
-            string errorMsg = $"Critical Error: Could not find application binary at:\n{internalExe}";
+            string errorMsg = "Critical Error: Could not find application binary at:\n" + internalExe;
             
 #if GUI
             MessageBoxW(IntPtr.Zero, errorMsg, "AIPromptBridge Error", MB_ICONERROR);
@@ -95,7 +95,7 @@ class Launcher
         }
         catch (Exception ex)
         {
-            string errorMsg = $"Failed to launch application:\n{ex.Message}";
+            string errorMsg = "Failed to launch application:\n" + ex.Message;
             
 #if GUI
             MessageBoxW(IntPtr.Zero, errorMsg, "AIPromptBridge Error", MB_ICONERROR);
