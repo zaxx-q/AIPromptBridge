@@ -1,5 +1,22 @@
 # Changelog
 
+## [4.0.1] - 2026-02-08
+
+### New Features/Changes
+
+- **Terminal**: Added a new keyboard shortcut `[A]` to directly open the Audio Analyzer from the console main menu.
+- **System Tray**: Direct file editing options ("Edit config.ini", "Edit prompts.json") in the tray menu are now conditionally visible only when the application is started with the `--show-console` flag.
+
+### Improvements
+
+- **GUI**: Fix scrolling of Settings and Prompt Editor windows in Tkinter fallback mode.
+- **UI/UX**: Adjusted widget widths and layout in the Settings window for better visual consistency, specifically targeting host/port fields, provider selection, and model dropdowns.
+- **Terminal**: Reorganized the main command box to prioritize the Audio Tool shortcut rather than Endpoint.
+
+### Internal
+
+- **Request Pipeline**: Simplified request origin tracking by consolidating multiple specific endpoint origins into a single `ENDPOINT` type.
+
 ## [4.0.0] - 2026-02-08
 
 ### New Features

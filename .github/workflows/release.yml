@@ -1,12 +1,15 @@
-name: Manual Release Build
+name: Release Build
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version Tag (Leave empty to use latest Git tag)'
+        description: 'Version Tag (Leave empty to use CHANGELOG.md latest)'
         required: false
-        default: '' # Leave blank to default to git tag
+        default: '' # Leave blank to use CHANGELOG.md
       release_notes:
         description: 'Short Summary (Edit the full release page later for long text)'
         required: false
@@ -30,28 +33,53 @@ jobs:
         id: get_version
         shell: pwsh
         run: |
+          # Priority:
+          # 1. Git Tag (if triggered by tag push)
+          # 2. Workflow Input (if provided manually)
+          # 3. CHANGELOG.md Latest Version (if manually triggered empty)
+
+          $refType = "${{ github.ref_type }}"
+          $refName = "${{ github.ref_name }}"
           $inputVer = "${{ inputs.version }}"
-          
-          if ([string]::IsNullOrWhiteSpace($inputVer)) {
-            try {
-              # Get the latest tag from git (e.g., v2.8.0)
-              $gitTag = git describe --tags --abbrev=0
-              Write-Host "No input provided. Detected latest git tag: $gitTag"
-              $finalVersion = $gitTag
-            } catch {
-              Write-Error "No input provided and no Git tags found in repository!"
-              exit 1
-            }
-          } else {
-            $inputVer = $inputVer.Trim()
-            if (-not ($inputVer.ToLower().StartsWith("v"))) {
-              $finalVersion = "v$inputVer"
-              Write-Host "Added 'v' prefix to input: $finalVersion"
-            } else {
+          $changelogPath = "CHANGELOG.md"
+
+          if ($refType -eq 'tag') {
+              # 1. Triggered by Tag
+              Write-Host "Triggered by Git Tag: $refName"
+              $finalVersion = $refName
+          } elseif (-not [string]::IsNullOrWhiteSpace($inputVer)) {
+              # 2. Manual Trigger with Input
+              Write-Host "Triggered manually with input: $inputVer"
               $finalVersion = $inputVer
-              Write-Host "Using user input version: $finalVersion"
-            }
+          } else {
+              # 3. Manual Trigger Empty -> Read CHANGELOG.md
+              Write-Host "Triggered manually (empty input). Reading latest version from $changelogPath..."
+              
+              if (Test-Path $changelogPath) {
+                  $content = Get-Content $changelogPath -Raw
+                  # Regex to find the first version header like ## [4.0.1] or ## [v4.0.1]
+                  # We only care about the first match (latest version)
+                  if ($content -match '## \[(v?[\d\.]+)\]') {
+                      $detectedVersion = $Matches[1]
+                      Write-Host "Found latest version in CHANGELOG: $detectedVersion"
+                      $finalVersion = $detectedVersion
+                  } else {
+                      Write-Error "Could not find any version header (## [x.x.x]) in $changelogPath!"
+                      exit 1
+                  }
+              } else {
+                  Write-Error "$changelogPath not found!"
+                  exit 1
+              }
           }
+
+          # Normalize to ensure 'v' prefix for Release Tag/Title consistency
+          $finalVersion = $finalVersion.Trim()
+          if (-not $finalVersion.ToLower().StartsWith("v")) {
+              $finalVersion = "v$finalVersion"
+          }
+          
+          Write-Host "Final Determined Version: $finalVersion"
           
           # Save to GITHUB_ENV so all other steps use this variable
           echo "RELEASE_VERSION=$finalVersion" >> $env:GITHUB_ENV
