@@ -98,6 +98,9 @@ class ChatWindowBase(ABC):
         self.attachments_frame = None
         self.pending_attachments = []  # List of {"path": str, "thumbnail": PhotoImage, "mime_type": str}
         self._attachment_thumbnails = []  # Keep references to prevent garbage collection
+        # Audio playback state
+        self._audio_playing_path = None  # Currently playing audio file path
+        self._audio_play_buttons = {}  # Map file_path -> play button widget
     
     @abstractmethod
     def _get_window_tag(self) -> str:
@@ -1177,7 +1180,8 @@ class ChatWindowBase(ABC):
         
         filetypes = [
             ("Images", "*.png *.jpg *.jpeg *.gif *.webp *.bmp"),
-            ("All supported", "*.png *.jpg *.jpeg *.gif *.webp *.bmp *.pdf"),
+            ("Audio", "*.wav *.mp3 *.ogg *.opus *.flac *.webm *.m4a"),
+            ("All supported", "*.png *.jpg *.jpeg *.gif *.webp *.bmp *.pdf *.wav *.mp3 *.ogg *.opus *.flac *.webm *.m4a"),
             ("All files", "*.*")
         ]
         
@@ -1212,7 +1216,10 @@ class ChatWindowBase(ABC):
         mime_map = {
             "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
             "gif": "image/gif", "webp": "image/webp", "bmp": "image/bmp",
-            "pdf": "application/pdf"
+            "pdf": "application/pdf",
+            "wav": "audio/wav", "mp3": "audio/mpeg", "ogg": "audio/ogg",
+            "opus": "audio/opus", "flac": "audio/flac", "webm": "audio/webm",
+            "m4a": "audio/mp4"
         }
         mime_type = mime_map.get(ext, "application/octet-stream")
         
@@ -1221,7 +1228,7 @@ class ChatWindowBase(ABC):
         if mime_type.startswith("image/"):
             try:
                 from PIL import Image, ImageTk
-                
+
                 with Image.open(file_path) as img:
                     # Create thumbnail (max 48x48)
                     img.thumbnail((48, 48), Image.Resampling.LANCZOS)
@@ -1229,13 +1236,17 @@ class ChatWindowBase(ABC):
                     self._attachment_thumbnails.append(thumbnail)  # Keep reference
             except Exception as e:
                 print(f"[ChatWindow] Failed to create thumbnail: {e}")
+
+        # For audio files, we'll use a speaker emoji icon indicator
+        is_audio = mime_type.startswith("audio/")
         
         # Add to pending list
         attach_info = {
             "source_path": file_path,
             "filename": path.name,
             "mime_type": mime_type,
-            "thumbnail": thumbnail
+            "thumbnail": thumbnail,
+            "is_audio": is_audio
         }
         self.pending_attachments.append(attach_info)
         
@@ -1260,63 +1271,70 @@ class ChatWindowBase(ABC):
         """Render attachment thumbnails inline in chat for a message."""
         if not attachments:
             return
-        
+
         try:
             from PIL import Image, ImageTk
             from ...attachment_manager import AttachmentManager
         except ImportError:
             return
-        
+
         for attach in attachments:
             file_path = attach.get("path", "")
             if not file_path:
                 continue
-            
-            # Check if it's an image
+
             mime_type = attach.get("mime_type", "")
+            filename = attach.get("filename", "attachment")
+
+            # Handle audio files with inline player
+            if mime_type.startswith("audio/"):
+                self._render_audio_player(file_path, filename, message_tag)
+                continue
+
+            # Handle non-image files
             if not mime_type.startswith("image/"):
                 # Show file icon for non-images
                 self.chat_text.insert(tk.END, "  📎 ", (message_tag,))
-                self.chat_text.insert(tk.END, f"{attach.get('filename', 'attachment')}\n", ("normal", message_tag))
+                self.chat_text.insert(tk.END, f"{filename}\n", ("normal", message_tag))
                 continue
-            
+
             try:
-                # Load and create thumbnail
+                # Load and create thumbnail for images
                 b64, mime = AttachmentManager.load_image(file_path)
                 if not b64:
                     continue
-                
+
                 import base64
                 import io
-                
+
                 image_data = base64.b64decode(b64)
                 with io.BytesIO(image_data) as buffer:
                     img = Image.open(buffer)
                     # Create thumbnail (max 150x150 for chat display)
                     img.thumbnail((150, 150), Image.Resampling.LANCZOS)
                     thumbnail = ImageTk.PhotoImage(img)
-                
+
                 # Store reference to prevent garbage collection
                 if not hasattr(self, '_chat_thumbnails'):
                     self._chat_thumbnails = []
                 self._chat_thumbnails.append(thumbnail)
-                
+
                 # Create unique tag for this image
                 img_tag = f"img_{id(thumbnail)}"
-                
+
                 # Insert indentation
                 self.chat_text.insert(tk.END, "  ", (message_tag,))
-                
+
                 # Insert image
                 self.chat_text.image_create(tk.END, image=thumbnail)
-                
+
                 # Add image tag for click handling
                 current_pos = self.chat_text.index(tk.INSERT)
                 line = int(current_pos.split('.')[0])
                 img_start = f"{line}.2"  # After the indentation
                 img_end = f"{line}.3"
                 self.chat_text.tag_add(img_tag, img_start, img_end)
-                
+
                 # Bind click events
                 self.chat_text.tag_bind(img_tag, "<Button-1>",
                     lambda e, path=file_path: self._on_image_left_click(e, path))
@@ -1326,13 +1344,258 @@ class ChatWindowBase(ABC):
                     lambda e: self.chat_text.config(cursor="hand2"))
                 self.chat_text.tag_bind(img_tag, "<Leave>",
                     lambda e: self.chat_text.config(cursor=""))
-                
+
                 # Add newline after image
                 self.chat_text.insert(tk.END, "\n", (message_tag,))
-                
+
             except Exception as e:
                 print(f"[ChatWindow] Failed to render attachment: {e}")
-                self.chat_text.insert(tk.END, f"  📎 {attach.get('filename', 'image')}\n", ("normal", message_tag))
+                self.chat_text.insert(tk.END, f"  📎 {filename}\n", ("normal", message_tag))
+
+    def _render_audio_player(self, file_path: str, filename: str, message_tag: str):
+        """Render an inline audio player widget in the chat."""
+        import os
+
+        # Create a frame for the audio player
+        if HAVE_CTK:
+            player_frame = ctk.CTkFrame(
+                self.chat_text,
+                fg_color=self.theme.surface0,
+                corner_radius=6,
+                height=36
+            )
+        else:
+            player_frame = tk.Frame(
+                self.chat_text,
+                bg=self.colors["surface0"],
+                height=36
+            )
+
+        # Keep reference to prevent GC
+        if not hasattr(self, '_audio_player_frames'):
+            self._audio_player_frames = []
+        self._audio_player_frames.append(player_frame)
+
+        # Speaker icon
+        if HAVE_CTK:
+            icon_label = ctk.CTkLabel(
+                player_frame,
+                text="🔊",
+                font=get_ctk_font(size=14),
+                width=24
+            )
+            icon_label.pack(side="left", padx=(8, 4))
+
+            # Filename (truncated)
+            display_name = filename[:30] + "..." if len(filename) > 30 else filename
+            name_label = ctk.CTkLabel(
+                player_frame,
+                text=display_name,
+                font=get_ctk_font(size=11),
+                text_color=self.theme.fg
+            )
+            name_label.pack(side="left", padx=4)
+
+            # Play/Stop button
+            play_btn = ctk.CTkButton(
+                player_frame,
+                text="▶",
+                font=get_ctk_font(size=12),
+                width=32,
+                height=24,
+                corner_radius=4,
+                fg_color=self.theme.accent,
+                hover_color=self.theme.surface1,
+                command=lambda p=file_path: self._toggle_audio(p)
+            )
+            play_btn.pack(side="left", padx=4)
+
+            # Store button reference for toggling
+            self._audio_play_buttons[file_path] = play_btn
+
+            # Open externally button
+            open_btn = ctk.CTkButton(
+                player_frame,
+                text="📂",
+                font=get_ctk_font(size=12),
+                width=32,
+                height=24,
+                corner_radius=4,
+                fg_color=self.theme.surface1,
+                hover_color=self.theme.overlay0,
+                command=lambda p=file_path: self._open_file_external(p)
+            )
+            open_btn.pack(side="left", padx=(0, 8))
+        else:
+            icon_label = tk.Label(
+                player_frame,
+                text="🔊",
+                font=("Segoe UI", 12),
+                bg=self.colors["surface0"],
+                fg=self.colors["fg"]
+            )
+            icon_label.pack(side=tk.LEFT, padx=(8, 4))
+
+            display_name = filename[:30] + "..." if len(filename) > 30 else filename
+            name_label = tk.Label(
+                player_frame,
+                text=display_name,
+                font=("Segoe UI", 10),
+                bg=self.colors["surface0"],
+                fg=self.colors["fg"]
+            )
+            name_label.pack(side=tk.LEFT, padx=4)
+
+            play_btn = tk.Button(
+                player_frame,
+                text="▶",
+                font=("Segoe UI", 10),
+                bg=self.colors["accent"],
+                fg="#ffffff",
+                relief=tk.FLAT,
+                width=3,
+                command=lambda p=file_path: self._toggle_audio(p),
+                cursor="hand2"
+            )
+            play_btn.pack(side=tk.LEFT, padx=4)
+
+            # Store button reference for toggling
+            self._audio_play_buttons[file_path] = play_btn
+
+            open_btn = tk.Button(
+                player_frame,
+                text="📂",
+                font=("Segoe UI", 10),
+                bg=self.colors["surface0"],
+                fg=self.colors["fg"],
+                relief=tk.FLAT,
+                width=3,
+                command=lambda p=file_path: self._open_file_external(p),
+                cursor="hand2"
+            )
+            open_btn.pack(side=tk.LEFT, padx=(0, 8))
+
+        # Insert the frame into the text widget
+        self.chat_text.insert(tk.END, "  ", (message_tag,))
+        self.chat_text.window_create(tk.END, window=player_frame)
+        self.chat_text.insert(tk.END, "\n", (message_tag,))
+
+    def _toggle_audio(self, file_path: str):
+        """Toggle audio playback - play if stopped, stop if playing."""
+        import os
+
+        if not os.path.exists(file_path):
+            self._update_status("Audio file not found")
+            return
+
+        # Check if this file is currently playing
+        if self._audio_playing_path == file_path:
+            # Stop playback
+            self._stop_audio()
+            return
+
+        # If another file is playing, stop it first
+        if self._audio_playing_path:
+            self._stop_audio()
+
+        # Start playing this file
+        try:
+            from ...audio.recorder import AudioRecorder
+
+            if not hasattr(self, '_audio_recorder'):
+                self._audio_recorder = AudioRecorder()
+
+            # Read the audio file
+            with open(file_path, 'rb') as f:
+                audio_data = f.read()
+
+            self._audio_recorder.play(audio_data)
+            self._audio_playing_path = file_path
+
+            # Update button to show stop icon
+            btn = self._audio_play_buttons.get(file_path)
+            if btn:
+                if HAVE_CTK:
+                    btn.configure(text="■", fg_color=self.theme.accent_red)
+                else:
+                    btn.configure(text="■", bg=self.colors.get("accent_red", "#f38ba8"))
+
+            self._update_status(f"Playing: {os.path.basename(file_path)}")
+
+        except Exception as e:
+            print(f"[ChatWindow] AudioRecorder playback failed: {e}")
+            # Fallback to system player
+            self._open_file_external(file_path)
+
+    def _stop_audio(self):
+        """Stop current audio playback and reset button state."""
+        if not self._audio_playing_path:
+            return
+
+        try:
+            if hasattr(self, '_audio_recorder'):
+                self._audio_recorder.stop_playback()
+        except Exception as e:
+            print(f"[ChatWindow] Failed to stop audio: {e}")
+
+        # Reset button to play icon
+        btn = self._audio_play_buttons.get(self._audio_playing_path)
+        if btn:
+            if HAVE_CTK:
+                btn.configure(text="▶", fg_color=self.theme.accent)
+            else:
+                btn.configure(text="▶", bg=self.colors["accent"])
+
+        self._update_status("Playback stopped")
+        self._audio_playing_path = None
+
+    def _play_audio(self, file_path: str):
+        """Play audio file using system default player or internal recorder."""
+        import os
+
+        if not os.path.exists(file_path):
+            self._update_status("Audio file not found")
+            return
+
+        try:
+            # Try to use the AudioRecorder for playback
+            from ...audio.recorder import AudioRecorder
+
+            if not hasattr(self, '_audio_recorder'):
+                self._audio_recorder = AudioRecorder()
+
+            # Read the audio file
+            with open(file_path, 'rb') as f:
+                audio_data = f.read()
+
+            self._audio_recorder.play(audio_data)
+            self._update_status(f"Playing: {os.path.basename(file_path)}")
+        except Exception as e:
+            print(f"[ChatWindow] AudioRecorder playback failed: {e}")
+            # Fallback to system player
+            self._open_file_external(file_path)
+
+    def _open_file_external(self, file_path: str):
+        """Open file in system default application."""
+        import os
+        import subprocess
+        import sys
+
+        if not os.path.exists(file_path):
+            self._update_status("File not found")
+            return
+
+        try:
+            if sys.platform == "win32":
+                os.startfile(file_path)
+            elif sys.platform == "darwin":
+                subprocess.run(["open", file_path])
+            else:
+                subprocess.run(["xdg-open", file_path])
+            self._update_status(f"Opened: {os.path.basename(file_path)}")
+        except Exception as e:
+            print(f"[ChatWindow] Failed to open file: {e}")
+            self._update_status("Failed to open file")
     
     def _render_session_image(self, message_tag: str):
         # Legacy method removed - use _render_message_attachments instead
@@ -1840,7 +2103,7 @@ class BrowserWindowBase(ABC):
             sessions.sort(key=lambda s: s['id'] if isinstance(s['id'], int) else 0, reverse=reverse)
         elif self.sort_column == "Title":
             sessions.sort(key=lambda s: (s['title'] or '').lower(), reverse=reverse)
-        elif self.sort_column == "Endpoint":
+        elif self.sort_column == "Origin":
             sessions.sort(key=lambda s: s['endpoint'], reverse=reverse)
         elif self.sort_column == "Messages":
             sessions.sort(key=lambda s: s['messages'], reverse=reverse)
