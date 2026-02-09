@@ -20,6 +20,7 @@ from ...session_manager import add_session, get_session, ChatSession
 from ..core import register_window
 from ..custom_widgets import create_emoji_button
 from ..themes import ThemeColors, get_colors, get_ctk_font, sync_ctk_appearance
+from ..emoji_renderer import get_emoji_renderer, HAVE_PIL
 from .chat_base import BrowserWindowBase
 from .utils import set_window_icon
 
@@ -51,12 +52,13 @@ class SessionListItem(tk.Frame):
         self.on_click_callback = on_click
         self.on_double_click_callback = on_double_click
         self.selected = False
+        self._emoji_images = []  # Keep references to prevent GC
         
         # Use grid layout for column alignment (pixel-perfect)
         # MUST match SessionListHeader grid config
         self.grid_columnconfigure(0, minsize=60)   # ID
         self.grid_columnconfigure(1, weight=1)     # Title
-        self.grid_columnconfigure(2, minsize=100)  # Endpoint
+        self.grid_columnconfigure(2, minsize=100)  # Origin
         self.grid_columnconfigure(3, minsize=70)   # Msgs
         self.grid_columnconfigure(4, minsize=140)  # Updated
         
@@ -78,12 +80,28 @@ class SessionListItem(tk.Frame):
         
         font = ("Segoe UI", 10)
         self.cells = []
-        
+
         # Helper to create cells
-        def create_cell(text, col, anchor="w", sticky="w"):
+        def create_cell(text, col, anchor="w", sticky="w", with_emoji=False):
+            emoji_img = None
+            display_text = text
+
+            # Try to extract leading emoji for title column
+            if with_emoji and HAVE_PIL:
+                try:
+                    renderer = get_emoji_renderer()
+                    emoji_char, remaining = renderer.extract_leading_emoji(text)
+                    if emoji_char:
+                        emoji_img = renderer.get_emoji_image(emoji_char, size=16)
+                        if emoji_img:
+                            self._emoji_images.append(emoji_img)  # Prevent GC
+                            display_text = remaining
+                except Exception:
+                    pass
+
             lbl = tk.Label(
                 self,
-                text=text,
+                text=display_text,
                 font=font,
                 bg=colors.surface0,
                 fg=colors.fg,
@@ -92,9 +110,13 @@ class SessionListItem(tk.Frame):
                 pady=8,
                 cursor="hand2"
             )
+
+            if emoji_img:
+                lbl.configure(image=emoji_img, compound="left")
+
             lbl.grid(row=0, column=col, sticky=sticky, padx=(10 if col==0 else 0, 0))
             self.cells.append(lbl)
-            
+
             # Event binding
             lbl.bind("<Button-1>", lambda e: self._on_click())
             lbl.bind("<Double-1>", lambda e: self._on_double_click())
@@ -103,7 +125,7 @@ class SessionListItem(tk.Frame):
 
         # Create columns
         create_cell(sid, 0, "w", "ew")
-        create_cell(title, 1, "w", "ew")
+        create_cell(title, 1, "w", "ew", with_emoji=True)  # Title with emoji support
         create_cell(endpoint, 2, "w", "ew")
         create_cell(msgs, 3, "center", "ew")
         create_cell(updated, 4, "w", "ew")
@@ -175,7 +197,7 @@ class SessionListHeader(tk.Frame):
         # Grid config (Must match SessionListItem)
         self.grid_columnconfigure(0, minsize=60)   # ID
         self.grid_columnconfigure(1, weight=1)     # Title
-        self.grid_columnconfigure(2, minsize=100)  # Endpoint
+        self.grid_columnconfigure(2, minsize=100)  # Origin
         self.grid_columnconfigure(3, minsize=70)   # Msgs
         self.grid_columnconfigure(4, minsize=140)  # Updated
         
@@ -214,7 +236,7 @@ class SessionListHeader(tk.Frame):
         
         create_header("ID", 0, "ID", "w", "ew")
         create_header("Title", 1, "Title", "w", "ew")
-        create_header("Endpoint", 2, "Endpoint", "w", "ew")
+        create_header("Origin", 2, "Origin", "w", "ew")
         create_header("Msgs", 3, "Msgs", "center", "ew")
         create_header("Updated", 4, "Updated", "w", "ew")
 
@@ -226,7 +248,7 @@ class SessionListHeader(tk.Frame):
         display_map = {
             "ID": "ID",
             "Title": "Title",
-            "Endpoint": "Endpoint",
+            "Origin": "Origin",
             "Messages": "Msgs",
             "Updated": "Updated"
         }

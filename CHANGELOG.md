@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.1.0] - 2026-02-09
+
+### New Features
+
+- **Audio Attachments**: Added support for attaching and playing audio files (MP3, WAV, OGG) directly in the chat window.
+- **Markdown Rendering**: Enhanced markdown parsing with support for italicized headers and improved table handling.
+
+### Improvements
+
+- **Workspace**: Improved robustness of frozen state detection to better handle Nuitka and standalone executable environments.
+
+### Build & Deployment
+
+- **Launchers**: Replaced C# launchers with Python-based cx_Freeze implementations to eliminate AV false positives and to simplify and centralize logi.
+
 ## [4.0.1] - 2026-02-08
 
 ### New Features/Changes

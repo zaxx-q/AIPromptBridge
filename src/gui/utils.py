@@ -16,7 +16,7 @@ import sys
 import webbrowser
 import tkinter as tk
 from tkinter import font as tkfont
-from typing import Optional, Dict, Union, Tuple
+from typing import Optional, Dict, Union, Tuple, List
 
 # Windows-specific imports and constants
 _user32 = None
@@ -200,7 +200,28 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         font=(base_font, 11, "bold"),
         foreground=colors["fg"],
         spacing1=3, spacing3=2)
-    
+
+    # Header + italic combinations
+    text_widget.tag_configure("h1_italic",
+        font=(base_font, 16, "bold italic"),
+        foreground=colors["header1"],
+        spacing1=6, spacing3=4)
+
+    text_widget.tag_configure("h2_italic",
+        font=(base_font, 14, "bold italic"),
+        foreground=colors["header2"],
+        spacing1=5, spacing3=3)
+
+    text_widget.tag_configure("h3_italic",
+        font=(base_font, 12, "bold italic"),
+        foreground=colors["header3"],
+        spacing1=4, spacing3=2)
+
+    text_widget.tag_configure("h4_italic",
+        font=(base_font, 11, "bold italic"),
+        foreground=colors["fg"],
+        spacing1=3, spacing3=2)
+
     # Inline formatting
     text_widget.tag_configure("bold", font=(base_font, 11, "bold"))
     text_widget.tag_configure("italic", font=(base_font, 11, "italic"))
@@ -325,6 +346,190 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         spacing1=1, spacing3=2)
 
 
+def _strip_inline_formatting(text: str) -> Tuple[str, Optional[str]]:
+    """
+    Remove markdown inline formatting markers and detect the formatting style.
+
+    Returns:
+        Tuple of (stripped_text, format_style) where format_style is one of:
+        'bold_italic', 'bold', 'italic', or None
+    """
+    # Check for bold+italic first
+    match = re.match(r'^\*\*\*(.+)\*\*\*$', text.strip())
+    if match:
+        return match.group(1), 'bold_italic'
+
+    match = re.match(r'^___(.+)___$', text.strip())
+    if match:
+        return match.group(1), 'bold_italic'
+
+    # Check for bold
+    match = re.match(r'^\*\*(.+)\*\*$', text.strip())
+    if match:
+        return match.group(1), 'bold'
+
+    match = re.match(r'^__(.+)__$', text.strip())
+    if match:
+        return match.group(1), 'bold'
+
+    # Check for italic
+    match = re.match(r'^\*([^\*]+)\*$', text.strip())
+    if match:
+        return match.group(1), 'italic'
+
+    match = re.match(r'^_([^_]+)_$', text.strip())
+    if match:
+        return match.group(1), 'italic'
+
+    # No formatting or mixed - strip all markers
+    result = text
+    result = re.sub(r'\*\*\*(.+?)\*\*\*', r'\1', result)
+    result = re.sub(r'\*\*(.+?)\*\*', r'\1', result)
+    result = re.sub(r'__(.+?)__', r'\1', result)
+    result = re.sub(r'\*([^\*]+)\*', r'\1', result)
+    result = re.sub(r'`([^`]+)`', r'\1', result)
+    return result, None
+
+
+def _strip_formatting_simple(text: str) -> str:
+    """Strip inline formatting markers without detecting style (for tables)."""
+    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'\1', text)
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    text = re.sub(r'__(.+?)__', r'\1', text)
+    text = re.sub(r'\*([^\*]+)\*', r'\1', text)
+    text = re.sub(r'`([^`]+)`', r'\1', text)
+    return text
+
+
+def _extract_tables(text: str) -> Tuple[str, List[Tuple[int, List[List[str]]]]]:
+    """
+    Extract markdown tables from text and replace with placeholders.
+
+    Returns:
+        Tuple of (modified_text, list of (placeholder_line_index, table_data))
+    """
+    lines = text.split('\n')
+    result_lines = []
+    tables = []
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+
+        # Check if this looks like a table row (starts and ends with |)
+        if stripped.startswith('|') and stripped.endswith('|'):
+            table_rows = []
+            table_start = len(result_lines)
+
+            # Collect all consecutive table rows
+            while i < len(lines):
+                row_line = lines[i].strip()
+                if not (row_line.startswith('|') and row_line.endswith('|')):
+                    break
+
+                # Parse cells (split by | and strip)
+                cells = [c.strip() for c in row_line.split('|')[1:-1]]
+
+                # Skip separator rows (containing only dashes/colons)
+                if cells and all(re.match(r'^:?-+:?$', c) for c in cells):
+                    i += 1
+                    continue
+
+                table_rows.append(cells)
+                i += 1
+
+            if table_rows:
+                # Add placeholder and store table data
+                placeholder = f"__TABLE_PLACEHOLDER_{len(tables)}__"
+                result_lines.append(placeholder)
+                tables.append((table_start, table_rows))
+            continue
+
+        result_lines.append(line)
+        i += 1
+
+    return '\n'.join(result_lines), tables
+
+
+def _render_table(text_widget: tk.Text, table_data: List[List[str]], colors: Dict[str, str],
+                  role_tag: Optional[str] = None, block_tag: Optional[str] = None,
+                  line_prefix: str = ""):
+    """Render a markdown table to the text widget with proper box-drawing borders."""
+    if not table_data:
+        return
+
+    def build_tags(*primary_tags):
+        result = list(primary_tags)
+        if role_tag:
+            result.append(role_tag)
+        if block_tag:
+            result.append(block_tag)
+        return tuple(result) if result else ("normal",)
+
+    # Calculate column widths
+    num_cols = max(len(row) for row in table_data)
+    col_widths = [0] * num_cols
+
+    for row in table_data:
+        for j, cell in enumerate(row):
+            if j < num_cols:
+                col_widths[j] = max(col_widths[j], len(_strip_formatting_simple(cell)))
+
+    # Ensure minimum column width
+    col_widths = [max(w, 3) for w in col_widths]
+
+    # Box-drawing characters
+    # ┌─┬─┐  top border
+    # │ │ │  row with data
+    # ├─┼─┤  separator (after header)
+    # │ │ │  row with data
+    # └─┴─┘  bottom border
+
+    # Build top border: ┌───┬───┬───┐
+    top_parts = ["─" * (w + 2) for w in col_widths]
+    top_border = "┌" + "┬".join(top_parts) + "┐"
+
+    # Build header separator: ├───┼───┼───┤
+    mid_parts = ["─" * (w + 2) for w in col_widths]
+    mid_border = "├" + "┼".join(mid_parts) + "┤"
+
+    # Build bottom border: └───┴───┴───┘
+    bottom_parts = ["─" * (w + 2) for w in col_widths]
+    bottom_border = "└" + "┴".join(bottom_parts) + "┘"
+
+    # Insert top border
+    text_widget.insert(tk.END, line_prefix, build_tags("normal"))
+    text_widget.insert(tk.END, top_border + "\n", build_tags("codeblock"))
+
+    # Render each row
+    for row_idx, row in enumerate(table_data):
+        # Pad row to have correct number of columns
+        while len(row) < num_cols:
+            row.append("")
+
+        # Build row: │ cell1 │ cell2 │ cell3 │
+        row_parts = []
+        for col_idx, cell in enumerate(row):
+            cell_text = _strip_formatting_simple(cell)
+            padded = cell_text.ljust(col_widths[col_idx])
+            row_parts.append(f" {padded} ")
+
+        row_text = "│" + "│".join(row_parts) + "│"
+
+        text_widget.insert(tk.END, line_prefix, build_tags("normal"))
+        text_widget.insert(tk.END, row_text + "\n", build_tags("codeblock"))
+
+        # Add separator after header row
+        if row_idx == 0:
+            text_widget.insert(tk.END, line_prefix, build_tags("normal"))
+            text_widget.insert(tk.END, mid_border + "\n", build_tags("codeblock"))
+
+    # Insert bottom border
+    text_widget.insert(tk.END, line_prefix, build_tags("normal"))
+    text_widget.insert(tk.END, bottom_border + "\n", build_tags("codeblock"))
+
+
 def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                    wrap: bool = True, as_role: Optional[str] = None,
                    enable_emojis: bool = True, block_tag: Optional[str] = None,
@@ -344,10 +549,13 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
     """
     # Setup tags if not already done
     setup_text_tags(text_widget, colors)
-    
+
     # Configure wrap mode
     text_widget.configure(wrap=tk.WORD if wrap else tk.NONE)
-    
+
+    # Pre-process: Extract and render tables first
+    text, table_blocks = _extract_tables(text)
+
     lines = text.split('\n')
     in_code_block = False
     code_block_lines = []
@@ -404,6 +612,15 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
         if not stripped:
             continue
 
+        # Check for table placeholder
+        table_match = re.match(r'^__TABLE_PLACEHOLDER_(\d+)__$', stripped)
+        if table_match:
+            table_idx = int(table_match.group(1))
+            if table_idx < len(table_blocks):
+                _, table_data = table_blocks[table_idx]
+                _render_table(text_widget, table_data, colors, role_tag, block_tag, line_prefix)
+            continue
+
         # Insert prefix for this line
         if line_prefix:
             prefix_tags = build_tags("normal")
@@ -419,8 +636,16 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                     break
             
             if level <= 6 and len(stripped) > level and stripped[level] == ' ':
-                content = stripped[level+1:]
-                tag = f"h{min(level, 4)}"
+                header_text = stripped[level+1:]
+                content, format_style = _strip_inline_formatting(header_text)
+                base_tag = f"h{min(level, 4)}"
+
+                # Use italic header tag if italic formatting detected
+                if format_style in ('italic', 'bold_italic'):
+                    tag = f"{base_tag}_italic"
+                else:
+                    tag = base_tag
+
                 tags = build_tags(tag)
                 _insert_with_emojis(text_widget, content, tags, enable_emojis)
                 continue
