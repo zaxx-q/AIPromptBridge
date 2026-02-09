@@ -525,6 +525,10 @@ class SettingsWindow:
                 if not found:
                     print(f"[Settings] Could not find initial tab '{initial_tab}'")
         
+        # Ensure content for the active tab is loaded (since explicit .set() doesn't trigger command)
+        if self.use_ctk:
+            self._load_tab_content(self.tabview.get())
+        
         # Register and bind
         register_window(self.window_tag)
         self.root.protocol("WM_DELETE_WINDOW", self._close)
@@ -657,7 +661,7 @@ class SettingsWindow:
                     bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
     
     def _create_notebook(self, parent):
-        """Create the tabbed notebook."""
+        """Create the tabbed notebook with lazy tab loading for performance."""
         if self.use_ctk:
             self.tabview = ctk.CTkTabview(
                 parent,
@@ -668,29 +672,32 @@ class SettingsWindow:
                 segmented_button_unselected_color=self.colors.surface0,
                 segmented_button_unselected_hover_color=self.colors.surface1,
                 text_color=self.colors.fg,
-                corner_radius=8
+                corner_radius=8,
+                command=self._on_tab_changed  # Lazy loading callback
             )
             self.tabview.pack(fill="both", expand=True, pady=(0, 2))
             
-            # Create tabs
-            self.tabview.add("⚙️ General")
-            self.tabview.add("🌐 Provider")
-            self.tabview.add("⚡ Streaming")
-            self.tabview.add("🔧 Tools")
-            self.tabview.add("🔑 API Keys")
-            self.tabview.add("🔗 Endpoints")
-            self.tabview.add("🎨 Theme")
+            # Define tab configurations for lazy loading
+            self._tab_configs = {
+                "⚙️ General": ("_create_general_tab", False),
+                "🌐 Provider": ("_create_provider_tab", False),
+                "⚡ Streaming": ("_create_streaming_tab", False),
+                "🔧 Tools": ("_create_tools_tab", False),
+                "🔑 API Keys": ("_create_keys_tab", False),
+                "🔗 Endpoints": ("_create_endpoints_tab", False),
+                "🎨 Theme": ("_create_theme_tab", False),
+            }
+            
+            # Create empty tabs
+            for tab_name in self._tab_configs.keys():
+                self.tabview.add(tab_name)
             
             # Upgrade tabs with images and larger font
             upgrade_tabview_with_icons(self.tabview)
             
-            self._create_general_tab(self.tabview.tab("⚙️ General"))
-            self._create_provider_tab(self.tabview.tab("🌐 Provider"))
-            self._create_streaming_tab(self.tabview.tab("⚡ Streaming"))
-            self._create_tools_tab(self.tabview.tab("🔧 Tools"))
-            self._create_keys_tab(self.tabview.tab("🔑 API Keys"))
-            self._create_endpoints_tab(self.tabview.tab("🔗 Endpoints"))
-            self._create_theme_tab(self.tabview.tab("🎨 Theme"))
+            # Only create the first tab's content immediately
+            first_tab = "⚙️ General"
+            self._load_tab_content(first_tab)
         else:
             from tkinter import ttk
             style = ttk.Style(self.root)
@@ -698,6 +705,7 @@ class SettingsWindow:
             self.tabview = ttk.Notebook(parent)
             self.tabview.pack(fill="both", expand=True, pady=(0, 2))
             
+            # For ttk.Notebook, we don't do lazy loading (simpler fallback)
             tabs = ["General", "Provider", "Streaming", "Tools", "API Keys", "Endpoints", "Theme"]
             frames = {}
             for tab_name in tabs:
@@ -712,6 +720,34 @@ class SettingsWindow:
             self._create_keys_tab(frames["API Keys"])
             self._create_endpoints_tab(frames["Endpoints"])
             self._create_theme_tab(frames["Theme"])
+    
+    def _on_tab_changed(self):
+        """Handle tab change event - lazy load tab content."""
+        if not self.use_ctk or not hasattr(self, '_tab_configs'):
+            return
+        
+        current_tab = self.tabview.get()
+        self._load_tab_content(current_tab)
+    
+    def _load_tab_content(self, tab_name: str):
+        """Load content for a tab if not already loaded."""
+        if not hasattr(self, '_tab_configs') or tab_name not in self._tab_configs:
+            return
+        
+        method_name, is_loaded = self._tab_configs[tab_name]
+        
+        if is_loaded:
+            return  # Already loaded
+        
+        # Mark as loaded before creating (to prevent re-entry)
+        self._tab_configs[tab_name] = (method_name, True)
+        
+        # Get the tab frame and call the creation method
+        tab_frame = self.tabview.tab(tab_name)
+        create_method = getattr(self, method_name, None)
+        
+        if create_method and callable(create_method):
+            create_method(tab_frame)
     
     def _create_general_tab(self, frame):
         """Create the General settings tab."""

@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.1.1] - 2026-02-10
+
+### Improvements
+
+- **Performance**: Implemented lazy loading for tabs in Settings and Prompt Editor windows, rendering content only upon selection to improve window opening speed.
+
 ## [4.1.0] - 2026-02-09
 
 ### New Features
@@ -13,7 +19,7 @@
 
 ### Build & Deployment
 
-- **Launchers**: Replaced C# launchers with Python-based cx_Freeze implementations to eliminate AV false positives and to simplify and centralize logi.
+- **Launchers**: Replaced C# launchers with Python-based cx_Freeze implementations to eliminate AV false positives and to simplify and centralize logic.
 
 ## [4.0.1] - 2026-02-08
 

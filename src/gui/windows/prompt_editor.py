@@ -659,25 +659,31 @@ class PromptEditorWindow:
                 segmented_button_unselected_color=self.colors.surface0,
                 segmented_button_unselected_hover_color=self.colors.surface1,
                 text_color=self.colors.fg,
-                corner_radius=8
+                corner_radius=8,
+                command=self._on_tab_changed
             )
             self.tabview.pack(fill="both", expand=True, pady=(0, 2))
             
-            # Create tabs
-            self.tabview.add("⚡ Actions")
-            self.tabview.add("📁 Groups")
-            self.tabview.add("⚙️ Settings")
-            self.tabview.add("🎛️ Modifiers")
-            self.tabview.add("🧪 Playground")
+            # Lazy loading configuration
+            # Format: "Tab Name": ("method_name", is_loaded_bool)
+            self._tab_configs = {
+                "⚡ Actions": ("_create_actions_tab", False),
+                "📁 Groups": ("_create_groups_tab", False),
+                "⚙️ Settings": ("_create_settings_tab", False),
+                "🎛️ Modifiers": ("_create_modifiers_tab", False),
+                "🧪 Playground": ("_create_playground_tab", False)
+            }
+            
+            # Create tabs (empty initially)
+            for tab_name in self._tab_configs.keys():
+                self.tabview.add(tab_name)
             
             # Upgrade tabs with images and larger font
             upgrade_tabview_with_icons(self.tabview)
             
-            self._create_actions_tab(self.tabview.tab("⚡ Actions"))
-            self._create_groups_tab(self.tabview.tab("📁 Groups"))
-            self._create_settings_tab(self.tabview.tab("⚙️ Settings"))
-            self._create_modifiers_tab(self.tabview.tab("🎛️ Modifiers"))
-            self._create_playground_tab(self.tabview.tab("🧪 Playground"))
+            # Load the first tab immediately
+            first_tab = "⚡ Actions"
+            self._load_tab_content(first_tab)
         else:
             # Fallback to ttk.Notebook
             from tkinter import ttk
@@ -704,6 +710,40 @@ class PromptEditorWindow:
             self._create_modifiers_tab(modifiers_frame)
             self._create_playground_tab(playground_frame)
     
+    def _on_tab_changed(self):
+        """Handle tab change event - lazy load tab content."""
+        if not self.use_ctk or not hasattr(self, '_tab_configs'):
+            return
+            
+        current_tab = self.tabview.get()
+        self._load_tab_content(current_tab)
+        
+    def _load_tab_content(self, tab_name: str):
+        """Load content for a tab if not already loaded."""
+        if not hasattr(self, '_tab_configs') or tab_name not in self._tab_configs:
+            return
+            
+        method_name, is_loaded = self._tab_configs[tab_name]
+        
+        if is_loaded:
+            return  # Already loaded
+            
+        # Mark as loaded first to prevent re-entry
+        self._tab_configs[tab_name] = (method_name, True)
+        
+        # Get tab frame
+        tab_frame = self.tabview.tab(tab_name)
+        
+        # Call creation method
+        create_method = getattr(self, method_name, None)
+        if create_method and callable(create_method):
+            try:
+                create_method(tab_frame)
+            except Exception as e:
+                print(f"[PromptEditor] Error loading tab '{tab_name}': {e}")
+                import traceback
+                traceback.print_exc()
+
     def _refresh_action_list(self):
         """Refresh the action scrollable list based on current tool."""
         if not self.action_listbox:
