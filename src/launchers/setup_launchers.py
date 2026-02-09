@@ -65,7 +65,7 @@ build_exe_options = {
 executables = [
     # Console Launcher (AIPromptBridge.exe)
     Executable(
-        "launcher_console.py",
+        "src/launchers/launcher_console.py",
         base="console",
         target_name="AIPromptBridge.exe",
         icon="icon.ico",
@@ -73,7 +73,7 @@ executables = [
     ),
     # GUI/No-Console Launcher (AIPromptBridge-NoConsole.exe)
     Executable(
-        "launcher_gui.py",
+        "src/launchers/launcher_gui.py",
         base="gui", # No console window
         target_name="AIPromptBridge-NoConsole.exe",
         icon="icon.ico",
