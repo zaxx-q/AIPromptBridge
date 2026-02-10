@@ -141,6 +141,11 @@ class ChatWindowBase(ABC):
         self._create_chat_area()
         self._create_input_area()
         self._create_action_buttons()
+        # Ensure row resizing behavior
+        self.root.rowconfigure(2, weight=1) # Chat area expands
+        self.root.rowconfigure(3, weight=0) # Input area fixed
+        self.root.rowconfigure(4, weight=0) # Attachments fixed
+
         
         register_window(self._get_window_tag())
         self.root.protocol("WM_DELETE_WINDOW", self._close)
@@ -149,7 +154,7 @@ class ChatWindowBase(ABC):
         """Create session info label."""
         from ... import web_server
         current_provider = web_server.CONFIG.get("default_provider", "google")
-        info_text = f"Session: {self.session.session_id} | Endpoint: /{self.session.endpoint} | Provider: {current_provider}"
+        info_text = f"Session: {self.session.session_id} | Origin: /{self.session.endpoint} | Provider: {current_provider}"
         
         if HAVE_CTK:
             ctk.CTkLabel(
@@ -157,12 +162,12 @@ class ChatWindowBase(ABC):
                 text=info_text,
                 font=get_ctk_font(size=11),
                 text_color=self.theme.blockquote
-            ).grid(row=0, column=0, sticky="w", padx=15, pady=(10, 5))
+            ).grid(row=0, column=0, sticky="w", padx=15, pady=(5, 2)) # Reduced padding
         else:
             tk.Label(
                 self.root, text=info_text, font=("Segoe UI", 9),
                 bg=self.colors["bg"], fg=self.colors["blockquote"]
-            ).grid(row=0, column=0, sticky=tk.W, padx=15, pady=(10, 5))
+            ).grid(row=0, column=0, sticky=tk.W, padx=15, pady=(5, 2))
     
     def _create_toolbar(self):
         """Create the toolbar with toggle buttons and model dropdown."""
@@ -380,28 +385,9 @@ class ChatWindowBase(ABC):
         placeholder = self._placeholder
         
         if HAVE_CTK:
-            # Header with attachment count
-            header_frame = ctk.CTkFrame(self.root, fg_color="transparent")
-            header_frame.grid(row=3, column=0, sticky="ew", padx=15, pady=(10, 5))
-            
-            ctk.CTkLabel(
-                header_frame,
-                text="Your message:",
-                font=get_ctk_font(size=12, weight="bold"),
-                text_color=self.theme.accent
-            ).pack(side="left")
-            
-            # Pending attachments indicator (initially hidden)
-            self._attachments_label = ctk.CTkLabel(
-                header_frame,
-                text="",
-                font=get_ctk_font(size=11),
-                text_color=self.theme.accent_yellow
-            )
-            self._attachments_label.pack(side="left", padx=(10, 0))
-            
             input_frame = ctk.CTkFrame(self.root, fg_color="transparent")
-            input_frame.grid(row=4, column=0, sticky="ew", padx=15, pady=5)
+            # Moved up to row 3 (was 4), removed header frame
+            input_frame.grid(row=3, column=0, sticky="ew", padx=15, pady=5)
             input_frame.columnconfigure(0, weight=1)
             
             textbox_colors = get_ctk_textbox_colors(self.theme)
@@ -415,6 +401,14 @@ class ChatWindowBase(ABC):
                 **textbox_colors
             )
             self.input_text.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+            
+            # Pending attachments indicator (inside input frame now)
+            self._attachments_label = ctk.CTkLabel(
+                input_frame,
+                text="",
+                font=get_ctk_font(size=10),
+                text_color=self.theme.accent_yellow
+            )
             
             # Attachment button (📎)
             attach_colors = get_ctk_button_colors(self.theme, "secondary")
@@ -432,7 +426,7 @@ class ChatWindowBase(ABC):
             
             # Pending attachments preview frame (below input)
             self.attachments_frame = ctk.CTkFrame(self.root, fg_color="transparent", height=0)
-            self.attachments_frame.grid(row=5, column=0, sticky="ew", padx=15)
+            self.attachments_frame.grid(row=4, column=0, sticky="ew", padx=15) # Row 5 -> 4
             self.attachments_frame.grid_remove()  # Initially hidden
             
             self.input_text.insert("0.0", placeholder)
@@ -481,24 +475,9 @@ class ChatWindowBase(ABC):
             self.input_text.bind('<Return>', on_key_return)
             self.input_text.bind('<Control-BackSpace>', on_ctrl_backspace)
         else:
-            # Header with attachment count
-            header_frame = tk.Frame(self.root, bg=self.colors["bg"])
-            header_frame.grid(row=3, column=0, sticky=tk.W, padx=15, pady=(10, 5))
-            
-            tk.Label(
-                header_frame, text="Your message:", font=("Segoe UI", 10, "bold"),
-                bg=self.colors["bg"], fg=self.colors["accent"]
-            ).pack(side=tk.LEFT)
-            
-            # Pending attachments indicator
-            self._attachments_label = tk.Label(
-                header_frame, text="", font=("Segoe UI", 9),
-                bg=self.colors["bg"], fg=self.colors["accent"]
-            )
-            self._attachments_label.pack(side=tk.LEFT, padx=(10, 0))
-            
             input_frame = tk.Frame(self.root, bg=self.colors["bg"])
-            input_frame.grid(row=4, column=0, sticky=tk.EW, padx=15, pady=5)
+            # Moved up to row 3 (was 4), removed header frame
+            input_frame.grid(row=3, column=0, sticky=tk.EW, padx=15, pady=5)
             input_frame.columnconfigure(0, weight=1)
             
             self.input_text = tk.Text(
@@ -517,6 +496,12 @@ class ChatWindowBase(ABC):
             )
             self.input_text.grid(row=0, column=0, sticky="ew", padx=(0, 5))
             
+            # Pending attachments indicator
+            self._attachments_label = tk.Label(
+                input_frame, text="", font=("Segoe UI", 9),
+                bg=self.colors["bg"], fg=self.colors["accent"]
+            )
+            
             # Attachment button
             self.attach_btn = tk.Button(
                 input_frame, text="📎", font=("Segoe UI", 14),
@@ -528,7 +513,7 @@ class ChatWindowBase(ABC):
             
             # Pending attachments preview frame
             self.attachments_frame = tk.Frame(self.root, bg=self.colors["bg"])
-            self.attachments_frame.grid(row=5, column=0, sticky=tk.EW, padx=15)
+            self.attachments_frame.grid(row=4, column=0, sticky=tk.EW, padx=15) # Row 5 -> 4
             self.attachments_frame.grid_remove()  # Initially hidden
             
             self.input_text.insert("1.0", placeholder)
@@ -563,7 +548,7 @@ class ChatWindowBase(ABC):
         """Create the action button row."""
         if HAVE_CTK:
             btn_row = ctk.CTkFrame(self.root, fg_color="transparent")
-            btn_row.grid(row=6, column=0, sticky="ew", padx=15, pady=(5, 15))
+            btn_row.grid(row=5, column=0, sticky="ew", padx=15, pady=(5, 15)) # Row 6 -> 5
             
             send_colors = get_ctk_button_colors(self.theme, "success")
             send_content = prepare_emoji_content("📤 Send", size=16)
@@ -638,7 +623,7 @@ class ChatWindowBase(ABC):
             self.status_label.pack(side="left", padx=15)
         else:
             btn_row = tk.Frame(self.root, bg=self.colors["bg"])
-            btn_row.grid(row=6, column=0, sticky=tk.EW, padx=15, pady=(5, 15))
+            btn_row.grid(row=5, column=0, sticky=tk.EW, padx=15, pady=(5, 15)) # Row 6 -> 5
             
             self.send_btn = tk.Button(
                 btn_row, text="Send", font=("Segoe UI", 10, "bold"),
@@ -1716,6 +1701,7 @@ class ChatWindowBase(ABC):
                     self._attachments_label.configure(text="")
                 else:
                     self._attachments_label.configure(text="")
+                self._attachments_label.grid_remove() # Hide label
             return
         
         # Show frame
@@ -1729,6 +1715,7 @@ class ChatWindowBase(ABC):
                 self._attachments_label.configure(text=label_text)
             else:
                 self._attachments_label.configure(text=label_text)
+            self._attachments_label.grid(row=1, column=0, sticky="w", padx=5) # Show label
         
         # Create preview items
         if HAVE_CTK:

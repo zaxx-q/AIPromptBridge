@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.2.0] - 2026-02-10
+
+### New Features
+
+- **LaTeX Rendering**: Implemented a lightweight, dependency-free LaTeX-to-Unicode renderer to display basic mathematical expressions directly in the chat window.
+
+### Improvements
+
+- **Prompts**: Refined system prompts for "OCR to Markdown" and "Transcribe Audio" tools to better handle visual ambiguities and enforce structure.
+- **GUI**: Optimized chat window layout to improve vertical space utilization and resizing behavior.
+- **Terminal**: Updated session details in the console to use "Origin" instead of "Endpoint" for consistency.
+
 ## [4.1.1] - 2026-02-10
 
 ### Improvements

@@ -553,7 +553,7 @@ def terminal_session_manager(endpoints=None):
                         if HAVE_RICH:
                             console.print(Panel(
                                 f"[bold]Title:[/bold] {session.title}\n"
-                                f"[dim]Endpoint:[/dim] {session.endpoint}\n"
+                                f"[dim]Origin:[/dim] {session.endpoint}\n"
                                 f"[dim]Created:[/dim] {session.created_at}",
                                 title=f"📋 Session: {session.session_id}"
                             ))
@@ -567,9 +567,7 @@ def terminal_session_manager(endpoints=None):
                             print(f"📋 SESSION: {session.session_id}")
                             print(f"{'─'*64}")
                             print(f"   Title:    {session.title}")
-                            # ... (keep existing non-rich code implicitly via structure, but simplified here for diff)
-                            # Actually I should keep the fallback complete for safety
-                            print(f"   Endpoint: {session.endpoint}")
+                            print(f"   Origin: {session.endpoint}")
                             print(f"   Created:  {session.created_at}")
                             print(f"{'─'*64}")
                             for msg in session.messages:
