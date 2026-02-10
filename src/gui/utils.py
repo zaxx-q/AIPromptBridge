@@ -51,6 +51,9 @@ except ImportError:
     HAVE_EMOJI_RENDERER = False
     get_emoji_renderer = None
 
+# Import LaTeX renderer
+from .latex_renderer import latex_to_unicode, extract_latex_blocks
+
 
 def is_dark_mode() -> bool:
     """
@@ -344,6 +347,30 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     text_widget.tag_configure("thinking_message",
         lmargin1=12, lmargin2=12, rmargin=8,
         spacing1=1, spacing3=2)
+    
+    # =================================================================
+    # LaTeX math display
+    # =================================================================
+    
+    # Inline math ($...$) - italic with accent color
+    text_widget.tag_configure("latex_inline",
+        font=(base_font, 11, "italic"),
+        foreground=colors.get("accent_yellow", colors["accent"]))
+    
+    # Display math ($$...$$) - left-aligned block with code font for alignment
+    text_widget.tag_configure("latex_block",
+        font=(mono_font, 11),
+        foreground=colors.get("accent_yellow", colors["accent"]),
+        background=colors["code_bg"],
+        justify="left",
+        lmargin1=24, lmargin2=24, rmargin=24,
+        spacing1=4, spacing3=4)
+    
+    # Technical symbols font (center pieces) - used for characters 
+    # that are missing or look poor in monospaced fonts.
+    text_widget.tag_configure("latex_symbols",
+        font=("Segoe UI Symbol", 24),
+        foreground=colors.get("accent_yellow", colors["accent"]))
 
 
 def _strip_inline_formatting(text: str) -> Tuple[str, Optional[str]]:
@@ -452,6 +479,26 @@ def _extract_tables(text: str) -> Tuple[str, List[Tuple[int, List[List[str]]]]]:
     return '\n'.join(result_lines), tables
 
 
+def _extract_latex_display_blocks(text: str) -> Tuple[str, List[str]]:
+    """
+    Extract $$...$$ display math blocks from text and replace with placeholders.
+    
+    Returns:
+        Tuple of (modified_text, list of latex_content_strings)
+    """
+    blocks = []
+    
+    def replace_block(match):
+        content = match.group(1).strip()
+        idx = len(blocks)
+        blocks.append(content)
+        return f'__LATEX_DISPLAY_{idx}__'
+    
+    # Match $$...$$ (may span multiple lines)
+    modified = re.sub(r'\$\$(.+?)\$\$', replace_block, text, flags=re.DOTALL)
+    return modified, blocks
+
+
 def _render_table(text_widget: tk.Text, table_data: List[List[str]], colors: Dict[str, str],
                   role_tag: Optional[str] = None, block_tag: Optional[str] = None,
                   line_prefix: str = ""):
@@ -555,6 +602,9 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
 
     # Pre-process: Extract and render tables first
     text, table_blocks = _extract_tables(text)
+    
+    # Pre-process: Extract $$...$$ display math blocks (may span lines)
+    text, latex_display_blocks = _extract_latex_display_blocks(text)
 
     lines = text.split('\n')
     in_code_block = False
@@ -619,6 +669,38 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
             if table_idx < len(table_blocks):
                 _, table_data = table_blocks[table_idx]
                 _render_table(text_widget, table_data, colors, role_tag, block_tag, line_prefix)
+            continue
+        
+        # Check for LaTeX display block placeholder
+        latex_match = re.match(r'^__LATEX_DISPLAY_(\d+)__$', stripped)
+        if latex_match:
+            latex_idx = int(latex_match.group(1))
+            if latex_idx < len(latex_display_blocks):
+                latex_content = latex_display_blocks[latex_idx]
+                try:
+                    converted = latex_to_unicode(latex_content)
+                except Exception:
+                    converted = latex_content
+                # Need to handle each line separately to apply prefix correctly
+                converted_lines = converted.split('\n')
+                for idx, line_str in enumerate(converted_lines):
+                    if idx > 0:
+                        text_widget.insert(tk.END, '\n', build_tags("normal"))
+                    
+                    if line_prefix:
+                        text_widget.insert(tk.END, line_prefix, build_tags("normal"))
+                    
+                    tags = build_tags("latex_block")
+                    
+                    # Technical characters that need Segoe UI Symbol
+                    symbol_chars = "⎨⎬"
+                    
+                    for char in line_str:
+                        if char in symbol_chars:
+                            char_tags = tuple(list(tags) + ["latex_symbols"])
+                            _insert_with_emojis(text_widget, char, char_tags, False)
+                        else:
+                            _insert_with_emojis(text_widget, char, tags, False)
             continue
 
         # Insert prefix for this line
@@ -798,11 +880,13 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
     ]
     
     # Build a combined pattern to find all matches in order
+    # Note: $...$ inline LaTeX is matched BEFORE bold/italic underscore patterns
     combined = r'(\*\*\*.+?\*\*\*|___.+?___|' \
                r'\*\*.+?\*\*|__.+?__|' \
                r'\*[^\*]+\*|(?<![a-zA-Z])_[^_]+_(?![a-zA-Z])|' \
                r'`[^`]+`|~~.+?~~|' \
-               r'\[[^\]]+\]\([^)]+\))'
+               r'\[[^\]]+\]\([^)]+\)|' \
+               r'(?<!\$)\$(?!\$)(\S(?:[^$]*?\S)?)\$(?!\$))'
     
     pos = 0
     for match in re.finditer(combined, text):
@@ -855,6 +939,16 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
                 # We'll allow spaces in tags? yes.
                 url_tag = f"url_{url}"
                 extra_tag = url_tag
+        elif matched_text.startswith('$') and matched_text.endswith('$') and not matched_text.startswith('$$'):
+            # Inline LaTeX math
+            inner = matched_text[1:-1]
+            # Skip if it looks like currency ($100)
+            if not re.match(r'^\d[\d,]*\.?\d*$', inner):
+                try:
+                    content = latex_to_unicode(inner)
+                except Exception:
+                    content = inner
+                tag = "latex_inline"
         elif matched_text.startswith('*') and matched_text.endswith('*'):
             content = matched_text[1:-1]
             tag = "italic"
