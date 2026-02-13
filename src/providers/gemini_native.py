@@ -79,7 +79,7 @@ class GeminiNativeProvider(BaseProvider):
     
     Thinking configuration:
     - Gemini 2.5: thinkingBudget (integer token count, -1 = auto/unlimited)
-    - Gemini 3.x: thinkingLevel ("low" or "high")
+    - Gemini 3.x: thinkingLevel ("LOW" or "HIGH")
     
     Files API:
     - Files > 15 MB are uploaded via Files API
@@ -741,7 +741,7 @@ class GeminiNativeProvider(BaseProvider):
         Build generationConfig with thinking settings.
         
         - Gemini 2.5: thinkingBudget (integer)
-        - Gemini 3.x: thinkingLevel ("low" or "high")
+        - Gemini 3.x: thinkingLevel ("LOW" or "HIGH")
         
         Optional parameters (only included if explicitly set in config):
         - max_tokens: Maps to maxOutputTokens
@@ -749,7 +749,6 @@ class GeminiNativeProvider(BaseProvider):
         config = {
             "temperature": params.get("temperature", 1.0),
             "topP": params.get("top_p", 0.95),
-            "topK": params.get("top_k", 0),
         }
         
         # Optional: maxOutputTokens (only include if explicitly set)
@@ -759,17 +758,17 @@ class GeminiNativeProvider(BaseProvider):
         if thinking_enabled:
             if self._is_gemini_3(model):
                 # Gemini 3.x uses thinkingLevel
-                level = self.config.get("thinking_level", "high")
+                level = self.config.get("thinking_level", "high").upper()
                 config["thinkingConfig"] = {
-                    "thinkingLevel": level,
-                    "includeThoughts": True
+                    "thinking_level": level,
+                    "include_thoughts": True
                 }
             else:
                 # Gemini 2.5 uses thinkingBudget
                 budget = self.config.get("thinking_budget", -1)  # -1 = auto/unlimited
                 config["thinkingConfig"] = {
-                    "thinkingBudget": budget,
-                    "includeThoughts": True
+                    "thinking_level": budget,
+                    "include_thoughts": True
                 }
         
         return config
