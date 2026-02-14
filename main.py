@@ -31,7 +31,6 @@ from src.key_manager import KeyManager
 from src.session_manager import load_sessions, list_sessions
 from src.terminal import terminal_session_manager, print_commands_box
 from src.gui.core import HAVE_GUI
-from src.workspace_manager import WorkspaceManager
 from src import web_server
 
 # System tray support
@@ -399,6 +398,94 @@ Examples:
     return parser.parse_args()
 
 
+def _is_compiled():
+    """Check if running as a compiled executable (Nuitka/PyInstaller)."""
+    return (
+        "__compiled__" in globals() or
+        getattr(sys, 'frozen', False) or
+        (sys.executable.lower().endswith(".exe") and "python" not in os.path.basename(sys.executable).lower())
+    )
+
+
+def _move_if_exists(src: Path, dst: Path):
+    """Move a single file or directory if source exists. Silent on failure."""
+    try:
+        if not src.exists():
+            return
+        if dst.exists():
+            if dst.is_dir():
+                shutil.rmtree(dst)
+            else:
+                dst.unlink()
+        shutil.move(str(src), str(dst))
+    except Exception:
+        pass
+
+
+def _migrate_stale_files(bin_dir: Path, root_dir: Path):
+    """
+    Move any leftover config/data files from bin/ to root/ in the background.
+    This handles the edge case where files end up next to the internal .exe
+    instead of the launcher directory.
+    """
+    managed_files = ["chat_sessions.json", "tools_config.json"]
+    managed_globs = ["config.ini*", "prompts.json*", "*file_processor.json", ".file_processor_*.json"]
+    managed_folders = ["session_attachments"]
+
+    try:
+        for filename in managed_files:
+            _move_if_exists(bin_dir / filename, root_dir / filename)
+
+        for pattern in managed_globs:
+            for file_path in bin_dir.glob(pattern):
+                _move_if_exists(file_path, root_dir / file_path.name)
+
+        for foldername in managed_folders:
+            _move_if_exists(bin_dir / foldername, root_dir / foldername)
+    except Exception:
+        pass  # Non-blocking, best-effort
+
+
+def setup_workspace(launched_mode):
+    """
+    Set up the working directory based on how the app was launched.
+
+    Rules:
+      - From source (python main.py): No changes needed, use current directory.
+      - Compiled + launcher (--launched-mode): CWD = launcher's directory (parent of bin/).
+      - Compiled + no launcher: Refuse to run (must use launcher).
+
+    Args:
+        launched_mode: Value of --launched-mode arg (None if not set).
+
+    Returns:
+        True if setup succeeded, False if the app should exit.
+    """
+    if not _is_compiled():
+        # Running from source - no workspace setup needed
+        return True
+
+    if not launched_mode:
+        # Compiled binary run directly without a launcher - refuse to start
+        print("❌ This executable must be launched via AIPromptBridge.exe or AIPromptBridge-Console.exe")
+        print("   Direct execution of the internal binary is not supported.")
+        try:
+            input("Press Enter to exit...")
+        except EOFError:
+            pass
+        return False
+
+    # Compiled with launcher: CWD = root directory (parent of bin/)
+    bin_dir = Path(sys.executable).parent
+    root_dir = bin_dir.parent
+    os.chdir(root_dir)
+
+    # Non-blocking: move any stale config files from bin/ to root/
+    threading.Thread(target=_migrate_stale_files, args=(bin_dir, root_dir), daemon=True).start()
+
+    return True
+
+
 def ensure_windows_terminal() -> bool:
     """
     Check if running in legacy Windows Console and relaunch in Windows Terminal if available.
@@ -442,15 +529,7 @@ def ensure_windows_terminal() -> bool:
         # -d: set working directory
         cmd = [wt_path, "-w", "0", "-d", os.getcwd()]
         
-        # Robust detection of compiled state
-        # 1. Nuitka sets __compiled__ in globals
-        # 2. PyInstaller/cx_Freeze set sys.frozen
-        # 3. Fallback: Check if sys.executable is NOT python.exe (renamed binary)
-        is_compiled = (
-            "__compiled__" in globals() or
-            getattr(sys, 'frozen', False) or
-            (sys.executable.lower().endswith(".exe") and "python" not in os.path.basename(sys.executable).lower())
-        )
+        is_compiled = _is_compiled()
         
         if is_compiled:
             # Nuitka Standalone: sys.executable is often reliable,
@@ -573,12 +652,12 @@ def configure_logging(debug_mode: bool = False):
 
 def main():
     """Main entry point"""
-    # Initialize workspace (handle file migration and CWD)
-    target_cwd = WorkspaceManager.initialize()
-    os.chdir(target_cwd)
-
-    # Parse command line arguments
+    # Parse command line arguments first (doesn't depend on CWD)
     args = parse_args()
+
+    # Set up workspace (CWD resolution for compiled mode)
+    if not setup_workspace(args.launched_mode):
+        sys.exit(1)
     
     # Configure global logging (DEBUG if --show-console, otherwise INFO)
     configure_logging(debug_mode=args.show_console)
@@ -588,11 +667,7 @@ def main():
     # - Console mode: Has console (WT check, toggle enabled)
     # - No launched-mode + compiled (Internal.exe): No console (attach mode, skip WT)
     # - No launched-mode + source (python main.py): Has console (WT check, toggle enabled)
-    is_compiled = (
-        "__compiled__" in globals() or
-        getattr(sys, 'frozen', False) or
-        (sys.executable.lower().endswith(".exe") and "python" not in os.path.basename(sys.executable).lower())
-    )
+    is_compiled = _is_compiled()
     
     if args.launched_mode == "gui":
         has_real_console = False
@@ -603,7 +678,9 @@ def main():
         has_real_console = not is_compiled
     
     # Try to relaunch in Windows Terminal for emoji support (unless --no-wt)
-    if has_real_console and not args.no_wt and ensure_windows_terminal():
+    # Never check for WT if in GUI mode
+    should_check_wt = has_real_console and args.launched_mode != "gui"
+    if should_check_wt and not args.no_wt and ensure_windows_terminal():
         sys.exit(0)  # Exit this instance, new one launched in WT
     
     # Suppress Flask startup banner

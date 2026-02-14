@@ -113,7 +113,7 @@ def main():
         if os.path.exists(main_py):
             print(f"Internal executable not found at: {internal_exe}")
             print("Assuming development mode, running main.py...")
-            subprocess.call([sys.executable, "main.py", "--launched-mode=console", "--show-console"] + sys.argv[1:])
+            subprocess.call([sys.executable, "main.py", "--launched-mode=console"] + sys.argv[1:])
             return
 
         print(f"❌ Critical Error: Could not find application binary at:\n{internal_exe}")
@@ -122,8 +122,7 @@ def main():
 
     # 5. Prepare Arguments
     # --launched-mode=console tells main.py to behave in console mode
-    # --show-console tells tray.py to show console on start
-    cmd_args = [str(internal_exe), "--launched-mode=console", "--show-console"] + sys.argv[1:]
+    cmd_args = [str(internal_exe), "--launched-mode=console"] + sys.argv[1:]
     
     # 6. Launch (Blocking)
     # We use subprocess.call (or run) because we want this launcher to stay alive 

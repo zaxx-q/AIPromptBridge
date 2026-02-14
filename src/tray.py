@@ -561,7 +561,6 @@ class TrayApp:
     
     def _on_edit_config(self, systray):
         """Open config.ini in default editor"""
-        # WorkspaceManager ensures CWD is correct
         config_path = Path.cwd() / "config.ini"
             
         if config_path.exists():
@@ -571,7 +570,6 @@ class TrayApp:
     
     def _on_edit_options(self, systray):
         """Open prompts.json in default editor"""
-        # WorkspaceManager ensures CWD is correct
         options_path = Path.cwd() / "prompts.json"
         
         if options_path.exists():

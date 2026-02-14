@@ -425,14 +425,15 @@ Both windows are accessible from the system tray menu.
 
 ## Workspace Management (Deployment)
 
-To support clean deployment with Nuitka, the application uses a split structure managed by `src/workspace_manager.py`:
+To support clean deployment with Nuitka, the application uses a split structure:
 
 - **Root**: Contains lightweight launchers (`AIPromptBridge.exe`, `AIPromptBridge-Console.exe`) and user config files.
 - **Bin**: Contains the heavy standalone application (`bin/AIPromptBridge_Internal.exe`) and dependencies.
 
-**`src/workspace_manager.py`** manages file migration:
-- **Initialization**: Called early in `main.py` via `WorkspaceManager.initialize()`.
-- **File Migration**: Automatically moves managed files (`config.ini`, `prompts.json`, sessions) between Root and Bin depending on the mode.
-- **CWD Resolution**: Ensures the application always operates in the correct directory (Root for launchers, Bin for direct execution) so relative paths work as expected.
+Workspace logic is handled inline in `main.py` via `setup_workspace()`:
+- **From source**: No CWD change needed; runs in the project directory as-is.
+- **Compiled + launcher** (`--launched-mode`): CWD is set to the launcher's directory (parent of `bin/`).
+- **Compiled + no launcher**: Refuses to start — the internal binary must be launched via a launcher.
+- **Stale file migration**: A non-blocking background thread moves any leftover config/data files from `bin/` to root on startup.
 
 For more details on the build process and launcher architecture, see [BUILD_PROCESS.md](BUILD_PROCESS.md).

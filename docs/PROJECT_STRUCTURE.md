@@ -41,7 +41,6 @@ AIPromptBridge/
     ├── utils.py                # Utility functions (strip_markdown, etc.)
     ├── version.py              # Application version source of truth
     ├── web_server.py           # Flask server and API endpoints
-    ├── workspace_manager.py    # Path management for Nuitka deployments
     │
     ├── audio/                  # Audio Subsystem
     │   ├── __init__.py
