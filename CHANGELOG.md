@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.3.1] - 2026-02-14
+
+### Fixes
+
+- **Internal**: Renamed internal references to `AIPromptBridge.exe` (Console) and `AIPromptBridge-NoConsole.exe` (GUI)
+- **System Tray**: Fix application restart logic to correctly handle both launcher-based and source-based execution modes.
+- **UX**: Added a native Windows error dialog when attempting to run the internal binary directly.
+- **Audio Tool**: Switched from print statements to proper logging for cleaner output and better diagnostics.
+
 ## [4.3.0] - 2026-02-14
 
 ### New Features

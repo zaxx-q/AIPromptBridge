@@ -222,6 +222,10 @@ For advanced users, configuration files are stored in the application root:
 - If one key hits rate limits, the next one is used automatically
 - The system tracks exhausted keys and skips them
 - Keys rotate on: 429 (rate limit), 401/402/403 (auth errors), empty responses
+- **Security**: You can also provide keys via Environment Variables instead of `config.ini`:
+  - `GEMINI_API_KEY`
+  - `OPENROUTER_API_KEY`
+  - `CUSTOM_API_KEY`
 
 ## 🔧 Command Line Options
 
