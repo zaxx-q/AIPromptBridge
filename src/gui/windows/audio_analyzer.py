@@ -1036,20 +1036,19 @@ class AudioAnalyzerWindow:
             
             if self.current_device:
                 self.recorder = AudioRecorder(self.current_device)
-                print(f"[AudioAnalyzer] Created recorder for device: {self.current_device.name}")
+                logging.debug(f"[AudioAnalyzer] Created recorder for device: {self.current_device.name}")
                 
                 # Start stream immediately with level callback
                 callback = self._create_level_callback()
                 if self.recorder.start_stream(level_callback=callback):
-                    print(f"[AudioAnalyzer] Stream started for: {self.current_device.name}")
+                    logging.debug(f"[AudioAnalyzer] Stream started for: {self.current_device.name}")
                     # Start continuous level updates
                     self._start_continuous_level_updates()
                 else:
-                    print(f"[AudioAnalyzer] Failed to start stream")
+                    logging.error(f"[AudioAnalyzer] Failed to start stream")
                 # NOTE: With unified stream, level meter works continuously!
                 
         except Exception as e:
-            print(f"[AudioAnalyzer] Failed to update recorder: {e}")
             logging.error(f"[AudioAnalyzer] Failed to update recorder: {e}")
     
     def _create_level_callback(self):
@@ -1107,7 +1106,7 @@ class AudioAnalyzerWindow:
             # Performance check
             duration = (time.time() - start_t) * 1000
             if duration > 15:  # If update takes more than 15ms
-                print(f"[Perf] Level update lagging: {duration:.1f}ms")
+                logging.debug(f"[Perf] Level update lagging: {duration:.1f}ms")
             
         except Exception as e:
             logging.debug(f"[AudioAnalyzer] Level update error: {e}")
@@ -1280,7 +1279,7 @@ class AudioAnalyzerWindow:
                 
                 # Level meter already running via _start_continuous_level_updates
                 self._update_status("Recording...", self.colors.red)
-                print("[AudioAnalyzer] Recording started (unified stream)")
+                print("[AudioAnalyzer] Recording started")
             else:
                 self._update_status("Failed to start recording", self.colors.red)
                 
@@ -1333,7 +1332,7 @@ class AudioAnalyzerWindow:
                 self.audio_duration = get_audio_duration(wav_data)
                 
                 logging.info(f"[AudioAnalyzer] Recording stopped (unified): {len(wav_data)} bytes, {self.audio_duration:.1f}s")
-                print(f"[AudioAnalyzer] Recording stopped (unified): {len(wav_data)} bytes, {self.audio_duration:.1f}s")
+                print(f"[AudioAnalyzer] Recording stopped: {len(wav_data)} bytes, {self.audio_duration:.1f}s")
                 
                 # Update compression estimate
                 self._update_size_estimate()
@@ -2101,7 +2100,7 @@ class AudioAnalyzerWindow:
         # Stop unified stream first
         if self.recorder:
             self.recorder.stop_stream()
-            print("[AudioAnalyzer] Unified stream stopped on close")
+            logging.debug("[AudioAnalyzer] Unified stream stopped on close")
         
         # Stop recording/playback and cleanup
         if self.recorder:
