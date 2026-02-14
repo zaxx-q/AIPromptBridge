@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GUI Launcher for AIPromptBridge
-This script is compiled as a Onefile executable (AIPromptBridge.exe).
+This script is compiled as a Onefile executable (AIPromptBridge-NoConsole.exe).
 It launches the internal Nuitka Standalone executable (bin/AIPromptBridge_Internal.exe)
 in GUI mode (no console).
 """

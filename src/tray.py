@@ -417,15 +417,25 @@ class TrayApp:
         """Restart the application"""
         print("\n🔄 Restarting AIPromptBridge...")
         
-        # Get the current script path
+        # Get current state
         script = os.path.abspath(sys.argv[0])
         args = sys.argv[1:]
         
-        # Ensure console is shown before restart
-        show_console()
-        enable_console_close_button()  # Re-enable close button before restart
+        # Detect mode
+        is_compiled = getattr(sys, 'frozen', False) or "__compiled__" in globals() or (sys.executable.lower().endswith(".exe") and "python" not in os.path.basename(sys.executable).lower())
         
-        # Clean up emoji resources before restart
+        launched_mode = None
+        for arg in sys.argv:
+            if arg.startswith("--launched-mode="):
+                launched_mode = arg.split("=")[1]
+                break
+
+        # Only manipulate console if NOT in GUI mode
+        if launched_mode != "gui":
+            show_console()
+            enable_console_close_button()
+        
+        # Clean up emoji resources
         try:
             from .gui.emoji_renderer import get_emoji_renderer
             if get_emoji_renderer():
@@ -433,20 +443,46 @@ class TrayApp:
         except Exception:
             pass
             
-        # Start the new process FIRST, before doing anything that might fail
+        # Strategy 1: Compiled Mode - Restart via Launcher
+        if is_compiled and launched_mode:
+            try:
+                bin_dir = Path(sys.executable).parent
+                root_dir = bin_dir.parent
+                
+                # Determine correct launcher
+                # Console mode is AIPromptBridge.exe
+                # GUI mode is AIPromptBridge-NoConsole.exe
+                launcher_name = "AIPromptBridge-NoConsole.exe" if launched_mode == "gui" else "AIPromptBridge.exe"
+                launcher_path = root_dir / launcher_name
+                
+                if launcher_path.exists():
+                    print(f"🔄 Restarting via launcher: {launcher_name}")
+                    
+                    # Remove --launched-mode arg as launcher adds it
+                    new_args = [arg for arg in sys.argv[1:] if not arg.startswith("--launched-mode")]
+                    
+                    cmd = [str(launcher_path)] + new_args
+                    
+                    # Detached process group
+                    subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+                    os._exit(0)
+            except Exception as e:
+                print(f"[Error] Launcher restart failed, falling back: {e}")
+
+        # Strategy 2: Source Mode / Fallback
         if sys.platform == 'win32':
             try:
-                # Check for Windows Terminal
+                # Check for Windows Terminal path
                 wt_path = shutil.which("wt.exe")
                 
-                # Check if we should prevent WT launch (e.g. user set flag)
+                # Check for flags that disable WT
                 no_wt = "--no-wt" in args
                 
-                if wt_path and not no_wt:
-                    # Launch in Windows Terminal
+                # Only use WT if available, not disabled, AND not in GUI mode
+                if wt_path and not no_wt and launched_mode != "gui":
                     print("🔄 Restarting via Windows Terminal...")
                     env = os.environ.copy()
-                    env["AI_PROMPT_BRIDGE_WT_LAUNCHED"] = "1"  # Prevent loop
+                    env["AI_PROMPT_BRIDGE_WT_LAUNCHED"] = "1"
                     
                     cmd = [wt_path, "-w", "0", "-d", os.getcwd()]
                     if script.endswith('.py'):
@@ -457,11 +493,12 @@ class TrayApp:
                     subprocess.Popen(cmd, env=env, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
                     
                 else:
-                    # Legacy console restart
-                    # DETACHED_PROCESS = 0x00000008
-                    # CREATE_NEW_CONSOLE = 0x00000010
-                    # CREATE_NEW_PROCESS_GROUP = 0x00000200
-                    flags = subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP
+                    # Legacy console or GUI background restart
+                    flags = subprocess.CREATE_NEW_PROCESS_GROUP
+                    
+                    # Only create new console window if NOT in GUI mode
+                    if launched_mode != "gui":
+                        flags |= subprocess.CREATE_NEW_CONSOLE
                     
                     if script.endswith('.py'):
                         subprocess.Popen(
@@ -470,7 +507,6 @@ class TrayApp:
                             start_new_session=True
                         )
                     else:
-                        # Frozen executable
                         subprocess.Popen(
                             [script] + args,
                             creationflags=flags,
@@ -478,12 +514,10 @@ class TrayApp:
                         )
             except Exception as e:
                 print(f"[Error] Failed to start new process: {e}")
-                return  # Don't exit if we couldn't start new process
+                return
         else:
             os.execv(sys.executable, [sys.executable, script] + args)
         
-        # Don't call systray.shutdown() - it causes "cannot join current thread" error
-        # Just force exit. The tray icon will disappear when the process dies.
         os._exit(0)
     
     def _on_session_browser(self, systray):

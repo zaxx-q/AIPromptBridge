@@ -429,7 +429,7 @@ Both windows are accessible from the system tray menu.
 
 To support clean deployment with Nuitka, the application uses a split structure:
 
-- **Root**: Contains lightweight launchers (`AIPromptBridge.exe`, `AIPromptBridge-Console.exe`) and user config files.
+- **Root**: Contains lightweight launchers (`AIPromptBridge.exe`, `AIPromptBridge-NoConsole.exe`) and user config files.
 - **Bin**: Contains the heavy standalone application (`bin/AIPromptBridge_Internal.exe`) and dependencies.
 
 Workspace logic is handled inline in `main.py` via `setup_workspace()`:
