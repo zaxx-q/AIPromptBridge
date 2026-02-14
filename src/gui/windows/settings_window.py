@@ -66,6 +66,7 @@ class ConfigData:
     
     def __init__(self):
         self.config: Dict[str, Any] = {}       # [config] section values
+        self.ai_params: Dict[str, Any] = {}    # [ai_params] section values
         self.endpoints: Dict[str, str] = {}    # [endpoints] section
         # API key sections - now stores dicts with "key" and "name" fields
         # Format: [{"key": "sk-xxx", "name": "My Key"}, ...]
@@ -133,6 +134,16 @@ def parse_config_full(filepath: str = "config.ini") -> ConfigData:
                         data.comments[key] = last_comment
                     last_comment = ""
             
+            elif current_section == 'ai_params':
+                if '=' in stripped:
+                    key, value = stripped.split('=', 1)
+                    key = key.strip().lower()
+                    value = _parse_value(value.strip())
+                    data.ai_params[key] = value
+                    if last_comment:
+                        data.comments[f"ai_params.{key}"] = last_comment
+                    last_comment = ""
+            
             elif current_section == 'endpoints':
                 if '=' in stripped:
                     if multiline_key:
@@ -194,9 +205,10 @@ def _parse_value(value_str: str) -> Any:
     value_str = value_str.strip()
     if value_str.lower() in ['none', 'null', '']:
         return None
-    if value_str.lower() in ['true', 'yes', 'on', '1']:
+    # Note: '1'/'0' intentionally excluded - they should parse as int, not bool.
+    if value_str.lower() in ['true', 'yes', 'on']:
         return True
-    if value_str.lower() in ['false', 'no', 'off', '0']:
+    if value_str.lower() in ['false', 'no', 'off']:
         return False
     try:
         if '.' not in value_str:
@@ -238,6 +250,7 @@ def save_config_full(data: ConfigData, filepath: str = "config.ini") -> bool:
         lines = []
         current_section = None
         written_keys = set()
+        written_ai_params = set()
         written_endpoints = set()
         written_api_keys = {"custom": set(), "openrouter": set(), "google": set()}
         
@@ -265,6 +278,15 @@ def save_config_full(data: ConfigData, filepath: str = "config.ini") -> bool:
                     written_keys.add(key)
                 else:
                     lines.append(raw_line + '\n')
+            
+            elif current_section == 'ai_params' and '=' in stripped:
+                key = stripped.split('=', 1)[0].strip().lower()
+                if key in data.ai_params:
+                    value = _value_to_str(data.ai_params[key])
+                    lines.append(f"{key} = {value}\n")
+                    written_ai_params.add(key)
+                else:
+                    continue
             
             elif current_section == 'endpoints' and '=' in stripped:
                 # Skip multiline continuations (handled with main key)
@@ -301,24 +323,47 @@ def save_config_full(data: ConfigData, filepath: str = "config.ini") -> bool:
         if new_config_lines and config_section_end > 0:
             lines = lines[:config_section_end] + new_config_lines + lines[config_section_end:]
         
+        # Add new ai_params keys not in original file
+        ai_params_section_end = _find_section_end(lines, 'ai_params')
+        if ai_params_section_end == -1 and data.ai_params:
+            # [ai_params] section doesn't exist yet - create it before API key sections
+            # Find position: before [custom], [openrouter], [google], or at end of file
+            insert_pos = len(lines)
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                if stripped.startswith('[') and stripped.endswith(']'):
+                    sec = stripped[1:-1].lower()
+                    if sec in ('custom', 'openrouter', 'google'):
+                        insert_pos = i
+                        break
+            section_lines = ['\n[ai_params]\n']
+            for key, value in data.ai_params.items():
+                if value is not None:
+                    section_lines.append(f"{key} = {_value_to_str(value)}\n")
+            lines = lines[:insert_pos] + section_lines + lines[insert_pos:]
+        elif ai_params_section_end > 0:
+            new_ai_params_lines = []
+            for key, value in data.ai_params.items():
+                if key not in written_ai_params:
+                    if value is None:
+                        continue
+                    new_ai_params_lines.append(f"{key} = {_value_to_str(value)}\n")
+            if new_ai_params_lines:
+                lines = lines[:ai_params_section_end] + new_ai_params_lines + lines[ai_params_section_end:]
+        
         # Add API keys at end of their sections
         for section in ['custom', 'openrouter', 'google']:
             section_end = _find_section_end(lines, section)
             if section_end > 0:
                 key_lines = []
                 for key_data in data.keys[section]:
-                    if isinstance(key_data, dict):
-                        key_str = key_data.get("key", "")
-                        name = key_data.get("name", "")
-                        if key_str:  # Only write non-empty keys
-                            if name:
-                                key_lines.append(f'{key_str}   # {name}\n')
-                            else:
-                                key_lines.append(f'{key_str}\n')
-                    else:
-                        # Backward compat: plain string
-                        if key_data:
-                            key_lines.append(f'{key_data}\n')
+                    key_str = key_data.get("key", "")
+                    name = key_data.get("name", "")
+                    if key_str:  # Only write non-empty keys
+                        if name:
+                            key_lines.append(f'{key_str}   # {name}\n')
+                        else:
+                            key_lines.append(f'{key_str}\n')
                 lines = lines[:section_end] + key_lines + lines[section_end:]
         
         # Write file
@@ -455,6 +500,9 @@ class SettingsWindow:
             from ... import web_server
             for key, value in web_server.CONFIG.items():
                 self.config_data.config[key] = value
+            # Also load AI params from web_server
+            for key, value in web_server.AI_PARAMS.items():
+                self.config_data.ai_params[key] = value
         except (ImportError, AttributeError):
             pass
         
@@ -784,6 +832,12 @@ class SettingsWindow:
                                self.config_data.config.get("show_ai_response_in_chat_window", False),
                                hint="For direct chat popup and endpoint requests. Actions/modifiers override this.")
         
+        # Use origin system prompt
+        self._add_toggle_field(content_parent, "chat_use_origin_system_prompt",
+                               "Use origin system prompt in chat",
+                               self.config_data.config.get("chat_use_origin_system_prompt", True),
+                               hint="Use the action's system prompt for follow-up messages instead of global one")
+        
         # Session Auto-Save
         row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
@@ -958,6 +1012,42 @@ class SettingsWindow:
         self._add_model_dropdown_field(content_parent, "google_model", "Model:",
                                        self.config_data.config.get("google_model", ""),
                                        provider="google", width=260)
+        
+        # AI Parameters section
+        create_section_header(content_parent, "🔧 AI Parameters", self.colors, top_padding=20)
+        
+        if self.use_ctk:
+            ctk.CTkLabel(content_parent, text="Optional parameters passed to the model. Leave empty for model defaults.\nYou can add custom parameters in the [ai_params] section of config.ini",
+                        font=get_ctk_font(11), justify="left", **get_ctk_label_colors(self.colors, muted=True)
+                        ).pack(anchor="w", pady=(0, 8))
+        else:
+            tk.Label(content_parent, text="Optional parameters passed to the model. Leave empty for model defaults.\nYou can add custom parameters in the [ai_params] section of config.ini",
+                    font=("Segoe UI", 9), justify="left", bg=self.colors.bg, fg=self.colors.blockquote).pack(anchor="w", pady=(0, 8))
+        
+        # Track which var keys belong to ai_params (prefixed with "ai_param_")
+        if not hasattr(self, '_ai_param_keys'):
+            self._ai_param_keys = set()
+        
+        # Temperature
+        temp_val = self.config_data.ai_params.get("temperature", "")
+        self._add_entry_field(content_parent, "ai_param_temperature", "Temperature:",
+                             str(temp_val) if temp_val != "" and temp_val is not None else "",
+                             width=80, hint="0.0-2.0. Controls randomness")
+        self._ai_param_keys.add("ai_param_temperature")
+        
+        # Max tokens
+        max_tok_val = self.config_data.ai_params.get("max_tokens", "")
+        self._add_entry_field(content_parent, "ai_param_max_tokens", "Max tokens:",
+                             str(max_tok_val) if max_tok_val != "" and max_tok_val is not None else "",
+                             width=100, hint="Maximum output tokens")
+        self._ai_param_keys.add("ai_param_max_tokens")
+        
+        # Top P
+        top_p_val = self.config_data.ai_params.get("top_p", "")
+        self._add_entry_field(content_parent, "ai_param_top_p", "Top P:",
+                             str(top_p_val) if top_p_val != "" and top_p_val is not None else "",
+                             width=80, hint="0.0-1.0. Nucleus sampling threshold")
+        self._ai_param_keys.add("ai_param_top_p")
     
     def _create_streaming_tab(self, frame):
         """Create the Streaming/Thinking settings tab."""
@@ -1429,15 +1519,10 @@ class SettingsWindow:
         # DEPRECATED: Use custom_widgets.upgrade_tabview_with_icons
         pass
 
-    def _mask_key(self, key_data) -> str:
+    def _mask_key(self, key_data: dict) -> str:
         """Mask an API key for display, including name if present."""
-        # Handle both dict format and legacy string format
-        if isinstance(key_data, dict):
-            key = key_data.get("key", "")
-            name = key_data.get("name", "")
-        else:
-            key = str(key_data)
-            name = ""
+        key = key_data.get("key", "")
+        name = key_data.get("name", "")
         
         if len(key) <= 8:
             masked = "*" * len(key)
@@ -1482,12 +1567,9 @@ class SettingsWindow:
         
         # Extract actual keys from the dict format
         for kd in keys_data:
-            if isinstance(kd, dict):
-                key_str = kd.get("key", "")
-                if key_str:
-                    result["keys"].append(key_str)
-            elif kd:
-                result["keys"].append(str(kd))
+            key_str = kd.get("key", "")
+            if key_str:
+                result["keys"].append(key_str)
         
         if not result["keys"]:
             result["error"] = f"No valid API keys for {provider}"
@@ -2258,7 +2340,24 @@ class SettingsWindow:
                 except (ValueError, TypeError):
                     value = 5000  # Default port
             
-            self.config_data.config[key] = value
+            # Route ai_param_ prefixed keys to ai_params dict
+            if hasattr(self, '_ai_param_keys') and key in self._ai_param_keys:
+                param_name = key[len("ai_param_"):]  # Strip prefix
+                str_val = str(value).strip() if value is not None else ""
+                if str_val:
+                    # Parse numeric values
+                    try:
+                        if '.' in str_val:
+                            self.config_data.ai_params[param_name] = float(str_val)
+                        else:
+                            self.config_data.ai_params[param_name] = int(str_val)
+                    except ValueError:
+                        self.config_data.ai_params[param_name] = str_val
+                else:
+                    # Empty = unset, remove from ai_params
+                    self.config_data.ai_params.pop(param_name, None)
+            else:
+                self.config_data.config[key] = value
         
         # Collect API keys (now as list of dicts with key and name)
         for provider in ["custom", "openrouter", "google"]:
@@ -2267,11 +2366,8 @@ class SettingsWindow:
                 # Filter out empty keys and ensure dict format
                 cleaned_keys = []
                 for kd in self.widgets[data_key]:
-                    if isinstance(kd, dict):
-                        if kd.get("key"):
-                            cleaned_keys.append(kd)
-                    elif kd:  # Backward compat: plain string
-                        cleaned_keys.append({"key": str(kd), "name": ""})
+                    if kd.get("key"):
+                        cleaned_keys.append(kd)
                 self.config_data.keys[provider] = cleaned_keys
         
         # Save to file
@@ -2289,12 +2385,9 @@ class SettingsWindow:
                         # Extract just the key strings for the KeyManager
                         key_strings = []
                         for kd in new_keys:
-                            if isinstance(kd, dict):
-                                key_str = kd.get("key", "")
-                                if key_str:
-                                    key_strings.append(key_str)
-                            elif kd:
-                                key_strings.append(str(kd))
+                            key_str = kd.get("key", "")
+                            if key_str:
+                                key_strings.append(key_str)
                         web_server.KEY_MANAGERS[provider].keys = key_strings
                         web_server.KEY_MANAGERS[provider].current_index = 0
                         web_server.KEY_MANAGERS[provider].exhausted_keys.clear()
@@ -2304,6 +2397,12 @@ class SettingsWindow:
                 for endpoint_name, prompt in self.config_data.endpoints.items():
                     web_server.ENDPOINTS[endpoint_name] = prompt
                 print(f"[Settings] Reloaded {len(self.config_data.endpoints)} endpoint(s)")
+                
+                # Sync AI parameters to in-memory dict
+                web_server.AI_PARAMS.clear()
+                web_server.AI_PARAMS.update(self.config_data.ai_params)
+                if self.config_data.ai_params:
+                    print(f"[Settings] AI params: {self.config_data.ai_params}")
                 
             except (ImportError, AttributeError) as e:
                 print(f"[Settings] Note: Could not update in-memory config: {e}")
@@ -2353,6 +2452,13 @@ class SettingsWindow:
                             var.set(str(default_value))
                         else:
                             var.set(str(default_value) if default_value is not None else "")
+            
+            # Clear AI parameters and reset their UI fields
+            self.config_data.ai_params.clear()
+            if hasattr(self, '_ai_param_keys'):
+                for ap_key in self._ai_param_keys:
+                    if ap_key in self.vars:
+                        self.vars[ap_key].set("")
             
             # Update theme preview if on theme tab
             if self.preview_frame:

@@ -113,9 +113,10 @@ def parse_config_value(value_str):
     value_str = value_str.strip()
     if value_str.lower() in ['none', 'null', '']:
         return None
-    if value_str.lower() in ['true', 'yes', 'on', '1']:
+    # Use 'true'/'false' for boolean values in config.
+    if value_str.lower() in ['true', 'yes', 'on']:
         return True
-    if value_str.lower() in ['false', 'no', 'off', '0']:
+    if value_str.lower() in ['false', 'no', 'off']:
         return False
     try:
         if '.' not in value_str:
@@ -147,6 +148,7 @@ def load_config(filepath=CONFIG_FILE):
         current_section = None
         multiline_key = None
         multiline_value = []
+        seen_config_keys = set()
         
         for line in lines:
             raw_line = line.rstrip('\n\r')
@@ -166,8 +168,20 @@ def load_config(filepath=CONFIG_FILE):
                     key = key.strip().lower()
                     value = parse_config_value(value)
                     if key in DEFAULT_CONFIG:
+                        if key in seen_config_keys:
+                            print(f"[Warning] Duplicate config key '{key}' in config.ini (using last value)")
+                        seen_config_keys.add(key)
                         config[key] = value
-                    elif value is not None:
+                    else:
+                        print(f"[Warning] Unknown key '{key}' in [config] section (ignored). "
+                              f"AI parameters belong in [ai_params].")
+            
+            elif current_section == 'ai_params':
+                if '=' in stripped:
+                    key, value = stripped.split('=', 1)
+                    key = key.strip().lower()
+                    value = parse_config_value(value)
+                    if value is not None:
                         ai_params[key] = value
             
             # Legacy [endpoints] section parsing removed - prompts now in prompts.json
@@ -318,11 +332,6 @@ request_timeout = 120
 # Session management
 max_sessions = 50
 
-# AI Parameters (optional)
-# temperature = 1
-# max_tokens = 16384
-# top_p = 0.95
-
 # ============================================================
 # STREAMING AND THINKING SETTINGS
 # ============================================================
@@ -442,6 +451,19 @@ session_image_quality = 85
 # true = Use the originating action's system prompt for follow-up messages
 # false = Always use chat_window_system_instruction from prompts.json
 chat_use_origin_system_prompt = true
+
+# ============================================================
+# AI PARAMETERS (Optional)
+# ============================================================
+# These parameters are passed directly to the AI model.
+# Only set values you want to override; unset = model defaults.
+# Unknown keys in [config] are ignored to prevent stale values
+# from being sent to the model.
+
+[ai_params]
+# temperature = 1
+# max_tokens = 16384
+# top_p = 0.95
 
 # ============================================================
 # API KEYS - Add your keys below (one per line)
