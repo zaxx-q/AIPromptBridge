@@ -1730,23 +1730,32 @@ class FileProcessor(BaseTool):
         self,
         base_prompt: str,
         batch_instructions: Optional[str],
-        per_file_instructions: Optional[str]
+        per_file_instructions: Optional[str],
+        filename: Optional[str] = None
     ) -> str:
         """
-        Build the final prompt by injecting custom instructions.
+        Build the final prompt by injecting filename and custom instructions.
         
         Args:
             base_prompt: The original prompt text
             batch_instructions: Batch-wide instructions (or None)
             per_file_instructions: File-specific instructions (or None)
+            filename: Original filename to include for context (or None)
             
         Returns:
-            Final prompt with instructions appended
+            Final prompt with filename and instructions appended
         """
-        if not batch_instructions and not per_file_instructions:
+        if not batch_instructions and not per_file_instructions and not filename:
             return base_prompt
         
         parts = [base_prompt]
+        
+        if filename:
+            parts.append(f"\n\n[File: {filename}]")
+        
+        if not batch_instructions and not per_file_instructions:
+            return "\n".join(parts)
+        
         parts.append("\n\n---\nADDITIONAL CONTEXT FROM USER:")
         
         if batch_instructions:
@@ -2099,11 +2108,12 @@ class FileProcessor(BaseTool):
                             cp.per_file_instructions[str(file_path)] = per_file_result
                             self.checkpoint_manager.save(cp)
                 
-                # Build final prompt with custom instructions
+                # Build final prompt with filename and custom instructions
                 final_prompt = self._build_final_prompt(
                     cp.prompt_text,
                     self._custom_instructions,
-                    per_file_instructions
+                    per_file_instructions,
+                    filename=file_path_obj.name
                 )
                 
                 process_path = file_path_obj
