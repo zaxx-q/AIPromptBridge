@@ -738,7 +738,7 @@ def main():
             
             # Open Settings Window directly (blocking)
             # Use GUICoordinator to keep the root alive and avoid re-init delays
-            show_settings_window_blocking()
+            show_settings_window_blocking(initial_tab="API Keys")
             
             # Reload keys after settings window closes
             has_any_keys = any(km.has_keys() for km in web_server.KEY_MANAGERS.values())

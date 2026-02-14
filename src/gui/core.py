@@ -327,7 +327,8 @@ class GUICoordinator:
         """Create a settings window on the GUI thread"""
         from .windows import create_attached_settings_window
         on_close = request.get('on_close')
-        create_attached_settings_window(self._root, on_close)
+        initial_tab = request.get('initial_tab')
+        create_attached_settings_window(self._root, on_close, initial_tab)
 
     def _create_prompt_editor_window(self, request):
         """Create a prompt editor window on the GUI thread"""
@@ -554,12 +555,13 @@ class GUICoordinator:
             'timeout_ms': timeout_ms
         })
     
-    def request_settings_window(self, on_close: Optional[Callable] = None):
+    def request_settings_window(self, on_close: Optional[Callable] = None, initial_tab: str = None):
         """Request creation of a settings window (thread-safe)"""
         self.ensure_running()
         self._request_queue.put({
             'type': 'settings',
-            'on_close': on_close
+            'on_close': on_close,
+            'initial_tab': initial_tab
         })
     
     def request_prompt_editor_window(self):
@@ -678,17 +680,20 @@ def dismiss_typing_indicator():
     coordinator.request_dismiss_typing_indicator()
 
 
-def show_settings_window():
+def show_settings_window(initial_tab: str = None):
     """Show settings window (thread-safe)"""
     coordinator = GUICoordinator.get_instance()
-    coordinator.request_settings_window()
+    coordinator.request_settings_window(initial_tab=initial_tab)
     return True
 
 
-def show_settings_window_blocking():
+def show_settings_window_blocking(initial_tab: str = None):
     """
     Show settings window and block until it is closed.
     Uses the GUICoordinator to ensure thread safety and keep the GUI root alive.
+    
+    Args:
+        initial_tab: Name of the tab to select initially
     """
     coordinator = GUICoordinator.get_instance()
     
@@ -697,7 +702,7 @@ def show_settings_window_blocking():
     def on_close():
         done_event.set()
         
-    coordinator.request_settings_window(on_close=on_close)
+    coordinator.request_settings_window(on_close=on_close, initial_tab=initial_tab)
     done_event.wait()
     return True
 

@@ -2431,16 +2431,16 @@ class AttachedSettingsWindow:
     Used for centralized GUI threading.
     """
     
-    def __init__(self, parent_root, on_close=None):
+    def __init__(self, parent_root, on_close=None, initial_tab=None):
         self.parent_root = parent_root
         # Run directly on GUI thread as a child window
         settings = SettingsWindow(master=parent_root, on_close=on_close)
-        settings.show()
+        settings.show(initial_tab=initial_tab)
 
 
-def create_attached_settings_window(parent_root, on_close=None):
+def create_attached_settings_window(parent_root, on_close=None, initial_tab=None):
     """Create a settings window (called on GUI thread)."""
-    AttachedSettingsWindow(parent_root, on_close)
+    AttachedSettingsWindow(parent_root, on_close, initial_tab)
 
 
 def show_settings_window():
