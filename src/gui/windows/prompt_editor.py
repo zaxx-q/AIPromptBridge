@@ -3830,47 +3830,68 @@ class PromptEditorWindow:
                 self.status_label.configure(text="❌ Failed to save", fg=self.colors.accent_red)
     
     def _reset_to_defaults(self):
-        """Reset all prompts configuration to defaults."""
+        """Reset all prompts configuration to defaults in-memory. Requires Save All to persist."""
         if not messagebox.askyesno(
             "Reset to Defaults",
             "This will reset ALL prompts, actions, modifiers, and settings to their default values.\n\n"
-            "Your current configuration will be backed up to prompts.json.bak\n\n"
+            "You will need to click 'Save All' to apply the changes to prompts.json.\n\n"
             "Are you sure you want to continue?",
             parent=self.root
         ):
             return
         
         try:
-            from ..prompts import get_prompts_config, PROMPTS_FILE
+            from ..prompts import get_prompts_config
             
-            # Create backup of current file
-            if Path(PROMPTS_FILE).exists():
-                backup_path = PROMPTS_FILE + ".bak"
-                shutil.copy2(PROMPTS_FILE, backup_path)
-            
-            # Get fresh defaults from PromptsConfig
+            # Get fresh defaults WITHOUT saving to file
             config = get_prompts_config()
-            config.reset_to_defaults()
+            self.options_data = config._get_defaults()
             
-            # Reload options data
-            self.options_data = load_options()
+            # Clear current selection
+            self.current_action = None
             
-            # Refresh all UI elements
-            self._refresh_action_list()
-            self._clear_editor()
-            
-            # Update status
-            if self.use_ctk:
-                self.status_label.configure(text="✅ Reset to defaults complete!", text_color=self.colors.accent_green)
+            # Reset all loaded tabs so they rebuild with new data
+            if self.use_ctk and hasattr(self, '_tab_configs'):
+                current_tab = self.tabview.get()
+                
+                for tab_name, (method_name, is_loaded) in list(self._tab_configs.items()):
+                    if is_loaded:
+                        # Destroy tab content
+                        tab_frame = self.tabview.tab(tab_name)
+                        for widget in tab_frame.winfo_children():
+                            widget.destroy()
+                        # Mark as not loaded
+                        self._tab_configs[tab_name] = (method_name, False)
+                
+                # Reset widget references that tabs depend on
+                self.action_listbox = None
+                self.editor_widgets = {}
+                if hasattr(self, 'settings_widgets'):
+                    self.settings_widgets = {}
+                if hasattr(self, 'modifier_listbox'):
+                    self.modifier_listbox = None
+                if hasattr(self, 'modifier_widgets'):
+                    self.modifier_widgets = {}
+                if hasattr(self, 'group_listbox'):
+                    self.group_listbox = None
+                if hasattr(self, 'group_widgets'):
+                    self.group_widgets = {}
+                
+                # Reload the current tab
+                self._load_tab_content(current_tab)
             else:
-                self.status_label.configure(text="✅ Reset to defaults complete!", fg=self.colors.accent_green)
+                # Non-CTk fallback: refresh what we can
+                if self.action_listbox:
+                    self._refresh_action_list()
+                self._clear_editor()
             
-            messagebox.showinfo(
-                "Reset Complete",
-                "Configuration has been reset to defaults.\n\n"
-                "Please close and reopen the Prompt Editor to see all changes.",
-                parent=self.root
-            )
+            # Update status - tell user to Save All
+            if self.use_ctk:
+                self.status_label.configure(text="🔄 Reset to defaults. Click Save All to apply.", text_color=self.colors.accent_yellow)
+            else:
+                self.status_label.configure(text="🔄 Reset to defaults. Click Save All to apply.", fg=self.colors.accent_yellow)
+            
+            print("[PromptEditor] Configuration reset to defaults in editor. Click Save All to apply.")
             
         except Exception as e:
             if self.use_ctk:
