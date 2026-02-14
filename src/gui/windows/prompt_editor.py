@@ -1197,15 +1197,30 @@ class PromptEditorWindow:
         tet_val = self.options_data.get("text_edit_tool", {}).get("_settings", {}).get("popup_items_per_page", 6)
         tet_items_var = tk.IntVar(master=scroll_frame, value=tet_val)
         if self.use_ctk:
-             ctk.CTkEntry(row, textvariable=tet_items_var, width=60, font=get_ctk_font(12),
-                        **get_ctk_entry_colors(self.colors)).pack(side="left", padx=10)
+             tet_items_entry = ctk.CTkEntry(row, textvariable=tet_items_var, width=60, font=get_ctk_font(12),
+                        **get_ctk_entry_colors(self.colors))
+             tet_items_entry.pack(side="left", padx=10)
+             ctk.CTkLabel(row, text="(only if groups disabled)", font=get_ctk_font(11),
+                        **get_ctk_label_colors(self.colors, muted=True)).pack(side="left")
         else:
-             tk.Entry(row, textvariable=tet_items_var, width=5).pack(side="left", padx=10)
+             tet_items_entry = tk.Entry(row, textvariable=tet_items_var, width=5)
+             tet_items_entry.pack(side="left", padx=10)
+             tk.Label(row, text="(only if groups disabled)", font=("Segoe UI", 8),
+                     bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left")
         self.settings_widgets["text_edit_tool:popup_items_per_page"] = ("int", tet_items_var)
 
         # Use groups
         tet_grp_val = self.options_data.get("text_edit_tool", {}).get("_settings", {}).get("popup_use_groups", True)
         tet_grp_var = tk.BooleanVar(master=scroll_frame, value=tet_grp_val)
+        
+        def update_tet_items_state(*args):
+            state = "disabled" if tet_grp_var.get() else "normal"
+            tet_items_entry.configure(state=state)
+            
+        tet_grp_var.trace_add("write", update_tet_items_state)
+        # Initial state
+        update_tet_items_state()
+
         row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
         row.pack(fill="x", pady=4)
         if self.use_ctk:
@@ -1261,15 +1276,30 @@ class PromptEditorWindow:
         snip_val = self.options_data.get("snip_tool", {}).get("_settings", {}).get("popup_items_per_page", 6)
         snip_items_var = tk.IntVar(master=scroll_frame, value=snip_val)
         if self.use_ctk:
-             ctk.CTkEntry(row, textvariable=snip_items_var, width=60, font=get_ctk_font(12),
-                        **get_ctk_entry_colors(self.colors)).pack(side="left", padx=10)
+             snip_items_entry = ctk.CTkEntry(row, textvariable=snip_items_var, width=60, font=get_ctk_font(12),
+                        **get_ctk_entry_colors(self.colors))
+             snip_items_entry.pack(side="left", padx=10)
+             ctk.CTkLabel(row, text="(only if groups disabled)", font=get_ctk_font(11),
+                        **get_ctk_label_colors(self.colors, muted=True)).pack(side="left")
         else:
-             tk.Entry(row, textvariable=snip_items_var, width=5).pack(side="left", padx=10)
+             snip_items_entry = tk.Entry(row, textvariable=snip_items_var, width=5)
+             snip_items_entry.pack(side="left", padx=10)
+             tk.Label(row, text="(only if groups disabled)", font=("Segoe UI", 8),
+                     bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left")
         self.settings_widgets["snip_tool:popup_items_per_page"] = ("int", snip_items_var)
 
         # Use groups
         snip_grp_val = self.options_data.get("snip_tool", {}).get("_settings", {}).get("popup_use_groups", True)
         snip_grp_var = tk.BooleanVar(master=scroll_frame, value=snip_grp_val)
+        
+        def update_snip_items_state(*args):
+            state = "disabled" if snip_grp_var.get() else "normal"
+            snip_items_entry.configure(state=state)
+            
+        snip_grp_var.trace_add("write", update_snip_items_state)
+        # Initial state
+        update_snip_items_state()
+
         row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
         row.pack(fill="x", pady=4)
         if self.use_ctk:
@@ -1307,18 +1337,33 @@ class PromptEditorWindow:
              tk.Label(row, text="Items per page:", font=("Segoe UI", 10),
                      bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
         
-        audio_val = self.options_data.get("audio_tool", {}).get("_settings", {}).get("popup_items_per_page", 6)
+        audio_val = self.options_data.get("audio_tool", {}).get("_settings", {}).get("items_per_page", 6)
         audio_items_var = tk.IntVar(master=scroll_frame, value=audio_val)
         if self.use_ctk:
-             ctk.CTkEntry(row, textvariable=audio_items_var, width=60, font=get_ctk_font(12),
-                        **get_ctk_entry_colors(self.colors)).pack(side="left", padx=10)
+             audio_items_entry = ctk.CTkEntry(row, textvariable=audio_items_var, width=60, font=get_ctk_font(12),
+                        **get_ctk_entry_colors(self.colors))
+             audio_items_entry.pack(side="left", padx=10)
+             ctk.CTkLabel(row, text="(only if groups disabled)", font=get_ctk_font(11),
+                        **get_ctk_label_colors(self.colors, muted=True)).pack(side="left")
         else:
-             tk.Entry(row, textvariable=audio_items_var, width=5).pack(side="left", padx=10)
-        self.settings_widgets["audio_tool:popup_items_per_page"] = ("int", audio_items_var)
+             audio_items_entry = tk.Entry(row, textvariable=audio_items_var, width=5)
+             audio_items_entry.pack(side="left", padx=10)
+             tk.Label(row, text="(only if groups disabled)", font=("Segoe UI", 8),
+                     bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left")
+        self.settings_widgets["audio_tool:items_per_page"] = ("int", audio_items_var)
 
         # Use groups (audio_tool is a window, not popup, so uses "use_groups")
         audio_grp_val = self.options_data.get("audio_tool", {}).get("_settings", {}).get("use_groups", True)
         audio_grp_var = tk.BooleanVar(master=scroll_frame, value=audio_grp_val)
+        
+        def update_audio_items_state(*args):
+            state = "disabled" if audio_grp_var.get() else "normal"
+            audio_items_entry.configure(state=state)
+            
+        audio_grp_var.trace_add("write", update_audio_items_state)
+        # Initial state
+        update_audio_items_state()
+
         row = ctk.CTkFrame(scroll_frame, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_frame, bg=self.colors.bg)
         row.pack(fill="x", pady=4)
         if self.use_ctk:
