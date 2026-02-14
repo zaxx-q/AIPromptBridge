@@ -326,7 +326,8 @@ class GUICoordinator:
     def _create_settings_window(self, request):
         """Create a settings window on the GUI thread"""
         from .windows import create_attached_settings_window
-        create_attached_settings_window(self._root)
+        on_close = request.get('on_close')
+        create_attached_settings_window(self._root, on_close)
 
     def _create_prompt_editor_window(self, request):
         """Create a prompt editor window on the GUI thread"""
@@ -553,11 +554,12 @@ class GUICoordinator:
             'timeout_ms': timeout_ms
         })
     
-    def request_settings_window(self):
+    def request_settings_window(self, on_close: Optional[Callable] = None):
         """Request creation of a settings window (thread-safe)"""
         self.ensure_running()
         self._request_queue.put({
-            'type': 'settings'
+            'type': 'settings',
+            'on_close': on_close
         })
     
     def request_prompt_editor_window(self):
@@ -680,6 +682,23 @@ def show_settings_window():
     """Show settings window (thread-safe)"""
     coordinator = GUICoordinator.get_instance()
     coordinator.request_settings_window()
+    return True
+
+
+def show_settings_window_blocking():
+    """
+    Show settings window and block until it is closed.
+    Uses the GUICoordinator to ensure thread safety and keep the GUI root alive.
+    """
+    coordinator = GUICoordinator.get_instance()
+    
+    done_event = threading.Event()
+    
+    def on_close():
+        done_event.set()
+        
+    coordinator.request_settings_window(on_close=on_close)
+    done_event.wait()
     return True
 
 

@@ -408,11 +408,12 @@ class SettingsWindow:
     Standalone settings window using CustomTkinter.
     """
     
-    def __init__(self, master=None):
+    def __init__(self, master=None, on_close=None):
         self.window_id = get_next_window_id()
         self.window_tag = f"settings_{self.window_id}"
         
         self.master = master
+        self.on_close_callback = on_close
         self.colors = get_colors()
         self.root = None  # type: ignore
         self._destroyed = False
@@ -2411,6 +2412,12 @@ class SettingsWindow:
         """Close the settings window."""
         self._destroyed = True
         
+        if self.on_close_callback:
+            try:
+                self.on_close_callback()
+            except Exception as e:
+                print(f"[Settings] Error in on_close callback: {e}")
+
         # If we have a master, we rely on the master's loop, so we must destroy now.
         # If we are standalone (no master), the manual event loop will see
         # self._destroyed and call _safe_destroy()
@@ -2424,16 +2431,16 @@ class AttachedSettingsWindow:
     Used for centralized GUI threading.
     """
     
-    def __init__(self, parent_root):
+    def __init__(self, parent_root, on_close=None):
         self.parent_root = parent_root
         # Run directly on GUI thread as a child window
-        settings = SettingsWindow(master=parent_root)
+        settings = SettingsWindow(master=parent_root, on_close=on_close)
         settings.show()
 
 
-def create_attached_settings_window(parent_root):
+def create_attached_settings_window(parent_root, on_close=None):
     """Create a settings window (called on GUI thread)."""
-    AttachedSettingsWindow(parent_root)
+    AttachedSettingsWindow(parent_root, on_close)
 
 
 def show_settings_window():

@@ -30,7 +30,7 @@ from src.version import __version__
 from src.key_manager import KeyManager
 from src.session_manager import load_sessions, list_sessions
 from src.terminal import terminal_session_manager, print_commands_box
-from src.gui.core import HAVE_GUI
+from src.gui.core import HAVE_GUI, show_settings_window_blocking
 from src import web_server
 
 # System tray support
@@ -737,9 +737,8 @@ def main():
                 print()
             
             # Open Settings Window directly (blocking)
-            from src.gui.windows import SettingsWindow
-            settings = SettingsWindow()
-            settings.show(initial_tab="API Keys")
+            # Use GUICoordinator to keep the root alive and avoid re-init delays
+            show_settings_window_blocking()
             
             # Reload keys after settings window closes
             has_any_keys = any(km.has_keys() for km in web_server.KEY_MANAGERS.values())
