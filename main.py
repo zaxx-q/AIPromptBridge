@@ -22,6 +22,7 @@ import signal
 import argparse
 import shutil
 import subprocess
+import ctypes
 from pathlib import Path
 
 from src.console import console, Panel, Table, print_panel, print_success, print_error, print_warning, HAVE_RICH
@@ -467,12 +468,22 @@ def setup_workspace(launched_mode):
 
     if not launched_mode:
         # Compiled binary run directly without a launcher - refuse to start
-        print("❌ This executable must be launched via AIPromptBridge.exe or AIPromptBridge-Console.exe")
-        print("   Direct execution of the internal binary is not supported.")
+        msg = (
+            "This executable must be launched via one of the launcher files:\n"
+            "- AIPromptBridge.exe (Console)\n"
+            "- AIPromptBridge-NoConsole.exe (GUI)\n\n"
+            "Direct execution of the internal binary is not supported as it bypasses workspace configuration."
+        )
         try:
-            input("Press Enter to exit...")
-        except EOFError:
-            pass
+            # 0x10 = MB_ICONERROR
+            ctypes.windll.user32.MessageBoxW(0, msg, "AIPromptBridge Error", 0x10)
+        except Exception:
+            # Fallback if no GUI
+            print(f"❌ {msg}")
+            try:
+                input("Press Enter to exit...")
+            except EOFError:
+                pass
         return False
 
     # Compiled with launcher: CWD = root directory (parent of bin/)
