@@ -195,6 +195,7 @@ Sessions are stored in `chat_sessions.json` with sequential IDs.
 {
   "1": {
     "id": 1,
+    "origin": "textedit:Explain",
     "title": "First message preview...",
     "messages": [
       {"role": "user", "content": "..."},
@@ -228,8 +229,9 @@ Prompts are managed centrally via `PromptsConfig` (loading `prompts.json` or def
 - **General Mode** (`"general"`): Conversational responses (e.g., Explain). Uses `base_output_rules_general`.
 
 #### Context Injection
-- `chat_system_instruction`: Used for initial direct chats.
-- `chat_window_system_instruction`: Global instruction for follow-up conversations in chat windows.
+- `chat_system_instruction`: Used for initial direct chats via the popup.
+- `chat_window_system_instruction`: Default global instruction for follow-up conversations in chat windows.
+- **Origin-Awareness**: If `chat_use_origin_system_prompt` is enabled, sessions initiated from specific tool actions (e.g., `textedit:Explain`, `snip:Extract Text`) persist that action's system prompt for the entire conversation, preserving the specific persona/rules defined for that action.
 
 ### Design Decision
 

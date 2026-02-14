@@ -98,6 +98,10 @@ DEFAULT_CONFIG = {
     # - canvas: Custom canvas with grid lines and color gradient (default)
     # - progressbar: Smooth, simple progress bar
     "audio_level_meter_style": "canvas",
+    # Chat window system prompt behavior
+    # true = Use the originating action's system prompt for follow-up messages
+    # false = Always use chat_window_system_instruction from prompts.json
+    "chat_use_origin_system_prompt": True,
 }
 
 # API URLs
@@ -431,6 +435,13 @@ session_image_format = webp
 # Higher = better quality but larger file size
 session_image_quality = 85
 
+# ============================================================
+# CHAT WINDOW BEHAVIOR
+# ============================================================
+# Chat window system prompt behavior
+# true = Use the originating action's system prompt for follow-up messages
+# false = Always use chat_window_system_instruction from prompts.json
+chat_use_origin_system_prompt = true
 
 # ============================================================
 # API KEYS - Add your keys below (one per line)

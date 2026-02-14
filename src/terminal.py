@@ -163,7 +163,7 @@ def terminal_session_manager(endpoints=None):
                     print("   (No sessions)")
                 else:
                     for i, s in enumerate(sessions):
-                        print(f"   [{s['id']}] {s['title'][:35]} ({s['messages']} msgs, {s['endpoint']})")
+                        print(f"   [{s['id']}] {s['title'][:35]} ({s['messages']} msgs, {s['origin']})")
                 print(f"{'─'*64}\n")
             
             elif key == 'o':
@@ -553,7 +553,7 @@ def terminal_session_manager(endpoints=None):
                         if HAVE_RICH:
                             console.print(Panel(
                                 f"[bold]Title:[/bold] {session.title}\n"
-                                f"[dim]Origin:[/dim] {session.endpoint}\n"
+                                f"[dim]Origin:[/dim] {session.origin}\n"
                                 f"[dim]Created:[/dim] {session.created_at}",
                                 title=f"📋 Session: {session.session_id}"
                             ))
@@ -567,7 +567,7 @@ def terminal_session_manager(endpoints=None):
                             print(f"📋 SESSION: {session.session_id}")
                             print(f"{'─'*64}")
                             print(f"   Title:    {session.title}")
-                            print(f"   Origin: {session.endpoint}")
+                            print(f"   Origin: {session.origin}")
                             print(f"   Created:  {session.created_at}")
                             print(f"{'─'*64}")
                             for msg in session.messages:

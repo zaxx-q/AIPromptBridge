@@ -325,6 +325,8 @@ class SnipToolApp:
             
             if show_in_chat:
                 from ..request_pipeline import RequestOrigin
+                # Set origin for session tracking before streaming
+                self._current_session_origin = f"snip:{action_key}"
                 self._stream_to_chat_window(
                     messages=messages,
                     window_title=window_title,
@@ -450,10 +452,14 @@ class SnipToolApp:
         from ..attachment_manager import AttachmentManager
         from ..request_pipeline import RequestPipeline, RequestContext, StreamCallback
         
+        # Determine session origin from action context
+        # The window_title contains the action info (e.g., "📷 Describe")
+        # We extract it from the title prefix pattern
+        session_origin = getattr(self, '_current_session_origin', 'snip')
+        
         # Create session (empty image initially, properly utilizing attachments)
         session = ChatSession(
-            endpoint="snip",
-            mime_type=None
+            origin=session_origin
         )
         session.title = window_title
         
@@ -494,10 +500,6 @@ class SnipToolApp:
                     "mime_type": get_mime_from_path(compare_path)
                 })
         
-        if attachments:
-            # Update session mime type to match first attachment if available
-            if len(attachments) > 0:
-                session.mime_type = attachments[0]["mime_type"]
         
         # Add user message
         # Extract text from multimodal message
@@ -514,8 +516,16 @@ class SnipToolApp:
         # Add message with attachments (attachments belong to message, not session)
         session.add_message("user", task_text, attachments=attachments)
         
-        # Set system instruction for follow-ups (use global setting)
-        session.system_instruction = self.prompts.get_chat_window_system_instruction()
+        # Resolve follow-up system instruction based on origin
+        use_origin = self.config.get("chat_use_origin_system_prompt", True)
+        if use_origin:
+            resolved = self.prompts.get_system_prompt_for_origin(session_origin)
+            if resolved:
+                session.system_instruction = resolved
+            else:
+                session.system_instruction = self.prompts.get_chat_window_system_instruction()
+        else:
+            session.system_instruction = self.prompts.get_chat_window_system_instruction()
         
         # Check if streaming is enabled
         streaming_enabled = self.config.get("streaming_enabled", True)

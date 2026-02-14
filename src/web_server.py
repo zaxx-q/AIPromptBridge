@@ -133,8 +133,7 @@ def create_endpoint_handler(endpoint_name, prompt_template):
         # Show chat window if requested
         if show_gui and HAVE_GUI:
             session = ChatSession(
-                endpoint=endpoint_name,
-                mime_type=mime_type
+                origin=f"endpoint:{endpoint_name}"
             )
             
             # Save attachment so it's available in chat history

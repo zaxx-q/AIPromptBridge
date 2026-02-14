@@ -154,7 +154,7 @@ class ChatWindowBase(ABC):
         """Create session info label."""
         from ... import web_server
         current_provider = web_server.CONFIG.get("default_provider", "google")
-        info_text = f"Session: {self.session.session_id} | Origin: /{self.session.endpoint} | Provider: {current_provider}"
+        info_text = f"Session: {self.session.session_id} | Origin: {self.session.origin} | Provider: {current_provider}"
         
         if HAVE_CTK:
             ctk.CTkLabel(
@@ -2091,7 +2091,7 @@ class BrowserWindowBase(ABC):
         elif self.sort_column == "Title":
             sessions.sort(key=lambda s: (s['title'] or '').lower(), reverse=reverse)
         elif self.sort_column == "Origin":
-            sessions.sort(key=lambda s: s['endpoint'], reverse=reverse)
+            sessions.sort(key=lambda s: s.get('origin', ''), reverse=reverse)
         elif self.sort_column == "Messages":
             sessions.sort(key=lambda s: s['messages'], reverse=reverse)
         elif self.sort_column == "Updated":

@@ -832,6 +832,60 @@ class PromptsConfig:
             "You are a helpful AI assistant continuing a conversation."
         )
     
+    def get_system_prompt_for_origin(self, origin: str) -> Optional[str]:
+        """
+        Resolve a system prompt from a session origin string.
+        
+        Parses the `tool:action` format and looks up the action's `system_prompt`
+        from the correct tool section in prompts.json.
+        
+        Args:
+            origin: Origin string in `tool:action` format (e.g., "textedit:Explain",
+                    "snip:Extract Text", "audio:Transcribe", "directchat", "chat",
+                    "endpoint:ocr")
+        
+        Returns:
+            The resolved system_prompt string, or None if the origin maps to the
+            global fallback (chat, endpoint:*, unknown/missing).
+        """
+        if not origin:
+            return None
+        
+        # directchat → text_edit_tool._settings.chat_system_instruction
+        if origin == "directchat":
+            return self.get_text_edit_setting(
+                "chat_system_instruction",
+                "You are a friendly, helpful, and knowledgeable AI conversational assistant."
+            )
+        
+        # chat, endpoint:* → None (caller uses global chat_window_system_instruction)
+        if origin == "chat" or origin.startswith("endpoint:"):
+            return None
+        
+        # Parse tool:action format
+        if ":" not in origin:
+            return None
+        
+        tool, action_key = origin.split(":", 1)
+        
+        if tool == "textedit":
+            actions = self.get_text_edit_actions()
+            action = actions.get(action_key, {})
+            return action.get("system_prompt") or None
+        
+        elif tool == "snip":
+            actions = self.get_snip_actions()
+            action = actions.get(action_key, {})
+            return action.get("system_prompt") or None
+        
+        elif tool == "audio":
+            actions = self.get_audio_actions()
+            action = actions.get(action_key, {})
+            return action.get("system_prompt") or None
+        
+        # Unknown tool prefix → None (fallback to global)
+        return None
+    
     # =========================================================================
     # Endpoints Accessors
     # =========================================================================

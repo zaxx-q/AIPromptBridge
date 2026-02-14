@@ -219,6 +219,7 @@ class AudioToolApp:
             
             # Stream to chat window
             from ..request_pipeline import RequestOrigin
+            session_origin = f"audio:{action_key}"
             self._stream_to_chat_window(
                 messages=messages,
                 window_title=window_title,
@@ -227,7 +228,8 @@ class AudioToolApp:
                 mime_type=mime_type,
                 duration=duration,
                 provider=provider,
-                model=model
+                model=model,
+                session_origin=session_origin
             )
             
             print(f"{'─'*60}\n")
@@ -256,7 +258,8 @@ class AudioToolApp:
         mime_type: str,
         duration: float,
         provider: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        session_origin: str = "audio"
     ):
         """
         Open a chat window and stream API response into it.
@@ -270,6 +273,7 @@ class AudioToolApp:
             duration: Audio duration in seconds
             provider: Selected provider override
             model: Selected model override
+            session_origin: Origin string for session tracking (e.g., "audio:Transcribe")
         """
         from .core import GUICoordinator
         from ..session_manager import ChatSession
@@ -277,9 +281,8 @@ class AudioToolApp:
         from ..request_pipeline import RequestPipeline, RequestContext, StreamCallback
         
         # Create session with audio info
-        session = ChatSession(endpoint="audio")
+        session = ChatSession(origin=session_origin)
         session.title = window_title
-        session.mime_type = mime_type
         
         # Save audio to external file for persistence
         attachment_path = AttachmentManager.save_audio(
@@ -310,8 +313,16 @@ class AudioToolApp:
         # Add message with attachments (attachments belong to message, not session)
         session.add_message("user", task_text, attachments=attachments)
         
-        # Set system instruction for follow-ups
-        session.system_instruction = self.prompts.get_chat_window_system_instruction()
+        # Resolve follow-up system instruction based on origin
+        use_origin = self.config.get("chat_use_origin_system_prompt", True)
+        if use_origin:
+            resolved = self.prompts.get_system_prompt_for_origin(session_origin)
+            if resolved:
+                session.system_instruction = resolved
+            else:
+                session.system_instruction = self.prompts.get_chat_window_system_instruction()
+        else:
+            session.system_instruction = self.prompts.get_chat_window_system_instruction()
         
         # Check if streaming is enabled
         streaming_enabled = self.config.get("streaming_enabled", True)

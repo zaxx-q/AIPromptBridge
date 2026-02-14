@@ -253,7 +253,7 @@ class TextEditToolApp:
         if streaming_enabled:
             # Create a temporary session (uses current config, not stored provider/model)
             session = ChatSession(
-                endpoint="textedit"
+                origin="textedit"
             )
             # Add messages directly
             for msg in messages:
@@ -503,6 +503,29 @@ class TextEditToolApp:
                 pass
             return False
     
+    def _resolve_followup_system_instruction(self, session_origin: str) -> str:
+        """
+        Resolve the system instruction for follow-up messages based on session origin.
+        
+        When chat_use_origin_system_prompt is enabled, looks up the action's system_prompt
+        from prompts.json. Otherwise falls back to chat_window_system_instruction.
+        
+        Args:
+            session_origin: The session origin string (e.g., "textedit:Explain", "directchat")
+            
+        Returns:
+            The resolved system instruction string
+        """
+        use_origin = self.config.get("chat_use_origin_system_prompt", True)
+        
+        if use_origin:
+            resolved = self.prompts.get_system_prompt_for_origin(session_origin)
+            if resolved:
+                return resolved
+        
+        # Fallback to global chat_window_system_instruction
+        return self.prompts.get_chat_window_system_instruction()
+    
     def _process_direct_chat(self, user_input: str, response_mode: str = "default"):
         """
         Process direct chat input.
@@ -525,6 +548,9 @@ class TextEditToolApp:
             
             messages = build_text_message(user_input, chat_system_instruction)
             
+            # Session origin for direct chat (no text selected)
+            session_origin = "directchat"
+            
             # Determine display mode based on hierarchy:
             # 1. Radio button (if not "default")
             # 2. "Custom" action setting from text_edit_tool_options.json
@@ -537,6 +563,9 @@ class TextEditToolApp:
                 # For direct chat, strictly use global config
                 show_gui = self.config.get("show_ai_response_in_chat_window", False)
             
+            # Resolve followup system instruction based on origin
+            followup_system_instruction = self._resolve_followup_system_instruction(session_origin)
+            
             if show_gui:
                 # Stream directly into chat window for real-time display
                 streaming_enabled = self.config.get("streaming_enabled", True)
@@ -548,15 +577,14 @@ class TextEditToolApp:
                 
                 if streaming_enabled:
                     # Streaming mode: open window immediately and stream content into it
-                    # For direct chat (no text selected), use chat_system_instruction for BOTH
-                    # initial request AND follow-up messages
                     self._stream_to_chat_window(
                         messages=messages,
                         window_title="AI Chat",
                         original_text=user_input,
                         task_context=None,
                         origin=RequestOrigin.POPUP_INPUT,
-                        followup_system_instruction=chat_system_instruction  # Same as initial
+                        session_origin=session_origin,
+                        followup_system_instruction=followup_system_instruction
                     )
                 else:
                     # Non-streaming: wait for response, then show window
@@ -577,9 +605,9 @@ class TextEditToolApp:
                         return
                     
                     if response:
-                        # For direct chat, use chat_system_instruction for follow-ups too
                         self._show_chat_window("AI Chat", response, user_input, task_context=None,
-                                             followup_system_instruction=chat_system_instruction)
+                                             session_origin=session_origin,
+                                             followup_system_instruction=followup_system_instruction)
                 
                 print(f"{'─'*60}\n")
             else:
@@ -781,6 +809,12 @@ class TextEditToolApp:
             
             from ..request_pipeline import RequestOrigin
             
+            # Determine session origin for tracking
+            session_origin = f"textedit:{option_key}"
+            
+            # Resolve followup system instruction based on origin
+            followup_system_instruction = self._resolve_followup_system_instruction(session_origin)
+            
             if show_in_chat_window:
                 # Stream directly into chat window for real-time display
                 streaming_enabled = self.config.get("streaming_enabled", True)
@@ -790,16 +824,14 @@ class TextEditToolApp:
                 
                 if streaming_enabled:
                     # Streaming mode: open window immediately and stream content into it
-                    # For popup buttons (ELI5, etc.), the initial request uses the button's
-                    # system_prompt, but follow-ups use the global chat_window_system_instruction
-                    chat_window_system_instruction = self.prompts.get_chat_window_system_instruction()
                     self._stream_to_chat_window(
                         messages=messages,
                         window_title=f"{option_key} Result",
                         original_text=selected_text,
                         task_context=task,
                         origin=RequestOrigin.POPUP_PROMPT,
-                        followup_system_instruction=chat_window_system_instruction
+                        session_origin=session_origin,
+                        followup_system_instruction=followup_system_instruction
                     )
                 else:
                     # Non-streaming: wait for response, then show window
@@ -825,10 +857,9 @@ class TextEditToolApp:
                         return
                     
                     # Pass task context for better follow-up context
-                    # For popup buttons, use the global chat_window_system_instruction for follow-ups
-                    chat_window_system_instruction = self.prompts.get_chat_window_system_instruction()
                     self._show_chat_window(f"{option_key} Result", response, selected_text, task_context=task,
-                                         followup_system_instruction=chat_window_system_instruction)
+                                         session_origin=session_origin,
+                                         followup_system_instruction=followup_system_instruction)
                 
                 print(f"{'─'*60}\n")
             else:
@@ -959,6 +990,7 @@ class TextEditToolApp:
     
     def _stream_to_chat_window(self, messages: list, window_title: str, original_text: str,
                                 task_context: Optional[str], origin,
+                                session_origin: str = "textedit",
                                 followup_system_instruction: Optional[str] = None):
         """
         Open a chat window immediately and stream API response into it.
@@ -969,16 +1001,15 @@ class TextEditToolApp:
             original_text: Original selected text or user input
             task_context: Optional task description for context
             origin: RequestOrigin for logging
+            session_origin: Origin string for session tracking (e.g., "textedit:Explain", "directchat")
             followup_system_instruction: System instruction to use for follow-up messages.
-                For popup buttons (ELI5, etc.): use chat_window_system_instruction
-                For direct chat: use chat_system_instruction (same as initial)
         """
         from .core import GUICoordinator
         from ..session_manager import ChatSession
         from ..request_pipeline import RequestPipeline, RequestContext, StreamCallback
         
         # Create session with user message already added
-        session = ChatSession(endpoint="textedit")
+        session = ChatSession(origin=session_origin)
         session.title = window_title
         
         # Build the first user message with task context if available
@@ -1092,6 +1123,7 @@ class TextEditToolApp:
             logging.error('Failed to replace text')
     
     def _show_chat_window(self, title: str, response: str, original_text: str, task_context: Optional[str] = None,
+                          session_origin: str = "textedit",
                           followup_system_instruction: Optional[str] = None):
         """
         Show the response in a chat window.
@@ -1101,9 +1133,8 @@ class TextEditToolApp:
             response: AI response text
             original_text: Original selected text
             task_context: Optional task description for context (e.g., "Explain the following text...")
+            session_origin: Origin string for session tracking (e.g., "textedit:Explain", "directchat")
             followup_system_instruction: System instruction to use for follow-up messages.
-                For popup buttons (ELI5, etc.): use chat_window_system_instruction
-                For direct chat: use chat_system_instruction (same as initial)
         """
         logging.debug('Showing chat window')
         
@@ -1113,7 +1144,7 @@ class TextEditToolApp:
         
         # Create a temporary session for this response (uses current config)
         session = ChatSession(
-            endpoint="textedit"
+            origin=session_origin
         )
         session.title = title
         

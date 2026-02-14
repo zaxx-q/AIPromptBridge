@@ -29,16 +29,15 @@ def get_next_session_id():
 class ChatSession:
     """Represents a chat session with history"""
     
-    def __init__(self, session_id=None, endpoint=None, mime_type=None):
+    def __init__(self, session_id=None, origin=None):
         # Use provided ID or generate sequential one
         if session_id is None:
             self.session_id = get_next_session_id()
         else:
             self.session_id = session_id
-        self.endpoint = endpoint or "chat"
+        self.origin = origin or "chat"
         self.created_at = datetime.now().isoformat()
         self.updated_at = self.created_at
-        self.mime_type = mime_type or "image/png"
         
         self.messages = []
         self.title = None
@@ -132,15 +131,15 @@ class ChatSession:
     
     def to_dict(self):
         """Convert session to dictionary for serialization"""
-        return {
+        d = {
             "session_id": self.session_id,
-            "endpoint": self.endpoint,
+            "origin": self.origin,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "title": self.title,
             "messages": self.messages,
-            "mime_type": self.mime_type
         }
+        return d
     
     @classmethod
     def from_dict(cls, data):
@@ -156,12 +155,11 @@ class ChatSession:
             session_id = None
         
         session = cls(session_id=session_id)
-        session.endpoint = data.get("endpoint", "chat")
+        session.origin = data.get("origin", "chat")
         session.created_at = data.get("created_at", datetime.now().isoformat())
         session.updated_at = data.get("updated_at", session.created_at)
         session.title = data.get("title")
         session.messages = data.get("messages", [])
-        session.mime_type = data.get("mime_type", "image/png")
         
         return session
 
@@ -257,7 +255,7 @@ def list_sessions():
             sessions.append({
                 "id": sid,
                 "title": session.title or "(No title)",
-                "endpoint": session.endpoint,
+                "origin": session.origin,
                 "messages": len(session.messages),
                 "updated": session.updated_at,
                 "created": session.created_at

@@ -72,7 +72,7 @@ class SessionListItem(tk.Frame):
         if len(title) > 60:
             title = title[:60] + '...'
             
-        endpoint = session_data.get('endpoint', '')
+        endpoint = session_data.get('origin', '')
         msgs = str(session_data.get('messages', 0))
         updated = session_data.get('updated', '')
         if updated:
@@ -544,7 +544,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
         from ..prompts import get_prompts_config
         from .chat_window import StandaloneChatWindow
         
-        session = ChatSession(endpoint="chat")
+        session = ChatSession(origin="chat")
         session.system_instruction = get_prompts_config().get_chat_window_system_instruction()
         add_session(session)
         
@@ -567,7 +567,15 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
         
         session = get_session(self.selected_session_id)
         if session:
-            session.system_instruction = get_prompts_config().get_chat_window_system_instruction()
+            # Resolve system instruction from origin when config enabled
+            prompts = get_prompts_config()
+            from ... import web_server
+            use_origin = web_server.CONFIG.get("chat_use_origin_system_prompt", True)
+            if use_origin:
+                resolved = prompts.get_system_prompt_for_origin(session.origin)
+                session.system_instruction = resolved or prompts.get_chat_window_system_instruction()
+            else:
+                session.system_instruction = prompts.get_chat_window_system_instruction()
             
             def open_chat():
                 chat = StandaloneChatWindow(session)
@@ -825,7 +833,7 @@ class AttachedBrowserWindow(BrowserWindowBase):
         from ..core import GUICoordinator
         from ..prompts import get_prompts_config
         
-        session = ChatSession(endpoint="chat")
+        session = ChatSession(origin="chat")
         session.system_instruction = get_prompts_config().get_chat_window_system_instruction()
         add_session(session)
         GUICoordinator.get_instance().request_chat_window(session)
@@ -843,7 +851,15 @@ class AttachedBrowserWindow(BrowserWindowBase):
         
         session = get_session(self.selected_session_id)
         if session:
-            session.system_instruction = get_prompts_config().get_chat_window_system_instruction()
+            # Resolve system instruction from origin when config enabled
+            prompts = get_prompts_config()
+            from ... import web_server
+            use_origin = web_server.CONFIG.get("chat_use_origin_system_prompt", True)
+            if use_origin:
+                resolved = prompts.get_system_prompt_for_origin(session.origin)
+                session.system_instruction = resolved or prompts.get_chat_window_system_instruction()
+            else:
+                session.system_instruction = prompts.get_chat_window_system_instruction()
             GUICoordinator.get_instance().request_chat_window(session)
             self._update_status(f"Opened session {self.selected_session_id}")
         else:
