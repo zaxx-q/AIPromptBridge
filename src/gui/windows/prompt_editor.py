@@ -1163,7 +1163,7 @@ class PromptEditorWindow:
         create_section_header(scroll_frame, "Text Edit Tool", self.colors, "✏️")
         
         tet_fields = [
-            ("chat_system_instruction", "Chat System Instruction (Direct)", True),
+            ("chat_system_instruction", "Direct Chat System Instruction", True),
             ("base_output_rules_edit", "Base Output Rules (Edit)", True),
             ("base_output_rules_general", "Base Output Rules (General)", True),
             ("text_delimiter", "Text Delimiter", False),

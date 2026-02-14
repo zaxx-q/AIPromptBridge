@@ -20,7 +20,7 @@ from typing import Optional, Dict
 from .hotkey import HotkeyListener
 from .text_handler import TextHandler
 from .popups import InputPopup, PromptSelectionPopup
-from .prompts import SETTINGS_KEY, DEFAULT_TEXT_EDIT_SETTINGS, DEFAULT_TEXT_EDIT_ACTIONS, get_prompts_config
+from .prompts import get_prompts_config
 
 # Import API client directly (no wrapper needed)
 from ..api_client import call_api_with_retry
@@ -50,8 +50,9 @@ class TextEditToolApp:
         self.ai_params = ai_params
         self.key_managers = key_managers
         
-        # Load options (TextEditTool specific section)
-        self.options = self._load_options()
+        # Live reference to PromptsConfig singleton (like SnipTool pattern)
+        # Reads are always fresh - no stale snapshot caching
+        self.prompts = get_prompts_config()
         
         # Get TextEditTool-specific config
         self.enabled = config.get("text_edit_tool_enabled", True)
@@ -79,26 +80,19 @@ class TextEditToolApp:
         
         logging.debug('TextEditToolApp initialized')
     
-    def _load_options(self) -> Dict:
-        """Load TextEditTool options from unified PromptsConfig."""
-        # Use the centralized config manager which handles migration and structure
-        prompts = get_prompts_config()
-        # Ensure we're up to date
-        prompts.reload()
-        
-        # Return only the Text Edit Tool section for compatibility
-        return prompts.get_text_edit_tool()
-    
     def _get_setting(self, key: str, default=None):
-        """Get a setting from the _settings section of options."""
-        # Use PromptsConfig helper if available, or fallback to current dictionary
-        # Note: self.options here is just the dict snapshot we loaded
-        settings = self.options.get(SETTINGS_KEY, {})
-        return settings.get(key, DEFAULT_TEXT_EDIT_SETTINGS.get(key, default))
+        """Get a setting from the _settings section of options.
+        
+        Reads live from PromptsConfig singleton - no stale snapshots.
+        """
+        return self.prompts.get_text_edit_setting(key, default)
     
     def _get_action_options(self) -> Dict:
-        """Get action options (excluding _settings)."""
-        return {k: v for k, v in self.options.items() if k != SETTINGS_KEY}
+        """Get action options (excluding _settings).
+        
+        Reads live from PromptsConfig singleton - no stale snapshots.
+        """
+        return self.prompts.get_text_edit_actions()
     
     def start(self):
         """Start the TextEditTool application."""
@@ -163,9 +157,9 @@ class TextEditToolApp:
         if self.current_selected_text:
             logging.debug(f'Selected text: "{self.current_selected_text[:50]}..."')
             # Text selected - show prompt selection popup via coordinator
-            # Pass full options (including _settings for popup_items_per_page)
+            # Pass live options from PromptsConfig (including _settings for popup_items_per_page)
             GUICoordinator.get_instance().request_prompt_popup(
-                options=self.options,
+                options=self.prompts.get_text_edit_tool(),
                 on_option_selected=self._on_option_selected,
                 on_close=self._on_popup_closed,
                 selected_text=self.current_selected_text
@@ -713,7 +707,7 @@ class TextEditToolApp:
             option = action_options.get(option_key, {})
             
             # Get modifier definitions from global settings
-            modifier_defs = get_prompts_config().get_modifiers()
+            modifier_defs = self.prompts.get_modifiers()
             
             # Check if any active modifier forces chat window
             forces_chat_window = self._modifiers_force_chat_window(active_modifiers, modifier_defs)
@@ -798,7 +792,7 @@ class TextEditToolApp:
                     # Streaming mode: open window immediately and stream content into it
                     # For popup buttons (ELI5, etc.), the initial request uses the button's
                     # system_prompt, but follow-ups use the global chat_window_system_instruction
-                    chat_window_system_instruction = get_prompts_config().get_chat_window_system_instruction()
+                    chat_window_system_instruction = self.prompts.get_chat_window_system_instruction()
                     self._stream_to_chat_window(
                         messages=messages,
                         window_title=f"{option_key} Result",
@@ -832,7 +826,7 @@ class TextEditToolApp:
                     
                     # Pass task context for better follow-up context
                     # For popup buttons, use the global chat_window_system_instruction for follow-ups
-                    chat_window_system_instruction = get_prompts_config().get_chat_window_system_instruction()
+                    chat_window_system_instruction = self.prompts.get_chat_window_system_instruction()
                     self._show_chat_window(f"{option_key} Result", response, selected_text, task_context=task,
                                          followup_system_instruction=chat_window_system_instruction)
                 
@@ -1075,7 +1069,7 @@ class TextEditToolApp:
             session.system_instruction = followup_system_instruction
         else:
             # Fallback to global chat_window_system_instruction
-            session.system_instruction = get_prompts_config().get_chat_window_system_instruction()
+            session.system_instruction = self.prompts.get_chat_window_system_instruction()
         
         # Finalize: add the complete message to session
         response_text = ''.join(full_response) or ctx.response_text or ""
@@ -1146,7 +1140,7 @@ class TextEditToolApp:
             session.system_instruction = followup_system_instruction
         else:
             # Fallback to global chat_window_system_instruction
-            session.system_instruction = get_prompts_config().get_chat_window_system_instruction()
+            session.system_instruction = self.prompts.get_chat_window_system_instruction()
         
         # Show the chat window
         show_chat_gui(session, initial_response=response)
@@ -1206,10 +1200,14 @@ class TextEditToolApp:
         """
         Reload options from file without restart.
         This is called when the prompt editor saves changes.
+        
+        Note: Since we now read live from PromptsConfig singleton (like SnipTool),
+        this just ensures the singleton is refreshed. All subsequent reads via
+        _get_setting() and _get_action_options() will automatically return fresh data.
         """
         logging.info("Reloading TextEditTool options...")
-        self.options = self._load_options()
-        print("[TextEditTool] Reloaded options from PromptsConfig")
+        self.prompts.reload()
+        print("[TextEditTool] PromptsConfig reloaded - live reads will reflect changes")
 
 
 # Global reference for hot-reload
