@@ -123,10 +123,6 @@ class AttachedChatWindow(ChatWindowBase):
         # Use after() for reliable focus on new window
         self.root.after(100, lambda: self._focus_window())
     
-    def _schedule_model_loading(self):
-        """Schedule model loading via after() for attached windows."""
-        self.root.after(100, self._load_models)
-    
     def _run_on_gui_thread(self, func):
         """Run callback on GUI thread via coordinator."""
         if self._destroyed:

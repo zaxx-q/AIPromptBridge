@@ -1,5 +1,30 @@
 # Changelog
 
+## [4.3.0] - 2026-02-14
+
+### New Features
+
+- **AI Parameters**: Added a dedicated `[ai_params]` section in `config.ini` and Settings window to configure model-specific parameters (temperature, max_tokens, top_p) separately from application settings.
+- **Context Handling**: Implemented "Origin System Prompt" persistence as new default setting, allowing follow-up chat messages to respect the specific persona of the initiating tool (e.g., "Transcribe", "Explain") instead of reverting to the generic chat prompt.
+- **File Processor**: Automatically injects the filename into the prompt context during batch processing for better model awareness.
+
+### Improvements
+
+- **Prompt Editor**:
+  - Changed "Reset to Defaults" to operate in-memory, requiring an explicit "Save All" to persist changes.
+  - Added conditional visual states to pagination settings to clarify when they are disabled by grouping.
+- **Configuration**: Switched `TextEditTool` to use live `PromptsConfig` references, ensuring settings changes are immediately reflected without restarts.
+
+### Fixes
+
+- **Gemini Provider**: Fixed configuration key format for thinking models (using snake_case and uppercase levels) and removed `topK` parameter from defaults.
+- **Chat Window**: Resolved a UI freeze issue by moving model loading to a background thread.
+- **Settings GUI**: Fix opening the Settings window directly to specific tabs caused thread-related 9 seconds of delay when opening popups and windows.
+
+### Refactoring
+
+- **Deployment**: Simplified workspace management by inlining logic into `main.py` and removing the legacy `workspace_manager.py` module.
+
 ## [4.2.0] - 2026-02-10
 
 ### New Features
