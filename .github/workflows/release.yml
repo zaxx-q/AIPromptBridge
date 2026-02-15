@@ -136,7 +136,7 @@ jobs:
           output-dir: build_internal
           # Migrated from main.py
           enable-plugins: tk-inter
-          windows-console-mode: attach
+          windows-console-mode: hide
           windows-icon-from-ico: icon.ico
           include-data-dir: assets=assets
           include-data-files: icon.ico=icon.ico

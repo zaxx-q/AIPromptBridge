@@ -54,10 +54,20 @@ def main():
     try:
         # DETACHED_PROCESS = 0x00000008
         # CREATE_NEW_PROCESS_GROUP = 0x00000200
-        # We want to launch it without attaching a console, letting it manage itself.
-        # Since this launcher has no console (--windows-console-mode=disable),
-        # Popen should inherit that (no console).
-        subprocess.Popen(cmd_args, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+        # CREATE_NO_WINDOW = 0x08000000
+        
+        # We want to launch it without a window (since it's now a Console subsystem app)
+        # and ensure it's detached from any group.
+        # We also need to redirect stdio to DEVNULL to prevents crashes on write when no console exists.
+        creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+        
+        subprocess.Popen(
+            cmd_args,
+            creationflags=creation_flags,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
     except Exception as e:
         # Simple exit on error to avoid ctypes dependency
         sys.exit(1)
