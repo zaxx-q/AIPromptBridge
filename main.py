@@ -29,6 +29,7 @@ from src.config import load_config, generate_example_config, CONFIG_FILE, OPENRO
 from src.version import __version__
 from src.key_manager import KeyManager
 from src.session_manager import load_sessions, list_sessions
+from src.attachment_manager import AttachmentManager
 from src.terminal import terminal_session_manager, print_commands_box
 from src.gui.core import HAVE_GUI, show_settings_window_blocking
 from src import web_server
@@ -178,6 +179,11 @@ def initialize():
     # ─── Sessions ─────────────────────────────────────────────────────────
     load_sessions()
     sessions = list_sessions()
+    
+    # Cleanup orphaned attachments from deleted sessions
+    # (Runs in background to avoid slowing down startup)
+    threading.Thread(target=AttachmentManager.cleanup_orphaned_attachments, daemon=True).start()
+
     if HAVE_RICH:
         console.print(f"[bold]📂 Sessions[/bold]  {len(sessions)} loaded")
         console.print()

@@ -508,28 +508,67 @@ class AttachmentManager:
         Compares attachment directories against existing sessions and
         removes any orphaned directories.
         
+        Built with CPU usage optimization:
+        - Checks file age before deleting (skips very new files to avoid race conditions)
+        - Yields CPU during heavy deletion operations
+        - Runs once and exits (designed for background thread usage)
+        
         Returns:
             Number of orphaned directories removed
         """
         attachments_path = Path(ATTACHMENTS_DIR)
         if not attachments_path.exists():
             return 0
+            
+        # Startup delay to ensure session manager is fully loaded and stable
+        # and to degrade priority effectively
+        time.sleep(2.0)
         
         removed = 0
         
         try:
             # Get existing session IDs
             from .session_manager import CHAT_SESSIONS
+            
+            # Create a localized set of valid IDs to minimize lock contention
+            # We assume session deletions during this millisecond window are acceptable handling edge cases
             existing_ids = set(str(sid) for sid in CHAT_SESSIONS.keys())
             
-            # Check each attachment directory
+            # Iterate through directories
             for item in attachments_path.iterdir():
-                if item.is_dir() and item.name not in existing_ids:
+                # Yield CPU between directory checks to keep background usage low
+                time.sleep(0.05)
+                
+                if item.is_dir():
+                    # Check if folder name is numeric (session ID)
+                    # We only manage numeric session IDs
+                    if not item.name.isdigit():
+                        continue
+                        
+                    # Skip if session exists
+                    if item.name in existing_ids:
+                        continue
+                        
+                    # SAFETY CHECK: Only delete folders older than 60 seconds
+                    # This prevents deleting attachments for a session that is currently being created
+                    # (where the folder might exist before it's registered in CHAT_SESSIONS)
+                    try:
+                        stat = item.stat()
+                        if time.time() - stat.st_mtime < 60:
+                            continue
+                    except OSError:
+                        pass
+                        
+                    # Force delete orphaned folder
                     try:
                         with _FILE_LOCK:
                             shutil.rmtree(item)
                         logging.info(f"[AttachmentManager] Removed orphaned: {item.name}")
                         removed += 1
+                        
+                        # Longer sleep after actual deletion work as it's I/O heavy
+                        time.sleep(0.2)
+                        
                     except Exception as e:
                         logging.warning(f"[AttachmentManager] Failed to remove {item.name}: {e}")
             

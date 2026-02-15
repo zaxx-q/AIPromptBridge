@@ -214,12 +214,40 @@ def load_sessions():
 
 def add_session(session, max_sessions=50):
     """Add a session and manage max limit"""
+    removed_ids = []
     with SESSION_LOCK:
         while len(CHAT_SESSIONS) >= max_sessions:
             oldest_id = next(iter(CHAT_SESSIONS))
             del CHAT_SESSIONS[oldest_id]
+            removed_ids.append(oldest_id)
         CHAT_SESSIONS[session.session_id] = session
+    
     threading.Thread(target=save_sessions, daemon=True).start()
+
+    # Cleanup attachments for removed sessions
+    # (Only runs if items were actually removed)
+    if removed_ids:
+        def cleanup():
+            import time
+            from .attachment_manager import delete_session_attachments
+            
+            # Initial delay to let the main operation finish
+            time.sleep(2.0)
+            
+            for sid in removed_ids:
+                try:
+                    # Clean up attachments - handle string/int IDs
+                    numeric_id = int(sid) if isinstance(sid, str) and sid.isdigit() else sid
+                    if isinstance(numeric_id, int):
+                        delete_session_attachments(numeric_id)
+                        # Yield CPU after each deletion
+                        time.sleep(0.1)
+                except Exception as e:
+                    print(f"[Warning] Failed to cleanup session {sid}: {e}")
+        
+        # Start cleanup in background
+        t = threading.Thread(target=cleanup, daemon=True)
+        t.start()
 
 
 def get_session(session_id):

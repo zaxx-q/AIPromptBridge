@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.3.2] - 2026-02-15
+
+### Improvements
+
+- **Attachments**: Implemented a background cleanup process to automatically remove orphaned attachment directories from deleted or missing sessions.
+
+### Fixes
+
+- **Console**: Bugfixes and adjustments to make console work reliably.
+
 ## [4.3.1] - 2026-02-14
 
 ### Fixes
