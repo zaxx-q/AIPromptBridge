@@ -21,7 +21,6 @@ import threading
 import signal
 import argparse
 import shutil
-import subprocess
 import ctypes
 from pathlib import Path
 
@@ -383,11 +382,6 @@ Examples:
         help='Start with console visible (when using tray mode)'
     )
     parser.add_argument(
-        '--no-wt',
-        action='store_true',
-        help='Skip Windows Terminal auto-detection (stay in current console)'
-    )
-    parser.add_argument(
         '--dummy',
         action='store_true',
         help='Dummy argument (does nothing)'
@@ -495,80 +489,6 @@ def setup_workspace(launched_mode):
     threading.Thread(target=_migrate_stale_files, args=(bin_dir, root_dir), daemon=True).start()
 
     return True
-
-
-def ensure_windows_terminal() -> bool:
-    """
-    Check if running in legacy Windows Console and relaunch in Windows Terminal if available.
-    
-    Windows Terminal provides full color emoji support, while the legacy conhost.exe
-    only renders emojis as monochrome outlines.
-    
-    Returns:
-        True if we should exit (because we relaunched in Windows Terminal)
-        False to continue in current terminal
-    """
-    # Only applies to Windows
-    if sys.platform != 'win32':
-        return False
-    
-    # Check if already running in Windows Terminal (WT_SESSION env var is set)
-    if os.environ.get("WT_SESSION"):
-        return False
-    
-    # Check if Windows Terminal is installed
-    wt_path = shutil.which("wt.exe")
-    if not wt_path:
-        return False
-    
-    # Prevent infinite relaunch loops
-    if os.environ.get("AI_PROMPT_BRIDGE_WT_LAUNCHED"):
-        return False
-    
-    print("🔄 Relaunching in Windows Terminal for full emoji support...")
-    
-    # Build the command to relaunch
-    args = sys.argv[1:]
-    
-    # Set environment variable to prevent loops
-    env = os.environ.copy()
-    env["AI_PROMPT_BRIDGE_WT_LAUNCHED"] = "1"
-    
-    try:
-        # Use Windows Terminal to open a new tab with the current script
-        # -w 0: target the first window (or create new if none)
-        # -d: set working directory
-        cmd = [wt_path, "-w", "0", "-d", os.getcwd()]
-        
-        is_compiled = _is_compiled()
-        
-        if is_compiled:
-            # Nuitka Standalone: sys.executable is often reliable,
-            # but sys.executable might still point to python.exe
-            # in some Nuitka versions or environment setups.
-            # safe_exe uses sys.argv[0] which is generally the invoked executable path.
-            exe_path = sys.argv[0]
-            # Ensure we're not accidentally picking up python.exe if something weird happened
-            if "python" in os.path.basename(exe_path).lower() and sys.executable.lower().endswith(".exe"):
-                 # Fallback to sys.executable if sys.argv[0] somehow lied, but unlikely in compiled
-                 pass
-            
-            # print(f"DEBUG: Relaunching compiled: {exe_path}")
-            cmd.append(exe_path)
-        else:
-            # Running from source: python.exe script.py
-            cmd.append(sys.executable)
-            cmd.append(os.path.abspath(__file__))
-            
-        cmd.extend(args)
-        
-        subprocess.Popen(cmd, env=env, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
-        return True
-        
-    except Exception as e:
-        print(f"⚠️  Failed to relaunch in Windows Terminal: {e}")
-        print("   Continuing in legacy console...")
-        return False
 
 
 def check_port_available(host: str, port: int) -> bool:
@@ -687,13 +607,7 @@ def main():
     else:
         # No launcher: compiled (direct Internal.exe) has no console, source does
         has_real_console = not is_compiled
-    
-    # Try to relaunch in Windows Terminal for emoji support (unless --no-wt)
-    # Never check for WT if in GUI mode
-    should_check_wt = has_real_console and args.launched_mode != "gui"
-    if should_check_wt and not args.no_wt and ensure_windows_terminal():
-        sys.exit(0)  # Exit this instance, new one launched in WT
-    
+        
     # Suppress Flask startup banner
     import flask.cli
     flask.cli.show_server_banner = lambda *args: None

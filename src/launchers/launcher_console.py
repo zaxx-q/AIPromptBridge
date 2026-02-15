@@ -42,6 +42,10 @@ def ensure_windows_terminal() -> bool:
     """
     Check if running in legacy Windows Console and relaunch in Windows Terminal if available.
     """
+    # Check for user opt-out
+    if "--no-wt" in sys.argv:
+        return False
+
     # Only applies to Windows
     if sys.platform != 'win32':
         return False
@@ -122,7 +126,9 @@ def main():
 
     # 5. Prepare Arguments
     # --launched-mode=console tells main.py to behave in console mode
-    cmd_args = [str(internal_exe), "--launched-mode=console"] + sys.argv[1:]
+    # Filter out --no-wt as it's handled by the launcher and not recognized by main.py
+    app_args = [arg for arg in sys.argv[1:] if arg != "--no-wt"]
+    cmd_args = [str(internal_exe), "--launched-mode=console"] + app_args
     
     # 6. Launch (Blocking)
     # We use subprocess.call (or run) because we want this launcher to stay alive 

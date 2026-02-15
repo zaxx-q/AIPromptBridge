@@ -246,7 +246,7 @@ Sessions do NOT store provider/model. This allows:
 The tray application (`src/tray.py`) manages:
 
 - Console show/hide handles both standard console and **Windows Terminal** (console X button is disabled in tray mode)
-- Application restart (spawns new process, exits current)
+- Application restart (spawns new process, exits current) via launcher where possible
 - Quick access to session browser
 - Config file editing
 

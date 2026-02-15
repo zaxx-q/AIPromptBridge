@@ -232,7 +232,7 @@ For advanced users, configuration files are stored in the application root:
 ```bash
 AIPromptBridge.exe --no-tray          # No tray icon
 AIPromptBridge.exe --show-console     # Doesn't automatically hide console at startup, also enable debug logs
-AIPromptBridge.exe --no-wt            # Skip Windows Terminal detection and redirection
+AIPromptBridge.exe --no-wt            # Skip Windows Terminal detection and redirection (handled by launcher)
 ```
 
 > 💡 **Console View**: For the best console experience (including full color emoji support), it is highly recommended to use [Windows Terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701). AIPromptBridge will attempt to automatically relaunch in Windows Terminal if detected.

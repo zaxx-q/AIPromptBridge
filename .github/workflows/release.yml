@@ -14,6 +14,11 @@ on:
         description: 'Short Summary (Edit the full release page later for long text)'
         required: false
         default: ''
+      create_release:
+        description: 'Create GitHub Release (Uncheck to only build artifacts)'
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -280,7 +285,15 @@ jobs:
              }
           }
 
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIPromptBridge-${{ env.RELEASE_VERSION }}
+          path: ${{ env.ASSET_PATH }}
+          if-no-files-found: error
+
       - name: Create GitHub Release
+        if: github.event_name == 'push' || inputs.create_release == true
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}

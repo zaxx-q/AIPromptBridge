@@ -472,46 +472,25 @@ class TrayApp:
         # Strategy 2: Source Mode / Fallback
         if sys.platform == 'win32':
             try:
-                # Check for Windows Terminal path
-                wt_path = shutil.which("wt.exe")
+                # Legacy console or GUI background restart
+                flags = subprocess.CREATE_NEW_PROCESS_GROUP
                 
-                # Check for flags that disable WT
-                no_wt = "--no-wt" in args
+                # Only create new console window if NOT in GUI mode
+                if launched_mode != "gui":
+                    flags |= subprocess.CREATE_NEW_CONSOLE
                 
-                # Only use WT if available, not disabled, AND not in GUI mode
-                if wt_path and not no_wt and launched_mode != "gui":
-                    print("🔄 Restarting via Windows Terminal...")
-                    env = os.environ.copy()
-                    env["AI_PROMPT_BRIDGE_WT_LAUNCHED"] = "1"
-                    
-                    cmd = [wt_path, "-w", "0", "-d", os.getcwd()]
-                    if script.endswith('.py'):
-                        cmd.extend([sys.executable, script] + args)
-                    else:
-                        cmd.extend([script] + args)
-                        
-                    subprocess.Popen(cmd, env=env, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
-                    
+                if script.endswith('.py'):
+                    subprocess.Popen(
+                        [sys.executable, script] + args,
+                        creationflags=flags,
+                        start_new_session=True
+                    )
                 else:
-                    # Legacy console or GUI background restart
-                    flags = subprocess.CREATE_NEW_PROCESS_GROUP
-                    
-                    # Only create new console window if NOT in GUI mode
-                    if launched_mode != "gui":
-                        flags |= subprocess.CREATE_NEW_CONSOLE
-                    
-                    if script.endswith('.py'):
-                        subprocess.Popen(
-                            [sys.executable, script] + args,
-                            creationflags=flags,
-                            start_new_session=True
-                        )
-                    else:
-                        subprocess.Popen(
-                            [script] + args,
-                            creationflags=flags,
-                            start_new_session=True
-                        )
+                    subprocess.Popen(
+                        [script] + args,
+                        creationflags=flags,
+                        start_new_session=True
+                    )
             except Exception as e:
                 print(f"[Error] Failed to start new process: {e}")
                 return
