@@ -147,6 +147,7 @@ class TTSWindow:
         self.play_pause_btn = None
         self.seek_slider = None
         self.position_label = None
+        self.format_dropdown = None
         self.save_btn = None
         self.status_label = None
     
@@ -520,7 +521,35 @@ class TTSWindow:
         """Create save/export section."""
         content = self._create_section_frame(parent, "Export")
         
-        save_content = prepare_emoji_content("💾 Save as WAV", size=12)
+        # Format selection
+        row = ctk.CTkFrame(content, fg_color="transparent")
+        row.pack(fill="x", pady=(0, 5))
+        
+        ctk.CTkLabel(row, text="Format:", font=get_ctk_font(size=11),
+                     text_color=self.colors.text).pack(side="left", padx=(0, 5))
+        
+        from ...audio.ffmpeg_utils import is_ffmpeg_available
+        
+        formats = ["WAV"]
+        if is_ffmpeg_available():
+            formats.extend(["MP3", "OGG", "FLAC", "AAC"])
+            
+        self.format_dropdown = ctk.CTkOptionMenu(
+            row,
+            values=formats,
+            width=90,
+            height=24,
+            font=get_ctk_font(size=11),
+            fg_color=self.colors.surface1,
+            button_color=self.colors.surface2,
+            button_hover_color=self.colors.overlay0,
+            dropdown_fg_color=self.colors.surface0,
+            text_color=self.colors.text
+        )
+        self.format_dropdown.set("WAV")
+        self.format_dropdown.pack(side="left", fill="x", expand=True)
+
+        save_content = prepare_emoji_content("💾 Save Audio", size=12)
         self.save_btn = ctk.CTkButton(
             content,
             **save_content,
@@ -1150,28 +1179,77 @@ class TTSWindow:
     # =========================================================================
     
     def _save_audio(self):
-        """Save generated audio as WAV file."""
+        """Save generated audio as file."""
         if not self.pcm_audio:
             return
         
         from ...audio.wav_utils import save_wav
+        from ...audio.ffmpeg_utils import get_ffmpeg_path, get_creation_flags
+        import subprocess
         
         # Create output directory
         save_dir = self.config.get("tts_save_directory", "tts_output")
         os.makedirs(save_dir, exist_ok=True)
         
+        # Get format
+        fmt = self.format_dropdown.get().lower()
+        if fmt == "aac":
+            ext = "m4a"
+        else:
+            ext = fmt
+            
         # Generate filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        voice = self.selected_voice.lower()
-        filename = f"tts_{voice}_{timestamp}.wav"
+        voice = self.selected_voice.lower().replace(" ", "_")
+        filename = f"tts_{voice}_{timestamp}.{ext}"
         filepath = os.path.join(save_dir, filename)
         
-        error = save_wav(filepath, self.pcm_audio)
+        error = None
+        
+        if fmt == "wav":
+            error = save_wav(filepath, self.pcm_audio)
+        else:
+            # Check if we have WAV data (header + PCM)
+            if not self.wav_audio:
+                # Fallback: create wav bytes from PCM
+                from ...audio.wav_utils import pcm_to_wav
+                self.wav_audio = pcm_to_wav(self.pcm_audio)
+                
+            # Use FFmpeg to convert
+            ffmpeg_path = get_ffmpeg_path()
+            if not ffmpeg_path:
+                self._update_status("FFmpeg not available for conversion", self.colors.red)
+                return
+                
+            try:
+                # -y overwrite, -i pipe:0 read from stdin
+                cmd = [ffmpeg_path, "-y", "-i", "pipe:0", "-v", "error"]
+                
+                # Use libopus for OGG
+                if ext == "ogg":
+                    cmd.extend(["-c:a", "libopus"])
+                
+                cmd.append(filepath)
+                
+                creation_flags = get_creation_flags()
+                
+                result = subprocess.run(
+                    cmd,
+                    input=self.wav_audio,
+                    capture_output=True,
+                    creationflags=creation_flags
+                )
+                
+                if result.returncode != 0:
+                    error = f"FFmpeg: {result.stderr.decode('utf-8')}"
+                    
+            except Exception as e:
+                error = str(e)
         
         if error:
             self._update_status(f"Save failed: {error}", self.colors.red)
         else:
-            self._update_status(f"✅ Saved: {filepath}", self.colors.green)
+            self._update_status(f"✅ Saved: {filename}", self.colors.green)
     
     # =========================================================================
     # Utilities
