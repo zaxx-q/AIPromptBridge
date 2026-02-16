@@ -248,6 +248,9 @@ AIPromptBridge.exe --no-wt            # Skip Windows Terminal detection and redi
 - **Windows 10/11** (uses Windows-specific APIs for tray, console, snipping, and audio capture mechanims)
 - **Windows Terminal** (Highly recommended for better console view and colors)
 - **Python 3.13+** (if running from source)
+- **FFmpeg** (Required for audio compression and conversion features)
+  - [Download FFmpeg](https://ffmpeg.org/download.html)
+  - [Install Guide](https://www.wikihow.com/Install-FFmpeg-on-Windows) - Ensure it is added to your system PATH
 - API keys for at least one provider (Google Gemini recommended)
 
 ## 📄 License

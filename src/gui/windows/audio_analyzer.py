@@ -109,7 +109,12 @@ class AudioAnalyzerWindow:
         self.playback_position = 0.0
         
         # Compression settings (always enabled with recommended preset by default)
-        self.compression_enabled = True
+        try:
+            from ...audio.recorder import is_ffmpeg_available
+            self.compression_enabled = is_ffmpeg_available()
+        except ImportError:
+            self.compression_enabled = False
+
         self.compression_preset = "recommended"
         
         # Provider/Model state
@@ -1547,6 +1552,18 @@ class AudioAnalyzerWindow:
     
     def _on_compression_toggled(self):
         """Handle compression checkbox toggle."""
+        if self.compression_var.get():
+            try:
+                from ...audio.recorder import is_ffmpeg_available
+                if not is_ffmpeg_available():
+                    self.compression_var.set(False)
+                    self.compression_enabled = False
+                    self._update_status("Error: FFmpeg not detected", self.colors.red)
+                    logging.error("[AudioAnalyzer] FFmpeg not available for compression")
+                    return
+            except ImportError:
+                pass
+
         self.compression_enabled = self.compression_var.get()
         self.compressed_audio = None  # Clear cached compressed audio
         self._update_size_estimate()
