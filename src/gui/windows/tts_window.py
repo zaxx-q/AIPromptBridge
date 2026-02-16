@@ -889,8 +889,9 @@ class TTSWindow:
         # Combine style + transcript
         if style_text:
             full_prompt = style_text
-            # If the style text doesn't already include the transcript, append it
-            if input_text not in style_text:
+            # Robust detection: check for transcript marker OR exact content match
+            # This prevents duplication if AI output varies slightly in whitespace
+            if "#### TRANSCRIPT" not in style_text and input_text not in style_text:
                 full_prompt += f"\n\n#### TRANSCRIPT\n{input_text}"
         else:
             full_prompt = input_text
@@ -963,7 +964,8 @@ class TTSWindow:
             
             # Step 2: Generate audio with the style
             full_prompt = style_text
-            if input_text not in style_text:
+            # Robust detection: check for transcript marker OR exact content match
+            if "#### TRANSCRIPT" not in style_text and input_text not in style_text:
                 full_prompt += f"\n\n#### TRANSCRIPT\n{input_text}"
             
             GUICoordinator.get_instance().run_on_gui_thread(
