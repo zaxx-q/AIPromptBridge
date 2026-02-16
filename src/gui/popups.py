@@ -1778,13 +1778,15 @@ class AttachedInputPopup:
         on_submit: Callable[[str, str], None],
         on_close: Optional[Callable[[], None]] = None,
         x: Optional[int] = None,
-        y: Optional[int] = None
+        y: Optional[int] = None,
+        on_tts: Optional[Callable[[str], None]] = None
     ):
         self.parent_root = parent_root
         self.on_submit = on_submit
         self.on_close_callback = on_close
         self.x = x
         self.y = y
+        self.on_tts_callback = on_tts
         
         self.colors = get_colors()
         self.root = None
@@ -1886,6 +1888,23 @@ class AttachedInputPopup:
                 command=self._submit
             )
             send_btn.pack(side="right")
+            
+            # TTS button (only if callback provided)
+            if self.on_tts_callback:
+                tts_btn = create_emoji_button(
+                    input_frame,
+                    text="",
+                    icon="🔊",
+                    colors=self.colors,
+                    variant="secondary",
+                    width=42,
+                    height=42,
+                    font_size=14,
+                    command=self._on_tts
+                )
+                tts_btn.configure(corner_radius=8)
+                tts_btn.pack(side="right", padx=(0, 4))
+                Tooltip(tts_btn, "Open TTS Window")
         else:
             # Fallback to tk
             self.root.configure(bg=self.colors.base)
@@ -1978,6 +1997,24 @@ class AttachedInputPopup:
             send_btn.bind('<Button-1>', lambda e: self._submit())
             send_btn.bind('<Enter>', lambda e: send_btn.config(bg=self.colors.lavender))
             send_btn.bind('<Leave>', lambda e: send_btn.config(bg=self.colors.blue))
+            
+            # TTS button (only if callback provided)
+            if self.on_tts_callback:
+                tts_btn = tk.Label(
+                    input_frame,
+                    text="🔊",
+                    font=("Arial", 14),
+                    bg=self.colors.surface1,
+                    fg=self.colors.text,
+                    padx=10,
+                    pady=8,
+                    cursor="hand2"
+                )
+                tts_btn.pack(side=tk.RIGHT, padx=(0, 4))
+                tts_btn.bind('<Button-1>', lambda e: self._on_tts())
+                tts_btn.bind('<Enter>', lambda e: tts_btn.config(bg=self.colors.surface2))
+                tts_btn.bind('<Leave>', lambda e: tts_btn.config(bg=self.colors.surface1))
+                Tooltip(tts_btn, "Open TTS Window")
         
         # Force Tk to process all pending drawing commands before showing
         self._position_window()
@@ -2040,6 +2077,13 @@ class AttachedInputPopup:
             self._close()
             self.on_submit(text, response_mode)
     
+    def _on_tts(self):
+        """Handle TTS button click - grab text and open TTS Window."""
+        text = self.input_entry.get().strip()
+        if text and text != self.PLACEHOLDER and self.on_tts_callback:
+            self._close()
+            self.on_tts_callback(text)
+    
     def _close(self):
         """Close the popup."""
         if self.root:
@@ -2069,7 +2113,8 @@ class AttachedPromptPopup:
         on_close: Optional[Callable[[], None]],
         selected_text: str,
         x: Optional[int] = None,
-        y: Optional[int] = None
+        y: Optional[int] = None,
+        on_tts: Optional[Callable[[str], None]] = None
     ):
         self.parent_root = parent_root
         self.options = options
@@ -2078,6 +2123,7 @@ class AttachedPromptPopup:
         self.selected_text = selected_text
         self.x = x
         self.y = y
+        self.on_tts_callback = on_tts
         
         self.colors = get_colors()
         self.root = None
@@ -2137,6 +2183,27 @@ class AttachedPromptPopup:
                 command=self._close
             )
             close_btn.pack(side="right")
+            
+            # TTS button in top bar (only if callback provided)
+            if self.on_tts_callback:
+                tts_btn = create_emoji_button(
+                    top_bar,
+                    text="",
+                    icon="🔊",
+                    colors=self.colors,
+                    variant="secondary",
+                    width=24,
+                    height=24,
+                    font_size=12,
+                    command=self._on_tts
+                )
+                tts_btn.configure(
+                    corner_radius=6,
+                    fg_color="transparent",
+                    hover_color=self.colors.surface1
+                )
+                tts_btn.pack(side="right", padx=(0, 4))
+                Tooltip(tts_btn, "Open TTS Window with selected text")
             
             # Response toggle
             toggle_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
@@ -2317,6 +2384,22 @@ class AttachedPromptPopup:
             close_btn.bind('<Button-1>', lambda e: self._close())
             close_btn.bind('<Enter>', lambda e: close_btn.config(fg=self.colors.red))
             close_btn.bind('<Leave>', lambda e: close_btn.config(fg=self.colors.overlay0))
+            
+            # TTS button in top bar (only if callback provided)
+            if self.on_tts_callback:
+                tts_btn = tk.Label(
+                    top_bar,
+                    text="🔊",
+                    font=("Arial", 12),
+                    bg=self.colors.base,
+                    fg=self.colors.overlay0,
+                    cursor="hand2"
+                )
+                tts_btn.pack(side=tk.RIGHT, padx=(0, 6))
+                tts_btn.bind('<Button-1>', lambda e: self._on_tts())
+                tts_btn.bind('<Enter>', lambda e: tts_btn.config(fg=self.colors.text))
+                tts_btn.bind('<Leave>', lambda e: tts_btn.config(fg=self.colors.overlay0))
+                Tooltip(tts_btn, "Open TTS Window with selected text")
             
             # Response mode toggle
             toggle_frame = tk.Frame(content_frame, bg=self.colors.base)
@@ -2693,6 +2776,12 @@ class AttachedPromptPopup:
         
         return user_mode
     
+    def _on_tts(self):
+        """Handle TTS button click - pass selected text to TTS Window."""
+        if self.on_tts_callback and self.selected_text:
+            self._close()
+            self.on_tts_callback(self.selected_text)
+    
     def _close(self):
         """Close the popup."""
         if self.root:
@@ -2710,10 +2799,11 @@ def create_attached_input_popup(
     on_submit: Callable[[str, str], None],
     on_close: Optional[Callable[[], None]],
     x: Optional[int] = None,
-    y: Optional[int] = None
+    y: Optional[int] = None,
+    on_tts: Optional[Callable[[str], None]] = None
 ):
     """Create an input popup as Toplevel attached to parent root."""
-    AttachedInputPopup(parent_root, on_submit, on_close, x, y)
+    AttachedInputPopup(parent_root, on_submit, on_close, x, y, on_tts)
 
 
 def create_attached_prompt_popup(
@@ -2723,10 +2813,11 @@ def create_attached_prompt_popup(
     on_close: Optional[Callable[[], None]],
     selected_text: str,
     x: Optional[int] = None,
-    y: Optional[int] = None
+    y: Optional[int] = None,
+    on_tts: Optional[Callable[[str], None]] = None
 ):
     """Create a prompt selection popup as Toplevel attached to parent root."""
-    AttachedPromptPopup(parent_root, options, on_option_selected, on_close, selected_text, x, y)
+    AttachedPromptPopup(parent_root, options, on_option_selected, on_close, selected_text, x, y, on_tts)
 
 
 # =============================================================================

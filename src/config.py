@@ -98,6 +98,16 @@ DEFAULT_CONFIG = {
     # - canvas: Custom canvas with grid lines and color gradient (default)
     # - progressbar: Smooth, simple progress bar
     "audio_level_meter_style": "canvas",
+    # TTS (Text-to-Speech) settings
+    "tts_enabled": True,
+    "tts_default_voice": "Kore",
+    "tts_default_model": "gemini-2.5-flash-preview-tts",
+    "tts_director_enabled": True,
+    "tts_director_auto_mode": False,
+    # Model override for AI Director (empty = use default provider model)
+    "tts_director_model": "",
+    # Directory for saved TTS audio files
+    "tts_save_directory": "tts_output",
     # Chat window system prompt behavior
     # true = Use the originating action's system prompt for follow-up messages
     # false = Always use chat_window_system_instruction from prompts.json
@@ -409,6 +419,33 @@ audio_default_loopback = true
 # - canvas: Custom canvas with grid lines and color gradient (default)
 # - progressbar: Smooth, simple progress bar
 audio_level_meter_style = canvas
+
+# ============================================================
+# TTS (TEXT-TO-SPEECH) - Gemini-powered speech synthesis
+# ============================================================
+# Enable/disable TTS feature
+tts_enabled = true
+
+# Default voice (see Voice Reference in docs for all 30 options)
+tts_default_voice = Kore
+
+# Default TTS model
+# Options: gemini-2.5-flash-preview-tts, gemini-2.5-pro-preview-tts
+tts_default_model = gemini-2.5-flash-preview-tts
+
+# Enable AI Director (auto-generates style instructions for expressive speech)
+tts_director_enabled = true
+
+# Auto mode: automatically run director before generating audio
+# false = manual (click Generate Style first, review, then Generate Audio)
+# true = auto (Generate Audio runs director automatically)
+tts_director_auto_mode = false
+
+# Model override for AI Director (leave empty to use default provider model)
+# tts_director_model =
+
+# Directory for saved TTS audio files (relative to app root)
+tts_save_directory = tts_output
 
 # ============================================================
 # FLASK API ENDPOINTS (Optional)

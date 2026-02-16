@@ -256,6 +256,8 @@ class GUICoordinator:
                     self._create_snip_popup(request)
                 elif request_type == 'audio_analyzer':
                     self._create_audio_analyzer_window(request)
+                elif request_type == 'tts_window':
+                    self._create_tts_window(request)
                 elif request_type == 'callback':
                     # Generic callback execution on GUI thread
                     callback = request.get('callback')
@@ -290,7 +292,8 @@ class GUICoordinator:
         on_close = request.get('on_close')
         x = request.get('x')
         y = request.get('y')
-        create_attached_input_popup(self._root, on_submit, on_close, x, y)
+        on_tts = request.get('on_tts')
+        create_attached_input_popup(self._root, on_submit, on_close, x, y, on_tts)
     
     def _create_prompt_popup(self, request):
         """Create a prompt selection popup on the GUI thread"""
@@ -301,7 +304,8 @@ class GUICoordinator:
         selected_text = request.get('selected_text')
         x = request.get('x')
         y = request.get('y')
-        create_attached_prompt_popup(self._root, options, on_option_selected, on_close, selected_text, x, y)
+        on_tts = request.get('on_tts')
+        create_attached_prompt_popup(self._root, options, on_option_selected, on_close, selected_text, x, y, on_tts)
     
     def _create_typing_indicator(self, request):
         """Create a typing indicator on the GUI thread"""
@@ -494,7 +498,8 @@ class GUICoordinator:
         })
     
     def request_input_popup(self, on_submit: Callable, on_close: Optional[Callable] = None,
-                           x: Optional[int] = None, y: Optional[int] = None):
+                           x: Optional[int] = None, y: Optional[int] = None,
+                           on_tts: Optional[Callable] = None):
         """Request creation of an input popup (thread-safe)"""
         self.ensure_running()
         self._request_queue.put({
@@ -502,12 +507,14 @@ class GUICoordinator:
             'on_submit': on_submit,
             'on_close': on_close,
             'x': x,
-            'y': y
+            'y': y,
+            'on_tts': on_tts
         })
     
     def request_prompt_popup(self, options: dict, on_option_selected: Callable,
                             on_close: Optional[Callable], selected_text: str,
-                            x: Optional[int] = None, y: Optional[int] = None):
+                            x: Optional[int] = None, y: Optional[int] = None,
+                            on_tts: Optional[Callable] = None):
         """Request creation of a prompt selection popup (thread-safe)"""
         self.ensure_running()
         self._request_queue.put({
@@ -517,7 +524,8 @@ class GUICoordinator:
             'on_close': on_close,
             'selected_text': selected_text,
             'x': x,
-            'y': y
+            'y': y,
+            'on_tts': on_tts
         })
     
     def run_on_gui_thread(self, callback: Callable):
@@ -624,6 +632,40 @@ class GUICoordinator:
             'key_managers': key_managers,
             'real_on_action': on_action,
             'real_on_close': on_close
+        })
+    
+    def _create_tts_window(self, request):
+        """Create a TTS window on the GUI thread"""
+        from .windows import create_tts_window
+        
+        config = request.get('config')
+        ai_params = request.get('ai_params')
+        key_managers = request.get('key_managers')
+        initial_text = request.get('initial_text', '')
+        on_close = request.get('on_close')
+        
+        if config is not None and ai_params is not None and key_managers is not None:
+            create_tts_window(
+                self._root, config, ai_params, key_managers, initial_text, on_close
+            )
+    
+    def request_tts_window(
+        self,
+        config,
+        ai_params,
+        key_managers,
+        initial_text: str = "",
+        on_close=None
+    ):
+        """Request creation of a TTS window (thread-safe)"""
+        self.ensure_running()
+        self._request_queue.put({
+            'type': 'tts_window',
+            'config': config,
+            'ai_params': ai_params,
+            'key_managers': key_managers,
+            'initial_text': initial_text,
+            'on_close': on_close
         })
     
     def get_root(self):

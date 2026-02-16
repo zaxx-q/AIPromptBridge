@@ -7,9 +7,11 @@ Uses the native Gemini API format (camelCase) with full feature support:
 - Streaming via streamGenerateContent endpoint
 - Full retry logic matching reverse-proxy behavior
 - Files API for large file uploads (>15 MB)
+- TTS (Text-to-Speech) via generate_tts()
 
 """
 
+import base64
 import json
 import os
 import re
@@ -475,6 +477,227 @@ class GeminiNativeProvider(BaseProvider):
             return True, None
         except Exception as e:
             return False, f"Error cancelling batch: {e}"
+    
+    # =========================================================================
+    # TTS (TEXT-TO-SPEECH) API
+    # =========================================================================
+    
+    def generate_tts(
+        self,
+        text: str,
+        model: str,
+        voice_name: str,
+        multi_speaker_config: Optional[List[Dict]] = None,
+        retry_count: int = 0
+    ) -> Tuple[Optional[bytes], Optional[str]]:
+        """
+        Generate TTS audio using Gemini TTS models.
+        
+        Uses the standard generateContent endpoint with responseModalities=["AUDIO"]
+        and speechConfig for voice selection.
+        
+        Args:
+            text: The full prompt (style instructions + transcript)
+            model: TTS model name (e.g. gemini-2.5-flash-preview-tts)
+            voice_name: Prebuilt voice name (e.g. Kore) for single-speaker
+            multi_speaker_config: Optional list of speaker configs for multi-speaker.
+                Each dict: {"speaker": "Name", "voice_name": "Kore"}
+            retry_count: Current retry attempt number
+            
+        Returns:
+            Tuple of (pcm_audio_bytes, error_message)
+            Audio is 24kHz, 16-bit, mono PCM when successful.
+            Returns (None, error_message) on failure.
+        """
+        if not self.key_manager or not self.key_manager.has_keys():
+            return None, "No API keys configured for Gemini"
+        
+        current_key = self.key_manager.get_current_key()
+        if not current_key:
+            return None, "No API key available"
+        
+        key_num = self.key_manager.get_key_number()
+        timeout = self.config.get("request_timeout", 120)
+        
+        url = self._get_url(model, streaming=False)
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": current_key
+        }
+        
+        # Build TTS-specific request body
+        body = self._build_tts_request_body(text, voice_name, multi_speaker_config)
+        
+        self.log("info", f"[TTS] Request: model={model}, voice={voice_name}, "
+                 f"multi_speaker={'yes' if multi_speaker_config else 'no'}, "
+                 f"key={key_num}, retry={retry_count}")
+        
+        try:
+            response = requests.post(url, headers=headers, json=body, timeout=timeout)
+            
+            # Handle error responses
+            if response.status_code != 200:
+                error_text = response.text[:500]
+                status_code = response.status_code
+                
+                reason = self.get_retry_reason(status_code, error_text)
+                
+                if self.should_retry(reason, retry_count):
+                    delay = self.get_retry_delay(reason)
+                    error_brief = self._extract_error_brief(error_text, status_code)
+                    self.log_retry(reason, retry_count + 1, delay, error_brief)
+                    
+                    if reason in (RetryReason.RATE_LIMITED, RetryReason.AUTH_ERROR):
+                        self.rotate_key_if_possible(f"({reason.value})")
+                    
+                    if delay > 0:
+                        time.sleep(delay)
+                    
+                    return self.generate_tts(
+                        text, model, voice_name, multi_speaker_config, retry_count + 1
+                    )
+                
+                self.log_error(f"[TTS] API error: {error_text}", status_code)
+                return None, f"TTS API error ({status_code}): {self._extract_error_brief(error_text, status_code)}"
+            
+            # Parse response - extract base64 PCM audio
+            data = response.json()
+            
+            try:
+                inline_data = data["candidates"][0]["content"]["parts"][0]["inlineData"]
+                audio_b64 = inline_data["data"]
+                pcm_bytes = base64.b64decode(audio_b64)
+            except (KeyError, IndexError) as e:
+                # Check if response was blocked
+                candidates = data.get("candidates", [])
+                if candidates and candidates[0].get("finishReason") == "SAFETY":
+                    return None, "TTS generation blocked by safety filters"
+                
+                self.log_error(f"[TTS] Failed to extract audio data: {e}")
+                
+                if self.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
+                    delay = self.get_retry_delay(RetryReason.EMPTY_RESPONSE)
+                    self.log_retry(RetryReason.EMPTY_RESPONSE, retry_count + 1, delay, "no audio data in response")
+                    self.rotate_key_if_possible("(empty TTS response)")
+                    
+                    if delay > 0:
+                        time.sleep(delay)
+                    
+                    return self.generate_tts(
+                        text, model, voice_name, multi_speaker_config, retry_count + 1
+                    )
+                
+                return None, f"No audio data in TTS response: {e}"
+            
+            # Log usage if available
+            usage_meta = data.get("usageMetadata", {})
+            prompt_tokens = usage_meta.get("promptTokenCount", 0)
+            total_tokens = usage_meta.get("totalTokenCount", 0)
+            
+            self.log("info", f"[TTS] Success: {len(pcm_bytes)} bytes PCM audio, "
+                     f"{prompt_tokens} prompt tokens, {total_tokens} total tokens")
+            
+            return pcm_bytes, None
+        
+        except requests.exceptions.Timeout:
+            self.log_error(f"[TTS] Request timeout after {timeout}s")
+            
+            if self.should_retry(RetryReason.NETWORK_ERROR, retry_count):
+                delay = self.get_retry_delay(RetryReason.NETWORK_ERROR)
+                self.log_retry(RetryReason.NETWORK_ERROR, retry_count + 1, delay, f"timeout after {timeout}s")
+                self.rotate_key_if_possible("(timeout)")
+                
+                if delay > 0:
+                    time.sleep(delay)
+                
+                return self.generate_tts(
+                    text, model, voice_name, multi_speaker_config, retry_count + 1
+                )
+            
+            return None, f"TTS request timeout after {timeout}s"
+        
+        except requests.exceptions.RequestException as e:
+            error_msg = str(e)
+            self.log_error(f"[TTS] Network error: {error_msg}")
+            
+            if self.should_retry(RetryReason.NETWORK_ERROR, retry_count):
+                delay = self.get_retry_delay(RetryReason.NETWORK_ERROR)
+                self.log_retry(RetryReason.NETWORK_ERROR, retry_count + 1, delay, error_msg[:100])
+                self.rotate_key_if_possible("(network error)")
+                
+                if delay > 0:
+                    time.sleep(delay)
+                
+                return self.generate_tts(
+                    text, model, voice_name, multi_speaker_config, retry_count + 1
+                )
+            
+            return None, f"TTS network error: {error_msg}"
+        
+        except Exception as e:
+            error_msg = str(e)
+            self.log_error(f"[TTS] Unexpected error: {error_msg}")
+            return None, f"TTS unexpected error: {error_msg}"
+    
+    def _build_tts_request_body(
+        self,
+        text: str,
+        voice_name: str,
+        multi_speaker_config: Optional[List[Dict]] = None
+    ) -> Dict:
+        """
+        Build the TTS-specific request body.
+        
+        Args:
+            text: The text/prompt to speak
+            voice_name: Default voice name for single-speaker
+            multi_speaker_config: Optional list of {"speaker": str, "voice_name": str}
+            
+        Returns:
+            Request body dict for generateContent with TTS config
+        """
+        # Build speech config
+        if multi_speaker_config and len(multi_speaker_config) > 0:
+            # Multi-speaker mode
+            speaker_voice_configs = []
+            for speaker_cfg in multi_speaker_config:
+                speaker_voice_configs.append({
+                    "speaker": speaker_cfg["speaker"],
+                    "voiceConfig": {
+                        "prebuiltVoiceConfig": {
+                            "voiceName": speaker_cfg["voice_name"]
+                        }
+                    }
+                })
+            
+            speech_config = {
+                "multiSpeakerVoiceConfig": {
+                    "speakerVoiceConfigs": speaker_voice_configs
+                }
+            }
+        else:
+            # Single-speaker mode
+            speech_config = {
+                "voiceConfig": {
+                    "prebuiltVoiceConfig": {
+                        "voiceName": voice_name
+                    }
+                }
+            }
+        
+        body = {
+            "contents": [
+                {
+                    "parts": [{"text": text}]
+                }
+            ],
+            "generationConfig": {
+                "responseModalities": ["AUDIO"],
+                "speechConfig": speech_config
+            }
+        }
+        
+        return body
     
     # =========================================================================
     # ERROR HANDLING

@@ -16,3 +16,4 @@ chat_sessions.json
 prompts.json
 tools_config.json
 session_attachments
+tts_output

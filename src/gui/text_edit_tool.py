@@ -162,20 +162,40 @@ class TextEditToolApp:
                 options=self.prompts.get_text_edit_tool(),
                 on_option_selected=self._on_option_selected,
                 on_close=self._on_popup_closed,
-                selected_text=self.current_selected_text
+                selected_text=self.current_selected_text,
+                on_tts=self._on_tts_requested
             )
         else:
             # No text selected - show simple input popup via coordinator
             logging.debug('No text selected, showing input popup')
             GUICoordinator.get_instance().request_input_popup(
                 on_submit=self._on_direct_chat,
-                on_close=self._on_popup_closed
+                on_close=self._on_popup_closed,
+                on_tts=self._on_tts_requested
             )
     
     def _on_popup_closed(self):
         """Handle popup window close."""
         logging.debug('Popup window closed')
         self.popup = None
+    
+    def _on_tts_requested(self, text: str):
+        """Handle TTS request from popup.
+        
+        Opens the TTS Window with the provided text for speech synthesis.
+        
+        Args:
+            text: Text to convert to speech (from input field or selected text)
+        """
+        logging.debug(f'TTS requested for text: "{text[:50]}..."')
+        
+        from .core import GUICoordinator
+        GUICoordinator.get_instance().request_tts_window(
+            config=self.config,
+            ai_params=self.ai_params,
+            key_managers=self.key_managers,
+            initial_text=text
+        )
     
     def _on_direct_chat(self, user_input: str, response_mode: str = "default"):
         """

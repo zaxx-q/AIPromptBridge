@@ -55,6 +55,12 @@ from .audio_analyzer import (
     create_audio_analyzer_window
 )
 
+# TTS window
+from .tts_window import (
+    TTSWindow,
+    create_tts_window
+)
+
 __all__ = [
     # Utils
     'get_icon_path',
@@ -91,4 +97,8 @@ __all__ = [
     # Audio analyzer
     'AudioAnalyzerWindow',
     'create_audio_analyzer_window',
+    
+    # TTS window
+    'TTSWindow',
+    'create_tts_window',
 ]
