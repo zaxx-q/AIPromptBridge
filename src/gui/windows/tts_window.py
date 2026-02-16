@@ -36,6 +36,7 @@ from ..prompts import get_prompts_config
 from ..emoji_renderer import prepare_emoji_content
 from .utils import set_window_icon
 from ...audio.tts_constants import TTS_MODELS, TTS_VOICES, get_voice_list, get_voice_details
+from ...audio.recorder import AudioRecorder
 
 
 class TTSWindow:
@@ -108,10 +109,14 @@ class TTSWindow:
         self.pcm_audio: Optional[bytes] = None
         self.wav_audio: Optional[bytes] = None
         self.audio_duration = 0.0
+        
+        try:
+            self.recorder = AudioRecorder()
+        except Exception:
+            self.recorder = None
+            
         self.is_playing = False
         self.playback_position = 0.0
-        self._play_thread: Optional[threading.Thread] = None
-        self._stop_playback_flag = False
         
         # Processing state
         self.is_generating = False
@@ -1051,139 +1056,86 @@ class TTSWindow:
     # =========================================================================
     
     def _play_audio(self):
-        """Start audio playback using simpleaudio or winsound."""
-        if not self.wav_audio:
+        """Start or resume audio playback."""
+        if not self.recorder or not self.wav_audio:
             return
-        
-        if self.is_playing:
-            return
-        
-        self.is_playing = True
-        self._stop_playback_flag = False
-        self.play_btn.configure(state="disabled")
-        self.pause_btn.configure(state="normal")
-        self._update_status("Playing...", self.colors.accent)
-        
-        self._play_thread = threading.Thread(target=self._playback_thread, daemon=True)
-        self._play_thread.start()
-        
-        # Start position update
-        self._update_playback_position()
-    
-    def _playback_thread(self):
-        """Playback thread using wave + pyaudio."""
-        import io
-        import wave
         
         try:
-            # Try PyAudio first
-            try:
-                import pyaudio
-                
-                wav_io = io.BytesIO(self.wav_audio)
-                wf = wave.open(wav_io, 'rb')
-                
-                p = pyaudio.PyAudio()
-                stream = p.open(
-                    format=p.get_format_from_width(wf.getsampwidth()),
-                    channels=wf.getnchannels(),
-                    rate=wf.getframerate(),
-                    output=True
-                )
-                
-                chunk_size = 1024
-                self._playback_start_time = time.time()
-                
-                data = wf.readframes(chunk_size)
-                while data and not self._stop_playback_flag:
-                    stream.write(data)
-                    data = wf.readframes(chunk_size)
-                
-                stream.stop_stream()
-                stream.close()
-                p.terminate()
-                wf.close()
-                
-            except ImportError:
-                # Fallback to winsound (Windows only, blocking)
-                import tempfile
-                import winsound
-                
-                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
-                    f.write(self.wav_audio)
-                    temp_path = f.name
-                
-                try:
-                    winsound.PlaySound(temp_path, winsound.SND_FILENAME)
-                finally:
-                    try:
-                        os.unlink(temp_path)
-                    except Exception:
-                        pass
+            position = self.playback_position if self.is_playing else 0.0
             
-            # Playback complete
-            def on_complete():
-                if not self._destroyed:
-                    self.is_playing = False
-                    self.play_btn.configure(state="normal")
-                    self.pause_btn.configure(state="disabled")
-                    self.seek_slider.set(0)
-                    self.playback_position = 0.0
-                    dur_str = self._format_short_duration(self.audio_duration)
-                    self.position_label.configure(text=f"00:00 / {dur_str}")
-                    self._update_status("Playback complete", self.colors.green)
-            
-            GUICoordinator.get_instance().run_on_gui_thread(on_complete)
-            
+            if self.recorder.play(self.wav_audio, position):
+                self.is_playing = True
+                self.play_btn.configure(state="disabled")
+                self.pause_btn.configure(state="normal")
+                
+                # Start position update
+                self._update_playback_position()
+                
+                self._update_status("Playing...", self.colors.accent)
         except Exception as e:
             logging.error(f"[TTS] Playback error: {e}")
-            
-            def on_error():
-                if not self._destroyed:
-                    self.is_playing = False
-                    self.play_btn.configure(state="normal")
-                    self.pause_btn.configure(state="disabled")
-                    self._update_status(f"Playback error: {e}", self.colors.red)
-            
-            GUICoordinator.get_instance().run_on_gui_thread(on_error)
+            self._update_status(f"Playback error: {e}", self.colors.red)
     
     def _pause_audio(self):
-        """Pause/stop audio playback."""
-        self._stop_playback_flag = True
-        self.is_playing = False
+        """Pause audio playback."""
+        if not self.recorder:
+            return
+        
+        self.recorder.pause()
+        self.playback_position = self.recorder.get_playback_position()
+        
         self.play_btn.configure(state="normal")
         self.pause_btn.configure(state="disabled")
+        
         self._update_status("Paused", self.colors.overlay0)
     
     def _on_seek(self, value):
         """Handle seek slider change."""
-        if self.audio_duration <= 0:
+        if not self.recorder or self.audio_duration <= 0:
             return
         
         position = (value / 100.0) * self.audio_duration
         self.playback_position = position
         
+        if self.is_playing:
+            self.recorder.seek(position)
+        
+        # Update position label
         pos_str = self._format_short_duration(position)
         dur_str = self._format_short_duration(self.audio_duration)
         self.position_label.configure(text=f"{pos_str} / {dur_str}")
     
     def _update_playback_position(self):
-        """Update playback position display during playback."""
-        if not self.is_playing or self._destroyed:
+        """Update playback position display."""
+        if not self.is_playing or self._destroyed or not self.recorder:
             return
         
-        if hasattr(self, '_playback_start_time'):
-            elapsed = time.time() - self._playback_start_time
-            self.playback_position = min(elapsed, self.audio_duration)
-            
-            if self.audio_duration > 0:
-                slider_value = (self.playback_position / self.audio_duration) * 100
-                self.seek_slider.set(slider_value)
-            
-            pos_str = self._format_short_duration(self.playback_position)
+        if not self.recorder.is_playing():
+            # Playback finished
+            self.is_playing = False
+            self.play_btn.configure(state="normal")
+            self.pause_btn.configure(state="disabled")
+            self.seek_slider.set(0)
+            self.playback_position = 0.0
             dur_str = self._format_short_duration(self.audio_duration)
-            self.position_label.configure(text=f"{pos_str} / {dur_str}")
+            self.position_label.configure(text=f"00:00 / {dur_str}")
+            self._update_status("Playback complete", self.colors.green)
+            return
         
+        position = self.recorder.get_playback_position()
+        self.playback_position = position
+        
+        # Update slider
+        if self.audio_duration > 0:
+            slider_value = (position / self.audio_duration) * 100
+            self.seek_slider.set(slider_value)
+        
+        # Update label
+        pos_str = self._format_short_duration(position)
+        dur_str = self._format_short_duration(self.audio_duration)
+        self.position_label.configure(text=f"{pos_str} / {dur_str}")
+        
+        # Schedule next update
         self.root.after(100, self._update_playback_position)
     
     # =========================================================================
@@ -1236,7 +1188,9 @@ class TTSWindow:
     def _close(self):
         """Close window and cleanup."""
         self._destroyed = True
-        self._stop_playback_flag = True
+        if self.recorder:
+            self.recorder.cleanup()
+            self.recorder = None
         
         unregister_window(self._get_window_tag())
         
