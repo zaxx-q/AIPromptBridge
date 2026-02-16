@@ -1892,19 +1892,24 @@ class AttachedInputPopup:
             # TTS button (only if callback provided)
             if self.on_tts_callback:
                 tts_btn = create_emoji_button(
-                    input_frame,
+                    top_bar,
                     text="",
                     icon="🔊",
                     colors=self.colors,
                     variant="secondary",
-                    width=42,
-                    height=42,
-                    font_size=14,
+                    width=24,
+                    height=24,
+                    font_size=12,
                     command=self._on_tts
                 )
-                tts_btn.configure(corner_radius=8)
-                tts_btn.pack(side="right", padx=(0, 4))
-                Tooltip(tts_btn, "Open TTS Window")
+                tts_btn.configure(
+                    corner_radius=6,
+                    fg_color="transparent",
+                    hover_color=self.colors.surface1
+                )
+                tts_btn.pack(side="left", padx=(4, 0))
+                self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window")
+                self.tts_btn = tts_btn
         else:
             # Fallback to tk
             self.root.configure(bg=self.colors.base)
@@ -2001,20 +2006,19 @@ class AttachedInputPopup:
             # TTS button (only if callback provided)
             if self.on_tts_callback:
                 tts_btn = tk.Label(
-                    input_frame,
+                    top_bar,
                     text="🔊",
-                    font=("Arial", 14),
-                    bg=self.colors.surface1,
-                    fg=self.colors.text,
-                    padx=10,
-                    pady=8,
+                    font=("Arial", 12),
+                    bg=self.colors.base,
+                    fg=self.colors.overlay0,
                     cursor="hand2"
                 )
-                tts_btn.pack(side=tk.RIGHT, padx=(0, 4))
+                tts_btn.pack(side=tk.LEFT, padx=(6, 0))
                 tts_btn.bind('<Button-1>', lambda e: self._on_tts())
-                tts_btn.bind('<Enter>', lambda e: tts_btn.config(bg=self.colors.surface2))
-                tts_btn.bind('<Leave>', lambda e: tts_btn.config(bg=self.colors.surface1))
-                Tooltip(tts_btn, "Open TTS Window")
+                tts_btn.bind('<Enter>', lambda e: tts_btn.config(fg=self.colors.text))
+                tts_btn.bind('<Leave>', lambda e: tts_btn.config(fg=self.colors.overlay0))
+                self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window")
+                self.tts_btn = tts_btn
         
         # Force Tk to process all pending drawing commands before showing
         self._position_window()
@@ -2072,17 +2076,53 @@ class AttachedInputPopup:
     def _submit(self):
         """Handle form submission."""
         text = self.input_entry.get().strip()
-        if text and text != self.PLACEHOLDER:
+        
+        # Check if empty (handling placeholder check for Tk)
+        is_empty = not text or (not HAVE_CTK and text == self.PLACEHOLDER)
+        
+        if not is_empty:
             response_mode = self.response_toggle.get() if self.response_toggle else "default"
             self._close()
             self.on_submit(text, response_mode)
+        else:
+            self._flash_input_error()
     
     def _on_tts(self):
         """Handle TTS button click - grab text and open TTS Window."""
         text = self.input_entry.get().strip()
-        if text and text != self.PLACEHOLDER and self.on_tts_callback:
+        
+        # Check if empty (handling placeholder check for Tk)
+        is_empty = not text or (not HAVE_CTK and text == self.PLACEHOLDER)
+        
+        if not is_empty and self.on_tts_callback:
             self._close()
             self.on_tts_callback(text)
+        elif self.on_tts_callback:
+            # Visual feedback: Flash input border red
+            self._flash_input_error()
+            
+    def _flash_input_error(self):
+        """Briefly flash input red to indicate error."""
+        try:
+            if HAVE_CTK:
+                orig_border = self.input_entry.cget("border_color")
+                self.input_entry.configure(border_color=self.colors.red)
+                self.root.after(500, lambda: self._safe_restore_border(orig_border))
+            else:
+                # Tk fallback - flash background
+                orig_bg = self.input_entry.cget("bg")
+                self.input_entry.config(bg=self.colors.red)
+                self.root.after(300, lambda: self.input_entry.config(bg=orig_bg))
+        except Exception:
+            pass
+            
+    def _safe_restore_border(self, color):
+        """Restore border color if widget still exists."""
+        try:
+            if self.input_entry and self.input_entry.winfo_exists():
+                self.input_entry.configure(border_color=color)
+        except Exception:
+            pass
     
     def _close(self):
         """Close the popup."""
@@ -2202,8 +2242,8 @@ class AttachedPromptPopup:
                     fg_color="transparent",
                     hover_color=self.colors.surface1
                 )
-                tts_btn.pack(side="right", padx=(0, 4))
-                Tooltip(tts_btn, "Open TTS Window with selected text")
+                tts_btn.pack(side="left", padx=(4, 0))
+                self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window with selected text")
             
             # Response toggle
             toggle_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
@@ -2395,11 +2435,11 @@ class AttachedPromptPopup:
                     fg=self.colors.overlay0,
                     cursor="hand2"
                 )
-                tts_btn.pack(side=tk.RIGHT, padx=(0, 6))
+                tts_btn.pack(side=tk.LEFT, padx=(6, 0))
                 tts_btn.bind('<Button-1>', lambda e: self._on_tts())
                 tts_btn.bind('<Enter>', lambda e: tts_btn.config(fg=self.colors.text))
                 tts_btn.bind('<Leave>', lambda e: tts_btn.config(fg=self.colors.overlay0))
-                Tooltip(tts_btn, "Open TTS Window with selected text")
+                self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window with selected text")
             
             # Response mode toggle
             toggle_frame = tk.Frame(content_frame, bg=self.colors.base)
