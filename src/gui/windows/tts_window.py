@@ -1050,6 +1050,10 @@ class TTSWindow:
                 
                 self.is_generating = False
                 self.generate_audio_btn.configure(state="normal")
+
+                # Autoplay if enabled
+                if self.config.get("tts_autoplay", True):
+                    self._play_audio()
             
             GUICoordinator.get_instance().run_on_gui_thread(update_ui)
             

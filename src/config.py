@@ -108,6 +108,8 @@ DEFAULT_CONFIG = {
     "tts_director_model": "",
     # Directory for saved TTS audio files
     "tts_save_directory": "tts_output",
+    # Automatically play generated audio
+    "tts_autoplay": True,
     # Chat window system prompt behavior
     # true = Use the originating action's system prompt for follow-up messages
     # false = Always use chat_window_system_instruction from prompts.json
@@ -446,6 +448,11 @@ tts_director_auto_mode = false
 
 # Directory for saved TTS audio files (relative to app root)
 tts_save_directory = tts_output
+
+# Automatically play generated audio
+# true = play immediately after generation
+# false = wait for user to press play
+tts_autoplay = true
 
 # ============================================================
 # FLASK API ENDPOINTS (Optional)
