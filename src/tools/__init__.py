@@ -27,7 +27,6 @@ from .config import (
 from .audio_processor import (
     # Core classes
     AudioProcessor,
-    AudioChunker,  # Backward compatibility alias
     AudioInfo,
     AudioChunk,
     ChunkingResult,
@@ -63,7 +62,6 @@ __all__ = [
     "ScanResult",
     # Audio processor - core
     "AudioProcessor",
-    "AudioChunker",  # Backward compatibility alias
     "AudioInfo",
     "AudioChunk",
     "ChunkingResult",

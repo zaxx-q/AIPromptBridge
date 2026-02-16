@@ -45,7 +45,8 @@ AIPromptBridge/
     ├── audio/                  # Audio Subsystem
     │   ├── __init__.py
     │   ├── devices.py          # PyAudioWPatch device enumeration
-    │   └── recorder.py         # Recorder class with voice activity detection
+    │   ├── ffmpeg_utils.py     # Shared FFmpeg/FFprobe/FFplay detection and helpers
+    │   └── recorder.py         # Recorder class with recording, playback, and compression
     │
     ├── gui/                    # GUI Package (CustomTkinter)
     │   ├── __init__.py

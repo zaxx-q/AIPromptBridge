@@ -24,6 +24,12 @@ from queue import Queue, Empty
 from typing import Callable, Optional, List
 
 from .devices import AudioDevice, is_pyaudio_available
+from .ffmpeg_utils import (
+    is_ffmpeg_available,
+    get_ffmpeg_path,
+    get_creation_flags,
+    get_audio_duration,
+)
 
 # Try to import PyAudioWPatch
 try:
@@ -71,21 +77,6 @@ COMPRESSION_PRESETS = {
     }
 }
 
-
-def is_ffmpeg_available() -> bool:
-    """Check if FFmpeg is available in PATH."""
-    try:
-        result = subprocess.run(
-            ["ffmpeg", "-version"],
-            capture_output=True,
-            text=True,
-            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-        )
-        return result.returncode == 0
-    except FileNotFoundError:
-        return False
-    except Exception:
-        return False
 
 
 def get_rms_level(audio_chunk: bytes, sample_width: int = 2) -> float:
@@ -537,12 +528,12 @@ class AudioRecorder:
                 try:
                     result = subprocess.run(
                         [
-                            "ffmpeg", "-y", "-i", tmp_in_path,
+                            get_ffmpeg_path(), "-y", "-i", tmp_in_path,
                             "-f", "wav", "-acodec", "pcm_s16le",
                             tmp_out_path
                         ],
                         capture_output=True,
-                        creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                        creationflags=get_creation_flags()
                     )
                     
                     if result.returncode == 0 and Path(tmp_out_path).exists():
@@ -718,14 +709,14 @@ class AudioRecorder:
             
             try:
                 # Build FFmpeg command
-                cmd = ["ffmpeg", "-y", "-i", tmp_in_path]
+                cmd = [get_ffmpeg_path(), "-y", "-i", tmp_in_path]
                 cmd.extend(ffmpeg_args.split())
                 cmd.append(tmp_out_path)
                 
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
-                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                    creationflags=get_creation_flags()
                 )
                 
                 if result.returncode != 0:
@@ -822,53 +813,3 @@ class AudioRecorder:
         self.cleanup()
 
 
-def get_audio_duration(audio_data: bytes) -> float:
-    """
-    Get duration of audio data in seconds.
-    
-    Args:
-        audio_data: WAV or compressed audio data
-        
-    Returns:
-        Duration in seconds
-    """
-    # Try WAV
-    try:
-        wav_buffer = io.BytesIO(audio_data)
-        with wave.open(wav_buffer, 'rb') as wf:
-            return wf.getnframes() / wf.getframerate()
-    except Exception:
-        pass
-    
-    # Try FFmpeg probe
-    if is_ffmpeg_available():
-        try:
-            with tempfile.NamedTemporaryFile(suffix=".audio", delete=False) as tmp:
-                tmp.write(audio_data)
-                tmp_path = tmp.name
-            
-            try:
-                result = subprocess.run(
-                    [
-                        "ffprobe", "-v", "error",
-                        "-show_entries", "format=duration",
-                        "-of", "default=noprint_wrappers=1:nokey=1",
-                        tmp_path
-                    ],
-                    capture_output=True,
-                    text=True,
-                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                )
-                
-                if result.returncode == 0:
-                    return float(result.stdout.strip())
-            finally:
-                try:
-                    Path(tmp_path).unlink(missing_ok=True)
-                except Exception:
-                    pass
-                    
-        except Exception:
-            pass
-    
-    return 0.0

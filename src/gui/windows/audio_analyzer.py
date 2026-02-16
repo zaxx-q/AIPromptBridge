@@ -110,7 +110,7 @@ class AudioAnalyzerWindow:
         
         # Compression settings (always enabled with recommended preset by default)
         try:
-            from ...audio.recorder import is_ffmpeg_available
+            from ...audio.ffmpeg_utils import is_ffmpeg_available
             self.compression_enabled = is_ffmpeg_available()
         except ImportError:
             self.compression_enabled = False
@@ -1333,7 +1333,7 @@ class AudioAnalyzerWindow:
                 self.recorded_wav = wav_data
                 
                 # Calculate duration from data
-                from ...audio.recorder import get_audio_duration
+                from ...audio.ffmpeg_utils import get_audio_duration
                 self.audio_duration = get_audio_duration(wav_data)
                 
                 logging.info(f"[AudioAnalyzer] Recording stopped (unified): {len(wav_data)} bytes, {self.audio_duration:.1f}s")
@@ -1554,7 +1554,7 @@ class AudioAnalyzerWindow:
         """Handle compression checkbox toggle."""
         if self.compression_var.get():
             try:
-                from ...audio.recorder import is_ffmpeg_available
+                from ...audio.ffmpeg_utils import is_ffmpeg_available
                 if not is_ffmpeg_available():
                     self.compression_var.set(False)
                     self.compression_enabled = False

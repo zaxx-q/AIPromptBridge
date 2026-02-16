@@ -14,7 +14,6 @@ Handles:
 
 import json
 import os
-import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
@@ -22,6 +21,16 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 
+from src.audio.ffmpeg_utils import (
+    is_ffmpeg_available as _is_ffmpeg_available,
+    is_ffprobe_available as _is_ffprobe_available,
+    is_ffplay_available as _is_ffplay_available,
+    get_ffmpeg_path,
+    get_ffprobe_path,
+    get_ffplay_path,
+    get_ffmpeg_version as _get_ffmpeg_version,
+    get_creation_flags,
+)
 from src.console import console, print_warning, print_info, print_error, print_success
 
 
@@ -571,44 +580,22 @@ class AudioProcessor:
     
     Uses FFmpeg for all audio operations. Requires FFmpeg to be
     installed and available on the system PATH.
+    
+    Binary detection is delegated to ``src.audio.ffmpeg_utils`` which
+    caches PATH lookups at the module level for efficiency.
     """
     
-    def __init__(self):
-        self._ffmpeg_path: Optional[str] = None
-        self._ffprobe_path: Optional[str] = None
-        self._ffplay_path: Optional[str] = None
-        self._checked = False
-    
     def is_available(self) -> bool:
-        """Check if FFmpeg is available on PATH"""
-        if not self._checked:
-            self._ffmpeg_path = shutil.which("ffmpeg")
-            self._ffprobe_path = shutil.which("ffprobe")
-            self._ffplay_path = shutil.which("ffplay")
-            self._checked = True
-        return self._ffmpeg_path is not None and self._ffprobe_path is not None
+        """Check if FFmpeg and FFprobe are available on PATH (cached)."""
+        return _is_ffmpeg_available() and _is_ffprobe_available()
     
     def is_ffplay_available(self) -> bool:
-        """Check if FFplay is available for audio preview"""
-        if not self._checked:
-            self.is_available()  # Populate paths
-        return self._ffplay_path is not None
+        """Check if FFplay is available for audio preview (cached)."""
+        return _is_ffplay_available()
     
     def get_ffmpeg_version(self) -> Optional[str]:
-        """Get FFmpeg version string"""
-        if not self.is_available():
-            return None
-        try:
-            result = subprocess.run(
-                [self._ffmpeg_path, "-version"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            first_line = result.stdout.split("\n")[0]
-            return first_line
-        except Exception:
-            return None
+        """Get FFmpeg version string."""
+        return _get_ffmpeg_version()
     
     def get_audio_info(self, filepath: Path) -> Optional[AudioInfo]:
         """
@@ -626,7 +613,7 @@ class AudioProcessor:
         try:
             result = subprocess.run(
                 [
-                    self._ffprobe_path,
+                    get_ffprobe_path(),
                     "-v", "quiet",
                     "-print_format", "json",
                     "-show_format",
@@ -635,7 +622,8 @@ class AudioProcessor:
                 ],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
+                creationflags=get_creation_flags()
             )
             
             if result.returncode != 0:
@@ -685,7 +673,7 @@ class AudioProcessor:
         try:
             result = subprocess.run(
                 [
-                    self._ffmpeg_path,
+                    get_ffmpeg_path(),
                     "-i", str(filepath),
                     "-af", "volumedetect",
                     "-f", "null",
@@ -693,7 +681,8 @@ class AudioProcessor:
                 ],
                 capture_output=True,
                 text=True,
-                timeout=120
+                timeout=120,
+                creationflags=get_creation_flags()
             )
             
             # Parse output for max_volume
@@ -783,7 +772,7 @@ class AudioProcessor:
         try:
             # Build command - always re-encode when using audio filters
             cmd = [
-                self._ffmpeg_path,
+                get_ffmpeg_path(),
                 "-y",  # Overwrite
                 "-i", str(filepath),
                 "-af", volume_filter,
@@ -806,7 +795,8 @@ class AudioProcessor:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=600
+                timeout=600,
+                creationflags=get_creation_flags()
             )
             
             if result.returncode != 0:
@@ -942,7 +932,7 @@ class AudioProcessor:
         
         try:
             cmd = [
-                self._ffmpeg_path,
+                get_ffmpeg_path(),
                 "-y",  # Overwrite
                 "-i", str(filepath),
             ]
@@ -981,7 +971,8 @@ class AudioProcessor:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=1200  # Allow more time for complex filter chains
+                timeout=1200,  # Allow more time for complex filter chains
+                creationflags=get_creation_flags()
             )
             
             if result.returncode != 0:
@@ -1111,7 +1102,7 @@ class AudioProcessor:
         
         try:
             cmd = [
-                self._ffplay_path,
+                get_ffplay_path(),
                 "-nodisp",
                 "-autoexit",
                 "-ss", str(start_seconds),
@@ -1194,7 +1185,7 @@ class AudioProcessor:
         
         try:
             cmd = [
-                self._ffplay_path,
+                get_ffplay_path(),
                 "-nodisp",  # No video display window
                 "-autoexit",  # Exit when done
                 "-ss", str(start_seconds),
@@ -1263,7 +1254,7 @@ class AudioProcessor:
                 filters.append(f"volume={volume_percent / 100.0}")
             
             cmd = [
-                self._ffplay_path,
+                get_ffplay_path(),
                 "-nodisp",
                 "-autoexit",
                 "-ss", str(start_seconds),
@@ -1393,7 +1384,7 @@ class AudioProcessor:
                 
                 # Build FFmpeg command
                 cmd = [
-                    self._ffmpeg_path,
+                    get_ffmpeg_path(),
                     "-y",  # Overwrite
                     "-i", str(filepath),
                     "-ss", str(current_time),
@@ -1418,7 +1409,8 @@ class AudioProcessor:
                     cmd,
                     capture_output=True,
                     text=True,
-                    timeout=300
+                    timeout=300,
+                    creationflags=get_creation_flags()
                 )
                 
                 if result.returncode != 0:
@@ -1487,9 +1479,6 @@ class AudioProcessor:
         return "\n\n".join(parts)
 
 
-# Backward compatibility alias
-AudioChunker = AudioProcessor
-
 
 def check_ffmpeg_available() -> Tuple[bool, Optional[str]]:
     """
@@ -1498,9 +1487,8 @@ def check_ffmpeg_available() -> Tuple[bool, Optional[str]]:
     Returns:
         Tuple of (is_available, version_string)
     """
-    processor = AudioProcessor()
-    if processor.is_available():
-        return True, processor.get_ffmpeg_version()
+    if _is_ffmpeg_available():
+        return True, _get_ffmpeg_version()
     return False, None
 
 
