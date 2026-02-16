@@ -212,7 +212,7 @@ def load_sessions():
         print(f"[Warning] Failed to load sessions: {e}")
 
 
-def add_session(session, max_sessions=50):
+def add_session(session, max_sessions=200):
     """Add a session and manage max limit"""
     removed_ids = []
     with SESSION_LOCK:

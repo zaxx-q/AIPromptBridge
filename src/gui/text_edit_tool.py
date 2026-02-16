@@ -1196,7 +1196,7 @@ class TextEditToolApp:
         if should_save:
             # Avoid circular import
             from ..session_manager import add_session
-            add_session(session, self.config.get("max_sessions", 50))
+            add_session(session, self.config.get("max_sessions", 200))
             logging.debug(f"Auto-saved session {session.session_id} (mode: {auto_save})")
 
     def is_running(self) -> bool:

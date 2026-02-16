@@ -1130,7 +1130,7 @@ class ChatWindowBase(ABC):
                         usage_str = f" | {self.last_usage.get('total_tokens', 0)} tokens"
                     
                     self._update_status(f"✅ Regenerated{usage_str}", self.theme.accent_green)
-                    add_session(self.session, web_server.CONFIG.get("max_sessions", 50))
+                    add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
                 
                 self.is_loading = False
                 if HAVE_CTK:
@@ -1956,7 +1956,7 @@ class ChatWindowBase(ABC):
                         usage_str = f" | {self.last_usage.get('total_tokens', 0)} tokens"
                     
                     self._update_status(f"✅ Response received{usage_str}", self.theme.accent_green)
-                    add_session(self.session, web_server.CONFIG.get("max_sessions", 50))
+                    add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
                 
                 self.is_loading = False
                 if HAVE_CTK:

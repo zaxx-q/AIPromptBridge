@@ -877,7 +877,7 @@ class SettingsWindow:
         
         # Max sessions
         self._add_spinbox_field(content_parent, "max_sessions", "Max sessions:",
-                               self.config_data.config.get("max_sessions", 50),
+                               self.config_data.config.get("max_sessions", 200),
                                1, 1000, width=80, hint="Maximum chat sessions to keep")
         
         # Max retries

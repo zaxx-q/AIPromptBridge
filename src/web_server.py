@@ -154,7 +154,7 @@ def create_endpoint_handler(endpoint_name, prompt_template):
             
             session.add_message("user", prompt, attachments=attachments)
             session.add_message("assistant", result)
-            add_session(session, CONFIG.get("max_sessions", 50))
+            add_session(session, CONFIG.get("max_sessions", 200))
             show_chat_gui(session, initial_response=result)
         
         if request.headers.get('Accept') == 'application/json':

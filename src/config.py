@@ -33,7 +33,7 @@ DEFAULT_CONFIG = {
     "max_retries": 3,
     "retry_delay": 5,
     "request_timeout": 120,
-    "max_sessions": 50,
+    "max_sessions": 200,
     # Show AI response in chat window: yes or no
     # This controls whether responses appear in a GUI window or are typed directly.
     # For API endpoints: overridden by ?show=yes/no URL parameter
@@ -330,7 +330,7 @@ retry_delay = 5
 request_timeout = 120
 
 # Session management
-max_sessions = 50
+max_sessions = 200
 
 # ============================================================
 # STREAMING AND THINKING SETTINGS
