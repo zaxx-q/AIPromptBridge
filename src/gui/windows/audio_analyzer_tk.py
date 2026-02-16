@@ -433,21 +433,13 @@ def _create_preview_section_tk(window, parent):
     row = tk.Frame(content, bg=colors.surface0)
     row.pack(fill="x")
     
-    # Play
-    window.play_btn = tk.Button(
+    # Play/Pause
+    window.play_pause_btn = tk.Button(
         row, text="▶", font=("Segoe UI", 12),
         bg=colors.green, fg="#ffffff", relief="flat",
-        width=3, command=window._play_audio, state="disabled"
+        width=3, command=window._toggle_playback, state="disabled"
     )
-    window.play_btn.pack(side="left", padx=(0, 5))
-    
-    # Pause
-    window.pause_btn = tk.Button(
-        row, text="⏸", font=("Segoe UI", 12),
-        bg=colors.surface1, fg=colors.text, relief="flat",
-        width=3, command=window._pause_audio, state="disabled"
-    )
-    window.pause_btn.pack(side="left", padx=(0, 8))
+    window.play_pause_btn.pack(side="left", padx=(0, 8))
     
     # Seek Slider 
     window.seek_slider = TkSliderWrapper(

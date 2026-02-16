@@ -144,8 +144,7 @@ class TTSWindow:
         self.director_model_dropdown = None
         self.generate_style_btn = None
         self.generate_audio_btn = None
-        self.play_btn = None
-        self.pause_btn = None
+        self.play_pause_btn = None
         self.seek_slider = None
         self.position_label = None
         self.save_btn = None
@@ -477,33 +476,19 @@ class TTSWindow:
         row_frame = ctk.CTkFrame(content, fg_color="transparent")
         row_frame.pack(fill="x")
         
-        # Play button
+        # Play/Pause button
         play_content = prepare_emoji_content("▶", size=14)
-        self.play_btn = ctk.CTkButton(
+        self.play_pause_btn = ctk.CTkButton(
             row_frame,
             **play_content,
             width=40,
             height=32,
             corner_radius=6,
-            command=self._play_audio,
+            command=self._toggle_playback,
             state="disabled",
             **get_ctk_button_colors(self.colors, "success")
         )
-        self.play_btn.pack(side="left", padx=(0, 5))
-        
-        # Pause button
-        pause_content = prepare_emoji_content("⏸", size=14)
-        self.pause_btn = ctk.CTkButton(
-            row_frame,
-            **pause_content,
-            width=40,
-            height=32,
-            corner_radius=6,
-            command=self._pause_audio,
-            state="disabled",
-            **get_ctk_button_colors(self.colors, "secondary")
-        )
-        self.pause_btn.pack(side="left", padx=(0, 8))
+        self.play_pause_btn.pack(side="left", padx=(0, 8))
         
         # Seek slider
         self.seek_slider = ctk.CTkSlider(
@@ -1028,7 +1013,7 @@ class TTSWindow:
                 )
                 
                 # Enable playback controls
-                self.play_btn.configure(state="normal")
+                self.play_pause_btn.configure(state="normal")
                 self.seek_slider.configure(state="normal")
                 self.save_btn.configure(state="normal")
                 self.position_label.configure(text=f"00:00 / {duration_str}")
@@ -1055,18 +1040,30 @@ class TTSWindow:
     # Audio Playback
     # =========================================================================
     
+    def _toggle_playback(self):
+        """Toggle playback state."""
+        if self.is_playing:
+            self._pause_audio()
+        else:
+            self._play_audio()
+
     def _play_audio(self):
         """Start or resume audio playback."""
         if not self.recorder or not self.wav_audio:
             return
         
         try:
-            position = self.playback_position if self.is_playing else 0.0
+            position = self.playback_position
             
             if self.recorder.play(self.wav_audio, position):
                 self.is_playing = True
-                self.play_btn.configure(state="disabled")
-                self.pause_btn.configure(state="normal")
+                
+                # Switch to Pause button
+                pause_content = prepare_emoji_content("⏸", size=14)
+                self.play_pause_btn.configure(
+                    **pause_content,
+                    **get_ctk_button_colors(self.colors, "secondary")
+                )
                 
                 # Start position update
                 self._update_playback_position()
@@ -1082,10 +1079,15 @@ class TTSWindow:
             return
         
         self.recorder.pause()
+        self.is_playing = False
         self.playback_position = self.recorder.get_playback_position()
         
-        self.play_btn.configure(state="normal")
-        self.pause_btn.configure(state="disabled")
+        # Switch to Play button
+        play_content = prepare_emoji_content("▶", size=14)
+        self.play_pause_btn.configure(
+            **play_content,
+            **get_ctk_button_colors(self.colors, "success")
+        )
         
         self._update_status("Paused", self.colors.overlay0)
     
@@ -1113,8 +1115,13 @@ class TTSWindow:
         if not self.recorder.is_playing():
             # Playback finished
             self.is_playing = False
-            self.play_btn.configure(state="normal")
-            self.pause_btn.configure(state="disabled")
+            
+            play_content = prepare_emoji_content("▶", size=14)
+            self.play_pause_btn.configure(
+                **play_content,
+                **get_ctk_button_colors(self.colors, "success")
+            )
+            
             self.seek_slider.set(0)
             self.playback_position = 0.0
             dur_str = self._format_short_duration(self.audio_duration)

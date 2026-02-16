@@ -155,8 +155,7 @@ class AudioAnalyzerWindow:
         self.preset_dropdown = None
         self.size_label = None
         self.preset_desc_label = None  # New: description label
-        self.play_btn = None
-        self.pause_btn = None
+        self.play_pause_btn = None
         self.seek_slider = None
         self.position_label = None
         self.actions_frame = None
@@ -621,33 +620,19 @@ class AudioAnalyzerWindow:
         row_frame = ctk.CTkFrame(content, fg_color="transparent")
         row_frame.pack(fill="x")
         
-        # Play button
+        # Play/Pause button
         play_content = prepare_emoji_content("▶", size=14)
-        self.play_btn = ctk.CTkButton(
+        self.play_pause_btn = ctk.CTkButton(
             row_frame,
             **play_content,
             width=40,
             height=32,
             corner_radius=6,
-            command=self._play_audio,
+            command=self._toggle_playback,
             state="disabled",
             **get_ctk_button_colors(self.colors, "success")
         )
-        self.play_btn.pack(side="left", padx=(0, 5))
-        
-        # Pause button
-        pause_content = prepare_emoji_content("⏸", size=14)
-        self.pause_btn = ctk.CTkButton(
-            row_frame,
-            **pause_content,
-            width=40,
-            height=32,
-            corner_radius=6,
-            command=self._pause_audio,
-            state="disabled",
-            **get_ctk_button_colors(self.colors, "secondary")
-        )
-        self.pause_btn.pack(side="left", padx=(0, 8))
+        self.play_pause_btn.pack(side="left", padx=(0, 8))
         
         # Seek slider
         self.seek_slider = ctk.CTkSlider(
@@ -1384,7 +1369,7 @@ class AudioAnalyzerWindow:
     
     def _enable_audio_controls(self):
         """Enable playback and send controls after recording."""
-        if self.play_btn: self.play_btn.configure(state="normal")
+        if self.play_pause_btn: self.play_pause_btn.configure(state="normal")
         if self.seek_slider: self.seek_slider.configure(state="normal")
         if self.send_btn: self.send_btn.configure(state="normal")
         if self.clear_btn: self.clear_btn.configure(state="normal")
@@ -1411,8 +1396,11 @@ class AudioAnalyzerWindow:
         self.size_label.configure(text="")
         
         # Disable controls
-        self.play_btn.configure(state="disabled")
-        self.pause_btn.configure(state="disabled")
+        self.play_pause_btn.configure(
+            state="disabled",
+            **prepare_emoji_content("▶", size=14),
+            **get_ctk_button_colors(self.colors, "success")
+        )
         self.seek_slider.configure(state="disabled")
         self.send_btn.configure(state="disabled")
         self.clear_btn.configure(state="disabled")
@@ -1430,6 +1418,13 @@ class AudioAnalyzerWindow:
     # Playback Controls
     # =========================================================================
     
+    def _toggle_playback(self):
+        """Toggle playback state."""
+        if self.is_playing:
+            self._pause_audio()
+        else:
+            self._play_audio()
+
     def _play_audio(self):
         """Start or resume audio playback."""
         if not self.recorder or not self.recorded_wav:
@@ -1441,12 +1436,18 @@ class AudioAnalyzerWindow:
             if not audio_to_play:
                 return
             
-            position = self.playback_position if self.is_playing else 0.0
+            # Use current position (0.0 if stopped, or paused position)
+            position = self.playback_position
             
             if self.recorder.play(audio_to_play, position):
                 self.is_playing = True
-                self.play_btn.configure(state="disabled")
-                self.pause_btn.configure(state="normal")
+                
+                # Switch to Pause button
+                pause_content = prepare_emoji_content("⏸", size=14)
+                self.play_pause_btn.configure(
+                    **pause_content,
+                    **get_ctk_button_colors(self.colors, "secondary")
+                )
                 
                 # Start position update
                 self._update_playback_position()
@@ -1463,10 +1464,15 @@ class AudioAnalyzerWindow:
             return
         
         self.recorder.pause()
+        self.is_playing = False
         self.playback_position = self.recorder.get_playback_position()
         
-        self.play_btn.configure(state="normal")
-        self.pause_btn.configure(state="disabled")
+        # Switch to Play button
+        play_content = prepare_emoji_content("▶", size=14)
+        self.play_pause_btn.configure(
+            **play_content,
+            **get_ctk_button_colors(self.colors, "success")
+        )
         
         self._update_status("Paused")
     
@@ -1479,9 +1485,15 @@ class AudioAnalyzerWindow:
         self.is_playing = False
         self.playback_position = 0.0
         
-        self.play_btn.configure(state="normal")
-        self.pause_btn.configure(state="disabled")
-        self.seek_slider.set(0)
+        # Switch to Play button
+        play_content = prepare_emoji_content("▶", size=14)
+        if self.play_pause_btn:
+            self.play_pause_btn.configure(
+                **play_content,
+                **get_ctk_button_colors(self.colors, "success")
+            )
+        if self.seek_slider:
+            self.seek_slider.set(0)
     
     def _on_seek(self, value):
         """Handle seek slider change."""
@@ -1507,8 +1519,11 @@ class AudioAnalyzerWindow:
         if not self.recorder.is_playing():
             # Playback finished
             self.is_playing = False
-            self.play_btn.configure(state="normal")
-            self.pause_btn.configure(state="disabled")
+            play_content = prepare_emoji_content("▶", size=14)
+            self.play_pause_btn.configure(
+                **play_content,
+                **get_ctk_button_colors(self.colors, "success")
+            )
             self.seek_slider.set(0)
             self.playback_position = 0.0
             self._update_status("Playback complete")
