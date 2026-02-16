@@ -598,43 +598,7 @@ DEFAULT_AUDIO_ACTIONS = {
 
 DEFAULT_TTS_SETTINGS = {
     "director_system_prompt": "You are an expert voice director for Gemini TTS. Your job is to analyze text and craft expressive style instructions that will guide a text-to-speech model to deliver a natural, compelling performance.\n\nYou must output a structured prompt following this format:\n\n# AUDIO PROFILE: [Character Name]\n## \"[Short descriptor]\"\n\n## THE SCENE: [Setting]\n[Describe the environment and mood]\n\n### DIRECTOR'S NOTES\nStyle: [Describe vocal style, emotion, energy]\nPace: [Describe pacing and rhythm]\nAccent: [If relevant, describe accent]\n\n### SAMPLE CONTEXT\n[Brief context for the character]\n\n#### TRANSCRIPT\n[The actual text to be spoken]\n\nIMPORTANT:\n- Analyze the text's tone, intent, and emotional content\n- Match the direction to what the text is trying to convey\n- Keep directions specific but not over-constrained\n- The transcript section MUST contain the exact original text unchanged",
-    "director_task_template": "Analyze the following text and create TTS style instructions for an expressive voice performance. The text:\n\n{text}",
-    "default_voice": "Kore",
-    "default_model": "gemini-2.5-flash-preview-tts",
-    "director_model_override": None
-}
-
-DEFAULT_TTS_VOICES = {
-    "Zephyr": "Bright",
-    "Puck": "Upbeat",
-    "Charon": "Informative",
-    "Kore": "Firm",
-    "Fenrir": "Excitable",
-    "Leda": "Youthful",
-    "Orus": "Firm",
-    "Aoede": "Breezy",
-    "Callirrhoe": "Easy-going",
-    "Autonoe": "Bright",
-    "Enceladus": "Breathy",
-    "Iapetus": "Clear",
-    "Umbriel": "Easy-going",
-    "Algieba": "Smooth",
-    "Despina": "Smooth",
-    "Erinome": "Clear",
-    "Algenib": "Gravelly",
-    "Rasalgethi": "Informative",
-    "Laomedeia": "Upbeat",
-    "Achernar": "Soft",
-    "Alnilam": "Firm",
-    "Schedar": "Even",
-    "Gacrux": "Mature",
-    "Pulcherrima": "Forward",
-    "Achird": "Friendly",
-    "Zubenelgenubi": "Casual",
-    "Vindemiatrix": "Gentle",
-    "Sadachbia": "Lively",
-    "Sadaltager": "Knowledgeable",
-    "Sulafat": "Warm"
+    "director_task_template": "Analyze the following text and create TTS style instructions for an expressive voice performance. The text:\n\n{text}"
 }
 
 # =============================================================================
@@ -742,8 +706,7 @@ class PromptsConfig:
         
         if "tts_tool" not in self._config:
             self._config["tts_tool"] = {
-                "_settings": DEFAULT_TTS_SETTINGS,
-                "voices": DEFAULT_TTS_VOICES
+                "_settings": DEFAULT_TTS_SETTINGS
             }
             changed = True
         
@@ -778,8 +741,7 @@ class PromptsConfig:
                 **DEFAULT_AUDIO_ACTIONS
             },
             "tts_tool": {
-                "_settings": DEFAULT_TTS_SETTINGS,
-                "voices": DEFAULT_TTS_VOICES
+                "_settings": DEFAULT_TTS_SETTINGS
             },
             "endpoints": {
                 "_settings": DEFAULT_ENDPOINTS_SETTINGS,
@@ -873,7 +835,7 @@ class PromptsConfig:
     # =========================================================================
     
     def get_tts_tool(self) -> dict:
-        """Get complete TTS tool configuration (including _settings and voices)."""
+        """Get complete TTS tool configuration (including _settings)."""
         return self._config.get("tts_tool", {})
     
     def get_tts_setting(self, key: str, default=None):
@@ -881,16 +843,6 @@ class PromptsConfig:
         tts = self.get_tts_tool()
         settings = tts.get("_settings", {})
         return settings.get(key, DEFAULT_TTS_SETTINGS.get(key, default))
-    
-    def get_tts_voices(self) -> Dict[str, str]:
-        """Get TTS voice name -> style mapping."""
-        tts = self.get_tts_tool()
-        return tts.get("voices", DEFAULT_TTS_VOICES)
-    
-    def get_tts_voice_list(self) -> List[str]:
-        """Get list of voice names formatted as 'Name — Style'."""
-        voices = self.get_tts_voices()
-        return [f"{name} — {style}" for name, style in voices.items()]
     
     def get_tts_director_system_prompt(self) -> str:
         """Get the AI Director system prompt for TTS style generation."""

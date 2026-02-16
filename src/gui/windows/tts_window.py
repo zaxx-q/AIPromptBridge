@@ -35,6 +35,7 @@ from ..custom_widgets import ScrollableComboBox
 from ..prompts import get_prompts_config
 from ..emoji_renderer import prepare_emoji_content
 from .utils import set_window_icon
+from ...audio.tts_constants import TTS_MODELS, TTS_VOICES, get_voice_list, get_voice_details
 
 
 class TTSWindow:
@@ -52,10 +53,7 @@ class TTSWindow:
     """
     
     # TTS models available
-    TTS_MODELS = [
-        "gemini-2.5-flash-preview-tts",
-        "gemini-2.5-pro-preview-tts"
-    ]
+    TTS_MODELS = TTS_MODELS
     
     def __init__(
         self,
@@ -92,10 +90,9 @@ class TTSWindow:
         self.prompts = get_prompts_config()
         
         # TTS state
-        self.selected_voice = config.get("tts_default_voice", 
-                                          self.prompts.get_tts_setting("default_voice", "Kore"))
-        self.selected_model = config.get("tts_default_model",
-                                          self.prompts.get_tts_setting("default_model", self.TTS_MODELS[0]))
+        self.selected_voice = config.get("tts_default_voice", "Kore")
+        self.selected_model = config.get("tts_default_model", self.TTS_MODELS[0])
+        
         self.is_multi_speaker = False
         self.speaker1_name = "Speaker1"
         self.speaker2_name = "Speaker2"
@@ -320,7 +317,7 @@ class TTSWindow:
         content = self._create_section_frame(parent, "Voice")
         
         # Build voice list with style descriptors
-        voice_list = self.prompts.get_tts_voice_list()
+        voice_list = get_voice_list()
         
         self.voice_dropdown = ScrollableComboBox(
             content,
@@ -330,10 +327,14 @@ class TTSWindow:
             height=32,
             command=self._on_voice_changed
         )
+        
         # Set default
-        voices = self.prompts.get_tts_voices()
-        default_style = voices.get(self.selected_voice, "")
-        default_display = f"{self.selected_voice} — {default_style}" if default_style else self.selected_voice
+        voice_data = get_voice_details(self.selected_voice)
+        if voice_data["style"] != "Unknown":
+            default_display = f"{self.selected_voice} — {voice_data['gender']}, {voice_data['style']}"
+        else:
+            default_display = self.selected_voice
+            
         self.voice_dropdown.set(default_display)
         self.voice_dropdown.pack(fill="x")
     
@@ -393,7 +394,7 @@ class TTSWindow:
         ms_content = ctk.CTkFrame(self.multi_speaker_frame, fg_color="transparent")
         ms_content.pack(fill="x", padx=12, pady=(0, 10))
         
-        voice_list = self.prompts.get_tts_voice_list()
+        voice_list = get_voice_list()
         
         # Speaker 1
         s1_row = ctk.CTkFrame(ms_content, fg_color="transparent")
@@ -420,9 +421,14 @@ class TTSWindow:
             text_color=self.colors.text,
             font=get_ctk_font(size=9)
         )
-        voices = self.prompts.get_tts_voices()
-        s1_style = voices.get(self.speaker1_voice, "")
-        self.speaker1_voice_dropdown.set(f"{self.speaker1_voice} — {s1_style}")
+        
+        s1_data = get_voice_details(self.speaker1_voice)
+        if s1_data["style"] != "Unknown":
+            s1_display = f"{self.speaker1_voice} — {s1_data['gender']}, {s1_data['style']}"
+        else:
+            s1_display = self.speaker1_voice
+            
+        self.speaker1_voice_dropdown.set(s1_display)
         self.speaker1_voice_dropdown.pack(side="left")
         
         # Speaker 2
@@ -450,8 +456,13 @@ class TTSWindow:
             text_color=self.colors.text,
             font=get_ctk_font(size=9)
         )
-        s2_style = voices.get(self.speaker2_voice, "")
-        self.speaker2_voice_dropdown.set(f"{self.speaker2_voice} — {s2_style}")
+        s2_data = get_voice_details(self.speaker2_voice)
+        if s2_data["style"] != "Unknown":
+            s2_display = f"{self.speaker2_voice} — {s2_data['gender']}, {s2_data['style']}"
+        else:
+            s2_display = self.speaker2_voice
+            
+        self.speaker2_voice_dropdown.set(s2_display)
         self.speaker2_voice_dropdown.pack(side="left")
     
     def _create_preview_section(self, parent):
