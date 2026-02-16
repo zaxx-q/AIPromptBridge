@@ -32,6 +32,7 @@ from ..themes import (
 )
 from ..core import get_next_window_id, register_window, unregister_window, GUICoordinator
 from ..custom_widgets import ScrollableComboBox
+from ..popups import Tooltip
 from ..prompts import get_prompts_config
 from ..emoji_renderer import prepare_emoji_content
 from .utils import set_window_icon
@@ -638,6 +639,10 @@ class TTSWindow:
             width=24
         )
         self.director_toggle.pack(side="right")
+        Tooltip(
+            self.director_toggle,
+            "Automatically generate style instructions when clicking 'Generate Audio' if the style box is empty or still has the default placeholder text."
+        )
         
         # Director controls row
         controls = ctk.CTkFrame(frame, fg_color="transparent")
@@ -777,13 +782,20 @@ class TTSWindow:
             self._update_status("No input text to analyze", self.colors.red)
             return
         
+        # Get director model override while on UI thread
+        director_model_override = self.director_model_entry.get().strip() if self.director_model_entry else ""
+        
         self.is_directing = True
         self.generate_style_btn.configure(state="disabled")
         self._update_status("Generating style instructions...", self.colors.accent)
         
-        threading.Thread(target=self._run_director, args=(input_text,), daemon=True).start()
+        threading.Thread(
+            target=self._run_director,
+            args=(input_text, director_model_override),
+            daemon=True
+        ).start()
     
-    def _run_director(self, input_text: str):
+    def _run_director(self, input_text: str, director_model_override: str):
         """Run the AI Director in a background thread."""
         try:
             from ...request_pipeline import RequestPipeline, RequestContext, RequestOrigin
@@ -800,7 +812,6 @@ class TTSWindow:
             ]
             
             # Determine provider/model for director
-            director_model_override = self.director_model_entry.get().strip() if self.director_model_entry else ""
             provider = self.config.get("default_provider", "google")
             model = director_model_override or self.config.get(f"{provider}_model", "")
             
@@ -838,10 +849,11 @@ class TTSWindow:
             
         except Exception as e:
             logging.error(f"[TTS] Director error: {e}")
+            error_msg = str(e)
             
             def show_error():
                 if not self._destroyed:
-                    self._update_status(f"Director error: {e}", self.colors.red)
+                    self._update_status(f"Director error: {error_msg}", self.colors.red)
                     self.is_directing = False
                     self.generate_style_btn.configure(state="normal")
             
@@ -861,6 +873,10 @@ class TTSWindow:
             self._update_status("No input text", self.colors.red)
             return
         
+        # Capture UI states on main thread
+        director_model = self.director_model_entry.get().strip() if self.director_model_entry else ""
+        multi_config = self._get_multi_speaker_config()
+        
         # Check if auto-director mode is enabled
         if self.director_auto_var.get():
             # Check if style textbox has actual content (not placeholder)
@@ -871,8 +887,8 @@ class TTSWindow:
                 self.generate_audio_btn.configure(state="disabled")
                 self._update_status("Auto-directing then generating...", self.colors.accent)
                 threading.Thread(
-                    target=self._auto_direct_then_generate, 
-                    args=(input_text,), daemon=True
+                    target=self._auto_direct_then_generate,
+                    args=(input_text, director_model, multi_config), daemon=True
                 ).start()
                 return
         
@@ -898,11 +914,11 @@ class TTSWindow:
         
         threading.Thread(
             target=self._run_tts_generation,
-            args=(full_prompt,),
+            args=(full_prompt, multi_config),
             daemon=True
         ).start()
     
-    def _auto_direct_then_generate(self, input_text: str):
+    def _auto_direct_then_generate(self, input_text: str, director_model_override: str, multi_config: Optional[List[Dict]]):
         """Run director first, then generate audio (auto mode)."""
         try:
             from ...request_pipeline import RequestPipeline, RequestContext, RequestOrigin
@@ -918,14 +934,6 @@ class TTSWindow:
             ]
             
             provider = self.config.get("default_provider", "google")
-            director_model_override = ""
-            if self.director_model_entry:
-                def get_entry():
-                    self._director_entry_text = self.director_model_entry.get().strip()
-                GUICoordinator.get_instance().run_on_gui_thread(get_entry)
-                time.sleep(0.1)  # Wait for UI thread
-                director_model_override = getattr(self, '_director_entry_text', '')
-            
             model = director_model_override or self.config.get(f"{provider}_model", "")
             
             ctx = RequestContext(
@@ -972,7 +980,7 @@ class TTSWindow:
                 lambda: self._update_status("Step 2/2: Generating audio...", self.colors.accent)
             )
             
-            self._run_tts_generation(full_prompt)
+            self._run_tts_generation(full_prompt, multi_config)
             
         except Exception as e:
             logging.error(f"[TTS] Auto-direct error: {e}")
@@ -983,7 +991,7 @@ class TTSWindow:
                     self.generate_audio_btn.configure(state="normal")
             GUICoordinator.get_instance().run_on_gui_thread(show_error)
     
-    def _run_tts_generation(self, full_prompt: str):
+    def _run_tts_generation(self, full_prompt: str, multi_config: Optional[List[Dict]] = None):
         """Run TTS generation in a background thread."""
         try:
             from ...api_client import get_provider_for_type
@@ -1001,15 +1009,6 @@ class TTSWindow:
                 return
             
             provider = get_provider_for_type("google", key_manager, self.config)
-            
-            # Build multi-speaker config if needed
-            multi_config = None
-            if self.is_multi_speaker:
-                def get_ms_config():
-                    self._ms_config = self._get_multi_speaker_config()
-                GUICoordinator.get_instance().run_on_gui_thread(get_ms_config)
-                time.sleep(0.1)
-                multi_config = getattr(self, '_ms_config', None)
             
             # Call generate_tts
             pcm_data, error = provider.generate_tts(

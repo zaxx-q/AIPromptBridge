@@ -9,6 +9,7 @@ from tkinter import ttk
 from typing import Optional, Callable, Any
 
 from ..themes import get_colors
+from ..popups import Tooltip
 
 # Reuse wrappers from audio_analyzer_tk
 from .audio_analyzer_tk import TkOptionMenuWrapper, TkSliderWrapper, TkCheckBoxWrapper
@@ -450,6 +451,10 @@ def _create_director_section_tk(window, parent):
         variable=window.director_auto_var
     )
     window.director_toggle.pack(side="right")
+    Tooltip(
+        window.director_toggle.cb,
+        "Automatically generate style instructions when clicking 'Generate Audio' if the style box is empty or still has the default placeholder text."
+    )
 
     # Director controls row
     controls = tk.Frame(frame, bg=colors.surface0)
