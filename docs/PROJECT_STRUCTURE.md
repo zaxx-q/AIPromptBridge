@@ -46,7 +46,9 @@ AIPromptBridge/
     │   ├── __init__.py
     │   ├── devices.py          # PyAudioWPatch device enumeration
     │   ├── ffmpeg_utils.py     # Shared FFmpeg/FFprobe/FFplay detection and helpers
-    │   └── recorder.py         # Recorder class with recording, playback, and compression
+    │   ├── recorder.py         # Recorder class with recording, playback, and compression
+    │   ├── tts_constants.py    # TTS voice list and model constants
+    │   └── wav_utils.py        # PCM-to-WAV conversion and WAV file utilities
     │
     ├── gui/                    # GUI Package (CustomTkinter)
     │   ├── __init__.py
@@ -74,12 +76,13 @@ AIPromptBridge/
     │       ├── chat_base.py        # Base classes for chat windows
     │       ├── chat_window.py      # Interactive chat window
     │       ├── session_browser.py  # Session history browser
+    │       ├── tts_window.py       # TTS generation with voice selection, AI Director, playback
     │       └── utils.py            # Window management utilities
     │
     ├── providers/              # AI Provider Implementations
     │   ├── __init__.py         # Provider exports and factory
     │   ├── base.py             # Abstract base provider, retry logic, ProviderResult
-    │   ├── gemini_native.py    # Native Gemini API (Batch, Files API support)
+    │   ├── gemini_native.py    # Native Gemini API (Batch, Files API, TTS support)
     │   └── openai_compatible.py # OpenRouter, Custom, Google OpenAI-compat
     │
     └── tools/                  # Tools Package - Batch file processing
@@ -131,7 +134,7 @@ AIPromptBridge/
 |--------|---------|
 | `base.py` | Abstract BaseProvider with retry logic |
 | `openai_compatible.py` | OpenAI API format (OpenRouter, custom endpoints) |
-| `gemini_native.py` | Native Google Gemini API with thinking support |
+| `gemini_native.py` | Native Google Gemini API with thinking and TTS support |
 
 ### Tools (`src/tools/`)
 

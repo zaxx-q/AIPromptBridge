@@ -15,6 +15,7 @@ AIPromptBridge is a Windows application consisting of:
 7. **Theme System** - Multi-theme support with dark/light modes and system detection
 8. **Settings Infrastructure** - GUI editors for config.ini and prompt options with hot-reload
 9. **Tools Subsystem** - Batch file processing framework with checkpoints and audio optimization
+10. **TTS (Text-to-Speech)** - Gemini-powered speech synthesis with AI Director for expressive style control
 
 ## Component Diagram
 
@@ -28,6 +29,7 @@ flowchart TB
         TET["TextEditTool<br/>(text_edit_tool.py)"]
         Snip["SnipTool<br/>(snip_tool.py)"]
         Audio["AudioTool<br/>(audio_tool.py)"]
+        TTS["TTSWindow<br/>(tts_window.py)"]
         Popups["Popups<br/>(popups.py)"]
         Modifiers["Scrollable ModifierBar<br/>(popups.py)"]
         TypingInd["TypingIndicator<br/>(popups.py)"]
@@ -43,7 +45,7 @@ flowchart TB
     
     subgraph Providers["Providers"]
         OAI["OpenAI-compatible<br/>Provider"]
-        Gemini["Gemini Native<br/>Provider"]
+        Gemini["Gemini Native<br/>Provider<br/>+ TTS"]
         Custom["Custom<br/>Endpoint"]
     end
     
@@ -120,6 +122,7 @@ flowchart LR
         Popup["PopupWindow (popups.py)"]
         SnipUI["SnipPopup (snip_popup.py)"]
         AudioUI["AudioAnalyzerWindow (windows/audio_analyzer.py)"]
+        TTSUI["TTSWindow (windows/tts_window.py)"]
     end
     
     subgraph OtherThreads["Other Threads"]
@@ -134,6 +137,7 @@ flowchart LR
     Root --> Popup
     Root --> SnipUI
     Root --> AudioUI
+    Root --> TTSUI
 ```
 
 ### Rules
@@ -160,6 +164,7 @@ To ensure robustness across different environments, AIPromptBridge includes a ce
 | `PopupWindow` | TextEditTool selection/input dialogs with dual input (Edit/Ask) and scrollable ModifierBar |
 | `SnipPopup` | Result dialog for screen snipping with image preview and action carousel |
 | `AudioAnalyzerWindow` | Audio recording, playback, and analysis interface |
+| `TTSWindow` | Text-to-Speech generation with voice selection, AI Director, and audio playback |
 | `ErrorPopup` | Dialog for displaying API failures to user |
 | `TypingIndicator` | Tooltip showing typing status and abort hotkey |
 | `SettingsWindow` | GUI editor for config.ini with tabbed interface |
@@ -221,6 +226,7 @@ Prompts are managed centrally via `PromptsConfig` (loading `prompts.json` or def
 - `text_edit_tool`: Configuration for text selection actions (Ctrl+Space)
 - `snip_tool`: Configuration for screen snipping actions (Ctrl+Shift+X)
 - `audio_tool`: Configuration for audio analysis actions (Ctrl+Shift+A)
+- `tts_tool`: Configuration for TTS voice list, director prompts, and defaults
 - `endpoints`: Flask API endpoint prompts
 - `_global_settings`: Shared modifiers and system instructions
 

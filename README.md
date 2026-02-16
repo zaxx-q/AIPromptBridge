@@ -43,6 +43,18 @@ Press **Ctrl+Shift+A** to record and analyze audio:
 - **Controls** - Visual level meter, compression settings (Opus/MP3), and preview
 - **Integration** - Send audio directly to chat context for follow-up questions
 
+### 🔊 Text-to-Speech (TTS)
+![TTS Tool](docs/images/feature_tts.png)
+
+Convert text into expressive speech using Gemini TTS models:
+- **30 Voices** - Choose from 30 prebuilt voices with distinct styles (Bright, Firm, Upbeat, etc.)
+- **AI Director** - Automatically generates style instructions for expressive, nuanced speech
+- **Two Models** - Flash (fast) and Pro (quality) TTS model options
+- **Multi-Speaker** - Support for up to 2 speakers with individual voice assignment
+- **Playback** - Built-in audio preview with play/pause and seek controls
+- **Export** - Save generated audio as WAV files
+- **Entry Points** - 🔊 button in popups, `[Y]` terminal key, and system tray menu
+
 ### 💬 Chat Interface
 ![Chat Interface](docs/images/feature_chat.png)
 
@@ -124,6 +136,7 @@ Right-click the tray icon for:
 - **Direct Chat** - Open text input popup (Ctrl+Space)
 - **Screen Snip** - Trigger screen capture (Ctrl+Shift+X)
 - **Audio Analyzer** - Open audio tool (Ctrl+Shift+A)
+- **TTS** - Open Text-to-Speech window
 - **Settings** - Open GUI settings editor
 - **Prompt Editor** - Edit TextEditTool prompts
 - **Edit config.ini** - Open configuration file (only visible with `--show-console` arg)
@@ -169,6 +182,7 @@ When console is visible, press these keys:
 
 | Key | Action |
 |-----|--------|
+| `Y` | Open TTS (Text-to-Speech) window |
 | `S` | Show system status |
 | `O` | Open session browser |
 | `M` | List available models (Use `?N` for details, e.g., `?1`) |
