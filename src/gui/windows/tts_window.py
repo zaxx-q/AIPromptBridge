@@ -190,9 +190,9 @@ class TTSWindow:
         self.root.protocol("WM_DELETE_WINDOW", self._close)
     
     def _build_tk_fallback_ui(self):
-        """Build minimal Tk fallback UI."""
-        tk.Label(self.root, text="TTS Window requires CustomTkinter", 
-                 bg=self.colors.base, fg=self.colors.text).pack(pady=20)
+        """Build standard Tkinter fallback UI from separate module."""
+        from .tts_window_tk import build_tk_ui
+        build_tk_ui(self)
     
     def _build_ctk_ui(self):
         """Build CustomTkinter UI with two-column layout."""
@@ -1094,11 +1094,7 @@ class TTSWindow:
                 self.is_playing = True
                 
                 # Switch to Pause button
-                pause_content = prepare_emoji_content("⏸", size=14)
-                self.play_pause_btn.configure(
-                    **pause_content,
-                    **get_ctk_button_colors(self.colors, "secondary")
-                )
+                self._set_play_button_icon("pause")
                 
                 # Start position update
                 self._update_playback_position()
@@ -1118,11 +1114,7 @@ class TTSWindow:
         self.playback_position = self.recorder.get_playback_position()
         
         # Switch to Play button
-        play_content = prepare_emoji_content("▶", size=14)
-        self.play_pause_btn.configure(
-            **play_content,
-            **get_ctk_button_colors(self.colors, "success")
-        )
+        self._set_play_button_icon("play")
         
         self._update_status("Paused", self.colors.overlay0)
     
@@ -1151,11 +1143,7 @@ class TTSWindow:
             # Playback finished
             self.is_playing = False
             
-            play_content = prepare_emoji_content("▶", size=14)
-            self.play_pause_btn.configure(
-                **play_content,
-                **get_ctk_button_colors(self.colors, "success")
-            )
+            self._set_play_button_icon("play")
             
             self.seek_slider.set(0)
             self.playback_position = 0.0
@@ -1267,14 +1255,52 @@ class TTSWindow:
         secs = int(seconds % 60)
         return f"{minutes:02d}:{secs:02d}"
     
+    def _set_play_button_icon(self, mode: str):
+        """Set play/pause button icon, handling both CTk and Tk widgets.
+        
+        Args:
+            mode: "play" for ▶ or "pause" for ⏸
+        """
+        if not self.play_pause_btn:
+            return
+        
+        if HAVE_CTK and isinstance(self.play_pause_btn, ctk.CTkButton):
+            if mode == "pause":
+                content = prepare_emoji_content("⏸", size=14)
+                self.play_pause_btn.configure(
+                    **content,
+                    **get_ctk_button_colors(self.colors, "secondary")
+                )
+            else:
+                content = prepare_emoji_content("▶", size=14)
+                self.play_pause_btn.configure(
+                    **content,
+                    **get_ctk_button_colors(self.colors, "success")
+                )
+        else:
+            # Standard Tk button
+            if mode == "pause":
+                self.play_pause_btn.configure(
+                    text="⏸",
+                    bg=self.colors.surface1,
+                    fg=self.colors.text
+                )
+            else:
+                self.play_pause_btn.configure(
+                    text="▶",
+                    bg=self.colors.green,
+                    fg="#ffffff"
+                )
+    
     def _update_status(self, text: str, color: str = None):
-        """Update status bar."""
+        """Update status bar. Handles both CTk and Tk label widgets."""
         if self.status_label and not self._destroyed:
             self.status_label.configure(text=text)
-            if color:
-                self.status_label.configure(text_color=color)
+            target_color = color or self.colors.overlay0
+            if HAVE_CTK and isinstance(self.status_label, ctk.CTkLabel):
+                self.status_label.configure(text_color=target_color)
             else:
-                self.status_label.configure(text_color=self.colors.overlay0)
+                self.status_label.configure(fg=target_color)
     
     def _close(self):
         """Close window and cleanup."""
