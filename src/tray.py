@@ -571,6 +571,24 @@ class TrayApp:
                 print("[Warning] AudioTool not running")
         except Exception as e:
             print(f"[Error] Could not open Audio Analyzer: {e}")
+
+    def _on_tts_window(self, systray):
+        """Open TTS Window"""
+        try:
+            from . import web_server
+            from .gui.core import GUICoordinator, HAVE_GUI
+            
+            if HAVE_GUI:
+                GUICoordinator.get_instance().request_tts_window(
+                    web_server.CONFIG,
+                    web_server.AI_PARAMS,
+                    web_server.KEY_MANAGERS,
+                    initial_text=""
+                )
+            else:
+                print("[Warning] GUI not available")
+        except Exception as e:
+            print(f"[Error] Could not open TTS Window: {e}")
     
     def _on_edit_config(self, systray):
         """Open config.ini in default editor"""
@@ -660,6 +678,7 @@ class TrayApp:
             ("💬 Direct Chat", self._on_direct_chat),
             ("📸 Screen Snip", self._on_snip_tool),
             ("🎤 Audio Analyzer", self._on_audio_analyzer),
+            ("🔊 TTS", self._on_tts_window),
             SEP,
             ("⚙️ Settings", self._on_settings),
             ("✏️ Prompt Editor", self._on_prompt_editor),

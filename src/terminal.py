@@ -70,7 +70,7 @@ def print_commands_box():
 
         # Column 1: Core/Navigation
         col1 = create_column_table([
-            ("L", "📋", "Sessions"),
+            ("Y", "🔊", "TTS"),
             ("O", "🌐", "Browser"),
             ("A", "🎤", "Audio"),
             ("X", "🧰", "Tools"),
@@ -107,7 +107,7 @@ def print_commands_box():
         print("─" * 64)
         print("  COMMANDS                                       Ctrl+C to stop")
         print("─" * 64)
-        print("  [L] 📋 Sessions      [P] 🔄 Provider     [S] 📊 Status")
+        print("  [Y] 🔊 TTS           [P] 🔄 Provider     [S] 📊 Status")
         print("  [O] 🌐 Browser       [M] 🤖 Models       [T] 💭 Thinking")
         print("  [A] 🎤 Audio         [G] 🔨 Settings     [R] 🌊 Streaming")
         print("  [X] 🧰 Tools         [W] 📝 Prompts      [H] ❓ Help")
@@ -165,6 +165,29 @@ def terminal_session_manager(endpoints=None):
                     for i, s in enumerate(sessions):
                         print(f"   [{s['id']}] {s['title'][:35]} ({s['messages']} msgs, {s['origin']})")
                 print(f"{'─'*64}\n")
+
+            elif key == 'y':
+                # Open TTS Window
+                if HAVE_GUI:
+                    from . import web_server
+                    from .gui.core import GUICoordinator
+                    
+                    if HAVE_RICH:
+                        console.print("\n[bold]🔊  Opening TTS Window...[/bold]\n")
+                    else:
+                        print("\n🔊  Opening TTS Window...\n")
+                        
+                    GUICoordinator.get_instance().request_tts_window(
+                        web_server.CONFIG,
+                        web_server.AI_PARAMS,
+                        web_server.KEY_MANAGERS,
+                        initial_text=""
+                    )
+                else:
+                    if HAVE_RICH:
+                        console.print("\n[red]✗ GUI not available[/red]\n")
+                    else:
+                        print("\n✗ GUI not available\n")
             
             elif key == 'o':
                 if HAVE_GUI:
@@ -658,7 +681,7 @@ def terminal_session_manager(endpoints=None):
                 print(f"\n{'─'*64}")
                 print("❓ HELP")
                 print(f"{'─'*64}")
-                print("   [L] 📋 Sessions      List recent saved sessions")
+                print("   [Y] 🔊 TTS           Open Text-to-Speech window")
                 print("   [O] 🌐 Browser       Open session browser GUI")
                 print("   [V] 👁️ View          View a session by ID")
                 print("   [D] 🗑️ Delete        Delete a session by ID")
