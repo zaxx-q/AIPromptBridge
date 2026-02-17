@@ -559,7 +559,7 @@ class SettingsWindow:
                 found = False
                 # List of known tabs with emojis
                 known_tabs = ["⚙️ General", "🌐 Provider", "⚡ Streaming",
-                             "🔧 Tools", "🔑 API Keys", "🔗 Endpoints", "🎨 Theme"]
+                             "🔧 Tools", "🗣️ TTS", "🔑 API Keys", "🔗 Endpoints", "🎨 Theme"]
                 
                 for tab_name in known_tabs:
                     # Check for suffix match or containment
@@ -732,6 +732,7 @@ class SettingsWindow:
                 "🌐 Provider": ("_create_provider_tab", False),
                 "⚡ Streaming": ("_create_streaming_tab", False),
                 "🔧 Tools": ("_create_tools_tab", False),
+                "🗣️ TTS": ("_create_tts_tab", False),
                 "🔑 API Keys": ("_create_keys_tab", False),
                 "🔗 Endpoints": ("_create_endpoints_tab", False),
                 "🎨 Theme": ("_create_theme_tab", False),
@@ -755,7 +756,7 @@ class SettingsWindow:
             self.tabview.pack(fill="both", expand=True, pady=(0, 2))
             
             # For ttk.Notebook, we don't do lazy loading (simpler fallback)
-            tabs = ["General", "Provider", "Streaming", "Tools", "API Keys", "Endpoints", "Theme"]
+            tabs = ["General", "Provider", "Streaming", "Tools", "TTS", "API Keys", "Endpoints", "Theme"]
             frames = {}
             for tab_name in tabs:
                 frame = tk.Frame(self.tabview, bg=self.colors.bg)
@@ -766,6 +767,7 @@ class SettingsWindow:
             self._create_provider_tab(frames["Provider"])
             self._create_streaming_tab(frames["Streaming"])
             self._create_tools_tab(frames["Tools"])
+            self._create_tts_tab(frames["TTS"])
             self._create_keys_tab(frames["API Keys"])
             self._create_endpoints_tab(frames["Endpoints"])
             self._create_theme_tab(frames["Theme"])
@@ -1215,6 +1217,15 @@ class SettingsWindow:
                              self.config_data.config.get("text_edit_tool_abort_hotkey", "escape"),
                              width=140, hint="⚠️ Restart required")
         
+        self._add_spinbox_field(content_parent, "streaming_typing_delay", "Typing delay (ms):",
+                               self.config_data.config.get("streaming_typing_delay", 5),
+                               1, 100, width=80, hint="Delay per character in replace mode")
+        
+        self._add_toggle_field(content_parent, "streaming_typing_uncapped",
+                               "Uncapped typing speed",
+                               self.config_data.config.get("streaming_typing_uncapped", False),
+                               hint="⚠️ No delay between chars. May overwhelm some apps.")
+        
         # ScreenSnip section
         create_section_header(content_parent, "📸 ScreenSnip", self.colors, top_padding=20)
         
@@ -1248,10 +1259,7 @@ class SettingsWindow:
                                self.config_data.config.get("audio_default_loopback", True),
                                hint="Record what you hear instead of microphone")
         
-        # Level meter style section
-        create_section_header(content_parent, "📊 Display", self.colors, top_padding=20)
-        
-        # Level meter style dropdown
+        # Level meter style
         row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
         
@@ -1269,7 +1277,7 @@ class SettingsWindow:
             )
             self.widgets["audio_level_meter_style"].pack(side="left", padx=(12, 0))
             
-            ctk.CTkLabel(row, text="Visual style of recording meter, use canvas for gradient effect, progressbar for simple slider-like style", font=get_ctk_font(11),
+            ctk.CTkLabel(row, text="Visual style of recording meter", font=get_ctk_font(11),
                         **get_ctk_label_colors(self.colors, muted=True)).pack(side="left", padx=(15, 0))
         else:
             from tkinter import ttk
@@ -1282,21 +1290,140 @@ class SettingsWindow:
             )
             self.widgets["audio_level_meter_style"].pack(side="left", padx=(10, 0))
             
-            tk.Label(row, text="Visual style of recording meter, use canvas for gradient effect, progressbar for simple slider-like style", font=("Segoe UI", 9),
+            tk.Label(row, text="Visual style of recording meter", font=("Segoe UI", 9),
                     bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
-        
-        # Typing settings section
-        create_section_header(content_parent, "🖱️ Typing Settings", self.colors, top_padding=20)
-        
-        self._add_spinbox_field(content_parent, "streaming_typing_delay", "Typing delay (ms):",
-                               self.config_data.config.get("streaming_typing_delay", 5),
-                               1, 100, width=80, hint="Delay per character in replace mode")
-        
-        self._add_toggle_field(content_parent, "streaming_typing_uncapped",
-                               "Uncapped typing speed",
-                               self.config_data.config.get("streaming_typing_uncapped", False),
-                               hint="⚠️ No delay between chars. May overwhelm some apps.")
     
+    def _create_tts_tab(self, frame):
+        """Create the TTS settings tab."""
+        content_parent = None
+        if self.use_ctk:
+            scroll_frame = ctk.CTkScrollableFrame(frame, fg_color="transparent")
+            content_parent = scroll_frame
+        else:
+            scroll_frame = TkScrollableFrame(frame, bg_color=self.colors.bg)
+            content_parent = scroll_frame.scrollable_frame
+            
+        scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Import TTS constants
+        try:
+            from ...audio.tts_constants import TTS_MODELS, get_voice_list
+            tts_models = TTS_MODELS
+            tts_voices = get_voice_list()
+        except ImportError:
+            tts_models = ["gemini-2.5-flash-preview-tts"]
+            tts_voices = ["Kore"]
+
+        # General TTS Settings
+        create_section_header(content_parent, "🗣️ Text-to-Speech", self.colors)
+        
+        self._add_toggle_field(content_parent, "tts_enabled",
+                               "Enable TTS",
+                               self.config_data.config.get("tts_enabled", True),
+                               hint="Enable Gemini Text-to-Speech features (Restart required)")
+                               
+        self._add_entry_field(content_parent, "tts_hotkey", "Activation hotkey:",
+                             self.config_data.config.get("tts_hotkey", "ctrl+shift+t"),
+                             width=140, hint="Hot key to open TTS window (Restart required)")
+        
+        # Model Dropdown
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
+        row.pack(fill="x", pady=8)
+        
+        self.vars["tts_default_model"] = tk.StringVar(
+            master=self.root, value=self.config_data.config.get("tts_default_model", tts_models[0]))
+        
+        if self.use_ctk:
+            ctk.CTkLabel(row, text="Default Model:", font=get_ctk_font(13), width=180, anchor="w",
+                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            self.widgets["tts_default_model"] = ctk.CTkComboBox(
+                row, variable=self.vars["tts_default_model"],
+                values=tts_models,
+                width=240, height=34, state="readonly", font=get_ctk_font(13),
+                **get_ctk_combobox_colors(self.colors)
+            )
+            self.widgets["tts_default_model"].pack(side="left", padx=(12, 0))
+        else:
+            from tkinter import ttk
+            tk.Label(row, text="Default Model:", font=("Segoe UI", 10), width=18, anchor="w",
+                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            self.widgets["tts_default_model"] = ttk.Combobox(
+                row, textvariable=self.vars["tts_default_model"],
+                values=tts_models,
+                state="readonly", width=35
+            )
+            self.widgets["tts_default_model"].pack(side="left", padx=(10, 0))
+            
+        # Voice Dropdown (ScrollableComboBox for CTk because list is long)
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
+        row.pack(fill="x", pady=8)
+        
+        # The stored config value is just the name (e.g. "Kore"), but UI shows "Kore - Female, Firm"
+        current_voice = self.config_data.config.get("tts_default_voice", "Kore")
+        
+        # Try to find the matching full display string
+        current_voice_display = current_voice
+        for v in tts_voices:
+            if v.startswith(current_voice + " ") or v == current_voice:
+                current_voice_display = v
+                break
+                
+        self.vars["tts_default_voice"] = tk.StringVar(master=self.root, value=current_voice_display)
+        
+        if self.use_ctk:
+            ctk.CTkLabel(row, text="Default Voice:", font=get_ctk_font(13), width=180, anchor="w",
+                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            
+            # Use ScrollableComboBox
+            self.widgets["tts_default_voice"] = ScrollableComboBox(
+                row, colors=self.colors, variable=self.vars["tts_default_voice"],
+                values=tts_voices,
+                width=240, height=34, font_size=13
+            )
+            self.widgets["tts_default_voice"].pack(side="left", padx=(12, 0))
+            
+        else:
+            from tkinter import ttk
+            tk.Label(row, text="Default Voice:", font=("Segoe UI", 10), width=18, anchor="w",
+                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            
+            # Use standard combo for Tk fallback
+            self.widgets["tts_default_voice"] = ttk.Combobox(
+                row, textvariable=self.vars["tts_default_voice"],
+                values=tts_voices,
+                state="readonly", width=35
+            )
+            self.widgets["tts_default_voice"].pack(side="left", padx=(10, 0))
+
+        # AI Director Section
+        create_section_header(content_parent, "🎬 AI Director", self.colors, top_padding=20)
+        
+        self._add_toggle_field(content_parent, "tts_director_enabled",
+                               "Enable AI Director",
+                               self.config_data.config.get("tts_director_enabled", True),
+                               hint="Generate style instructions for expressive speech")
+                               
+        self._add_toggle_field(content_parent, "tts_director_auto_mode",
+                               "Auto-run Director",
+                               self.config_data.config.get("tts_director_auto_mode", False),
+                               hint="Automatically run director before generating audio")
+                               
+        self._add_entry_field(content_parent, "tts_director_model", "Director Model:",
+                             self.config_data.config.get("tts_director_model", ""),
+                             width=240, hint="Override model (empty = use default provider)")
+
+        # Export & Playback Section
+        create_section_header(content_parent, "💾 Export & Playback", self.colors, top_padding=20)
+
+        self._add_entry_field(content_parent, "tts_save_directory", "Save Directory:",
+                             self.config_data.config.get("tts_save_directory", "tts_output"),
+                             width=240, hint="Folder to save generated audio files")
+                             
+        self._add_toggle_field(content_parent, "tts_autoplay",
+                               "Autoplay Audio",
+                               self.config_data.config.get("tts_autoplay", True),
+                               hint="Play audio immediately after generation")
+
     def _create_keys_tab(self, frame):
         """Create the API Keys settings tab."""
         container = ctk.CTkFrame(frame, fg_color="transparent") if self.use_ctk else tk.Frame(frame, bg=self.colors.bg)
@@ -2339,6 +2466,10 @@ class SettingsWindow:
                     value = int(value)
                 except (ValueError, TypeError):
                     value = 5000  # Default port
+            
+            # Special handling for TTS voice (strip extra info)
+            if key == "tts_default_voice" and isinstance(value, str) and " — " in value:
+                value = value.split(" — ")[0]
             
             # Route ai_param_ prefixed keys to ai_params dict
             if hasattr(self, '_ai_param_keys') and key in self._ai_param_keys:
