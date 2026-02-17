@@ -1962,6 +1962,8 @@ class PromptEditorWindow:
         self.playground_record_btn = create_emoji_button(record_row, "Record", "🔴", self.colors, "primary", 100, 36, self._toggle_playground_recording)
         self.playground_record_btn.pack(side="left", padx=(0, 8))
         
+        create_emoji_button(record_row, "Upload", "📁", self.colors, "secondary", 100, 36, self._select_playground_audio_file).pack(side="left", padx=(0, 8))
+        
         # Duration label
         if self.use_ctk:
             self.playground_audio_duration = ctk.CTkLabel(record_row, text="00:00", font=get_ctk_font(14, "bold"),
@@ -2739,6 +2741,55 @@ class PromptEditorWindow:
     
     # --- Audio Recording Methods ---
     
+    def _select_playground_audio_file(self):
+        """Open file dialog to upload an audio file."""
+        file_path = filedialog.askopenfilename(
+            title="Select Audio File",
+            filetypes=[("Audio Files", "*.wav *.mp3 *.ogg *.m4a *.aac *.flac")]
+        )
+        if file_path:
+            self._load_playground_audio(file_path)
+
+    def _load_playground_audio(self, filepath):
+        """Load audio from file."""
+        try:
+            with open(filepath, "rb") as f:
+                data = f.read()
+                
+            self.playground_audio_data = data
+            
+            ext = os.path.splitext(filepath)[1].lower()
+            if ext == '.wav':
+                self.playground_audio_mime = "audio/wav"
+            elif ext == '.mp3':
+                self.playground_audio_mime = "audio/mp3"
+            elif ext == '.ogg':
+                self.playground_audio_mime = "audio/ogg"
+            elif ext == '.m4a':
+                self.playground_audio_mime = "audio/m4a"
+            elif ext == '.aac':
+                self.playground_audio_mime = "audio/aac"
+            elif ext == '.flac':
+                self.playground_audio_mime = "audio/flac"
+            else:
+                self.playground_audio_mime = "audio/wav" # Fallback
+                
+            # Update UI
+            filename = os.path.basename(filepath)
+            size_kb = len(data) // 1024
+            
+            status_text = f"File: {filename} ({size_kb} KB)"
+            
+            if self.use_ctk:
+                self.playground_audio_status.configure(text=status_text, text_color=self.colors.accent_green)
+                self.playground_audio_duration.configure(text="FILE")
+            else:
+                self.playground_audio_status.configure(text=status_text, fg=self.colors.accent_green)
+                self.playground_audio_duration.configure(text="FILE")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load audio: {e}", parent=self.root)
+    
     def _refresh_audio_devices(self):
         """Refresh the list of available audio input devices."""
         try:
@@ -2909,7 +2960,7 @@ class PromptEditorWindow:
         return f"{mins:02d}:{secs:02d}"
     
     def _clear_playground_audio(self):
-        """Clear recorded audio data."""
+        """Clear recorded or loaded audio data."""
         # Stop recording if in progress
         if self.playground_is_recording:
             self._stop_playground_recording()
@@ -2919,15 +2970,15 @@ class PromptEditorWindow:
         
         if self.use_ctk:
             self.playground_audio_duration.configure(text="00:00")
-            self.playground_audio_status.configure(text="No audio recorded", text_color=self.colors.blockquote)
+            self.playground_audio_status.configure(text="No audio", text_color=self.colors.blockquote)
         else:
             self.playground_audio_duration.configure(text="00:00")
-            self.playground_audio_status.configure(text="No audio recorded", fg=self.colors.blockquote)
+            self.playground_audio_status.configure(text="No audio", fg=self.colors.blockquote)
     
     def _prepare_audio_request(self) -> Dict:
         """Prepare params for audio action request."""
         if not self.playground_audio_data:
-            return {"error": "No audio recorded. Please record audio first."}
+            return {"error": "No audio data. Please record or upload audio."}
         
         if self.use_ctk:
             system_prompt = self.playground_system_preview.get("0.0", "end").strip()
@@ -2967,9 +3018,9 @@ class PromptEditorWindow:
             self._continue_snip_test()
             return
         
-        # Audio mode: Check for recorded audio
+        # Audio mode: Check for recorded or loaded audio
         if mode == "action_audio" and not self.playground_audio_data:
-            messagebox.showinfo("Audio Required", "Please record audio before testing.", parent=self.root)
+            messagebox.showinfo("Audio Required", "Please record or upload audio before testing.", parent=self.root)
             return
 
         if self.use_ctk:
