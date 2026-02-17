@@ -36,7 +36,7 @@ from ..popups import Tooltip
 from ..prompts import get_prompts_config
 from ..emoji_renderer import prepare_emoji_content
 from .utils import set_window_icon
-from ...audio.tts_constants import TTS_MODELS, TTS_VOICES, get_voice_list, get_voice_details
+from ...audio.tts_constants import TTS_MODELS, get_voice_list, get_voice_details
 from ...audio.recorder import AudioRecorder
 
 
@@ -797,67 +797,39 @@ class TTSWindow:
     
     def _run_director(self, input_text: str, director_model_override: str):
         """Run the AI Director in a background thread."""
-        try:
-            from ...request_pipeline import RequestPipeline, RequestContext, RequestOrigin
+        from ...gui.tts_tool import get_instance as get_tts_tool
+        
+        tool = get_tts_tool()
+        if not tool:
+            # Fallback if no global instance
+            self._update_status("TTS Tool not initialized", self.colors.red)
+            self.is_directing = False
+            self.generate_style_btn.configure(state="normal")
+            return
+
+        def on_success(response_text, tokens):
+            if self._destroyed: return
             
-            # Get director prompts
-            system_prompt = self.prompts.get_tts_director_system_prompt()
-            task_template = self.prompts.get_tts_director_task_template()
-            task = task_template.replace("{text}", input_text)
-            
-            # Build messages
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": task}
-            ]
-            
-            # Determine provider/model for director
-            provider = self.config.get("default_provider", "google")
-            model = director_model_override or self.config.get(f"{provider}_model", "")
-            
-            ctx = RequestContext(
-                origin=RequestOrigin.TTS_TOOL,
-                provider=provider,
-                model=model,
-                streaming=False,
-                thinking_enabled=False
-            )
-            
-            ctx = RequestPipeline.execute_simple(
-                ctx, messages, self.config, self.ai_params, self.key_managers
-            )
-            
-            def update_ui():
-                if self._destroyed:
-                    return
-                
-                if ctx.error:
-                    self._update_status(f"Director error: {ctx.error}", self.colors.red)
-                else:
-                    # Populate style textbox
-                    self.style_textbox.delete("1.0", "end")
-                    self.style_textbox.insert("1.0", ctx.response_text)
-                    self._update_status(
-                        f"Style generated ({ctx.total_tokens} tokens)",
-                        self.colors.green
-                    )
-                
+            def update():
+                self.style_textbox.delete("1.0", "end")
+                self.style_textbox.insert("1.0", response_text)
+                self._update_status(f"Style generated ({tokens} tokens)", self.colors.green)
                 self.is_directing = False
                 self.generate_style_btn.configure(state="normal")
+                
+            GUICoordinator.get_instance().run_on_gui_thread(update)
+
+        def on_error(error_msg):
+            if self._destroyed: return
             
-            GUICoordinator.get_instance().run_on_gui_thread(update_ui)
-            
-        except Exception as e:
-            logging.error(f"[TTS] Director error: {e}")
-            error_msg = str(e)
-            
-            def show_error():
-                if not self._destroyed:
-                    self._update_status(f"Director error: {error_msg}", self.colors.red)
-                    self.is_directing = False
-                    self.generate_style_btn.configure(state="normal")
-            
-            GUICoordinator.get_instance().run_on_gui_thread(show_error)
+            def update():
+                self._update_status(error_msg, self.colors.red)
+                self.is_directing = False
+                self.generate_style_btn.configure(state="normal")
+                
+            GUICoordinator.get_instance().run_on_gui_thread(update)
+
+        tool.run_director(input_text, director_model_override, on_success, on_error)
     
     # =========================================================================
     # TTS Generation
@@ -920,121 +892,65 @@ class TTSWindow:
     
     def _auto_direct_then_generate(self, input_text: str, director_model_override: str, multi_config: Optional[List[Dict]]):
         """Run director first, then generate audio (auto mode)."""
-        try:
-            from ...request_pipeline import RequestPipeline, RequestContext, RequestOrigin
+        from ...gui.tts_tool import get_instance as get_tts_tool
+        
+        tool = get_tts_tool()
+        if not tool:
+            self._update_status("TTS Tool not initialized", self.colors.red)
+            self.is_generating = False
+            self.generate_audio_btn.configure(state="normal")
+            return
+
+        def on_director_success(style_text, tokens):
+            if self._destroyed: return
             
-            # Step 1: Run director
-            system_prompt = self.prompts.get_tts_director_system_prompt()
-            task_template = self.prompts.get_tts_director_task_template()
-            task = task_template.replace("{text}", input_text)
-            
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": task}
-            ]
-            
-            provider = self.config.get("default_provider", "google")
-            model = director_model_override or self.config.get(f"{provider}_model", "")
-            
-            ctx = RequestContext(
-                origin=RequestOrigin.TTS_TOOL,
-                provider=provider,
-                model=model,
-                streaming=False,
-                thinking_enabled=False
-            )
-            
-            GUICoordinator.get_instance().run_on_gui_thread(
-                lambda: self._update_status("Step 1/2: Generating style...", self.colors.accent)
-            )
-            
-            ctx = RequestPipeline.execute_simple(
-                ctx, messages, self.config, self.ai_params, self.key_managers
-            )
-            
-            if ctx.error:
-                def show_err():
-                    if not self._destroyed:
-                        self._update_status(f"Director error: {ctx.error}", self.colors.red)
-                        self.is_generating = False
-                        self.generate_audio_btn.configure(state="normal")
-                GUICoordinator.get_instance().run_on_gui_thread(show_err)
-                return
-            
-            style_text = ctx.response_text
-            
-            # Update style textbox on UI thread
             def update_style():
-                if not self._destroyed:
-                    self.style_textbox.delete("1.0", "end")
-                    self.style_textbox.insert("1.0", style_text)
+                self.style_textbox.delete("1.0", "end")
+                self.style_textbox.insert("1.0", style_text)
+                self._update_status("Step 2/2: Generating audio...", self.colors.accent)
+                
             GUICoordinator.get_instance().run_on_gui_thread(update_style)
             
-            # Step 2: Generate audio with the style
+            # Step 2: Generate audio
             full_prompt = style_text
-            # Robust detection: check for transcript marker OR exact content match
             if "#### TRANSCRIPT" not in style_text and input_text not in style_text:
                 full_prompt += f"\n\n#### TRANSCRIPT\n{input_text}"
-            
-            GUICoordinator.get_instance().run_on_gui_thread(
-                lambda: self._update_status("Step 2/2: Generating audio...", self.colors.accent)
-            )
-            
+                
             self._run_tts_generation(full_prompt, multi_config)
-            
-        except Exception as e:
-            logging.error(f"[TTS] Auto-direct error: {e}")
-            def show_error():
-                if not self._destroyed:
-                    self._update_status(f"Error: {e}", self.colors.red)
-                    self.is_generating = False
-                    self.generate_audio_btn.configure(state="normal")
-            GUICoordinator.get_instance().run_on_gui_thread(show_error)
+
+        def on_director_error(error_msg):
+            def update():
+                if self._destroyed: return
+                self._update_status(error_msg, self.colors.red)
+                self.is_generating = False
+                self.generate_audio_btn.configure(state="normal")
+                
+            GUICoordinator.get_instance().run_on_gui_thread(update)
+
+        GUICoordinator.get_instance().run_on_gui_thread(
+            lambda: self._update_status("Step 1/2: Generating style...", self.colors.accent)
+        )
+        
+        tool.run_director(input_text, director_model_override, on_director_success, on_director_error)
     
     def _run_tts_generation(self, full_prompt: str, multi_config: Optional[List[Dict]] = None):
         """Run TTS generation in a background thread."""
-        try:
-            from ...api_client import get_provider_for_type
-            from ...audio.wav_utils import pcm_to_wav, get_pcm_duration
-            
-            # TTS is always Gemini - get the google key manager
-            key_manager = self.key_managers.get("google")
-            if not key_manager:
-                def show_err():
-                    if not self._destroyed:
-                        self._update_status("No Google API key configured", self.colors.red)
-                        self.is_generating = False
-                        self.generate_audio_btn.configure(state="normal")
-                GUICoordinator.get_instance().run_on_gui_thread(show_err)
-                return
-            
-            provider = get_provider_for_type("google", key_manager, self.config)
-            
-            # Call generate_tts
-            pcm_data, error = provider.generate_tts(
-                text=full_prompt,
-                model=self.selected_model,
-                voice_name=self.selected_voice,
-                multi_speaker_config=multi_config
-            )
-            
-            if error:
-                def show_err():
-                    if not self._destroyed:
-                        self._update_status(f"TTS error: {error}", self.colors.red)
-                        self.is_generating = False
-                        self.generate_audio_btn.configure(state="normal")
-                GUICoordinator.get_instance().run_on_gui_thread(show_err)
-                return
-            
-            # Convert PCM to WAV
+        from ...gui.tts_tool import get_instance as get_tts_tool
+        
+        tool = get_tts_tool()
+        if not tool:
+            self._update_status("TTS Tool not initialized", self.colors.red)
+            self.is_generating = False
+            self.generate_audio_btn.configure(state="normal")
+            return
+
+        def on_success(pcm_data, wav_data, duration):
             self.pcm_audio = pcm_data
-            self.wav_audio = pcm_to_wav(pcm_data)
-            self.audio_duration = get_pcm_duration(pcm_data)
+            self.wav_audio = wav_data
+            self.audio_duration = duration
             
-            def update_ui():
-                if self._destroyed:
-                    return
+            def update():
+                if self._destroyed: return
                 
                 duration_str = self._format_short_duration(self.audio_duration)
                 self._update_status(
@@ -1056,19 +972,25 @@ class TTSWindow:
                 if self.config.get("tts_autoplay", True):
                     self._play_audio()
             
-            GUICoordinator.get_instance().run_on_gui_thread(update_ui)
+            GUICoordinator.get_instance().run_on_gui_thread(update)
+
+        def on_error(error_msg):
+            def update():
+                if self._destroyed: return
+                self._update_status(error_msg, self.colors.red)
+                self.is_generating = False
+                self.generate_audio_btn.configure(state="normal")
             
-        except Exception as e:
-            logging.error(f"[TTS] Generation error: {e}")
-            import traceback
-            traceback.print_exc()
-            
-            def show_error():
-                if not self._destroyed:
-                    self._update_status(f"Error: {e}", self.colors.red)
-                    self.is_generating = False
-                    self.generate_audio_btn.configure(state="normal")
-            GUICoordinator.get_instance().run_on_gui_thread(show_error)
+            GUICoordinator.get_instance().run_on_gui_thread(update)
+
+        tool.generate_audio(
+            text=full_prompt,
+            voice_name=self.selected_voice,
+            model=self.selected_model,
+            multi_config=multi_config,
+            callback_success=on_success,
+            callback_error=on_error
+        )
     
     # =========================================================================
     # Audio Playback
@@ -1175,69 +1097,28 @@ class TTSWindow:
         """Save generated audio as file."""
         if not self.pcm_audio:
             return
+            
+        from ...gui.tts_tool import get_instance as get_tts_tool
+        tool = get_tts_tool()
         
-        from ...audio.wav_utils import save_wav
-        from ...audio.ffmpeg_utils import get_ffmpeg_path, get_creation_flags
-        import subprocess
+        if not tool:
+            self._update_status("TTS Tool unavailable", self.colors.red)
+            return
         
-        # Create output directory
         save_dir = self.config.get("tts_save_directory", "tts_output")
-        os.makedirs(save_dir, exist_ok=True)
-        
-        # Get format
         fmt = self.format_dropdown.get().lower()
         if fmt == "aac":
             ext = "m4a"
         else:
             ext = fmt
             
-        # Generate filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        voice = self.selected_voice.lower().replace(" ", "_")
-        filename = f"tts_{voice}_{timestamp}.{ext}"
-        filepath = os.path.join(save_dir, filename)
-        
-        error = None
-        
-        if fmt == "wav":
-            error = save_wav(filepath, self.pcm_audio)
-        else:
-            # Check if we have WAV data (header + PCM)
-            if not self.wav_audio:
-                # Fallback: create wav bytes from PCM
-                from ...audio.wav_utils import pcm_to_wav
-                self.wav_audio = pcm_to_wav(self.pcm_audio)
-                
-            # Use FFmpeg to convert
-            ffmpeg_path = get_ffmpeg_path()
-            if not ffmpeg_path:
-                self._update_status("FFmpeg not available for conversion", self.colors.red)
-                return
-                
-            try:
-                # -y overwrite, -i pipe:0 read from stdin
-                cmd = [ffmpeg_path, "-y", "-i", "pipe:0", "-v", "error"]
-                
-                # Use libopus for OGG
-                if ext == "ogg":
-                    cmd.extend(["-c:a", "libopus"])
-                
-                cmd.append(filepath)
-                
-                creation_flags = get_creation_flags()
-                
-                result = subprocess.run(
-                    cmd,
-                    input=self.wav_audio,
-                    capture_output=True,
-                    creationflags=creation_flags
-                )
-                
-                if result.returncode != 0:
-                    error = f"FFmpeg: {result.stderr.decode('utf-8')}"
-                    
-            except Exception as e:
-                error = str(e)
+        filename, error = tool.save_audio_file(
+            self.pcm_audio,
+            self.wav_audio,
+            save_dir,
+            self.selected_voice,
+            ext
+        )
         
         if error:
             self._update_status(f"Save failed: {error}", self.colors.red)

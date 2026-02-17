@@ -1,0 +1,341 @@
+#!/usr/bin/env python3
+"""
+TTS Tool - Main Controller
+
+Coordinates hotkey listening, backend logic, and window UI requests for the Text-to-Speech feature.
+"""
+
+import logging
+import threading
+import os
+from typing import Optional, Dict, Any, List
+
+from .hotkey import HotkeyListener
+from .prompts import PromptsConfig
+from ..messages import build_text_message
+from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
+from ..api_client import get_provider_for_type
+from ..audio.wav_utils import pcm_to_wav, get_pcm_duration, save_wav
+from ..audio.ffmpeg_utils import get_ffmpeg_path, get_creation_flags, is_ffmpeg_available
+
+
+class TTSToolApp:
+    """
+    Main controller for TTS feature.
+    
+    Manages the lifecycle of:
+    - Hotkey listener for activation
+    - TTS window request
+    - Backend TTS generation logic
+    - AI Director logic
+    """
+    
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        ai_params: Dict[str, Any],
+        key_managers: Dict[str, Any]
+    ):
+        """
+        Initialize the TTS tool.
+        
+        Args:
+            config: Main application configuration
+            ai_params: AI parameters dictionary
+            key_managers: Dictionary of KeyManager instances for each provider
+        """
+        self.config = config
+        self.ai_params = ai_params
+        self.key_managers = key_managers
+        
+        # Feature settings
+        self.enabled = config.get("tts_enabled", True)
+        self.hotkey = config.get("tts_hotkey", "ctrl+shift+t")
+        
+        # Load prompts via unified config
+        self.prompts = PromptsConfig.get_instance()
+        
+        # State
+        self.hotkey_listener: Optional[HotkeyListener] = None
+        self._window_open = False
+        
+        logging.debug('TTSToolApp initialized')
+    
+    def start(self):
+        """Start the TTS tool with hotkey listener."""
+        if not self.enabled:
+            logging.info('TTS Tool is disabled')
+            return
+        
+        logging.info(f'Starting TTSTool with hotkey: {self.hotkey}')
+        
+        self.hotkey_listener = HotkeyListener(
+            shortcut=self.hotkey,
+            callback=self._on_hotkey_pressed
+        )
+        self.hotkey_listener.start()
+        
+        print(f"  ✅ TTSTool: Hotkey '{self.hotkey}' registered")
+    
+    def stop(self):
+        """Stop the TTS tool."""
+        logging.info('Stopping TTSTool')
+        
+        if self.hotkey_listener:
+            self.hotkey_listener.stop()
+            self.hotkey_listener = None
+            
+    def pause(self):
+        """Pause the hotkey listener."""
+        if self.hotkey_listener:
+            self.hotkey_listener.pause()
+    
+    def resume(self):
+        """Resume the hotkey listener."""
+        if self.hotkey_listener:
+            self.hotkey_listener.resume()
+    
+    def _on_hotkey_pressed(self):
+        """Handle hotkey press - show TTS window."""
+        logging.debug('TTS Tool hotkey pressed')
+        
+        if self._window_open:
+            logging.debug('TTS Window already open, ignoring hotkey')
+            return
+        
+        self._window_open = True
+        
+        # Request window via GUICoordinator (runs on GUI thread)
+        from .core import GUICoordinator
+        GUICoordinator.get_instance().request_tts_window(
+            initial_text="",
+            on_close=self._on_window_closed
+        )
+    
+    def _on_window_closed(self):
+        """Handle window close."""
+        logging.debug('TTS window closed')
+        self._window_open = False
+
+    def is_running(self) -> bool:
+        """Check if TTSTool is running."""
+        return self.hotkey_listener is not None and self.hotkey_listener.is_running()
+    
+    def is_paused(self) -> bool:
+        """Check if TTSTool is paused."""
+        return self.hotkey_listener is not None and self.hotkey_listener.is_paused()
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get current status."""
+        return {
+            "enabled": self.enabled,
+            "running": self.is_running(),
+            "paused": self.is_paused(),
+            "hotkey": self.hotkey,
+            "window_open": self._window_open
+        }
+
+    def reload_prompts(self):
+        """Reload configuration."""
+        self.prompts.reload()
+        # Also reload hotkey from config if changed (requires restart usually, but we can try)
+        logging.info("TTSTool prompts reloaded")
+
+    # =========================================================================
+    # Backend Logic - Exposed for Window and External Use
+    # =========================================================================
+
+    def run_director(
+        self,
+        input_text: str,
+        model_override: str = "",
+        callback_success: Optional[Callable[[str, int], None]] = None,
+        callback_error: Optional[Callable[[str], None]] = None
+    ):
+        """
+        Run the AI Director to generate style instructions.
+        
+        Args:
+            input_text: The text to analyze and style.
+            model_override: Optional model name to override default provider.
+            callback_success: Callback function(response_text, token_count).
+            callback_error: Callback function(error_message).
+        """
+        def _target():
+            try:
+                # Get director prompts
+                system_prompt = self.prompts.get_tts_director_system_prompt()
+                task_template = self.prompts.get_tts_director_task_template()
+                task = task_template.replace("{text}", input_text)
+                
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": task}
+                ]
+                
+                provider = self.config.get("default_provider", "google")
+                model = model_override or self.config.get(f"{provider}_model", "")
+                
+                ctx = RequestContext(
+                    origin=RequestOrigin.TTS_TOOL,
+                    provider=provider,
+                    model=model,
+                    streaming=False,
+                    thinking_enabled=False
+                )
+                
+                ctx = RequestPipeline.execute_simple(
+                    ctx, messages, self.config, self.ai_params, self.key_managers
+                )
+                
+                if ctx.error:
+                    if callback_error:
+                        callback_error(f"Director error: {ctx.error}")
+                else:
+                    if callback_success:
+                        callback_success(ctx.response_text, ctx.total_tokens)
+                        
+            except Exception as e:
+                logging.error(f"[TTS] Director error: {e}")
+                if callback_error:
+                    callback_error(f"Director error: {str(e)}")
+
+        threading.Thread(target=_target, daemon=True).start()
+
+    def generate_audio(
+        self,
+        text: str,
+        voice_name: str,
+        model: str,
+        multi_config: Optional[List[Dict]] = None,
+        callback_success: Optional[Callable[[bytes, bytes, float], None]] = None,
+        callback_error: Optional[Callable[[str], None]] = None
+    ):
+        """
+        Generate TTS audio using Google Gemini.
+        
+        Args:
+            text: The text to synthesize.
+            voice_name: The voice name to use.
+            model: The TTS model name.
+            multi_config: Optional multi-speaker configuration.
+            callback_success: Callback function(pcm_data, wav_data, duration).
+            callback_error: Callback function(error_message).
+        """
+        def _target():
+            try:
+                key_manager = self.key_managers.get("google")
+                if not key_manager:
+                    if callback_error:
+                        callback_error("No Google API key configured")
+                    return
+                
+                provider = get_provider_for_type("google", key_manager, self.config)
+                
+                pcm_data, error = provider.generate_tts(
+                    text=text,
+                    model=model,
+                    voice_name=voice_name,
+                    multi_speaker_config=multi_config
+                )
+                
+                if error:
+                    if callback_error:
+                        callback_error(f"TTS error: {error}")
+                    return
+                
+                wav_data = pcm_to_wav(pcm_data)
+                duration = get_pcm_duration(pcm_data)
+                
+                if callback_success:
+                    callback_success(pcm_data, wav_data, duration)
+                    
+            except Exception as e:
+                logging.error(f"[TTS] Generation error: {e}")
+                if callback_error:
+                    callback_error(f"Error: {e}")
+
+        threading.Thread(target=_target, daemon=True).start()
+
+    def save_audio_file(
+        self,
+        pcm_data: bytes,
+        wav_data: Optional[bytes],
+        directory: str,
+        voice_name: str,
+        format_ext: str
+    ) -> tuple[Optional[str], Optional[str]]:
+        """
+        Save audio data to a file.
+        
+        Args:
+            pcm_data: Raw PCM bytes.
+            wav_data: WAV bytes (optional, will be generated if None and needed).
+            directory: Directory to save to.
+            voice_name: Name of the voice (for filename).
+            format_ext: File extension (wav, mp3, ogg, etc.).
+            
+        Returns:
+            (filename, error_message)
+        """
+        import subprocess
+        from datetime import datetime
+        
+        os.makedirs(directory, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_voice = voice_name.lower().replace(" ", "_")
+        filename = f"tts_{safe_voice}_{timestamp}.{format_ext}"
+        filepath = os.path.join(directory, filename)
+        
+        error = None
+        
+        if format_ext == "wav":
+            error = save_wav(filepath, pcm_data)
+        else:
+            if not wav_data:
+                wav_data = pcm_to_wav(pcm_data)
+                
+            ffmpeg_path = get_ffmpeg_path()
+            if not ffmpeg_path:
+                return None, "FFmpeg not available for conversion"
+                
+            try:
+                cmd = [ffmpeg_path, "-y", "-i", "pipe:0", "-v", "error"]
+                if format_ext == "ogg":
+                    cmd.extend(["-c:a", "libopus"])
+                cmd.append(filepath)
+                
+                creation_flags = get_creation_flags()
+                
+                result = subprocess.run(
+                    cmd,
+                    input=wav_data,
+                    capture_output=True,
+                    creationflags=creation_flags
+                )
+                
+                if result.returncode != 0:
+                    error = f"FFmpeg: {result.stderr.decode('utf-8')}"
+            except Exception as e:
+                error = str(e)
+                
+        return (filename if not error else None), error
+
+
+# =============================================================================
+# Global instance management
+# =============================================================================
+
+_TTS_TOOL_INSTANCE: Optional[TTSToolApp] = None
+
+
+def set_instance(app: TTSToolApp):
+    """Set the global TTSTool instance."""
+    global _TTS_TOOL_INSTANCE
+    _TTS_TOOL_INSTANCE = app
+
+
+def get_instance() -> Optional[TTSToolApp]:
+    """Get the global TTSTool instance."""
+    return _TTS_TOOL_INSTANCE

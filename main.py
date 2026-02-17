@@ -69,6 +69,15 @@ except ImportError as e:
     HAVE_AUDIO_TOOL = False
     # Silent - will show in startup
 
+# TTSTool - text-to-speech feature
+TTS_TOOL_APP = None
+try:
+    from src.gui.tts_tool import TTSToolApp
+    HAVE_TTS_TOOL = True
+except ImportError as e:
+    HAVE_TTS_TOOL = False
+    # Silent - will show in startup
+
 
 def get_base_url(config, provider):
     """Get the base URL for a provider"""
@@ -318,9 +327,53 @@ def initialize_audio_tool(config, ai_params):
         return None
 
 
+def initialize_tts_tool(config, ai_params):
+    """Initialize TTSTool if enabled"""
+    global TTS_TOOL_APP
+    
+    if not HAVE_TTS_TOOL:
+        if HAVE_RICH:
+            console.print("  [red]✗[/red] TTSTool: Not available (missing dependencies)")
+        else:
+            print("  ✗ TTSTool: Not available (missing dependencies)")
+        return None
+    
+    if not config.get("tts_enabled", True):
+        return None
+    
+    # Check if Gemini key is available (TTS is Gemini-only)
+    gemini_key_manager = web_server.KEY_MANAGERS.get("google")
+    if not gemini_key_manager or not gemini_key_manager.has_keys():
+        if HAVE_RICH:
+            console.print("  [red]✗[/red] TTSTool: Requires Google Gemini API key")
+        else:
+            print("  ✗ TTSTool: Requires Google Gemini API key")
+        return None
+
+    try:
+        TTS_TOOL_APP = TTSToolApp(
+            config=config,
+            ai_params=ai_params,
+            key_managers=web_server.KEY_MANAGERS
+        )
+        TTS_TOOL_APP.start()
+        
+        # Register instance for hot-reload
+        from src.gui.tts_tool import set_instance
+        set_instance(TTS_TOOL_APP)
+        
+        return TTS_TOOL_APP
+    except Exception as e:
+        if HAVE_RICH:
+            console.print(f"  [red]✗ TTSTool: Failed to initialize: {e}[/red]")
+        else:
+            print(f"  ✗ TTSTool: Failed to initialize: {e}")
+        return None
+
+
 def cleanup():
     """Cleanup on shutdown"""
-    global TEXT_EDIT_TOOL_APP, SNIP_TOOL_APP, AUDIO_TOOL_APP
+    global TEXT_EDIT_TOOL_APP, SNIP_TOOL_APP, AUDIO_TOOL_APP, TTS_TOOL_APP
     
     if TEXT_EDIT_TOOL_APP:
         if HAVE_RICH:
@@ -345,6 +398,14 @@ def cleanup():
             print("Stopping AudioTool...")
         AUDIO_TOOL_APP.stop()
         AUDIO_TOOL_APP = None
+        
+    if TTS_TOOL_APP:
+        if HAVE_RICH:
+            console.print("Stopping TTSTool...")
+        else:
+            print("Stopping TTSTool...")
+        TTS_TOOL_APP.stop()
+        TTS_TOOL_APP = None
 
 
 def signal_handler(signum, frame):
@@ -750,6 +811,11 @@ def main():
     audio_tool_result = initialize_audio_tool(config, ai_params)
     if audio_tool_result:
         audio_hotkey = config.get("audio_tool_hotkey", "ctrl+shift+a")
+        
+    # TTSTool
+    tts_tool_result = initialize_tts_tool(config, ai_params)
+    if tts_tool_result:
+        tts_hotkey = config.get("tts_hotkey", "ctrl+shift+t")
     
     if HAVE_RICH:
         console.print()

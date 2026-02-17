@@ -100,6 +100,7 @@ DEFAULT_CONFIG = {
     "audio_level_meter_style": "canvas",
     # TTS (Text-to-Speech) settings
     "tts_enabled": True,
+    "tts_hotkey": "ctrl+shift+t",
     "tts_default_voice": "Kore",
     "tts_default_model": "gemini-2.5-flash-preview-tts",
     "tts_director_enabled": True,
@@ -427,6 +428,9 @@ audio_level_meter_style = canvas
 # ============================================================
 # Enable/disable TTS feature
 tts_enabled = true
+
+# Hotkey combination (e.g., ctrl+shift+t)
+tts_hotkey = ctrl+shift+t
 
 # Default voice (see Voice Reference in docs for all 30 options)
 tts_default_voice = Kore

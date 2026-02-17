@@ -651,14 +651,25 @@ class GUICoordinator:
     
     def request_tts_window(
         self,
-        config,
-        ai_params,
-        key_managers,
+        config=None,
+        ai_params=None,
+        key_managers=None,
         initial_text: str = "",
         on_close=None
     ):
         """Request creation of a TTS window (thread-safe)"""
         self.ensure_running()
+        
+        # If parameters not provided, use globals from web_server
+        if config is None or ai_params is None or key_managers is None:
+            try:
+                from .. import web_server
+                config = config or web_server.CONFIG
+                ai_params = ai_params or web_server.AI_PARAMS
+                key_managers = key_managers or web_server.KEY_MANAGERS
+            except ImportError:
+                pass
+                
         self._request_queue.put({
             'type': 'tts_window',
             'config': config,
