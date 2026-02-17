@@ -24,7 +24,7 @@ Works in any application: browsers, IDEs, Notepad, Word, everywhere.
 ### 📸 Screen Snip (SnipTool)
 <img src="docs/images/feature_snip.png" align="right" width="300" />
 
-Press **Ctrl+Shift+X** to capture a region of your screen and analyze it with AI:
+Press **Ctrl+Alt+X** to capture a region of your screen and analyze it with AI:
 - **OCR** - **Extract Text** or **OCR to Markdown** for clean formatting
 - **Analysis** - **Describe**, **Summarize**, or **Explain Code**
 - **Data** - **Extract Data** to tables, **Transcribe** handwriting, or **Smart Cleanup** notes
@@ -36,7 +36,7 @@ Press **Ctrl+Shift+X** to capture a region of your screen and analyze it with AI
 ### 🎤 Audio Analyzer
 ![Audio Analyzer](docs/images/feature_audio.png)
 
-Press **Ctrl+Shift+A** to record and analyze audio:
+Press **Ctrl+Alt+A** to record and analyze audio:
 - **Record** - Capture microphone input or system audio (loopback)
 - **Transcribe** - High-fidelity transcription with timestamps and speaker identification
 - **Analyze** - Summarize meetings, extract key points, or analyze tone
@@ -53,7 +53,7 @@ Convert text into expressive speech using Gemini TTS models:
 - **Multi-Speaker** - Support for up to 2 speakers with individual voice assignment
 - **Playback** - Built-in audio preview with play/pause and seek controls
 - **Export** - Save generated audio as WAV files
-- **Entry Points** - 🔊 button in popups, `[T]` terminal key, hotkey `Ctrl+Shift+T`, and system tray menu
+- **Entry Points** - 🔊 button in popups, `[T]` terminal key, hotkey `Ctrl+Alt+T`, and system tray menu
 
 ### 💬 Chat Interface
 ![Chat Interface](docs/images/feature_chat.png)
@@ -134,9 +134,9 @@ Right-click the tray icon for:
 - **Toggle Console or Double click tray icon** - Toggle console visibility (Not visible in No Console mode)
 - **Session Browser** - View chat history
 - **Direct Chat** - Open text input popup (Ctrl+Space)
-- **Screen Snip** - Trigger screen capture (Ctrl+Shift+X)
-- **Audio Analyzer** - Open audio tool (Ctrl+Shift+A)
-- **TTS** - Open Text-to-Speech window (Ctrl+Shift+T)
+- **Screen Snip** - Trigger screen capture (Ctrl+Alt+X)
+- **Audio Analyzer** - Open audio tool (Ctrl+Alt+A)
+- **TTS** - Open Text-to-Speech window (Ctrl+Alt+T)
 - **Settings** - Open GUI settings editor
 - **Prompt Editor** - Edit TextEditTool prompts
 - **Edit config.ini** - Open configuration file (only visible with `--show-console` arg)
@@ -155,14 +155,14 @@ Right-click the tray icon for:
 
 ### SnipTool (Screen Snipping)
 
-1. Press **Ctrl+Shift+X**
+1. Press **Ctrl+Alt+X**
 2. Click and drag to select a screen region
 3. Choose an action (Describe, Extract Text, etc.) or ask a question
 4. Results open in a chat window with the image attached, can also directly copied to clipboard.
 
 ### Audio Tool
 
-1. Press **Ctrl+Shift+A** to open the Audio Analyzer
+1. Press **Ctrl+Alt+A** to open the Audio Analyzer
 2. Select input device (Microphone or System Audio)
 3. Click **Record** to capture audio
 4. Choose an action (Transcribe, Analyze, etc.)
@@ -172,7 +172,7 @@ Right-click the tray icon for:
 
 **Note: These endpoints are largely deprecated.**
 - **ShareX Users**: ShareX 19.0.1+ now has a native "Analyze image" feature.
-- **Desktop Users**: The built-in SnipTool (**Ctrl+Shift+X**) offers better integration.
+- **Desktop Users**: The built-in SnipTool (**Ctrl+Alt+X**) offers better integration.
 
 Endpoints allow HTTP POST access (disabled by default). See [ShareX Setup Guide](docs/SHAREX_SETUP.md) if needed.
 

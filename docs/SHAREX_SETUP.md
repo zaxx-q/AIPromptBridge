@@ -2,7 +2,7 @@
 
 This guide explains how to set up ShareX to work with AIPromptBridge for image processing tasks like OCR, translation, and description.
 
-> **Note**: AIPromptBridge now includes a built-in Screen Snipping feature (**Ctrl+Shift+X**) which provides similar functionality without requiring external tools. This ShareX integration is intended for advanced users who need ShareX's specific workflow capabilities or custom endpoints.
+> **Note**: AIPromptBridge now includes a built-in Screen Snipping feature (**Ctrl+Alt+X**) which provides similar functionality without requiring external tools. This ShareX integration is intended for advanced users who need ShareX's specific workflow capabilities or custom endpoints.
 
 ## Demo
 

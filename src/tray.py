@@ -549,7 +549,7 @@ class TrayApp:
             print(f"[Error] Could not open direct chat: {e}")
 
     def _on_snip_tool(self, systray):
-        """Trigger snip tool (equivalent to Ctrl+Shift+X)"""
+        """Trigger snip tool (equivalent to Ctrl+Alt+X)"""
         try:
             from .gui.snip_tool import get_instance
             app = get_instance()
@@ -561,7 +561,7 @@ class TrayApp:
             print(f"[Error] Could not trigger snip tool: {e}")
 
     def _on_audio_analyzer(self, systray):
-        """Open Audio Analyzer window (equivalent to Ctrl+Shift+A)"""
+        """Open Audio Analyzer window (equivalent to Ctrl+Alt+A)"""
         try:
             from .gui.audio_tool import get_instance
             app = get_instance()

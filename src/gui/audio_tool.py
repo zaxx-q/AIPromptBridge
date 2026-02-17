@@ -6,7 +6,7 @@ Coordinates hotkey listening, audio recording, window UI, and AI processing
 for the audio analysis feature. Similar architecture to SnipToolApp.
 
 Flow:
-1. User presses hotkey (e.g., Ctrl+Shift+A)
+1. User presses hotkey (e.g., Ctrl+Alt+A)
 2. AudioAnalyzerWindow appears with device selection and recording controls
 3. User records audio and selects action
 4. AI processes audio and shows result in chat window
@@ -58,7 +58,7 @@ class AudioToolApp:
         
         # Feature settings
         self.enabled = config.get("audio_tool_enabled", True)
-        self.hotkey = config.get("audio_tool_hotkey", "ctrl+shift+a")
+        self.hotkey = config.get("audio_tool_hotkey", "ctrl+alt+a")
         
         # Load prompts via unified config
         self.prompts = PromptsConfig.get_instance()

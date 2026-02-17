@@ -50,7 +50,7 @@ class TTSToolApp:
         
         # Feature settings
         self.enabled = config.get("tts_enabled", True)
-        self.hotkey = config.get("tts_hotkey", "ctrl+shift+t")
+        self.hotkey = config.get("tts_hotkey", "ctrl+alt+t")
         
         # Load prompts via unified config
         self.prompts = PromptsConfig.get_instance()

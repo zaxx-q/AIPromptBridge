@@ -119,7 +119,7 @@ AIPromptBridge/
 | `emoji_renderer.py` | EmojiRenderer for Windows color emoji support (Twemoji) |
 | `custom_widgets.py` | Custom scrollable lists and emoji-aware dropdowns (ScrollableComboBox) |
 | `text_edit_tool.py` | Global hotkey TextEditTool application |
-| `snip_tool.py` | Screen Snipping application controller (`Ctrl+Shift+X`) |
+| `snip_tool.py` | Screen Snipping application controller (`Ctrl+Alt+X`) |
 | `platform.py` | Central authority for UI toolkit availability and toolkit fallback |
 | `windows/` | Modular package for application windows |
 | `popups.py` | Themed popup dialogs with dual inputs (Edit/Ask) and scrollable ModifierBar |

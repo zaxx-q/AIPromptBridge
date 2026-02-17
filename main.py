@@ -805,17 +805,17 @@ def main():
     # SnipTool
     snip_tool_result = initialize_snip_tool(config, ai_params)
     if snip_tool_result:
-        snip_hotkey = config.get("screen_snip_hotkey", "ctrl+shift+x")
+        snip_hotkey = config.get("screen_snip_hotkey", "ctrl+alt+x")
     
     # AudioTool
     audio_tool_result = initialize_audio_tool(config, ai_params)
     if audio_tool_result:
-        audio_hotkey = config.get("audio_tool_hotkey", "ctrl+shift+a")
+        audio_hotkey = config.get("audio_tool_hotkey", "ctrl+alt+a")
         
     # TTSTool
     tts_tool_result = initialize_tts_tool(config, ai_params)
     if tts_tool_result:
-        tts_hotkey = config.get("tts_hotkey", "ctrl+shift+t")
+        tts_hotkey = config.get("tts_hotkey", "ctrl+alt+t")
     
     if HAVE_RICH:
         console.print()

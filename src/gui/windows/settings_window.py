@@ -1246,7 +1246,7 @@ class SettingsWindow:
                                hint="⚠️ Restart required")
         
         self._add_entry_field(content_parent, "screen_snip_hotkey", "ScreenSnip hotkey:",
-                             self.config_data.config.get("screen_snip_hotkey", "ctrl+shift+x"),
+                             self.config_data.config.get("screen_snip_hotkey", "ctrl+alt+x"),
                              width=140, hint="⚠️ Restart required")
         
         # Audio Tool section
@@ -1258,7 +1258,7 @@ class SettingsWindow:
                                hint="⚠️ Restart required")
         
         self._add_entry_field(content_parent, "audio_tool_hotkey", "Audio Tool hotkey:",
-                             self.config_data.config.get("audio_tool_hotkey", "ctrl+shift+a"),
+                             self.config_data.config.get("audio_tool_hotkey", "ctrl+alt+a"),
                              width=140, hint="⚠️ Restart required")
         
         self._add_entry_field(content_parent, "audio_default_device", "Default device:",
@@ -1334,7 +1334,7 @@ class SettingsWindow:
                                hint="Enable Gemini Text-to-Speech features (Restart required)")
                                
         self._add_entry_field(content_parent, "tts_hotkey", "Activation hotkey:",
-                             self.config_data.config.get("tts_hotkey", "ctrl+shift+t"),
+                             self.config_data.config.get("tts_hotkey", "ctrl+alt+t"),
                              width=140, hint="Hot key to open TTS window (Restart required)")
         
         # Model Dropdown

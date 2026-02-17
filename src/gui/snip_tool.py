@@ -6,7 +6,7 @@ Coordinates hotkey listening, screen capture, popup UI, and AI processing
 for the screen snipping feature. Similar architecture to TextEditToolApp.
 
 Flow:
-1. User presses hotkey (e.g., Ctrl+Shift+X)
+1. User presses hotkey (e.g., Ctrl+Alt+X)
 2. Screen overlay appears for region selection
 3. After selection, popup appears with image preview and actions
 4. User selects action or asks custom question
@@ -53,7 +53,7 @@ class SnipToolApp:
         
         # Feature settings
         self.enabled = config.get("screen_snip_enabled", True)
-        self.hotkey = config.get("screen_snip_hotkey", "ctrl+shift+x")
+        self.hotkey = config.get("screen_snip_hotkey", "ctrl+alt+x")
         
         # Load prompts via unified config
         self.prompts = PromptsConfig.get_instance()

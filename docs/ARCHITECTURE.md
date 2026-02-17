@@ -226,8 +226,8 @@ Prompts are managed centrally via `PromptsConfig` (loading `prompts.json` or def
 
 #### Unified Configuration
 - `text_edit_tool`: Configuration for text selection actions (Ctrl+Space)
-- `snip_tool`: Configuration for screen snipping actions (Ctrl+Shift+X)
-- `audio_tool`: Configuration for audio analysis actions (Ctrl+Shift+A)
+- `snip_tool`: Configuration for screen snipping actions (Ctrl+Alt+X)
+- `audio_tool`: Configuration for audio analysis actions (Ctrl+Alt+A)
 - `tts_tool`: Configuration for TTS voice list, director prompts, and defaults
 - `endpoints`: Flask API endpoint prompts
 - `_global_settings`: Shared modifiers and system instructions

@@ -70,7 +70,7 @@ DEFAULT_CONFIG = {
     "streaming_typing_uncapped": False,
     # Screen Snipping Tool settings
     "screen_snip_enabled": True,
-    "screen_snip_hotkey": "ctrl+shift+x",
+    "screen_snip_hotkey": "ctrl+alt+x",
     # Flask endpoints settings
     # Enable/disable Flask API endpoints for external tools like ShareX
     # When disabled, endpoints from prompts.json are not registered
@@ -91,7 +91,7 @@ DEFAULT_CONFIG = {
     "session_image_quality": 85,
     # Audio Tool settings
     "audio_tool_enabled": True,
-    "audio_tool_hotkey": "ctrl+shift+a",
+    "audio_tool_hotkey": "ctrl+alt+a",
     "audio_default_device": "default",
     "audio_default_loopback": True,
     # Level meter display style
@@ -100,7 +100,7 @@ DEFAULT_CONFIG = {
     "audio_level_meter_style": "canvas",
     # TTS (Text-to-Speech) settings
     "tts_enabled": True,
-    "tts_hotkey": "ctrl+shift+t",
+    "tts_hotkey": "ctrl+alt+t",
     "tts_default_voice": "Kore",
     "tts_default_model": "gemini-2.5-flash-preview-tts",
     "tts_director_enabled": True,
@@ -396,8 +396,8 @@ streaming_typing_uncapped = false
 # Enable/disable screen snipping feature
 screen_snip_enabled = true
 
-# Hotkey combination (e.g., ctrl+shift+x)
-screen_snip_hotkey = ctrl+shift+x
+# Hotkey combination (e.g., ctrl+alt+x)
+screen_snip_hotkey = ctrl+alt+x
 
 # ============================================================
 # AUDIO TOOL - Audio recording and analysis with AI
@@ -405,8 +405,8 @@ screen_snip_hotkey = ctrl+shift+x
 # Enable/disable Audio Tool feature
 audio_tool_enabled = true
 
-# Hotkey combination (e.g., ctrl+shift+a)
-audio_tool_hotkey = ctrl+shift+a
+# Hotkey combination (e.g., ctrl+alt+a)
+audio_tool_hotkey = ctrl+alt+a
 
 # Default input device ("default" = system default)
 # Partial names allowed for matching (e.g., "High Definition" matches "Speakers (2- High Definition Audio Device)")
@@ -429,8 +429,8 @@ audio_level_meter_style = canvas
 # Enable/disable TTS feature
 tts_enabled = true
 
-# Hotkey combination (e.g., ctrl+shift+t)
-tts_hotkey = ctrl+shift+t
+# Hotkey combination (e.g., ctrl+alt+t)
+tts_hotkey = ctrl+alt+t
 
 # Default voice (see Voice Reference in docs for all 30 options)
 tts_default_voice = Kore
