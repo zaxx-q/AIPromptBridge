@@ -490,41 +490,27 @@ class AudioAnalyzerWindow:
         ).pack(side="left")
     
     def _create_recording_section_pack(self, parent):
-        """Create recording controls section (pack layout)."""
-        content = self._create_section_frame_pack(parent, "Recording")
+        """Create recording/upload controls section (pack layout)."""
+        # Changed panel name from "Recording" to "Audio Input"
+        content = self._create_section_frame_pack(parent, "Audio Input")
         
         # Controls row
         controls_row = ctk.CTkFrame(content, fg_color="transparent")
         controls_row.pack(fill="x")
         
-        # Record button
+        # Record/Stop button
         record_content = prepare_emoji_content("🔴 Record", size=14)
         self.record_btn = ctk.CTkButton(
             controls_row,
             **record_content,
             font=get_ctk_font(size=11, weight="bold"),
-            width=90,
+            width=100,
             height=32,
             corner_radius=6,
-            command=self._start_recording,
+            command=self._toggle_recording,
             **get_ctk_button_colors(self.colors, "danger")
         )
-        self.record_btn.pack(side="left", padx=(0, 5))
-        
-        # Stop button
-        stop_content = prepare_emoji_content("⏹ Stop", size=14)
-        self.stop_btn = ctk.CTkButton(
-            controls_row,
-            **stop_content,
-            font=get_ctk_font(size=11),
-            width=70,
-            height=32,
-            corner_radius=6,
-            command=self._stop_recording,
-            state="disabled",
-            **get_ctk_button_colors(self.colors, "secondary")
-        )
-        self.stop_btn.pack(side="left", padx=(0, 10))
+        self.record_btn.pack(side="left", padx=(0, 10))
         
         # Duration display
         self.duration_label = ctk.CTkLabel(
@@ -534,6 +520,20 @@ class AudioAnalyzerWindow:
             text_color=self.colors.text
         )
         self.duration_label.pack(side="left")
+        
+        # Upload button
+        upload_content = prepare_emoji_content("📁 Upload", size=14)
+        upload_btn = ctk.CTkButton(
+            controls_row,
+            **upload_content,
+            font=get_ctk_font(size=11),
+            width=90,
+            height=32,
+            corner_radius=6,
+            command=self._upload_audio_file,
+            **get_ctk_button_colors(self.colors, "secondary")
+        )
+        upload_btn.pack(side="right", padx=(5, 0))
     
     def _create_compression_section_pack(self, parent):
         """Create compression settings section (pack layout)."""
@@ -1248,12 +1248,61 @@ class AudioAnalyzerWindow:
     # Recording Controls
     # =========================================================================
     
+    def _set_record_button_icon(self, mode: str):
+        """Set record button icon, handling both CTk and Tk widgets.
+        
+        Args:
+            mode: "record" for 🔴 or "stop" for ⏹
+        """
+        if not self.record_btn:
+            return
+            
+        if HAVE_CTK and isinstance(self.record_btn, ctk.CTkButton):
+            if mode == "stop":
+                content = prepare_emoji_content("⏹ Stop", size=14)
+                self.record_btn.configure(
+                    **content,
+                    **get_ctk_button_colors(self.colors, "secondary")
+                )
+            else:
+                content = prepare_emoji_content("🔴 Record", size=14)
+                self.record_btn.configure(
+                    **content,
+                    **get_ctk_button_colors(self.colors, "danger")
+                )
+        else:
+            # Standard Tk button fallback
+            if mode == "stop":
+                self.record_btn.configure(
+                    text="⏹ Stop",
+                    bg=self.colors.surface1,
+                    fg=self.colors.text
+                )
+            else:
+                self.record_btn.configure(
+                    text="🔴 Record",
+                    bg=self.colors.red,
+                    fg="#ffffff"
+                )
+
+    def _toggle_recording(self):
+        """Toggle recording state."""
+        if self.is_recording:
+            self._stop_recording()
+        else:
+            self._start_recording()
+
     def _start_recording(self):
         """Start audio recording."""
-        if not self.recorder or self.is_recording:
+        if not self.recorder:
             return
-        
+            
         try:
+            # Clear previous audio
+            self.recorded_wav = None
+            self.compressed_audio = None
+            self.audio_duration = 0.0
+            
             # Unified stream architecture: recording is just a flag toggle
             # Stream is already open, level meter continues working
             if self.recorder.start_recording_unified():
@@ -1261,8 +1310,7 @@ class AudioAnalyzerWindow:
                 self.recording_start_time = time.time()
                 
                 # Update UI
-                self.record_btn.configure(state="disabled")
-                self.stop_btn.configure(state="normal")
+                self._set_record_button_icon("stop")
                 
                 # Start duration update
                 self._update_duration()
@@ -1336,12 +1384,49 @@ class AudioAnalyzerWindow:
                 self._update_status("No audio recorded", self.colors.accent_yellow)
             
             # Update UI
-            self.record_btn.configure(state="normal")
-            self.stop_btn.configure(state="disabled")
+            self._set_record_button_icon("record")
             
         except Exception as e:
             logging.error(f"[AudioAnalyzer] Stop recording error: {e}")
             self._update_status(f"Error: {e}", self.colors.red)
+
+    def _upload_audio_file(self):
+        """Open file dialog to upload an audio file."""
+        from tkinter import filedialog
+        import os
+        
+        file_path = filedialog.askopenfilename(
+            title="Select Audio File",
+            filetypes=[("Audio Files", "*.wav *.mp3 *.ogg *.m4a *.aac *.flac")]
+        )
+        
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, "rb") as f:
+                data = f.read()
+            
+            self.recorded_wav = data
+            self.compressed_audio = None # Clear previous compression cache
+            
+            # Determine duration
+            from ...audio.ffmpeg_utils import get_audio_duration
+            self.audio_duration = get_audio_duration(data)
+            
+            # Update UI
+            self.duration_label.configure(text="FILE")
+            filename = os.path.basename(file_path)
+            self._update_status(f"Loaded: {filename}", self.colors.green)
+            
+            # Update size estimate
+            self._update_size_estimate()
+            
+            # Enable controls
+            self._enable_audio_controls()
+            
+        except Exception as e:
+            self._update_status(f"Load failed: {e}", self.colors.red)
     
     def _update_duration(self):
         """Update duration display during recording."""
@@ -1396,11 +1481,8 @@ class AudioAnalyzerWindow:
         self.size_label.configure(text="")
         
         # Disable controls
-        self.play_pause_btn.configure(
-            state="disabled",
-            **prepare_emoji_content("▶", size=14),
-            **get_ctk_button_colors(self.colors, "success")
-        )
+        self._set_play_button_icon("play")
+        self.play_pause_btn.configure(state="disabled")
         self.seek_slider.configure(state="disabled")
         self.send_btn.configure(state="disabled")
         self.clear_btn.configure(state="disabled")
@@ -1418,6 +1500,43 @@ class AudioAnalyzerWindow:
     # Playback Controls
     # =========================================================================
     
+    def _set_play_button_icon(self, mode: str):
+        """Set play/pause button icon, handling both CTk and Tk widgets.
+        
+        Args:
+            mode: "play" for ▶ or "pause" for ⏸
+        """
+        if not self.play_pause_btn:
+            return
+        
+        if HAVE_CTK and isinstance(self.play_pause_btn, ctk.CTkButton):
+            if mode == "pause":
+                content = prepare_emoji_content("⏸", size=14)
+                self.play_pause_btn.configure(
+                    **content,
+                    **get_ctk_button_colors(self.colors, "secondary")
+                )
+            else:
+                content = prepare_emoji_content("▶", size=14)
+                self.play_pause_btn.configure(
+                    **content,
+                    **get_ctk_button_colors(self.colors, "success")
+                )
+        else:
+            # Standard Tk button fallback
+            if mode == "pause":
+                self.play_pause_btn.configure(
+                    text="⏸",
+                    bg=self.colors.surface1,
+                    fg=self.colors.text
+                )
+            else:
+                self.play_pause_btn.configure(
+                    text="▶",
+                    bg=self.colors.green,
+                    fg="#ffffff"
+                )
+
     def _toggle_playback(self):
         """Toggle playback state."""
         if self.is_playing:
@@ -1443,11 +1562,7 @@ class AudioAnalyzerWindow:
                 self.is_playing = True
                 
                 # Switch to Pause button
-                pause_content = prepare_emoji_content("⏸", size=14)
-                self.play_pause_btn.configure(
-                    **pause_content,
-                    **get_ctk_button_colors(self.colors, "secondary")
-                )
+                self._set_play_button_icon("pause")
                 
                 # Start position update
                 self._update_playback_position()
@@ -1468,11 +1583,7 @@ class AudioAnalyzerWindow:
         self.playback_position = self.recorder.get_playback_position()
         
         # Switch to Play button
-        play_content = prepare_emoji_content("▶", size=14)
-        self.play_pause_btn.configure(
-            **play_content,
-            **get_ctk_button_colors(self.colors, "success")
-        )
+        self._set_play_button_icon("play")
         
         self._update_status("Paused")
     
@@ -1486,12 +1597,7 @@ class AudioAnalyzerWindow:
         self.playback_position = 0.0
         
         # Switch to Play button
-        play_content = prepare_emoji_content("▶", size=14)
-        if self.play_pause_btn:
-            self.play_pause_btn.configure(
-                **play_content,
-                **get_ctk_button_colors(self.colors, "success")
-            )
+        self._set_play_button_icon("play")
         if self.seek_slider:
             self.seek_slider.set(0)
     
@@ -1519,11 +1625,7 @@ class AudioAnalyzerWindow:
         if not self.recorder.is_playing():
             # Playback finished
             self.is_playing = False
-            play_content = prepare_emoji_content("▶", size=14)
-            self.play_pause_btn.configure(
-                **play_content,
-                **get_ctk_button_colors(self.colors, "success")
-            )
+            self._set_play_button_icon("play")
             self.seek_slider.set(0)
             self.playback_position = 0.0
             self._update_status("Playback complete")

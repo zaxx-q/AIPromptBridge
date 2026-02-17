@@ -332,14 +332,14 @@ def _create_audio_source_section_tk(window, parent):
     create_radio("🔊 Loopback", "loopback").pack(side="left")
 
 def _create_recording_section_tk(window, parent):
-    """Create recording section."""
+    """Create recording/upload controls section (pack layout)."""
     colors = get_colors()
-    content = _create_section_frame_tk(parent, "Recording", colors)
+    content = _create_section_frame_tk(parent, "Audio Input", colors)
     
     row = tk.Frame(content, bg=colors.surface0)
     row.pack(fill="x")
     
-    # Record
+    # Record/Stop Button (Merged)
     window.record_btn = tk.Button(
         row,
         text="🔴 Record",
@@ -347,26 +347,11 @@ def _create_recording_section_tk(window, parent):
         bg=colors.red,
         fg="#ffffff",
         relief="flat",
-        padx=10,
+        padx=12,
         pady=4,
-        command=window._start_recording
+        command=window._toggle_recording
     )
-    window.record_btn.pack(side="left", padx=(0, 5))
-    
-    # Stop
-    window.stop_btn = tk.Button(
-        row,
-        text="⏹ Stop",
-        font=("Segoe UI", 10),
-        bg=colors.surface1,
-        fg=colors.text,
-        relief="flat",
-        padx=10,
-        pady=4,
-        command=window._stop_recording,
-        state="disabled"
-    )
-    window.stop_btn.pack(side="left", padx=(0, 10))
+    window.record_btn.pack(side="left", padx=(0, 10))
     
     # Duration
     window.duration_label = tk.Label(
@@ -377,6 +362,20 @@ def _create_recording_section_tk(window, parent):
         fg=colors.text
     )
     window.duration_label.pack(side="left")
+    
+    # Upload Button
+    upload_btn = tk.Button(
+        row,
+        text="📁 Upload",
+        font=("Segoe UI", 10),
+        bg=colors.surface1,
+        fg=colors.text,
+        relief="flat",
+        padx=10,
+        pady=4,
+        command=window._upload_audio_file
+    )
+    upload_btn.pack(side="right", padx=(5, 0))
 
 def _create_compression_section_tk(window, parent):
     """Create compression section."""
@@ -478,7 +477,7 @@ def _create_display_options_section_tk(window, parent):
         bg=colors.surface0,
         fg=colors.overlay0,
         justify="center",
-        wraplength=200
+        wraplength=250
     ).pack(fill="x", padx=5)
 
 def _create_prompt_section_tk(window, parent, row, col):
