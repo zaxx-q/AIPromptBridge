@@ -1,5 +1,41 @@
 # Changelog
 
+## [5.0.0] - 2026-02-17
+
+### New Features
+
+#### 🔊 Text-to-Speech (TTS)
+- **Gemini TTS Integration**: Full support for Google's Gemini TTS models with streaming audio generation.
+- **Voice Selection**: Access to 30 prebuilt voices with style and gender descriptors.
+- **AI Director**: Intelligent style generation that analyzes text to provide expressive performance instructions (tone, pace, emotion) before synthesis.
+- **Multi-Format Export**: Save generated audio as WAV, MP3, OGG, AAC, or FLAC (requires FFmpeg).
+- **Multi-Speaker**: Support for assigning different voices to up to 2 distinct speakers in a single generation.
+- **Integration Points**: Accessible via terminal `[Y]`, system tray menu, and directly from input popups.
+- **Tkinter Support**: Full functional fallback UI for standard Tkinter environments.
+
+#### 🎤 Audio Tool Enhancements
+- **File Upload**: Added support for uploading existing audio files for analysis, alongside live recording.
+- **Unified Controls**: Consolidated Record/Stop and Play/Pause buttons into dynamic toggle controls for a cleaner UI.
+
+#### ⚙️ Configuration & Playground
+- **Live Preview**: Prompt Editor playground now updates in real-time as settings are modified.
+- **Playground Audio**: Added ability to upload audio files directly in the Prompt Editor playground for testing.
+- **TTS Settings**: Dedicated "TTS" tab in Settings Window and configuration section in Prompt Editor.
+
+### Improvements
+
+- **Session History**: Increased default maximum sessions from 50 to 200.
+- **UI/UX**:
+  - Relocated TTS buttons in popups for better layout consistency.
+  - Added visual input validation feedback in popups.
+  - Added tooltips to TTS controls for better discoverability.
+- **Performance**: Centralized FFmpeg utility detection to reduce redundant system calls.
+
+### Fixes
+
+- **Threading**: Resolved thread-safety issues when accessing UI widgets from background threads in the TTS window.
+- **Prompts**: Improved robustness of transcript detection to prevent text duplication in AI Director outputs.
+
 ## [4.3.2] - 2026-02-15
 
 ### Improvements

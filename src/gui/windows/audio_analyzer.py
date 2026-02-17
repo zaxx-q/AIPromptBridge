@@ -27,7 +27,6 @@ from ..platform import HAVE_CTK, ctk
 from ..themes import (
     get_colors, ThemeColors,
     get_ctk_font, get_ctk_button_colors,
-    get_ctk_frame_colors, get_ctk_entry_colors,
     get_ctk_combobox_colors, sync_ctk_appearance
 )
 from ..core import get_next_window_id, register_window, unregister_window, GUICoordinator
@@ -2037,148 +2036,65 @@ class AudioAnalyzerWindow:
 
     def _process_audio_internal(self, action_key: str, audio_data: bytes, mime_type: str, custom_text: Optional[str] = None):
         """Process audio internally."""
-        temp_file_path = None
-        try:
-            from ...request_pipeline import RequestPipeline, RequestContext, RequestOrigin, StreamCallback
-            from ...messages import build_audio_message, build_file_message
-            from ...api_client import get_provider_for_type
-            import tempfile
-            import os
-            from pathlib import Path
-            
-            # Get action config
-            actions = self.prompts.get_audio_actions()
-            action = actions.get(action_key, {})
-            
-            system_prompt = action.get("system_prompt", "You are an audio analysis assistant.")
-            task = action.get("task", "Analyze this audio.")
-            
-            if action_key in ["_Custom", "_Ask"]:
-                # Use custom task template
-                template = self.prompts.get_audio_setting("custom_task_template", "Regarding this audio: {custom_input}")
-                if custom_text:
-                    task = template.replace("{custom_input}", custom_text)
-                else:
-                    task = "Analyze this audio."
-            elif custom_text:
-                # Optionally append custom text to other tasks if needed,
-                # but currently only _Custom/_Ask uses it explicitly.
-                pass
-            
-            # Apply modifier injections
-            if self.active_modifiers:
-                modifier_injections = self._build_modifier_injections()
-                if modifier_injections:
-                    system_prompt = system_prompt + "\n\n" + modifier_injections
-            
-            messages = []
-            
-            # Check for large file support if provider is google
-            # Gemini Native limit for inline data is ~15MB (safety margin)
-            is_large_file = len(audio_data) > 15 * 1024 * 1024
-            
-            if self.provider == "google" and is_large_file:
-                GUICoordinator.get_instance().run_on_gui_thread(
-                    lambda: self._update_status("Uploading large file...", self.colors.accent)
-                )
-                
-                # Determine extension based on mime_type
-                ext = ".wav"
-                if "ogg" in mime_type:
-                    ext = ".ogg"
-                elif "mpeg" in mime_type or "mp3" in mime_type:
-                    ext = ".mp3"
-                
-                # Create temp file
-                try:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as f:
-                        f.write(audio_data)
-                        temp_file_path = f.name
-                    
-                    # Get provider to use upload_file
-                    key_manager = self.key_managers.get("google")
-                    if key_manager:
-                        provider = get_provider_for_type("google", key_manager, self.config)
-                        
-                        # Upload
-                        uploaded_file, error = provider.upload_file(Path(temp_file_path))
-                        
-                        if uploaded_file:
-                            messages = build_file_message(uploaded_file.uri, mime_type, task, system_prompt)
-                            logging.info(f"[AudioAnalyzer] Uploaded large file: {uploaded_file.uri}")
-                        else:
-                            logging.error(f"[AudioAnalyzer] Upload failed: {error}")
-                            # Will fallback to inline below
-                except Exception as e:
-                    logging.error(f"[AudioAnalyzer] File upload preparation failed: {e}")
-                finally:
-                    # Clean up temp file
-                    if temp_file_path and os.path.exists(temp_file_path):
-                        try:
-                            os.unlink(temp_file_path)
-                        except Exception:
-                            pass
-            
-            if not messages:
-                # Build message with inline audio (fallback or small file)
-                audio_b64 = base64.b64encode(audio_data).decode('utf-8')
-                messages = build_audio_message(audio_b64, mime_type, task, system_prompt)
-            
-            # Create request context
-            ctx = RequestContext(
-                origin=RequestOrigin.AUDIO_TOOL,
-                provider=self.provider,
-                model=self.model,
-                streaming=self.config.get("streaming_enabled", True),
-                thinking_enabled=self.config.get("thinking_enabled", False)
+        from ...gui.audio_tool import get_instance as get_audio_tool
+        
+        tool = get_audio_tool()
+        if not tool:
+            self._update_status("Audio Tool offline", self.colors.red)
+            self.is_processing = False
+            self.send_btn.configure(state="normal")
+            return
+
+        def on_progress(msg):
+            if self._destroyed: return
+            GUICoordinator.get_instance().run_on_gui_thread(
+                lambda: self._update_status(msg, self.colors.accent)
             )
+
+        def on_success(response_text, tokens):
+            if self._destroyed: return
             
-            # For now, use non-streaming for simplicity
-            ctx = RequestPipeline.execute_simple(
-                ctx,
-                messages,
-                self.config,
-                self.ai_params,
-                self.key_managers
-            )
-            
-            # Update UI on main thread
-            def update_result():
-                if self._destroyed:
-                    return
+            def update():
+                self.result_text = response_text
+                self.result_text_widget.configure(state=tk.NORMAL, fg=self.colors.text)
+                self.result_text_widget.delete("1.0", tk.END)
+                self.result_text_widget.insert("1.0", response_text)
+                self.result_text_widget.configure(state=tk.DISABLED)
+                self.copy_btn.configure(state="normal")
                 
-                if ctx.error:
-                    self._update_status(f"Error: {ctx.error}", self.colors.red)
-                    self.result_text_widget.configure(state=tk.NORMAL)
-                    self.result_text_widget.delete("1.0", tk.END)
-                    self.result_text_widget.insert("1.0", f"Error: {ctx.error}")
-                    self.result_text_widget.configure(state=tk.DISABLED, fg=self.colors.red)
-                else:
-                    self.result_text = ctx.response_text
-                    self.result_text_widget.configure(state=tk.NORMAL, fg=self.colors.text)
-                    self.result_text_widget.delete("1.0", tk.END)
-                    self.result_text_widget.insert("1.0", ctx.response_text)
-                    self.result_text_widget.configure(state=tk.DISABLED)
-                    self.copy_btn.configure(state="normal")
-                    
-                    tokens = ctx.total_tokens
-                    self._update_status(f"✅ Complete ({tokens} tokens)", self.colors.green)
+                self._update_status(f"✅ Complete ({tokens} tokens)", self.colors.green)
+                self.is_processing = False
+                self.send_btn.configure(state="normal")
+                
+            GUICoordinator.get_instance().run_on_gui_thread(update)
+
+        def on_error(error_msg):
+            if self._destroyed: return
+            
+            def update():
+                self._update_status(f"Error: {error_msg}", self.colors.red)
+                self.result_text_widget.configure(state=tk.NORMAL)
+                self.result_text_widget.delete("1.0", tk.END)
+                self.result_text_widget.insert("1.0", f"Error: {error_msg}")
+                self.result_text_widget.configure(state=tk.DISABLED, fg=self.colors.red)
                 
                 self.is_processing = False
                 self.send_btn.configure(state="normal")
-            
-            GUICoordinator.get_instance().run_on_gui_thread(update_result)
-            
-        except Exception as e:
-            logging.error(f"[AudioAnalyzer] Processing error: {e}")
-            
-            def show_error():
-                if not self._destroyed:
-                    self._update_status(f"Error: {e}", self.colors.red)
-                    self.is_processing = False
-                    self.send_btn.configure(state="normal")
-            
-            GUICoordinator.get_instance().run_on_gui_thread(show_error)
+                
+            GUICoordinator.get_instance().run_on_gui_thread(update)
+
+        tool.analyze_audio(
+            audio_data=audio_data,
+            mime_type=mime_type,
+            action_key=action_key,
+            custom_text=custom_text,
+            active_modifiers=self.active_modifiers,
+            provider=self.provider,
+            model=self.model,
+            callback_progress=on_progress,
+            callback_success=on_success,
+            callback_error=on_error
+        )
     
     def _build_modifier_injections(self) -> str:
         """Build modifier injection text."""

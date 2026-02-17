@@ -8,7 +8,7 @@ Coordinates hotkey listening, backend logic, and window UI requests for the Text
 import logging
 import threading
 import os
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Callable
 
 from .hotkey import HotkeyListener
 from .prompts import PromptsConfig

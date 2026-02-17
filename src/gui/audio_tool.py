@@ -17,7 +17,15 @@ import threading
 from typing import Optional, Dict, Any, List
 
 from .hotkey import HotkeyListener
+import os
+import tempfile
+import base64
+from pathlib import Path
+from typing import Callable
 from .prompts import PromptsConfig
+from ..messages import build_audio_message, build_file_message
+from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
+from ..api_client import get_provider_for_type
 
 
 class AudioToolApp:
@@ -164,6 +172,145 @@ class AudioToolApp:
             daemon=True
         ).start()
     
+    def analyze_audio(
+        self,
+        audio_data: bytes,
+        mime_type: str,
+        action_key: str,
+        custom_text: Optional[str] = None,
+        active_modifiers: List[str] = None,
+        provider: str = None,
+        model: str = None,
+        callback_progress: Optional[Callable[[str], None]] = None,
+        callback_success: Optional[Callable[[str, int], None]] = None,
+        callback_error: Optional[Callable[[str], None]] = None
+    ):
+        """
+        Analyze audio and return text result (backend logic).
+        
+        Args:
+            audio_data: Raw audio bytes
+            mime_type: MIME type of audio
+            action_key: Key of the action prompt
+            custom_text: Custom user input (if action allows)
+            active_modifiers: List of active modifier keys
+            provider: Provider override
+            model: Model override
+            callback_progress: Callback(status_message)
+            callback_success: Callback(response_text, token_count)
+            callback_error: Callback(error_message)
+        """
+        def _target():
+            temp_file_path = None
+            try:
+                # Get action config
+                actions = self.prompts.get_audio_actions()
+                action = actions.get(action_key, {})
+                
+                system_prompt = action.get("system_prompt", "You are an audio analysis assistant.")
+                task = action.get("task", "Analyze this audio.")
+                
+                # Check for custom input substitution
+                if action_key in ["_Custom", "_Ask"]:
+                    settings = self.prompts.get_audio_tool().get("_settings", {})
+                    template = settings.get("custom_task_template", "Regarding this audio: {custom_input}")
+                    if custom_text:
+                        task = template.replace("{custom_input}", custom_text)
+                    else:
+                        task = "Analyze this audio."
+                
+                # Apply modifier injections
+                if active_modifiers:
+                    modifier_defs = self.prompts.get_modifiers()
+                    injections = []
+                    for mod in modifier_defs:
+                        if mod.get("key") in active_modifiers:
+                            injection = mod.get("injection", "")
+                            if injection:
+                                injections.append(injection)
+                    if injections:
+                        system_prompt = system_prompt + "\n\n" + "\n".join(injections)
+                
+                messages = []
+                
+                # Determine provider/model
+                req_provider = provider or self.config.get("default_provider", "google")
+                req_model = model or self.config.get(f"{req_provider}_model")
+                
+                # Check for large file support (Gemini only)
+                # Upload if > 15MB
+                is_large_file = len(audio_data) > 15 * 1024 * 1024
+                
+                if req_provider == "google" and is_large_file:
+                    if callback_progress:
+                        callback_progress("Uploading large file...")
+                        
+                    # Determine extension
+                    ext = ".wav"
+                    if "ogg" in mime_type: ext = ".ogg"
+                    elif "mpeg" in mime_type or "mp3" in mime_type: ext = ".mp3"
+                    
+                    try:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as f:
+                            f.write(audio_data)
+                            temp_file_path = f.name
+                        
+                        key_manager = self.key_managers.get("google")
+                        if key_manager:
+                            prov_instance = get_provider_for_type("google", key_manager, self.config)
+                            uploaded_file, error = prov_instance.upload_file(Path(temp_file_path))
+                            
+                            if uploaded_file:
+                                messages = build_file_message(uploaded_file.uri, mime_type, task, system_prompt)
+                                logging.info(f"[AudioTool] Uploaded large file: {uploaded_file.uri}")
+                            else:
+                                logging.error(f"[AudioTool] Upload failed: {error}")
+                    except Exception as e:
+                        logging.error(f"[AudioTool] File upload prep failed: {e}")
+                    finally:
+                        if temp_file_path and os.path.exists(temp_file_path):
+                            try:
+                                os.unlink(temp_file_path)
+                            except Exception:
+                                pass
+                
+                if not messages:
+                    # Build message with inline audio
+                    audio_b64 = base64.b64encode(audio_data).decode('utf-8')
+                    messages = build_audio_message(
+                        audio_b64=audio_b64,
+                        mime_type=mime_type,
+                        task=task,
+                        system_prompt=system_prompt
+                    )
+                
+                ctx = RequestContext(
+                    origin=RequestOrigin.AUDIO_TOOL,
+                    provider=req_provider,
+                    model=req_model,
+                    streaming=self.config.get("streaming_enabled", True),
+                    thinking_enabled=self.config.get("thinking_enabled", False)
+                )
+                
+                # Execute simple (non-streaming result for this method)
+                ctx = RequestPipeline.execute_simple(
+                    ctx, messages, self.config, self.ai_params, self.key_managers
+                )
+                
+                if ctx.error:
+                    if callback_error:
+                        callback_error(f"Analysis error: {ctx.error}")
+                else:
+                    if callback_success:
+                        callback_success(ctx.response_text, ctx.total_tokens)
+                        
+            except Exception as e:
+                logging.error(f"[AudioTool] Analysis error: {e}")
+                if callback_error:
+                    callback_error(str(e))
+
+        threading.Thread(target=_target, daemon=True).start()
+
     def _process_action(
         self,
         action_key: str,
@@ -176,9 +323,6 @@ class AudioToolApp:
     ):
         """Process the selected action with audio context."""
         try:
-            import base64
-            from ..messages import build_audio_message
-            
             # Get action config
             actions = self.prompts.get_audio_actions()
             settings = self.prompts.get_audio_tool().get("_settings", {})
