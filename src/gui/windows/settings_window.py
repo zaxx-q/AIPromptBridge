@@ -938,6 +938,17 @@ class SettingsWindow:
         self._add_spinbox_field(content_parent, "session_image_quality", "Quality (1-100):",
                                self.config_data.config.get("session_image_quality", 85),
                                1, 100, width=80, hint="Compression level for webp/jpg")
+
+        # Windows Startup section
+        create_section_header(content_parent, "🖥️ Windows Startup", self.colors, top_padding=20)
+        
+        # Run at startup toggle
+        self._add_startup_toggle_field(content_parent, "run_at_startup",
+                               "Run at Windows startup",
+                               hint="Launch AIPromptBridge when Windows starts")
+        
+        # Startup info label
+        self._add_startup_info_label(content_parent)
     
     def _create_provider_tab(self, frame):
         """Create the Provider settings tab."""
@@ -2384,6 +2395,109 @@ class SettingsWindow:
                 tk.Label(row, text=hint, font=("Segoe UI", 9),
                         bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
     
+    def _add_startup_toggle_field(self, parent, key: str, label: str, hint: str = None):
+        """Add a startup toggle field that reads/writes to registry immediately."""
+        row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        row.pack(fill="x", pady=8)
+        
+        # Read current startup state from registry
+        try:
+            from ...startup_manager import is_startup_enabled
+            current_value = is_startup_enabled()
+        except Exception:
+            current_value = False
+        
+        self.vars[key] = tk.BooleanVar(master=self.root, value=current_value)
+        
+        if self.use_ctk:
+            self.widgets[key] = ctk.CTkSwitch(
+                row, text=label, variable=self.vars[key],
+                font=get_ctk_font(13), text_color=self.colors.fg,
+                fg_color=self.colors.surface2,
+                progress_color=self.colors.accent,
+                button_color="#ffffff",
+                button_hover_color="#f0f0f0",
+                command=self._on_startup_toggle
+            )
+            self.widgets[key].pack(side="left")
+            
+            if hint:
+                ctk.CTkLabel(row, text=hint, font=get_ctk_font(11),
+                            **get_ctk_label_colors(self.colors, muted=True)).pack(side="left", padx=(15, 0))
+        else:
+            tk.Label(row, text=label, font=("Segoe UI", 10),
+                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            toggle = ToggleSwitch(row, self.vars[key], self.colors, command=self._on_startup_toggle)
+            toggle.pack(side="left", padx=(10, 0))
+            self.widgets[key] = toggle
+            
+            if hint:
+                tk.Label(row, text=hint, font=("Segoe UI", 9),
+                        bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
+    
+    def _on_startup_toggle(self):
+        """Handle Windows startup toggle change immediately."""
+        startup_key = "run_at_startup"
+        if startup_key not in self.vars:
+            return
+        
+        try:
+            from ...startup_manager import set_startup
+            enabled = self.vars[startup_key].get()
+            success, message = set_startup(enabled)
+            
+            if not success and enabled:
+                # Failed to enable - show error and reset toggle
+                if self.use_ctk:
+                    self.status_label.configure(text=f"❌ {message}", text_color=self.colors.accent_red)
+                else:
+                    self.status_label.configure(text=f"❌ {message}", fg=self.colors.accent_red)
+                
+                # Reset the toggle back to disabled (suppress callback to avoid loop)
+                self.vars[startup_key].set(False)
+            else:
+                # Success - show confirmation
+                if self.use_ctk:
+                    self.status_label.configure(text=f"✅ {message}", text_color=self.colors.accent_green)
+                else:
+                    self.status_label.configure(text=f"✅ {message}", fg=self.colors.accent_green)
+                    
+        except Exception as e:
+            print(f"[Settings] Startup toggle error: {e}")
+            if self.use_ctk:
+                self.status_label.configure(text=f"❌ Error: {e}", text_color=self.colors.accent_red)
+            else:
+                self.status_label.configure(text=f"❌ Error: {e}", fg=self.colors.accent_red)
+
+    def _add_startup_info_label(self, parent):
+        """Add an info label showing current startup target."""
+        row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        row.pack(fill="x", pady=(0, 8))
+        
+        # Get startup info
+        try:
+            from ...startup_manager import get_startup_info
+            info = get_startup_info()
+            
+            if info["path"]:
+                mode_text = f" ({info['mode']} mode)" if info["mode"] else ""
+                path_short = info["path"]
+                # Shorten path for display
+                if len(path_short) > 50:
+                    path_short = "..." + path_short[-47:]
+                info_text = f"Target: {path_short}{mode_text}"
+            else:
+                info_text = "Launcher not found (running in development mode?)"
+        except Exception as e:
+            info_text = f"Error: {e}"
+        
+        if self.use_ctk:
+            ctk.CTkLabel(row, text=info_text, font=get_ctk_font(11),
+                        **get_ctk_label_colors(self.colors, muted=True)).pack(side="left", padx=(32, 0))
+        else:
+            tk.Label(row, text=info_text, font=("Segoe UI", 9),
+                    bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(32, 0))
+    
     def _create_button_bar(self, parent):
         """Create the bottom button bar."""
         btn_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
@@ -2443,6 +2557,10 @@ class SettingsWindow:
         
         # Collect values from widgets
         for key, var in self.vars.items():
+            # Skip keys that shouldn't be saved to config.ini
+            if key in ["run_at_startup"]:
+                continue
+                
             try:
                 value = var.get()
             except tk.TclError:
@@ -2500,6 +2618,9 @@ class SettingsWindow:
                     if kd.get("key"):
                         cleaned_keys.append(kd)
                 self.config_data.keys[provider] = cleaned_keys
+        
+        # Cleanup transient keys that shouldn't be persisted
+        self.config_data.config.pop("run_at_startup", None)
         
         # Save to file
         if save_config_full(self.config_data):

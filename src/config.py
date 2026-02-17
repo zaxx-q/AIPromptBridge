@@ -448,7 +448,7 @@ tts_director_enabled = true
 tts_director_auto_mode = false
 
 # Model override for AI Director (leave empty to use default provider model)
-# tts_director_model =
+tts_director_model =
 
 # Directory for saved TTS audio files (relative to app root)
 tts_save_directory = tts_output
