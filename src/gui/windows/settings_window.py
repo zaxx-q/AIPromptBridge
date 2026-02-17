@@ -812,18 +812,16 @@ class SettingsWindow:
             
         scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # Server settings section
-        create_section_header(content_parent, "🖥️ Server Settings", self.colors)
+        # Windows Startup section (Moved to top)
+        create_section_header(content_parent, "🖥️ Windows Startup", self.colors)
         
-        # Host
-        self._add_entry_field(content_parent, "host", "Host:",
-                             self.config_data.config.get("host", "127.0.0.1"),
-                             width=140, hint="⚠️ Restart required. IP address to bind.")
+        # Run at startup toggle
+        self._add_startup_toggle_field(content_parent, "run_at_startup",
+                               "Run at Windows startup",
+                               hint="Launch AIPromptBridge when Windows starts")
         
-        # Port
-        self._add_entry_field(content_parent, "port", "Port:",
-                             str(self.config_data.config.get("port", 5000)),
-                             width=80, hint="⚠️ Restart required. Port for Flask server (1-65535)")
+        # Startup info label
+        self._add_startup_info_label(content_parent)
         
         # Behavior section
         create_section_header(content_parent, "🧠 Behavior", self.colors, top_padding=20)
@@ -939,16 +937,75 @@ class SettingsWindow:
                                self.config_data.config.get("session_image_quality", 85),
                                1, 100, width=80, hint="Compression level for webp/jpg")
 
-        # Windows Startup section
-        create_section_header(content_parent, "🖥️ Windows Startup", self.colors, top_padding=20)
+        # Server settings section (Moved to bottom and LOCKED)
+        create_section_header(content_parent, "🖥️ Server Settings", self.colors, top_padding=20)
         
-        # Run at startup toggle
-        self._add_startup_toggle_field(content_parent, "run_at_startup",
-                               "Run at Windows startup",
-                               hint="Launch AIPromptBridge when Windows starts")
+        # Unlock checkbox
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
+        row.pack(fill="x", pady=(0, 5))
         
-        # Startup info label
-        self._add_startup_info_label(content_parent)
+        self.vars["unlock_server_settings"] = tk.BooleanVar(master=self.root, value=False)
+        
+        if self.use_ctk:
+            checkbox = ctk.CTkCheckBox(
+                row, text="Unlock server settings (advanced)",
+                variable=self.vars["unlock_server_settings"],
+                font=get_ctk_font(13), text_color=self.colors.fg,
+                checkbox_height=20, checkbox_width=20, corner_radius=6,
+                fg_color=self.colors.accent, hover_color=self.colors.accent,
+                command=self._on_server_settings_unlock
+            )
+            checkbox.pack(side="left", padx=(0, 0))
+            
+            ctk.CTkLabel(row, text="⚠️ Port auto-switches if occupied. Restart required after changes.",
+                         font=get_ctk_font(11),
+                         **get_ctk_label_colors(self.colors, muted=True)).pack(side="left", padx=(15, 0))
+        else:
+            checkbox = tk.Checkbutton(
+                row, text="Unlock server settings (advanced)",
+                variable=self.vars["unlock_server_settings"],
+                font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
+                activebackground=self.colors.bg, activeforeground=self.colors.fg,
+                selectcolor=self.colors.bg,
+                command=self._on_server_settings_unlock
+            )
+            checkbox.pack(side="left")
+            
+            tk.Label(row, text="⚠️ Port auto-switches if occupied. Restart required after changes.",
+                    font=("Segoe UI", 9),
+                    bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
+        
+        # Host
+        self._add_entry_field(content_parent, "host", "Host:",
+                             self.config_data.config.get("host", "127.0.0.1"),
+                             width=140, hint=None)
+        
+        # Port
+        self._add_entry_field(content_parent, "port", "Port:",
+                             str(self.config_data.config.get("port", 5000)),
+                             width=80, hint=None)
+                             
+        # Initially lock fields
+        self._on_server_settings_unlock()
+
+    def _on_server_settings_unlock(self):
+        """Toggle enabled state of server settings fields."""
+        unlocked = self.vars["unlock_server_settings"].get()
+        state = "normal" if unlocked else "disabled"
+        
+        # Update widget states
+        if "host" in self.widgets:
+            self.widgets["host"].configure(state=state)
+            if self.use_ctk:
+                # Dim the text color when disabled if using CTk
+                text_color = self.colors.fg if unlocked else self.colors.surface2
+                self.widgets["host"].configure(text_color=text_color)
+                
+        if "port" in self.widgets:
+            self.widgets["port"].configure(state=state)
+            if self.use_ctk:
+                 text_color = self.colors.fg if unlocked else self.colors.surface2
+                 self.widgets["port"].configure(text_color=text_color)
     
     def _create_provider_tab(self, frame):
         """Create the Provider settings tab."""
