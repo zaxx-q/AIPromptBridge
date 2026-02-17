@@ -573,6 +573,54 @@ def check_port_available(host: str, port: int) -> bool:
         return False
 
 
+def find_available_port(host: str, port: int, max_attempts: int = 20) -> int:
+    """
+    Find an available port starting from the configured port.
+    Tries port, port+1, port+2, ... up to max_attempts.
+    
+    Returns:
+        Available port number
+        
+    Raises:
+        RuntimeError if no port found within max_attempts
+    """
+    for offset in range(max_attempts):
+        candidate = port + offset
+        if candidate > 65535:
+            break
+        if check_port_available(host, candidate):
+            return candidate
+    raise RuntimeError(f"No available port found in range {port}-{port + max_attempts - 1}")
+
+
+def acquire_single_instance_mutex():
+    """
+    Acquire a named mutex to ensure single instance.
+    
+    Returns:
+        mutex_handle if acquired successfully (first instance)
+        None if another instance is already running
+    """
+    if sys.platform != 'win32':
+        return "NotWindows"
+        
+    kernel32 = ctypes.windll.kernel32
+    mutex_name = "AIPromptBridge_SingleInstance"
+    
+    # CreateMutexW(security_attributes, initial_owner, name)
+    mutex = kernel32.CreateMutexW(None, False, mutex_name)
+    
+    # ERROR_ALREADY_EXISTS = 183
+    if kernel32.GetLastError() == 183:
+        # Another instance owns the mutex
+        if mutex:
+            kernel32.CloseHandle(mutex)
+        return None
+    
+    # We own the mutex - keep the handle alive for process lifetime
+    return mutex
+
+
 def run_server(config, ai_params, endpoints):
     """Run the Flask server (used by both tray and terminal modes)"""
     host = web_server.CONFIG.get('host', '127.0.0.1')
@@ -657,6 +705,33 @@ def main():
     if not setup_workspace(args.launched_mode):
         sys.exit(1)
     
+    # Single instance check via named mutex (Windows only)
+    # We do this early to prevent multiple instances
+    mutex_handle = None
+    if sys.platform == 'win32':
+        mutex_handle = acquire_single_instance_mutex()
+        if mutex_handle is None:
+            if args.show_console or (not args.no_tray):
+                # If console is visible or tray is enabled, we might want to alert
+                pass
+            
+            if HAVE_RICH:
+                print_error("Another instance of AIPromptBridge is already running!")
+            else:
+                print("❌ ERROR: Another instance of AIPromptBridge is already running!")
+            
+            # If we are in tray mode (hidden console), just exit silently
+            # User probably just double clicked the icon again
+            if not args.show_console and not args.no_tray:
+                sys.exit(0)
+
+            print("Press Enter to exit...")
+            try:
+                input()
+            except EOFError:
+                pass
+            sys.exit(1)
+            
     # Configure global logging (DEBUG if --show-console, otherwise INFO)
     configure_logging(debug_mode=args.show_console)
     
@@ -747,33 +822,38 @@ def main():
     
     # ─── Server Info ──────────────────────────────────────────────────────
     host = web_server.CONFIG.get('host', '127.0.0.1')
-    port = int(web_server.CONFIG.get('port', 5000))
+    configured_port = int(web_server.CONFIG.get('port', 5000))
     
-    # Check if port is available (single instance check)
-    if not check_port_available(host, port):
+    # Auto-switch port if occupied
+    try:
+        actual_port = find_available_port(host, configured_port)
+    except RuntimeError as e:
         if HAVE_RICH:
             console.print()
-            print_error(f"Port {port} is already in use!")
-            console.print()
-            print_warning("Another instance of AIPromptBridge may already be running.")
-            console.print(f"[dim]Check if port {port} is in use: netstat -an | findstr {port}[/dim]")
+            print_error(f"Could not find an available port: {e}")
             console.print()
             console.print("[dim]Press Enter to exit...[/dim]")
         else:
             print()
-            print(f"❌ ERROR: Port {port} is already in use!")
-            print()
-            print("Another instance of AIPromptBridge may already be running.")
-            print(f"Check if port {port} is in use: netstat -an | findstr {port}")
+            print(f"❌ ERROR: Could not find an available port: {e}")
             print()
             print("Press Enter to exit...")
-        
-        # Avoid input() in detached/nuitka mode if no console
         try:
             input()
         except EOFError:
             pass
         sys.exit(1)
+
+    if actual_port != configured_port:
+        if HAVE_RICH:
+            print_warning(f"Port {configured_port} occupied, using {actual_port} instead")
+        else:
+            print(f"⚠️ Port {configured_port} occupied, using {actual_port} instead")
+        
+        # Update config in memory (so run_server picks it up)
+        web_server.CONFIG['port'] = actual_port
+    
+    port = actual_port
     
     # Show endpoint status based on flask_endpoints_enabled
     flask_endpoints_enabled = config.get("flask_endpoints_enabled", False)

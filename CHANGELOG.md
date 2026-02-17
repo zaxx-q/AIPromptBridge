@@ -1,5 +1,33 @@
 # Changelog
 
+## [5.1.0] - 2026-02-17
+
+### New Features
+
+- **Launch on startup**: Add new option to allow AIPromptBridge to run automatically on Windows boot. Accessible via a new toggle in the Settings window.
+
+### Changes
+
+- **Hotkeys**: Modified default global hotkeys to use `Ctrl+Alt` instead of `Ctrl+Shift` to avoid conflicts with common Windows/app shortcuts:
+  - Screen Snip: `Ctrl+Alt+X`
+  - Audio Tool: `Ctrl+Alt+A`
+  - TTS: `Ctrl+Alt+T`
+- **Settings Layout**:
+  - Moved "Windows Startup" configuration to the top of the Settings window for better visibility.
+  - Relocated "Server Settings" to the bottom and added a safety lock that must be manually unchecked to edit host/port values.
+
+### Improvements
+
+- **Terminal Interface**: Reorganized the console command menu into clearer categories (Features, Info & Toggles) and updated hotkeys for consistency:
+  - `[S]` Sessions (was L)
+  - `[L]` List Sessions (was S status)
+  - `[I]` Info/Status (new)
+  - `[K]` Thinking Toggle (was T)
+  - `[T]` TTS Window (was Y)
+- **Settings UX**: Added explicit warnings when modifying server settings that require a restart.
+- **Port Discovery**: Implemented automatic port discovery and conflict resolution for the local web server. The application will now check 20 subsequent ports if the configured port is occupied.
+- **Single Instance**: Changed the mechanism to prevent multiple instances of AIPromptBridge from running simultaneously.
+
 ## [5.0.0] - 2026-02-17
 
 ### New Features
@@ -10,7 +38,7 @@
 - **AI Director**: Intelligent style generation that analyzes text to provide expressive performance instructions (tone, pace, emotion) before synthesis.
 - **Multi-Format Export**: Save generated audio as WAV, MP3, OGG, AAC, or FLAC (requires FFmpeg).
 - **Multi-Speaker**: Support for assigning different voices to up to 2 distinct speakers in a single generation.
-- **Integration Points**: Accessible via terminal `[Y]`, system tray menu, and directly from input popups.
+- **Integration Points**: Accessible via terminal `[T]`, system tray menu, and directly from input popups.
 - **Tkinter Support**: Full functional fallback UI for standard Tkinter environments.
 
 #### 🎤 Audio Tool Enhancements
