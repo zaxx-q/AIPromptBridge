@@ -53,7 +53,7 @@ Convert text into expressive speech using Gemini TTS models:
 - **Multi-Speaker** - Support for up to 2 speakers with individual voice assignment
 - **Playback** - Built-in audio preview with play/pause and seek controls
 - **Export** - Save generated audio as WAV files
-- **Entry Points** - 🔊 button in popups, `[Y]` terminal key, and system tray menu
+- **Entry Points** - 🔊 button in popups, `[T]` terminal key, hotkey `Ctrl+Shift+T`, and system tray menu
 
 ### 💬 Chat Interface
 ![Chat Interface](docs/images/feature_chat.png)
@@ -136,7 +136,7 @@ Right-click the tray icon for:
 - **Direct Chat** - Open text input popup (Ctrl+Space)
 - **Screen Snip** - Trigger screen capture (Ctrl+Shift+X)
 - **Audio Analyzer** - Open audio tool (Ctrl+Shift+A)
-- **TTS** - Open Text-to-Speech window
+- **TTS** - Open Text-to-Speech window (Ctrl+Shift+T)
 - **Settings** - Open GUI settings editor
 - **Prompt Editor** - Edit TextEditTool prompts
 - **Edit config.ini** - Open configuration file (only visible with `--show-console` arg)
@@ -182,13 +182,18 @@ When console is visible, press these keys:
 
 | Key | Action |
 |-----|--------|
-| `Y` | Open TTS (Text-to-Speech) window |
-| `S` | Show system status |
-| `O` | Open session browser |
-| `M` | List available models (Use `?N` for details, e.g., `?1`) |
+| `S` | Open session browser (Sessions) |
+| `A` | Open Audio Analyzer |
+| `T` | Open TTSTool window (Text-to-Speech) |
+| `X` | Open Tools menu |
+| `L` | List recent saved sessions |
+| `I` | Show system info (Status) |
+| `K` | Toggle thinking mode |
 | `P` | Switch AI provider |
-| `T` | Toggle thinking mode |
+| `M` | List available models (Use `?N` for details, e.g., `?1`) |
 | `R` | Toggle streaming mode |
+| `G` | Open Settings window |
+| `W` | Open prompt editor |
 | `H` | Show help |
 
 ## ⚙️ Configuration

@@ -76,7 +76,7 @@ AIPromptBridge/
     │       ├── chat_base.py        # Base classes for chat windows
     │       ├── chat_window.py      # Interactive chat window
     │       ├── session_browser.py  # Session history browser
-    │       ├── tts_window.py       # TTS generation with voice selection, AI Director, playback
+    │       ├── tts_window.py       # TTS UI (voice selection, AI Director, playback)
     │       └── utils.py            # Window management utilities
     │
     ├── providers/              # AI Provider Implementations

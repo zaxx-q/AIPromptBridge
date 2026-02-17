@@ -29,7 +29,8 @@ flowchart TB
         TET["TextEditTool<br/>(text_edit_tool.py)"]
         Snip["SnipTool<br/>(snip_tool.py)"]
         Audio["AudioTool<br/>(audio_tool.py)"]
-        TTS["TTSWindow<br/>(tts_window.py)"]
+        TTS["TTSTool<br/>(tts_tool.py)"]
+        TTSUI["TTSWindow<br/>(windows/tts_window.py)"]
         Popups["Popups<br/>(popups.py)"]
         Modifiers["Scrollable ModifierBar<br/>(popups.py)"]
         TypingInd["TypingIndicator<br/>(popups.py)"]
@@ -60,6 +61,7 @@ flowchart TB
     TET --> Popups
     Snip --> Popups
     Audio --> Popups
+    TTS --> TTSUI
     Popups --> Modifiers
     TET --> TypingInd
     Popups --> Pipeline

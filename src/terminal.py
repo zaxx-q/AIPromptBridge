@@ -68,11 +68,11 @@ def print_commands_box():
                     t.add_row("", "", "")
             return t
 
-        # Column 1: Core/Navigation
+        # Column 1: Features
         col1 = create_column_table([
-            ("Y", "🔊", "TTS"),
-            ("O", "🌐", "Browser"),
+            ("S", "🌐", "Sessions"),
             ("A", "🎤", "Audio"),
+            ("T", "🔊", "TTS"),
             ("X", "🧰", "Tools"),
         ])
         
@@ -84,10 +84,10 @@ def print_commands_box():
             ("W", "📝", "Prompts"),
         ])
         
-        # Column 3: Toggles/Status
+        # Column 3: Info & Toggles
         col3 = create_column_table([
-            ("S", "📊", "Status"),
-            ("T", "💭", "Thinking"),
+            ("I", "📊", "Info"),
+            ("K", "💭", "Thinking"),
             ("R", "🌊", "Streaming"),
             ("H", "❓", "Help"),
         ])
@@ -107,9 +107,9 @@ def print_commands_box():
         print("─" * 64)
         print("  COMMANDS                                       Ctrl+C to stop")
         print("─" * 64)
-        print("  [Y] 🔊 TTS           [P] 🔄 Provider     [S] 📊 Status")
-        print("  [O] 🌐 Browser       [M] 🤖 Models       [T] 💭 Thinking")
-        print("  [A] 🎤 Audio         [G] 🔨 Settings     [R] 🌊 Streaming")
+        print("  [S] 🌐 Sessions      [P] 🔄 Provider     [I] 📊 Info")
+        print("  [A] 🎤 Audio         [M] 🤖 Models       [K] 💭 Thinking")
+        print("  [T] 🔊 TTS           [G] 🔨 Settings     [R] 🌊 Streaming")
         print("  [X] 🧰 Tools         [W] 📝 Prompts      [H] ❓ Help")
         print("─" * 64)
         print()
@@ -166,7 +166,7 @@ def terminal_session_manager(endpoints=None):
                         print(f"   [{s['id']}] {s['title'][:35]} ({s['messages']} msgs, {s['origin']})")
                 print(f"{'─'*64}\n")
 
-            elif key == 'y':
+            elif key == 't':
                 # Open TTS Window
                 if HAVE_GUI:
                     from . import web_server
@@ -189,7 +189,7 @@ def terminal_session_manager(endpoints=None):
                     else:
                         print("\n✗ GUI not available\n")
             
-            elif key == 'o':
+            elif key == 's':
                 if HAVE_GUI:
                     if HAVE_RICH:
                         console.print("\n[bold]🌐  Opening session browser...[/bold]\n")
@@ -451,8 +451,8 @@ def terminal_session_manager(endpoints=None):
                     pass
                 print(f"{'─'*64}\n")
             
-            elif key == 's':
-                # Status command - enhanced with base_url
+            elif key == 'i':
+                # Info command - enhanced with base_url
                 from . import web_server
                 
                 provider = web_server.CONFIG.get("default_provider", "google")
@@ -496,11 +496,11 @@ def terminal_session_manager(endpoints=None):
                     
                     grid.add_row("[bold]🔑 API Keys[/bold]", ", ".join(key_status))
                     
-                    console.print(Panel(grid, title="[bold]System Status[/bold]", border_style="blue"))
+                    console.print(Panel(grid, title="[bold]System Info[/bold]", border_style="blue"))
                     console.print()
                 else:
                     print(f"\n{'─'*64}")
-                    print("📊 STATUS")
+                    print("📊 INFO")
                     print(f"{'─'*64}")
                     print(f"   📡 Provider:  {provider}")
                     print(f"      Base URL:  {base_url}")
@@ -518,7 +518,7 @@ def terminal_session_manager(endpoints=None):
                         print(f"      {p}: {count}")
                     print(f"{'─'*64}\n")
             
-            elif key == 't':
+            elif key == 'k':
                 # Toggle thinking mode
                 from . import web_server
                 from .config import save_config_value
@@ -681,21 +681,26 @@ def terminal_session_manager(endpoints=None):
                 print(f"\n{'─'*64}")
                 print("❓ HELP")
                 print(f"{'─'*64}")
-                print("   [Y] 🔊 TTS           Open Text-to-Speech window")
-                print("   [O] 🌐 Browser       Open session browser GUI")
+                print("   Feature Commands:")
+                print("   [S] 🌐 Sessions      Open session browser GUI")
+                print("   [A] 🎤 Audio         Open Audio Analyzer")
+                print("   [T] 🔊 TTS           Open Text-to-Speech window")
+                print("   [X] 🧰 Tools         Open tools menu")
+                print("\n   Session Management:")
+                print("   [L] 📋 List          List recent saved sessions")
                 print("   [V] 👁️ View          View a session by ID")
                 print("   [D] 🗑️ Delete        Delete a session by ID")
                 print("   [C] 🧹 Clear         Clear all sessions")
-                print("   [A] 🎤 Audio         Open Audio Analyzer")
-                print("   [E] 📡 Endpoints     List registered endpoints")
-                print("   [X] 🧰 Tools         Open tools menu (File Processor, etc.)")
-                print("   [M] 🤖 Models        List/set models from API")
+                print("\n   Configuration:")
                 print("   [P] 🔄 Provider      Switch API provider")
-                print("   [S] 📊 Status        Show current configuration")
-                print("   [T] 💭 Thinking      Toggle thinking mode")
-                print("   [R] 🌊 Streaming     Toggle streaming")
+                print("   [M] 🤖 Models        List/set models from API")
                 print("   [G] 🔨 Settings      Open settings window")
                 print("   [W] 📝 Prompts       Open prompt editor")
+                print("\n   Info & Toggles:")
+                print("   [I] 📊 Info          Show current configuration")
+                print("   [K] 💭 Thinking      Toggle thinking mode")
+                print("   [R] 🌊 Streaming     Toggle streaming")
+                print("   [E] 📡 Endpoints     List registered endpoints")
                 print("   [H] ❓ Help          Show this help")
                 print(f"{'─'*64}\n")
             
