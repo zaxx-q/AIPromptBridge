@@ -1128,9 +1128,11 @@ class PromptEditorWindow:
                 if self.use_ctk:
                     widget = ctk.CTkTextbox(row, height=100, font=get_ctk_font(12),
                                            **get_ctk_textbox_colors(self.colors))
+                    widget.bind('<KeyRelease>', lambda e: self._update_playground_preview())
                 else:
                     widget = tk.Text(row, height=4, font=("Consolas", 9),
                                     bg=self.colors.input_bg, fg=self.colors.fg, wrap="word")
+                    widget.bind('<KeyRelease>', lambda e: self._update_playground_preview())
                 widget.pack(fill="x", pady=(2, 0))
                 
                 if self.use_ctk:
@@ -1140,6 +1142,7 @@ class PromptEditorWindow:
                 self.settings_widgets[widget_key] = ("text", widget)
             else:
                 var = tk.StringVar(master=scroll_frame, value=str(val))
+                var.trace_add("write", lambda *args: self._update_playground_preview())
                 if self.use_ctk:
                     widget = ctk.CTkEntry(row, textvariable=var, font=get_ctk_font(12), height=34,
                                          **get_ctk_entry_colors(self.colors))
@@ -2382,6 +2385,35 @@ class PromptEditorWindow:
         except Exception as e:
             print(f"Error populating endpoints: {e}")
     
+    def _get_current_setting(self, section, key, default=None):
+        """Get setting value from widgets (live) or data (stored)."""
+        # Data value as fallback
+        if section == "global":
+            val = self.options_data.get("_global_settings", {}).get(key, default)
+        else:
+            val = self.options_data.get(section, {}).get("_settings", {}).get(key, default)
+            
+        # Check widget if exists
+        widget_key = f"{section}:{key}"
+        if hasattr(self, 'settings_widgets') and widget_key in self.settings_widgets:
+            w_type, w_obj = self.settings_widgets[widget_key]
+            try:
+                if w_type == "entry": # w_obj is StringVar
+                    val = w_obj.get()
+                elif w_type == "text": # w_obj is widget
+                    if self.use_ctk:
+                        val = w_obj.get("0.0", "end").strip()
+                    else:
+                        val = w_obj.get("1.0", "end").strip()
+                elif w_type == "int": # w_obj is IntVar
+                    val = w_obj.get()
+                elif w_type == "bool": # w_obj is BooleanVar
+                    val = w_obj.get()
+            except Exception:
+                pass
+                
+        return val
+
     def _update_playground_preview(self, event=None):
         """
         Update the live preview based on current action configuration.
@@ -2392,14 +2424,6 @@ class PromptEditorWindow:
         if not action_name:
             return
             
-        action_data = self.options_data.get(action_name, {})
-        # Note: action_data might be in sub-dict if not properly flattened, but _populate uses keys from tool dict
-        # So self.options_data[tool][action_name] is the correct way?
-        # self.options_data IS nested now.
-        # But wait, self.options_data.get(action_name, {}) implies flat structure or top-level.
-        # _populate_playground_actions used tool_data = self.options_data.get(tool_key, {})
-        # So we must fetch from the correct tool!
-        
         if mode == "action_text":
             tool_key = "text_edit_tool"
         elif mode == "action_snip":
@@ -2410,8 +2434,6 @@ class PromptEditorWindow:
         action_data = tool_data.get(action_name, {})
         
         # Determine global vs tool settings
-        # _settings is usually at tool level too
-        tool_settings = tool_data.get("_settings", {})
         global_settings = self.options_data.get("_global_settings", {})
         
         # --- 1. System Prompt Construction ---
@@ -2460,10 +2482,10 @@ class PromptEditorWindow:
         task = ""
         
         if action_name == "_Custom" and custom_input:
-            template = tool_settings.get("custom_task_template", "Apply the following change to the text: {custom_input}")
+            template = self._get_current_setting(tool_key, "custom_task_template", "Apply the following change to the text: {custom_input}")
             task = template.format(custom_input=custom_input)
         elif action_name == "_Ask" and custom_input:
-            template = tool_settings.get("ask_task_template", "Answer the following question about the text: {custom_input}")
+            template = self._get_current_setting(tool_key, "ask_task_template", "Answer the following question about the text: {custom_input}")
             task = template.format(custom_input=custom_input)
         else:
             if self.current_action == action_name:
@@ -2485,16 +2507,16 @@ class PromptEditorWindow:
              prompt_type = action_data.get("prompt_type", "edit")
              
         if prompt_type == "general":
-            output_rules = tool_settings.get("base_output_rules_general", "")
+            output_rules = self._get_current_setting(tool_key, "base_output_rules_general", "")
         else:
-            output_rules = tool_settings.get("base_output_rules_edit", "")
+            output_rules = self._get_current_setting(tool_key, "base_output_rules_edit", "")
             
         if output_rules:
             user_parts.append(output_rules)
             
         # Add text with delimiters
-        text_delimiter = tool_settings.get("text_delimiter", "\n\n<text_to_process>\n")
-        text_delimiter_close = tool_settings.get("text_delimiter_close", "\n</text_to_process>")
+        text_delimiter = self._get_current_setting(tool_key, "text_delimiter", "\n\n<text_to_process>\n")
+        text_delimiter_close = self._get_current_setting(tool_key, "text_delimiter_close", "\n</text_to_process>")
         
         if self.use_ctk:
             sample_text = self.playground_sample_text.get("0.0", "end").strip()
