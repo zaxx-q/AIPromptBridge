@@ -1372,6 +1372,15 @@ class PromptEditorWindow:
         else:
             tk.Checkbutton(row, text="Use Groups", variable=audio_grp_var).pack(anchor="w")
         self.settings_widgets["audio_tool:use_groups"] = ("bool", audio_grp_var)
+
+        # =====================================================================
+        # TTS Tool Settings
+        # =====================================================================
+        if self.use_ctk: ctk.CTkFrame(scroll_frame, height=20, fg_color="transparent").pack()
+        create_section_header(scroll_frame, "TTS Tool", self.colors, "🔊")
+        
+        add_setting_row("tts_tool", "director_system_prompt", "Director System Prompt", True)
+        add_setting_row("tts_tool", "director_task_template", "Director Task Template", True)
     
     def _create_modifiers_tab(self, frame):
         """Create the Modifiers editing tab."""
