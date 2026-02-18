@@ -302,9 +302,25 @@ class TTSToolApp:
                 return None, "FFmpeg not available for conversion"
                 
             try:
+                # Base command: read WAV from stdin
                 cmd = [ffmpeg_path, "-y", "-i", "pipe:0", "-v", "error"]
-                if format_ext == "ogg":
-                    cmd.extend(["-c:a", "libopus"])
+                
+                # Format-specific encoder and quality settings.
+                # Source audio: 24kHz, 16-bit, mono PCM from Gemini TTS.
+                # 128k CBR is transparent for mono speech; AAC/Vorbis are more
+                # efficient than MP3 so 128k sounds even better there.
+                if format_ext == "mp3":
+                    cmd.extend(["-c:a", "libmp3lame", "-b:a", "128k"])
+                elif format_ext == "ogg":
+                    # -q:a 4 ≈ 128 kbps VBR — transparent for speech
+                    cmd.extend(["-c:a", "libvorbis", "-q:a", "4"])
+                elif format_ext == "flac":
+                    # FLAC is lossless — no bitrate needed
+                    cmd.extend(["-c:a", "flac"])
+                elif format_ext == "m4a":
+                    # AAC is very efficient for voice; 128k is more than enough
+                    cmd.extend(["-c:a", "aac", "-b:a", "128k"])
+                
                 cmd.append(filepath)
                 
                 creation_flags = get_creation_flags()
@@ -317,7 +333,7 @@ class TTSToolApp:
                 )
                 
                 if result.returncode != 0:
-                    error = f"FFmpeg: {result.stderr.decode('utf-8')}"
+                    error = f"FFmpeg: {result.stderr.decode('utf-8', errors='replace')}"
             except Exception as e:
                 error = str(e)
                 
