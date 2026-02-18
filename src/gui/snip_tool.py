@@ -387,12 +387,13 @@ class SnipToolApp:
         
         provider = self.config.get("default_provider", "google")
         
+        thinking_enabled = self.config.get("thinking_enabled", False)
         ctx = RequestContext(
             origin=RequestOrigin.SNIP_TOOL,
             provider=provider,
             model=self.config.get(f"{provider}_model"),
             streaming=False,  # Must be non-streaming for copy mode
-            thinking_enabled=self.config.get("thinking_enabled", False)
+            thinking_enabled=thinking_enabled
         )
         
         ctx = RequestPipeline.execute_simple(
@@ -546,12 +547,13 @@ class SnipToolApp:
             provider = self.config.get("default_provider", "google")
             
             # Setup context
+            thinking_enabled = self.config.get("thinking_enabled", False)
             ctx = RequestContext(
                 origin=origin,
                 provider=provider,
                 model=self.config.get(f"{provider}_model"),
                 streaming=True,
-                thinking_enabled=self.config.get("thinking_enabled", False)
+                thinking_enabled=thinking_enabled
             )
             
             # Stream callbacks
@@ -616,12 +618,13 @@ class SnipToolApp:
             # Non-streaming: execute simple request, then show window
             provider = self.config.get("default_provider", "google")
             
+            thinking_enabled = self.config.get("thinking_enabled", False)
             ctx = RequestContext(
                 origin=origin,
                 provider=provider,
                 model=self.config.get(f"{provider}_model"),
                 streaming=False,
-                thinking_enabled=self.config.get("thinking_enabled", False)
+                thinking_enabled=thinking_enabled
             )
             
             ctx = RequestPipeline.execute_simple(

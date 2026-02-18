@@ -262,12 +262,13 @@ class TextEditToolApp:
         origin = origin_override or RequestOrigin.POPUP_INPUT
         
         # Setup context
+        thinking_enabled = self.config.get("thinking_enabled", False)
         ctx = RequestContext(
             origin=origin,
             provider=provider,
             model=model or self.config.get(f"{provider}_model"),
             streaming=streaming_enabled,
-            thinking_enabled=self.config.get("thinking_enabled", False)
+            thinking_enabled=thinking_enabled
         )
         
         if streaming_enabled:
@@ -1063,12 +1064,13 @@ class TextEditToolApp:
         provider = self.config.get("default_provider", "google")
         
         # Setup context
+        thinking_enabled = self.config.get("thinking_enabled", False)
         ctx = RequestContext(
             origin=origin,
             provider=provider,
             model=self.config.get(f"{provider}_model"),
             streaming=True,
-            thinking_enabled=self.config.get("thinking_enabled", False)
+            thinking_enabled=thinking_enabled
         )
         
         # Stream callbacks

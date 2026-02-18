@@ -107,7 +107,7 @@ def create_endpoint_handler(endpoint_name, prompt_template):
             provider=provider,
             model=effective_model,
             streaming=False,
-            thinking_enabled=False
+            thinking_enabled=CONFIG.get("thinking_enabled", False)
         )
         
         # Prepare messages for simple API call

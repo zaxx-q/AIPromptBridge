@@ -176,12 +176,13 @@ class TTSToolApp:
                 provider = self.config.get("default_provider", "google")
                 model = model_override or self.config.get(f"{provider}_model", "")
                 
+                thinking_enabled = self.config.get("thinking_enabled", False)
                 ctx = RequestContext(
                     origin=RequestOrigin.TTS_TOOL,
                     provider=provider,
                     model=model,
                     streaming=False,
-                    thinking_enabled=False
+                    thinking_enabled=thinking_enabled
                 )
                 
                 ctx = RequestPipeline.execute_simple(

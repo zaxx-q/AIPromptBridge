@@ -284,12 +284,13 @@ class AudioToolApp:
                         system_prompt=system_prompt
                     )
                 
+                thinking_enabled = self.config.get("thinking_enabled", False)
                 ctx = RequestContext(
                     origin=RequestOrigin.AUDIO_TOOL,
                     provider=req_provider,
                     model=req_model,
                     streaming=self.config.get("streaming_enabled", True),
-                    thinking_enabled=self.config.get("thinking_enabled", False)
+                    thinking_enabled=thinking_enabled
                 )
                 
                 # Execute simple (non-streaming result for this method)
@@ -489,12 +490,13 @@ class AudioToolApp:
             req_model = model or self.config.get(f"{req_provider}_model")
             
             # Setup context
+            thinking_enabled = self.config.get("thinking_enabled", False)
             ctx = RequestContext(
                 origin=origin,
                 provider=req_provider,
                 model=req_model,
                 streaming=True,
-                thinking_enabled=self.config.get("thinking_enabled", False)
+                thinking_enabled=thinking_enabled
             )
             
             # Stream callbacks
@@ -560,12 +562,13 @@ class AudioToolApp:
             req_provider = provider or self.config.get("default_provider", "google")
             req_model = model or self.config.get(f"{req_provider}_model")
             
+            thinking_enabled = self.config.get("thinking_enabled", False)
             ctx = RequestContext(
                 origin=origin,
                 provider=req_provider,
                 model=req_model,
                 streaming=False,
-                thinking_enabled=self.config.get("thinking_enabled", False)
+                thinking_enabled=thinking_enabled
             )
             
             ctx = RequestPipeline.execute_simple(
