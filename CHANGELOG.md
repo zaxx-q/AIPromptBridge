@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.1.1] - 2026-02-18
+
+### Improvements
+
+- **Thinking Mode**: Standardized "Thinking" behavior across all tools (Audio, Snip, TextEdit) to respect the global `thinking_enabled` setting instead of using hardcoded defaults.
+
+### Fixes
+
+- **Startup Manager**: Reimplemented launcher detection with a more robust multi-path search strategy to fix the "Launch on startup" feature in Nuitka-compiled production builds.
+- **Chat Persistence**: Implemented immediate session saving after user messages and modifications, ensuring chat history is preserved and retry/regeneration is possible even if an API error occurs.
+- **Regenerate Button**: Fixed assistant message handling in the chat window to correctly support response regeneration and session state persistence.
+
 ## [5.1.0] - 2026-02-17
 
 ### New Features

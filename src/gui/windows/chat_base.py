@@ -1002,6 +1002,9 @@ class ChatWindowBase(ABC):
         if last_msg["role"] == "assistant":
             # Delete last assistant message and regenerate
             self.session.messages.pop()
+            # Save session after modifying messages
+            from ... import web_server
+            add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
             self._update_chat_display(scroll_to_bottom=True)
             self._update_status("Regenerating response...")
         else:
@@ -1857,6 +1860,9 @@ class ChatWindowBase(ABC):
             # Add message with attachments
             self.session.add_message("user", user_input, attachments=message_attachments)
             
+            # Save session immediately after adding user message (allows retry on failure)
+            add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
+            
             # Update display and clear input
             def update_ui():
                 self._update_chat_display(scroll_to_bottom=True)
@@ -1941,7 +1947,7 @@ class ChatWindowBase(ABC):
                 
                 if ctx.error:
                     self._update_status(f"Error: {ctx.error}", self.theme.accent_red)
-                    self.session.messages.pop()
+                    # Don't pop user message - keep it for retry via Regen button
                 else:
                     self.session.add_message("assistant", ctx.response_text)
                     thinking_content = self.streaming_thinking or ctx.reasoning_text
