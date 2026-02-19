@@ -10,20 +10,14 @@ Settings Override Hierarchy (for display mode):
 For API endpoints, the ?show= URL parameter takes highest priority.
 """
 
-import json
 import logging
 import threading
 import time
-from pathlib import Path
 from typing import Optional, Dict
 
 from .hotkey import HotkeyListener
 from .text_handler import TextHandler
-from .popups import InputPopup, PromptSelectionPopup
 from .prompts import get_prompts_config
-
-# Import API client directly (no wrapper needed)
-from ..api_client import call_api_with_retry
 
 
 class TextEditToolApp:
@@ -706,8 +700,6 @@ class TextEditToolApp:
                     self._stream_to_chat_window(
                         messages=messages,
                         window_title="AI Chat",
-                        original_text=user_input,
-                        task_context=None,
                         origin=RequestOrigin.POPUP_INPUT,
                         session_origin=session_origin,
                         followup_system_instruction=followup_system_instruction
@@ -731,9 +723,13 @@ class TextEditToolApp:
                         return
                     
                     if response:
-                        self._show_chat_window("AI Chat", response, user_input, task_context=None,
-                                             session_origin=session_origin,
-                                             followup_system_instruction=followup_system_instruction)
+                        self._show_chat_window(
+                            messages=messages,
+                            response=response,
+                            window_title="AI Chat",
+                            session_origin=session_origin,
+                            followup_system_instruction=followup_system_instruction
+                        )
                 
                 print(f"{'─'*60}\n")
             else:
@@ -981,8 +977,6 @@ class TextEditToolApp:
                     self._stream_to_chat_window(
                         messages=messages,
                         window_title=f"{option_key} Result",
-                        original_text=selected_text,
-                        task_context=task,
                         origin=RequestOrigin.POPUP_PROMPT,
                         session_origin=session_origin,
                         followup_system_instruction=followup_system_instruction
@@ -1010,10 +1004,14 @@ class TextEditToolApp:
                         self.is_processing = False
                         return
                     
-                    # Pass task context for better follow-up context
-                    self._show_chat_window(f"{option_key} Result", response, selected_text, task_context=task,
-                                         session_origin=session_origin,
-                                         followup_system_instruction=followup_system_instruction)
+                    # Show chat window with response
+                    self._show_chat_window(
+                        messages=messages,
+                        response=response,
+                        window_title=f"{option_key} Result",
+                        session_origin=session_origin,
+                        followup_system_instruction=followup_system_instruction
+                    )
                 
                 print(f"{'─'*60}\n")
             else:
@@ -1142,9 +1140,32 @@ class TextEditToolApp:
                     return True
         return False
     
-    def _stream_to_chat_window(self, messages: list, window_title: str, original_text: str,
-                                task_context: Optional[str], origin,
-                                session_origin: str = "textedit",
+    def _extract_user_content_from_messages(self, messages: list) -> str:
+        """
+        Extract user text content from API messages.
+        
+        Handles both string and multimodal (list) content formats.
+        Preserves proper formatting for compare mode (<text_1>, <text_2> tags).
+        
+        Args:
+            messages: API messages list (messages[0] is system, messages[1] is user)
+            
+        Returns:
+            Extracted user text content
+        """
+        if len(messages) >= 2:
+            user_content = messages[1].get("content", "")
+            # Handle both string and list content formats
+            if isinstance(user_content, list):
+                # Multimodal content - extract text parts
+                text_parts = [item.get("text", "") for item in user_content if item.get("type") == "text"]
+                return text_parts[-1] if text_parts else ""
+            else:
+                return user_content
+        return ""
+    
+    def _stream_to_chat_window(self, messages: list, window_title: str,
+                                origin, session_origin: str = "textedit",
                                 followup_system_instruction: Optional[str] = None):
         """
         Open a chat window immediately and stream API response into it.
@@ -1152,8 +1173,6 @@ class TextEditToolApp:
         Args:
             messages: API messages to send (with the correct system prompt for initial request)
             window_title: Title for the chat window
-            original_text: Original selected text or user input
-            task_context: Optional task description for context
             origin: RequestOrigin for logging
             session_origin: Origin string for session tracking (e.g., "textedit:Explain", "directchat")
             followup_system_instruction: System instruction to use for follow-up messages.
@@ -1167,30 +1186,9 @@ class TextEditToolApp:
         session.title = window_title
         
         # Extract user content from the already-built messages
-        # This preserves the proper format for compare mode (<text_1>, <text_2> tags)
-        # messages[0] is system, messages[1] is user
-        if len(messages) >= 2:
-            user_content = messages[1].get("content", "")
-            # Handle both string and list content formats
-            if isinstance(user_content, list):
-                # Multimodal content - extract text parts
-                text_parts = [item.get("text", "") for item in user_content if item.get("type") == "text"]
-                user_text = text_parts[-1] if text_parts else ""
-            else:
-                user_text = user_content
-            
+        user_text = self._extract_user_content_from_messages(messages)
+        if user_text:
             session.add_message("user", user_text)
-        elif original_text:
-            # Fallback: build from original_text (for non-compare modes)
-            text_delimiter = self._get_setting("text_delimiter", "\n\n<text_to_process>\n")
-            text_delimiter_close = self._get_setting("text_delimiter_close", "\n</text_to_process>")
-            
-            if task_context:
-                first_message = f"[Task: {task_context}]{text_delimiter}{original_text}{text_delimiter_close}"
-            else:
-                first_message = original_text
-            
-            session.add_message("user", first_message)
         
         # NOTE: Don't set session.system_instruction yet - it would be prepended to
         # the initial request, overriding the button's system prompt.
@@ -1283,26 +1281,17 @@ class TextEditToolApp:
         
         print(f"  ✅ Response streamed to chat window ({len(response_text)} chars)")
     
-    def _replace_text(self, new_text: str):
-        """Replace the selected text with new text."""
-        success = self.text_handler.replace_selected_text(new_text)
-        if success:
-            logging.debug('Text replaced successfully')
-        else:
-            logging.error('Failed to replace text')
-    
-    def _show_chat_window(self, title: str, response: str, original_text: str, task_context: Optional[str] = None,
+    def _show_chat_window(self, messages: list, response: str, window_title: str,
                           session_origin: str = "textedit",
                           followup_system_instruction: Optional[str] = None):
         """
-        Show the response in a chat window.
+        Show the response in a chat window (non-streaming path).
         
         Args:
-            title: Window title
+            messages: API messages (with the correct system prompt)
             response: AI response text
-            original_text: Original selected text
-            task_context: Optional task description for context (e.g., "Explain the following text...")
-            session_origin: Origin string for session tracking (e.g., "textedit:Explain", "directchat")
+            window_title: Title for the chat window
+            session_origin: Origin string for session tracking (e.g., "textedit:Explain")
             followup_system_instruction: System instruction to use for follow-up messages.
         """
         logging.debug('Showing chat window')
@@ -1311,31 +1300,18 @@ class TextEditToolApp:
         from .core import show_chat_gui
         from ..session_manager import ChatSession
         
-        # Create a temporary session for this response (uses current config)
-        session = ChatSession(
-            origin=session_origin
-        )
-        session.title = title
+        # Create a temporary session for this response
+        session = ChatSession(origin=session_origin)
+        session.title = window_title
         
-        # Build the first user message with task context if available
-        if original_text:
-            text_delimiter = self._get_setting("text_delimiter", "\n\n<text_to_process>\n")
-            text_delimiter_close = self._get_setting("text_delimiter_close", "\n</text_to_process>")
-            
-            if task_context:
-                # Include task context so AI knows what action was performed
-                # Format: [Task: ...]\n\n<text_to_process>...</text_to_process>
-                first_message = f"[Task: {task_context}]{text_delimiter}{original_text}{text_delimiter_close}"
-            else:
-                # No task context (direct chat) - just show the text
-                first_message = original_text
-            
-            session.add_message("user", first_message)
+        # Extract user content from the already-built messages
+        user_text = self._extract_user_content_from_messages(messages)
+        if user_text:
+            session.add_message("user", user_text)
         
         session.add_message("assistant", response)
         
         # Store system instruction for follow-up messages
-        # This will be used by the chat window when sending follow-ups
         if followup_system_instruction:
             session.system_instruction = followup_system_instruction
         else:
