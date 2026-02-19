@@ -12,7 +12,7 @@ Currently includes:
 
 from .base import BaseTool, ToolResult, ToolStatus
 from .file_handler import FileHandler, FileInfo, ScanResult
-from .checkpoint import CheckpointManager, FileProcessorCheckpoint
+from .checkpoint import CheckpointManager, FileProcessorCheckpoint, TTSCheckpoint, TTSCheckpointManager
 from .config import (
     load_tools_config,
     get_file_processor_prompts,
@@ -50,6 +50,7 @@ from .audio_processor import (
     is_audio_file,
 )
 from .file_processor import FileProcessor, show_tools_menu
+from .tts_processor import TTSProcessor
 
 __all__ = [
     # Base classes
@@ -85,6 +86,8 @@ __all__ = [
     # Checkpoint
     "CheckpointManager",
     "FileProcessorCheckpoint",
+    "TTSCheckpoint",
+    "TTSCheckpointManager",
     # Config
     "load_tools_config",
     "get_file_processor_prompts",
@@ -98,4 +101,6 @@ __all__ = [
     # File Processor
     "FileProcessor",
     "show_tools_menu",
+    # TTS Processor
+    "TTSProcessor",
 ]

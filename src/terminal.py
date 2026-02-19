@@ -667,7 +667,23 @@ def terminal_session_manager(endpoints=None):
             
             elif key == 'x':
                 # Open Tools menu
-                from .tools.file_processor import show_tools_menu
+                try:
+                    from .tools.file_processor import show_tools_menu
+                except Exception as import_err:
+                    # Handle import errors (e.g., atexit during shutdown)
+                    error_msg = str(import_err)
+                    if "atexit" in error_msg.lower():
+                        # Retry once if atexit error occurred during import
+                        try:
+                            from .tools.file_processor import show_tools_menu
+                        except Exception:
+                            if HAVE_RICH:
+                                print_error("\nFailed to open Tools menu. Please try again.")
+                            else:
+                                print("\n✗ Failed to open Tools menu. Please try again.")
+                            continue
+                    else:
+                        raise
                 if HAVE_RICH:
                     console.print("\n[bold]🧰  Opening Tools menu...[/bold]\n")
                 else:
@@ -707,7 +723,12 @@ def terminal_session_manager(endpoints=None):
             time.sleep(0.1)
         
         except Exception as e:
-            print(f"[Terminal Error] {e}")
+            # Suppress atexit errors during shutdown
+            error_msg = str(e)
+            if "atexit" in error_msg.lower() and "shutdown" in error_msg.lower():
+                pass  # Ignore atexit errors during interpreter shutdown
+            else:
+                print(f"[Terminal Error] {e}")
             time.sleep(1)
 
 

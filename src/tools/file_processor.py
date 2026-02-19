@@ -3064,7 +3064,7 @@ def show_tools_menu(endpoints: Dict[str, str] = None) -> bool:
     if HAVE_RICH:
         print_panel(
             "[1] 📁 File Processor   Process files with AI prompts\n"
-            "[2] 🔜 Coming Soon...   More tools planned\n\n"
+            "[2] 🔊 TTS Processor    Convert text files to speech audio\n\n"
             "[B] ← Back to main menu",
             title="🧰 TOOLS",
             border_style="cyan"
@@ -3075,7 +3075,7 @@ def show_tools_menu(endpoints: Dict[str, str] = None) -> bool:
         print(f"{'═' * 60}")
         print()
         print("  [1] 📁 File Processor   Process files with AI prompts")
-        print("  [2] 🔜 Coming Soon...   More tools planned")
+        print("  [2] 🔊 TTS Processor    Convert text files to speech audio")
         print()
         print("  [B] ← Back to main menu")
         print(f"{'═' * 60}")
@@ -3103,9 +3103,29 @@ def show_tools_menu(endpoints: Dict[str, str] = None) -> bool:
         
         return True
     
+    elif choice == '2':
+        # Import TTSProcessor lazily to avoid atexit issues during module load
+        try:
+            from .tts_processor import TTSProcessor
+        except RuntimeError as e:
+            if "atexit" in str(e).lower():
+                print_error("\n⚠️ TTS Processor temporarily unavailable. Please try again.")
+                return True
+            raise
+        
+        from src import web_server
+        processor = TTSProcessor(config=web_server.CONFIG)
+        result = processor.run_interactive()
+        if result.success:
+            print_success(f"\n{result.message}")
+        else:
+            if result.message != "Cancelled":
+                print_warning(f"\n{result.message}")
+        return True
+    
     elif choice == 'b' or choice == '':
         return False
     
     else:
-        print_warning("Coming soon!")
+        print_warning("Invalid selection")
         return False

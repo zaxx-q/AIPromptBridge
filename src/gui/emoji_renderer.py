@@ -23,9 +23,22 @@ import sys
 import zipfile
 import io
 import tempfile
-import atexit
 import shutil
 import threading
+
+# Safe atexit registration that ignores errors during interpreter shutdown
+def _safe_atexit_register(func):
+    """Register an atexit handler, ignoring errors if interpreter is shutting down."""
+    import sys
+    # Check if interpreter is already shutting down (Python 3.13+)
+    is_finalizing = getattr(sys, 'is_finalizing', None)
+    if is_finalizing is not None and is_finalizing():
+        return
+    try:
+        import atexit
+        atexit.register(func)
+    except Exception:
+        pass  # Interpreter may be shutting down
 try:
     import emoji
     HAVE_EMOJI_LIB = True
@@ -157,7 +170,7 @@ class EmojiRenderer:
         # Temp dir for generated icons - Eager initialization
         # We create this immediately so we can exclude it from background cleanup logic
         self._temp_icon_dir = tempfile.mkdtemp(prefix="aipromptbridge_icons_")
-        atexit.register(self.cleanup)
+        _safe_atexit_register(self.cleanup)
         
         # Clean up stale directories in background to avoid startup delay
         # This is safe because we've already created (and know the path of) our current dir

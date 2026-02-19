@@ -515,3 +515,270 @@ class CheckpointManager:
             return False
         
         return len(checkpoint.remaining_files) > 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TTS Processor Checkpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class TTSCheckpoint:
+    """
+    Checkpoint state for TTS Processor.
+    
+    Stores all information needed to resume a batch TTS processing session.
+    """
+    
+    # Session identification
+    session_id: str
+    created_at: str
+    updated_at: str
+    
+    # Input
+    input_path: str                      # Path to source text file
+    segments: List[str]                  # Ordered list of text segments to synthesize
+    split_mode: str                      # "lines", "paragraphs", "sentences", "whole"
+    
+    # Voice configuration
+    voice_name: str
+    model: str
+    style_instructions: str              # Global style/tone for all segments
+    speaker_mode: str                    # "single" or "multi"
+    multi_speaker_config: Optional[List[Dict[str, str]]] = None  # [{name, voice}, ...]
+    per_segment_styles: Dict[int, str] = field(default_factory=dict)  # idx -> style string
+    
+    # Output configuration
+    output_mode: str = "individual"      # "individual" or "merge"
+    output_path: str = ""                # Output directory
+    naming_template: str = "{filename}_{index:03d}"
+    
+    # Execution settings
+    delay_between_requests: float = 1.0
+    concurrency: int = 1
+    
+    # Progress tracking
+    completed_segments: List[int] = field(default_factory=list)   # 0-based indices
+    failed_segments: List[Dict] = field(default_factory=list)     # {idx, error}
+    output_files: List[str] = field(default_factory=list)         # Paths of generated WAVs
+    
+    # Retry metadata
+    is_retry_checkpoint: bool = False
+    retry_count: int = 0
+    
+    @property
+    def total_segments(self) -> int:
+        return len(self.segments)
+    
+    @property
+    def remaining_indices(self) -> List[int]:
+        """Segment indices not yet processed."""
+        done = set(self.completed_segments) | {f["idx"] for f in self.failed_segments}
+        return [i for i in range(len(self.segments)) if i not in done]
+    
+    @property
+    def progress_percent(self) -> float:
+        if not self.segments:
+            return 0.0
+        processed = len(self.completed_segments) + len(self.failed_segments)
+        return (processed / len(self.segments)) * 100
+    
+    @property
+    def is_complete(self) -> bool:
+        return len(self.remaining_indices) == 0
+    
+    def mark_completed(self, idx: int, output_file: str):
+        if idx not in self.completed_segments:
+            self.completed_segments.append(idx)
+        if output_file and output_file not in self.output_files:
+            self.output_files.append(output_file)
+        self.updated_at = datetime.now().isoformat()
+    
+    def mark_failed(self, idx: int, error: str):
+        # Remove from completed if somehow there
+        if idx in self.completed_segments:
+            self.completed_segments.remove(idx)
+        # Update or append
+        for entry in self.failed_segments:
+            if entry["idx"] == idx:
+                entry["error"] = error
+                break
+        else:
+            self.failed_segments.append({"idx": idx, "error": error})
+        self.updated_at = datetime.now().isoformat()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TTSCheckpoint":
+        import inspect
+        sig = inspect.signature(cls)
+        valid_args = {k: v for k, v in data.items() if k in sig.parameters}
+        return cls(**valid_args)
+    
+    def get_summary(self) -> Dict[str, Any]:
+        return {
+            "session_id": self.session_id,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "total_segments": self.total_segments,
+            "completed": len(self.completed_segments),
+            "failed": len(self.failed_segments),
+            "remaining": len(self.remaining_indices),
+            "progress_percent": self.progress_percent,
+            "voice_name": self.voice_name,
+            "model": self.model,
+            "output_path": self.output_path,
+            "split_mode": self.split_mode,
+        }
+    
+    @classmethod
+    def create_retry_checkpoint(cls, original: "TTSCheckpoint") -> Optional["TTSCheckpoint"]:
+        """Create a new checkpoint for retrying only failed segments."""
+        if not original.failed_segments:
+            return None
+        
+        now = datetime.now().isoformat()
+        failed_indices = {f["idx"] for f in original.failed_segments}
+        
+        return cls(
+            session_id=str(uuid.uuid4())[:8],
+            created_at=now,
+            updated_at=now,
+            input_path=original.input_path,
+            segments=original.segments,
+            split_mode=original.split_mode,
+            voice_name=original.voice_name,
+            model=original.model,
+            style_instructions=original.style_instructions,
+            speaker_mode=original.speaker_mode,
+            multi_speaker_config=original.multi_speaker_config,
+            per_segment_styles={k: v for k, v in original.per_segment_styles.items() if int(k) in failed_indices},
+            output_mode=original.output_mode,
+            output_path=original.output_path,
+            naming_template=original.naming_template,
+            delay_between_requests=original.delay_between_requests,
+            concurrency=original.concurrency,
+            completed_segments=[],
+            failed_segments=[],
+            output_files=list(original.output_files),  # Keep existing outputs for merge
+            is_retry_checkpoint=True,
+            retry_count=original.retry_count + 1,
+        )
+
+
+class TTSCheckpointManager:
+    """
+    Manage checkpoint persistence for TTS Processor.
+    """
+    
+    DEFAULT_CHECKPOINT_FILE = ".tts_processor_checkpoint.json"
+    FAILED_CHECKPOINT_FILE = ".tts_processor_failed.json"
+    
+    def __init__(self, checkpoint_dir: Path = None):
+        self.checkpoint_dir = Path(checkpoint_dir) if checkpoint_dir else Path(".")
+    
+    @property
+    def checkpoint_path(self) -> Path:
+        return self.checkpoint_dir / self.DEFAULT_CHECKPOINT_FILE
+    
+    @property
+    def failed_checkpoint_path(self) -> Path:
+        return self.checkpoint_dir / self.FAILED_CHECKPOINT_FILE
+    
+    def exists(self) -> bool:
+        return self.checkpoint_path.exists()
+    
+    def failed_exists(self) -> bool:
+        return self.failed_checkpoint_path.exists()
+    
+    def has_any_checkpoint(self) -> Tuple[bool, bool]:
+        return (self.exists(), self.failed_exists())
+    
+    def load(self) -> Optional[TTSCheckpoint]:
+        if not self.exists():
+            return None
+        try:
+            with open(self.checkpoint_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return TTSCheckpoint.from_dict(data)
+        except (json.JSONDecodeError, TypeError, KeyError) as e:
+            print(f"[Warning] Failed to load TTS checkpoint: {e}")
+            return None
+    
+    def save(self, checkpoint: TTSCheckpoint):
+        checkpoint.updated_at = datetime.now().isoformat()
+        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        with open(self.checkpoint_path, "w", encoding="utf-8") as f:
+            json.dump(checkpoint.to_dict(), f, indent=2, ensure_ascii=False)
+    
+    def clear(self):
+        if self.exists():
+            self.checkpoint_path.unlink()
+    
+    def load_failed(self) -> Optional[TTSCheckpoint]:
+        if not self.failed_exists():
+            return None
+        try:
+            with open(self.failed_checkpoint_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return TTSCheckpoint.from_dict(data)
+        except (json.JSONDecodeError, TypeError, KeyError) as e:
+            print(f"[Warning] Failed to load TTS failed checkpoint: {e}")
+            return None
+    
+    def save_failed(self, checkpoint: TTSCheckpoint):
+        checkpoint.updated_at = datetime.now().isoformat()
+        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        with open(self.failed_checkpoint_path, "w", encoding="utf-8") as f:
+            json.dump(checkpoint.to_dict(), f, indent=2, ensure_ascii=False)
+    
+    def clear_failed(self):
+        if self.failed_exists():
+            self.failed_checkpoint_path.unlink()
+    
+    def create_failed_checkpoint(self, original: TTSCheckpoint) -> Optional[TTSCheckpoint]:
+        retry = TTSCheckpoint.create_retry_checkpoint(original)
+        if retry:
+            self.save_failed(retry)
+        return retry
+    
+    def create(
+        self,
+        input_path: str,
+        segments: List[str],
+        split_mode: str,
+        voice_name: str,
+        model: str,
+        style_instructions: str,
+        speaker_mode: str,
+        output_mode: str,
+        output_path: str,
+        naming_template: str,
+        delay: float,
+        concurrency: int,
+        multi_speaker_config: Optional[List[Dict[str, str]]] = None,
+    ) -> TTSCheckpoint:
+        now = datetime.now().isoformat()
+        return TTSCheckpoint(
+            session_id=str(uuid.uuid4())[:8],
+            created_at=now,
+            updated_at=now,
+            input_path=input_path,
+            segments=segments,
+            split_mode=split_mode,
+            voice_name=voice_name,
+            model=model,
+            style_instructions=style_instructions,
+            speaker_mode=speaker_mode,
+            multi_speaker_config=multi_speaker_config,
+            per_segment_styles={},
+            output_mode=output_mode,
+            output_path=output_path,
+            naming_template=naming_template,
+            delay_between_requests=delay,
+            concurrency=concurrency,
+            completed_segments=[],
+            failed_segments=[],
+            output_files=[],
+        )
