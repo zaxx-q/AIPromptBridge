@@ -254,6 +254,9 @@ class TextEditToolApp:
                 except Exception:
                     pass
             
+            # Dismiss the toast notification
+            GUICoordinator.get_instance().request_dismiss_toast_notification()
+            
             if text_or_none:
                 logging.debug(f'[TextEditTool] Compare text captured: "{text_or_none[:50]}..."')
                 print(f"[TextEditTool] Compare text captured ({len(text_or_none)} chars)")

@@ -2805,17 +2805,8 @@ class AttachedPromptPopup:
         )
     
     def _on_compare_text_captured(self, text: str):
-        """Handle second text capture - re-show popup and execute pending action."""
+        """Handle second text capture - execute pending action with compare text."""
         self._compare_text = text
-        
-        # Show popup again so user can see the result
-        if self.root:
-            try:
-                self.root.deiconify()
-                self.root.lift()
-                self.root.focus_force()
-            except tk.TclError:
-                pass
         
         # Execute the pending action with the captured compare text
         if self._pending_compare_action:
@@ -2824,6 +2815,9 @@ class AttachedPromptPopup:
             response_mode = self._get_effective_response_mode(option_key)
             self._close()
             self.on_option_selected(option_key, self.selected_text, custom_input, response_mode, self.active_modifiers, text)
+        else:
+            # No pending action (shouldn't happen), just close
+            self._close()
     
     def _on_compare_text_cancelled(self):
         """Handle cancellation of second text capture - re-show popup."""
@@ -3886,6 +3880,10 @@ class ToastNotification:
                 pass
 
 
+# Global reference for toast dismissal
+_current_toast: Optional[ToastNotification] = None
+
+
 def create_toast_notification(
     parent_root,
     title: str,
@@ -3893,4 +3891,26 @@ def create_toast_notification(
     timeout_ms: int = 4000
 ):
     """Create and show a toast notification."""
-    ToastNotification(parent_root, title, message, timeout_ms)
+    global _current_toast
+    
+    # Dismiss any existing toast first
+    if _current_toast:
+        try:
+            _current_toast.dismiss()
+        except Exception:
+            pass
+    
+    _current_toast = ToastNotification(parent_root, title, message, timeout_ms)
+    return _current_toast
+
+
+def dismiss_toast_notification():
+    """Dismiss the current toast notification if any."""
+    global _current_toast
+    
+    if _current_toast:
+        try:
+            _current_toast.dismiss()
+        except Exception:
+            pass
+        _current_toast = None

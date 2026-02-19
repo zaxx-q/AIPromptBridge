@@ -242,6 +242,8 @@ class GUICoordinator:
                     self._dismiss_typing_indicator()
                 elif request_type == 'toast_notification':
                     self._create_toast_notification(request)
+                elif request_type == 'dismiss_toast_notification':
+                    self._dismiss_toast_notification()
                 elif request_type == 'settings':
                     self._create_settings_window(request)
                 elif request_type == 'prompt_editor':
@@ -327,6 +329,11 @@ class GUICoordinator:
         message = request.get('message')
         timeout_ms = request.get('timeout_ms', 3000)
         create_toast_notification(self._root, title, message, timeout_ms)
+    
+    def _dismiss_toast_notification(self):
+        """Dismiss the toast notification on the GUI thread"""
+        from .popups import dismiss_toast_notification
+        dismiss_toast_notification()
     
     def _create_settings_window(self, request):
         """Create a settings window on the GUI thread"""
@@ -565,6 +572,13 @@ class GUICoordinator:
             'message': message,
             'timeout_ms': timeout_ms
         })
+    
+    def request_dismiss_toast_notification(self):
+        """Request dismissing the toast notification (thread-safe)"""
+        if self._running:
+            self._request_queue.put({
+                'type': 'dismiss_toast_notification'
+            })
     
     def request_settings_window(self, on_close: Optional[Callable] = None, initial_tab: str = None):
         """Request creation of a settings window (thread-safe)"""

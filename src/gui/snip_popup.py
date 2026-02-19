@@ -941,16 +941,16 @@ class AttachedSnipPopup:
         self.compare_capture = capture_result
         self._update_compare_indicator()
         
-        # Show popup again
-        self.root.deiconify()
-        self.root.lift()
-        self.root.focus_force()
-        
-        # If we have a pending action, execute it now
+        # If we have a pending action, execute it directly without re-showing popup
         if self._pending_action:
             source, action_key, custom_input = self._pending_action
             self._pending_action = None
             self._execute_action(source, action_key, custom_input)
+        else:
+            # No pending action - show popup again for user to select action
+            self.root.deiconify()
+            self.root.lift()
+            self.root.focus_force()
     
     def _on_compare_cancelled(self):
         """Handle cancellation of second capture."""
