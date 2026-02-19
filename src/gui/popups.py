@@ -2154,7 +2154,8 @@ class AttachedPromptPopup:
         selected_text: str,
         x: Optional[int] = None,
         y: Optional[int] = None,
-        on_tts: Optional[Callable[[str], None]] = None
+        on_tts: Optional[Callable[[str], None]] = None,
+        on_request_compare_text: Optional[Callable] = None
     ):
         self.parent_root = parent_root
         self.options = options
@@ -2164,12 +2165,17 @@ class AttachedPromptPopup:
         self.x = x
         self.y = y
         self.on_tts_callback = on_tts
+        self.on_request_compare_text = on_request_compare_text
         
         self.colors = get_colors()
         self.root = None
         self.response_toggle = None
         self.modifier_bar = None
         self.active_modifiers: List[str] = []
+        
+        # Compare mode state
+        self._compare_text: Optional[str] = None
+        self._pending_compare_action: Optional[tuple] = None  # (option_key, custom_input)
         
         self._create_window()
     
@@ -2767,10 +2773,70 @@ class AttachedPromptPopup:
         self.active_modifiers = active_modifiers
     
     def _on_option_click(self, option_key: str):
-        """Handle action button click."""
+        """Handle action button click.
+        
+        If the action has compare_prompts=True and a compare text callback is
+        registered, the popup hides and waits for the user to select a second
+        text snippet before executing.
+        """
+        # Check if this action requires a second text for comparison
+        action = self.options.get(option_key, {})
+        if action.get("compare_prompts", False) and self.on_request_compare_text:
+            self._pending_compare_action = (option_key, None)
+            self._initiate_compare_text()
+            return
+        
         response_mode = self._get_effective_response_mode(option_key)
         self._close()
-        self.on_option_selected(option_key, self.selected_text, None, response_mode, self.active_modifiers)
+        self.on_option_selected(option_key, self.selected_text, None, response_mode, self.active_modifiers, None)
+    
+    def _initiate_compare_text(self):
+        """Hide popup and request a second text selection from the user."""
+        if not self.root:
+            return
+        try:
+            self.root.withdraw()
+        except tk.TclError:
+            pass
+        
+        self.on_request_compare_text(
+            self._on_compare_text_captured,
+            self._on_compare_text_cancelled
+        )
+    
+    def _on_compare_text_captured(self, text: str):
+        """Handle second text capture - re-show popup and execute pending action."""
+        self._compare_text = text
+        
+        # Show popup again so user can see the result
+        if self.root:
+            try:
+                self.root.deiconify()
+                self.root.lift()
+                self.root.focus_force()
+            except tk.TclError:
+                pass
+        
+        # Execute the pending action with the captured compare text
+        if self._pending_compare_action:
+            option_key, custom_input = self._pending_compare_action
+            self._pending_compare_action = None
+            response_mode = self._get_effective_response_mode(option_key)
+            self._close()
+            self.on_option_selected(option_key, self.selected_text, custom_input, response_mode, self.active_modifiers, text)
+    
+    def _on_compare_text_cancelled(self):
+        """Handle cancellation of second text capture - re-show popup."""
+        self._pending_compare_action = None
+        self._compare_text = None
+        
+        if self.root:
+            try:
+                self.root.deiconify()
+                self.root.lift()
+                self.root.focus_force()
+            except tk.TclError:
+                pass
     
     def _on_custom_submit(self):
         """Handle custom edit submission."""
@@ -2784,7 +2850,7 @@ class AttachedPromptPopup:
         
         response_mode = self._get_effective_response_mode("_Custom")
         self._close()
-        self.on_option_selected("_Custom", self.selected_text, custom_text, response_mode, self.active_modifiers)
+        self.on_option_selected("_Custom", self.selected_text, custom_text, response_mode, self.active_modifiers, None)
     
     def _on_ask_submit(self):
         """Handle ask submission."""
@@ -2798,7 +2864,7 @@ class AttachedPromptPopup:
         
         response_mode = self._get_effective_response_mode("_Ask")
         self._close()
-        self.on_option_selected("_Ask", self.selected_text, ask_text, response_mode, self.active_modifiers)
+        self.on_option_selected("_Ask", self.selected_text, ask_text, response_mode, self.active_modifiers, None)
     
     def _get_effective_response_mode(self, option_key: str) -> str:
         """Get effective response mode, considering modifiers."""
@@ -2854,10 +2920,11 @@ def create_attached_prompt_popup(
     selected_text: str,
     x: Optional[int] = None,
     y: Optional[int] = None,
-    on_tts: Optional[Callable[[str], None]] = None
+    on_tts: Optional[Callable[[str], None]] = None,
+    on_request_compare_text: Optional[Callable] = None
 ):
     """Create a prompt selection popup as Toplevel attached to parent root."""
-    AttachedPromptPopup(parent_root, options, on_option_selected, on_close, selected_text, x, y, on_tts)
+    AttachedPromptPopup(parent_root, options, on_option_selected, on_close, selected_text, x, y, on_tts, on_request_compare_text)
 
 
 # =============================================================================

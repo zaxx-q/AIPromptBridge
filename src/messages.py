@@ -143,6 +143,39 @@ def build_comparison_message(
         ]}
     ]
 
+def build_text_comparison_message(
+    text1: str,
+    text2: str,
+    task: str,
+    system_prompt: str
+) -> List[Dict[str, Any]]:
+    """
+    Build a text comparison message with two labeled text blocks.
+
+    Both texts are wrapped in explicit XML-style delimiters so the AI
+    can clearly distinguish them.
+
+    Args:
+        text1: The first text to compare.
+        text2: The second text to compare.
+        task: The comparison instruction.
+        system_prompt: The system instruction.
+
+    Returns:
+        List of message dictionaries.
+    """
+    user_content = (
+        f"{task}"
+        f"\n\n<text_1>\n{text1}\n</text_1>"
+        f"\n\n<text_2>\n{text2}\n</text_2>"
+    )
+
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_content}
+    ]
+
+
 def build_file_message(
     file_uri: str,
     mime_type: str,

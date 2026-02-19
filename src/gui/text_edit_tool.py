@@ -163,7 +163,8 @@ class TextEditToolApp:
                 on_option_selected=self._on_option_selected,
                 on_close=self._on_popup_closed,
                 selected_text=self.current_selected_text,
-                on_tts=self._on_tts_requested
+                on_tts=self._on_tts_requested,
+                on_request_compare_text=self._on_request_compare_text
             )
         else:
             # No text selected - show simple input popup via coordinator
@@ -215,7 +216,110 @@ class TextEditToolApp:
             daemon=True
         ).start()
     
-    def _on_option_selected(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None):
+    def _on_request_compare_text(self, on_captured, on_cancelled):
+        """
+        Handle request for a second text selection (compare mode).
+        
+        Shows a toast notification instructing the user to select text and
+        press Ctrl+C. Listens for Ctrl+C via pynput, reads the clipboard
+        after a short delay, then invokes on_captured/on_cancelled on the
+        GUI thread (via GUICoordinator.run_on_gui_thread) to avoid the
+        "main thread is not in main loop" Tkinter error.
+        
+        Args:
+            on_captured: Callable[[str], None] - called with the second text
+            on_cancelled: Callable[[], None] - called if no text was captured
+        """
+        import pyperclip
+        from pynput import keyboard as pykeyboard
+        from .core import GUICoordinator
+        
+        TIMEOUT_SECS = 20
+        
+        logging.debug('[TextEditTool] Compare mode: waiting for Ctrl+C with second text...')
+        
+        # Show user instruction via toast notification
+        GUICoordinator.get_instance().request_toast_notification(
+            title="Compare Mode — Select 2nd text",
+            message=f"Select text, press Ctrl+C to confirm  •  Esc to cancel  •  ({TIMEOUT_SECS}s timeout)",
+            timeout_ms=TIMEOUT_SECS * 1000
+        )
+        
+        captured = [False]
+        ctrl_held = [False]
+        _listener_ref = [None]
+        
+        def _finish(text_or_none):
+            """Call on_captured/on_cancelled safely on the GUI thread."""
+            if captured[0]:
+                return
+            captured[0] = True
+            if _listener_ref[0]:
+                try:
+                    _listener_ref[0].stop()
+                except Exception:
+                    pass
+            
+            if text_or_none:
+                logging.debug(f'[TextEditTool] Compare text captured: "{text_or_none[:50]}..."')
+                print(f"[TextEditTool] Compare text captured ({len(text_or_none)} chars)")
+                GUICoordinator.get_instance().run_on_gui_thread(lambda: on_captured(text_or_none))
+            else:
+                logging.debug('[TextEditTool] Compare mode: cancelled / timed out')
+                print("[TextEditTool] Compare mode: cancelled - no second text captured")
+                GUICoordinator.get_instance().run_on_gui_thread(on_cancelled)
+        
+        def _on_press(key):
+            try:
+                # Escape cancels the compare mode
+                if key == pykeyboard.Key.esc:
+                    logging.debug('[TextEditTool] Compare mode cancelled by Escape')
+                    _finish(None)
+                    return False  # Stop listener
+                
+                if key in (pykeyboard.Key.ctrl_l, pykeyboard.Key.ctrl_r):
+                    ctrl_held[0] = True
+                    return
+                
+                # Detect C key (char 'c' or control-char '\x03') while Ctrl held
+                is_c = False
+                try:
+                    if key.char in ('c', '\x03'):
+                        is_c = True
+                except AttributeError:
+                    pass
+                
+                if is_c and ctrl_held[0]:
+                    # Ctrl+C detected — read clipboard after OS has updated it
+                    def _delayed_read():
+                        time.sleep(0.15)  # Give OS time to copy selection
+                        try:
+                            text = pyperclip.paste()
+                        except Exception:
+                            text = ""
+                        _finish(text.strip() or None)
+                    
+                    threading.Thread(target=_delayed_read, daemon=True).start()
+                    return False  # Stop listener
+            except Exception as e:
+                logging.error(f'[TextEditTool] Compare key listener error: {e}')
+        
+        def _on_release(key):
+            if key in (pykeyboard.Key.ctrl_l, pykeyboard.Key.ctrl_r):
+                ctrl_held[0] = False
+        
+        listener = pykeyboard.Listener(on_press=_on_press, on_release=_on_release)
+        _listener_ref[0] = listener
+        listener.start()
+        
+        # Timeout fallback
+        def _timeout():
+            time.sleep(TIMEOUT_SECS)
+            _finish(None)
+        
+        threading.Thread(target=_timeout, daemon=True).start()
+    
+    def _on_option_selected(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None):
         """
         Handle option selection from popup.
         
@@ -225,17 +329,18 @@ class TextEditToolApp:
             custom_input: Custom input text (for Custom option)
             response_mode: Response mode ("default", "replace", or "show")
             active_modifiers: List of active modifier keys
+            compare_text: Optional second text for compare mode
         """
         if active_modifiers is None:
             active_modifiers = []
         
-        logging.debug(f'Option selected: {option_key}, mode: {response_mode}, modifiers: {active_modifiers}')
+        logging.debug(f'Option selected: {option_key}, mode: {response_mode}, modifiers: {active_modifiers}, compare={bool(compare_text)}')
         
         self.is_processing = True
         
         threading.Thread(
             target=self._process_option,
-            args=(option_key, selected_text, custom_input, response_mode, active_modifiers),
+            args=(option_key, selected_text, custom_input, response_mode, active_modifiers, compare_text),
             daemon=True
         ).start()
     
@@ -717,7 +822,7 @@ class TextEditToolApp:
         finally:
             self.is_processing = False
     
-    def _process_option(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None):
+    def _process_option(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None):
         """
         Process the selected option.
         
@@ -727,6 +832,7 @@ class TextEditToolApp:
             custom_input: Custom input text (for Custom edit or _Ask question)
             response_mode: Response mode ("default", "replace", or "show")
             active_modifiers: List of active modifier keys
+            compare_text: Optional second text for compare mode
         
         Display Mode Override Hierarchy:
             1. response_mode from popup radio button (if not "default")
@@ -734,7 +840,7 @@ class TextEditToolApp:
             3. show_chat_window_instead_of_replace per-action setting
             4. Falls back to False (replace mode)
         
-        Prompt Structure:
+        Prompt Structure (single text):
             SYSTEM: {system_prompt}
                     {modifier_injections}
             USER: {task}
@@ -742,6 +848,9 @@ class TextEditToolApp:
                    {text_delimiter}
                    {selected_text}
                    {text_delimiter_close}
+        
+        Prompt Structure (compare mode):
+            Uses build_text_comparison_message() with both texts.
         
         Both "Custom" and "_Ask" use the same pattern:
             - Get action options from config (system_prompt, prompt_type, show_chat_window_instead_of_replace)
@@ -761,12 +870,17 @@ class TextEditToolApp:
             # Check if any active modifier forces chat window
             forces_chat_window = self._modifiers_force_chat_window(active_modifiers, modifier_defs)
             
+            # Compare mode always shows in chat window
+            is_compare_mode = bool(compare_text)
+            
             # Determine if this should open in a window based on response mode
-            # Hierarchy: radio button > modifiers > per-action setting > default (False)
+            # Hierarchy: radio button > compare mode > modifiers > per-action setting > default (False)
             if response_mode == "show":
                 show_in_chat_window = True
             elif response_mode == "replace":
                 show_in_chat_window = False
+            elif is_compare_mode:
+                show_in_chat_window = True  # Compare mode always shows result in chat window
             elif forces_chat_window:
                 show_in_chat_window = True
             else:  # "default" - use the action's setting
@@ -813,20 +927,39 @@ class TextEditToolApp:
                 )
                 task = ask_task_template.format(custom_input=custom_input)
             
-            # Build user message: task + output rules + delimiter + text
-            user_message_parts = []
-            if task:
-                user_message_parts.append(task)
-            if base_output_rules:
-                user_message_parts.append(base_output_rules)
-            
-            user_message = "\n\n".join(user_message_parts)
-            user_message += text_delimiter + selected_text + text_delimiter_close
+            # Build messages - compare mode uses dual-text structure
+            if is_compare_mode:
+                from ..messages import build_text_comparison_message
+                
+                # Build combined task (include output rules in task for comparison)
+                task_with_rules = task
+                if base_output_rules:
+                    task_with_rules = task + "\n\n" + base_output_rules
+                
+                messages = build_text_comparison_message(
+                    text1=selected_text,
+                    text2=compare_text,
+                    task=task_with_rules,
+                    system_prompt=system_prompt
+                )
+                
+                logging.debug(f'[TextEditTool] Compare mode: {option_key} on {len(selected_text)}+{len(compare_text)} chars')
+                print(f"[TextEditTool] Compare mode: {len(selected_text)} vs {len(compare_text)} chars")
+            else:
+                # Build user message: task + output rules + delimiter + text
+                user_message_parts = []
+                if task:
+                    user_message_parts.append(task)
+                if base_output_rules:
+                    user_message_parts.append(base_output_rules)
+                
+                user_message = "\n\n".join(user_message_parts)
+                user_message += text_delimiter + selected_text + text_delimiter_close
+                
+                from ..messages import build_text_message
+                messages = build_text_message(user_message, system_prompt)
             
             logging.debug(f'Getting AI response for {option_key}')
-            
-            from ..messages import build_text_message
-            messages = build_text_message(user_message, system_prompt)
             
             from ..request_pipeline import RequestOrigin
             
@@ -1033,8 +1166,22 @@ class TextEditToolApp:
         session = ChatSession(origin=session_origin)
         session.title = window_title
         
-        # Build the first user message with task context if available
-        if original_text:
+        # Extract user content from the already-built messages
+        # This preserves the proper format for compare mode (<text_1>, <text_2> tags)
+        # messages[0] is system, messages[1] is user
+        if len(messages) >= 2:
+            user_content = messages[1].get("content", "")
+            # Handle both string and list content formats
+            if isinstance(user_content, list):
+                # Multimodal content - extract text parts
+                text_parts = [item.get("text", "") for item in user_content if item.get("type") == "text"]
+                user_text = text_parts[-1] if text_parts else ""
+            else:
+                user_text = user_content
+            
+            session.add_message("user", user_text)
+        elif original_text:
+            # Fallback: build from original_text (for non-compare modes)
             text_delimiter = self._get_setting("text_delimiter", "\n\n<text_to_process>\n")
             text_delimiter_close = self._get_setting("text_delimiter_close", "\n</text_to_process>")
             

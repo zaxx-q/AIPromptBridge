@@ -181,6 +181,11 @@ DEFAULT_TEXT_EDIT_SETTINGS = {
             "name": "Suggestor",
             "enabled": True,
             "items": ["Table", "Continue", "Reply Suggest", "Emojify", "Kaomojify", "Kaomoji Suggest"]
+        },
+        {
+            "name": "Compare",
+            "enabled": True,
+            "items": ["Compare Texts", "Find Differences", "Which is Better", "Before/After"]
         }
     ]
 }
@@ -381,6 +386,38 @@ DEFAULT_TEXT_EDIT_ACTIONS = {
         "system_prompt": "You are a documentation engineer.",
         "task": "Add comprehensive comments and docstrings to this code. Document arguments, return values, and complex logic.",
         "show_chat_window_instead_of_replace": False
+    },
+    "Compare Texts": {
+        "icon": "🔀",
+        "prompt_type": "general",
+        "system_prompt": "You are a precise text comparison specialist.\n\n<format>\n- Start with a **Summary** of the key differences.\n- Use a structured breakdown: similarities, differences, tone shifts, key changes.\n- Use Markdown for clarity.\n</format>\n\n<constraints>\n- Be objective and thorough.\n- Note both what changed and what stayed the same.\n- If the texts are nearly identical, say so and highlight the minor differences.\n</constraints>",
+        "task": "Compare these two texts. Identify key differences and similarities in content, tone, and style.",
+        "show_chat_window_instead_of_replace": True,
+        "compare_prompts": True
+    },
+    "Find Differences": {
+        "icon": "🔍",
+        "prompt_type": "general",
+        "system_prompt": "You are a meticulous text diff analyst who identifies every change between two versions of a text.\n\n<format>\nList each difference as:\n- **[Type]**: [Original] → [Changed]\n\nTypes: Added, Removed, Changed, Reworded, Reordered\n\nGroup by significance: major changes first, then minor wording tweaks.\n</format>\n\n<constraints>\n- Identify ALL differences, no matter how small (punctuation, capitalization, word order).\n- Be exhaustive—missing a change is worse than listing a trivial one.\n- If the texts are identical, state that clearly.\n</constraints>",
+        "task": "Identify ALL differences between these two texts, no matter how small. List every change exhaustively.",
+        "show_chat_window_instead_of_replace": True,
+        "compare_prompts": True
+    },
+    "Which is Better": {
+        "icon": "⚖️",
+        "prompt_type": "general",
+        "system_prompt": "You are an objective text evaluator who provides clear, reasoned recommendations.\n\n<format>\n**Recommendation:** [Text 1 / Text 2 / Neither — they're equal]\n\n**Why:**\n- [Key reason 1]\n- [Key reason 2]\n\n**What Text [X] does better:**\n[Brief points]\n\n**What Text [Y] does better:**\n[Brief points]\n</format>\n\n<constraints>\n- Be direct with your recommendation—don't hedge.\n- Judge on clarity, effectiveness, and fitness for purpose.\n- If they're equal in quality, say so and explain.\n</constraints>",
+        "task": "Evaluate these two texts and recommend which is better. Be direct with your recommendation and explain your reasoning.",
+        "show_chat_window_instead_of_replace": True,
+        "compare_prompts": True
+    },
+    "Before/After": {
+        "icon": "⏮️",
+        "prompt_type": "general",
+        "system_prompt": "You are a change documentation specialist who analyzes edits and their impact.\n\n<format>\n**What Changed:**\n[List the key edits made from Text 1 to Text 2]\n\n**Why It Was Changed (likely):**\n[Infer the purpose or intent behind the changes]\n\n**Impact:**\n[How the changes affect tone, clarity, meaning, or effectiveness]\n\n**Overall Assessment:**\n[Did the changes improve the text? Be honest.]\n</format>\n\n<constraints>\n- Treat Text 1 as the 'before' and Text 2 as the 'after'.\n- Focus on the intent and effect of changes, not just listing them.\n- Be concise but insightful.\n</constraints>",
+        "task": "Analyze Text 1 (before) and Text 2 (after). Describe what changed, why it was likely changed, and whether the edits improved the text.",
+        "show_chat_window_instead_of_replace": True,
+        "compare_prompts": True
     },
     "_Custom": {
         "icon": "⚡",
