@@ -1190,9 +1190,15 @@ class TextEditToolApp:
         if user_text:
             session.add_message("user", user_text)
         
-        # NOTE: Don't set session.system_instruction yet - it would be prepended to
-        # the initial request, overriding the button's system prompt.
-        # We'll set it AFTER the streaming completes for follow-up messages.
+        # Set system instruction for follow-up messages NOW (before request)
+        # This ensures it's available for regeneration even if the initial request fails.
+        # The initial request uses messages directly (with correct system prompt),
+        # so this won't affect the initial request - only follow-ups and regeneration.
+        if followup_system_instruction:
+            session.system_instruction = followup_system_instruction
+        else:
+            # Fallback to global chat_window_system_instruction
+            session.system_instruction = self.prompts.get_chat_window_system_instruction()
         
         # Request streaming chat window (opens immediately)
         callbacks = GUICoordinator.get_instance().request_streaming_chat_window(session)
