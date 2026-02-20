@@ -2,27 +2,12 @@
 """TTS Processor Tool - Batch text-to-speech generation using Gemini TTS API."""
 
 import re
-import sys
 import time
 import wave
 import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-
-# Lazy import for concurrent.futures to avoid atexit issues during module load
-# ThreadPoolExecutor registers atexit handlers which can fail if Python is shutting down
-ThreadPoolExecutor = None
-as_completed = None
-
-def _ensure_concurrent_futures():
-    """Lazily import concurrent.futures when actually needed."""
-    global ThreadPoolExecutor, as_completed
-    if ThreadPoolExecutor is None:
-        from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
-        from concurrent.futures import as_completed as _as_completed
-        ThreadPoolExecutor = _ThreadPoolExecutor
-        as_completed = _as_completed
 
 try:
     import msvcrt
@@ -102,8 +87,8 @@ class TTSProcessor(BaseTool):
                 return ToolResult(success=False, message="Cancelled")
 
             # Step 3: Style instructions
-            style = self._step3_style_instructions(input_config["segments"])
-            if style is None:
+            style_config = self._step3_style_instructions(input_config["segments"])
+            if style_config is None:
                 return ToolResult(success=False, message="Cancelled")
 
             # Step 4: Output config
@@ -123,14 +108,14 @@ class TTSProcessor(BaseTool):
                 split_mode=input_config["split_mode"],
                 voice_name=voice_config["voice_name"],
                 model=voice_config["model"],
-                style_instructions=style,
+                style_instructions=style_config["style_instructions"],
+                per_segment_styles=style_config.get("per_segment_styles"),
                 speaker_mode=voice_config["speaker_mode"],
                 multi_speaker_config=voice_config.get("multi_speaker_config"),
                 output_mode=output_config["mode"],
                 output_path=output_config["path"],
                 naming_template=output_config["naming"],
                 delay=exec_settings["delay"],
-                concurrency=exec_settings["concurrency"],
             )
 
             return self._execute_processing()
@@ -231,7 +216,7 @@ class TTSProcessor(BaseTool):
         """Step 2: Select voice, speaker mode, and TTS model."""
         self._print_header("🔊 TTS PROCESSOR - Step 2: Voice & Model")
 
-        from src.audio.tts_constants import VOICE_OPTIONS
+        from src.audio.tts_constants import TTS_VOICES
 
         # Config defaults
         default_voice = (self.config or {}).get("tts_default_voice", "Kore")
@@ -252,15 +237,13 @@ class TTSProcessor(BaseTool):
 
         if speaker_mode == "single":
             # Voice list
-            voice_list = list(VOICE_OPTIONS.keys()) if isinstance(VOICE_OPTIONS, dict) else list(VOICE_OPTIONS)
+            voice_list = list(TTS_VOICES.keys())
             print(f"\nAvailable voices:")
             for i, v in enumerate(voice_list, 1):
                 marker = " ◄" if v == default_voice else ""
-                if isinstance(VOICE_OPTIONS, dict):
-                    desc = VOICE_OPTIONS[v]
-                    print(f"  [{i:2d}] {v:<12} {desc}{marker}")
-                else:
-                    print(f"  [{i:2d}] {v}{marker}")
+                details = TTS_VOICES.get(v, {})
+                desc = f"{details.get('gender', '?')}, {details.get('style', '?')}"
+                print(f"  [{i:2d}] {v:<12} {desc}{marker}")
 
             try:
                 voice_input = input(f"\nVoice name or number [{default_voice}]: ").strip()
@@ -279,7 +262,7 @@ class TTSProcessor(BaseTool):
 
         else:
             # Multi-speaker config
-            voice_list = list(VOICE_OPTIONS.keys()) if isinstance(VOICE_OPTIONS, dict) else list(VOICE_OPTIONS)
+            voice_list = list(TTS_VOICES.keys())
             print("\nMulti-speaker mode: configure up to 2 speakers")
             multi_speaker_config = []
 
@@ -296,9 +279,10 @@ class TTSProcessor(BaseTool):
                 except (EOFError, KeyboardInterrupt):
                     return None
 
-                multi_speaker_config.append({"name": name, "voice": voice_in})
+                # Use format expected by generate_tts: {"speaker": str, "voice_name": str}
+                multi_speaker_config.append({"speaker": name, "voice_name": voice_in})
 
-            voice_name = multi_speaker_config[0]["voice"] if multi_speaker_config else default_voice
+            voice_name = multi_speaker_config[0]["voice_name"] if multi_speaker_config else default_voice
             print(f"✅ Configured {len(multi_speaker_config)} speaker(s)")
 
         # Model selection
@@ -333,11 +317,20 @@ class TTSProcessor(BaseTool):
             "multi_speaker_config": multi_speaker_config,
         }
 
-    def _step3_style_instructions(self, segments: List[str]) -> Optional[str]:
-        """Step 3: Choose style instructions (manual, default, or AI Director)."""
+    def _step3_style_instructions(self, segments: List[str]) -> Optional[Dict[str, Any]]:
+        """
+        Step 3: Choose style instructions (manual, default, or AI Director).
+        
+        Returns:
+            Dict with:
+                - style_instructions: str (the base style, without embedded transcript)
+                - per_segment_styles: Optional[Dict[int, str]] (if per-segment mode)
+            Or None if cancelled.
+        """
         self._print_header("🔊 TTS PROCESSOR - Step 3: Style Instructions")
 
-        default_style = (self.config or {}).get("tts_default_style", "Read aloud naturally")
+        # Hardcoded defaults (not configurable via config.ini)
+        default_style = "Read aloud naturally"
         director_enabled = (self.config or {}).get("tts_director_enabled", True)
 
         print(f"\nStyle instructions tell Gemini how to speak the text.")
@@ -346,8 +339,10 @@ class TTSProcessor(BaseTool):
         print(f"\nOptions:")
         print(f"  [1] Enter style manually")
         print(f"  [2] Use default: '{default_style}'")
+        print(f"  [3] No style - Send text directly to TTS")
         if director_enabled:
-            print(f"  [3] AI Director - Auto-generate style from text content")
+            print(f"  [4] AI Director - Single style for all segments")
+            print(f"  [5] AI Director (Per-Segment) - Unique style for each segment")
         print(f"  [Q] Cancel")
 
         try:
@@ -367,27 +362,133 @@ class TTSProcessor(BaseTool):
             if not style:
                 style = default_style
             print(f"✅ Style: {style}")
-            return style
+            return {"style_instructions": style, "per_segment_styles": None}
 
-        if choice == '3' and director_enabled:
-            sample = segments[0] if segments else ""
-            print("\n🎭 Running AI Director...")
-            style = self._generate_style_with_director(sample)
-            if style:
-                print(f"✅ Generated style: {style}")
-                try:
-                    keep = input("Use this style? [Y/n]: ").strip().lower()
-                except (EOFError, KeyboardInterrupt):
-                    return None
-                if keep != 'n':
-                    return style
-            else:
-                print_warning("Director failed, using default")
-            return default_style
+        if choice == '3':
+            # No style - send text directly
+            print(f"✅ No style - text will be sent directly to TTS")
+            return {"style_instructions": "", "per_segment_styles": None}
+
+        if choice == '4' and director_enabled:
+            # Single style for all segments (aggregate analysis)
+            return self._run_director_single_style(segments, default_style)
+
+        if choice == '5' and director_enabled:
+            # Per-segment style (unique for each)
+            return self._run_director_per_segment(segments, default_style)
 
         # Default (choice == '2' or anything else)
         print(f"✅ Style: {default_style}")
-        return default_style
+        return {"style_instructions": default_style, "per_segment_styles": None}
+
+    def _run_director_single_style(self, segments: List[str], default_style: str) -> Optional[Dict[str, Any]]:
+        """
+        Run AI Director once on a sample of segments to generate a single style.
+        
+        Uses first few segments as context for better style matching.
+        Strips embedded transcript from Director output.
+        """
+        n_segments = len(segments)
+        default_sample_count = min(3, n_segments)
+        
+        # Ask user how many segments to analyze
+        print(f"\n📊 {n_segments} segment(s) total. How many to analyze for style context?")
+        print(f"   (More segments = better context, but longer processing)")
+        try:
+            count_input = input(f"   Segments to analyze [{default_sample_count}]: ").strip()
+            if count_input:
+                sample_count = min(int(count_input), n_segments)
+            else:
+                sample_count = default_sample_count
+        except (ValueError, EOFError, KeyboardInterrupt):
+            sample_count = default_sample_count
+        
+        # Use first N segments as sample for better context
+        sample_segments = segments[:sample_count]
+        sample_text = "\n\n".join(sample_segments)
+        
+        print(f"\n🎭 Running AI Director on first {len(sample_segments)} segment(s)...")
+        raw_style = self._generate_style_with_director(sample_text)
+        
+        if raw_style:
+            # Strip the embedded transcript - we'll add per-segment transcripts later
+            style = self._strip_transcript_from_style(raw_style)
+            
+            print(f"\n📋 Generated style:")
+            print("─" * 40)
+            # Show preview (first 500 chars)
+            preview = style[:500] + "..." if len(style) > 500 else style
+            print(preview)
+            print("─" * 40)
+            
+            try:
+                keep = input("\nUse this style? [Y/n/r=regenerate]: ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                return None
+            
+            if keep == 'r':
+                # Regenerate
+                return self._run_director_single_style(segments, default_style)
+            if keep != 'n':
+                return {"style_instructions": style, "per_segment_styles": None}
+        else:
+            print_warning("Director failed, using default")
+        
+        return {"style_instructions": default_style, "per_segment_styles": None}
+
+    def _run_director_per_segment(self, segments: List[str], default_style: str) -> Optional[Dict[str, Any]]:
+        """
+        Run AI Director on each segment individually for unique styles.
+        
+        More API calls but better style matching per segment.
+        """
+        n_segments = len(segments)
+        
+        print(f"\n🎭 AI Director Per-Segment Mode")
+        print(f"   This will make {n_segments} API calls to generate unique styles.")
+        print(f"   Recommended for smaller batches or when segments have varying tones.")
+        
+        try:
+            confirm = input(f"\nProceed with {n_segments} Director calls? [Y/n]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return None
+        
+        if confirm == 'n':
+            return None
+        
+        per_segment_styles: Dict[int, str] = {}
+        
+        for i, segment in enumerate(segments):
+            print(f"\n   [{i+1}/{n_segments}] Analyzing segment {i+1}...")
+            raw_style = self._generate_style_with_director(segment)
+            
+            if raw_style:
+                # Strip embedded transcript
+                style = self._strip_transcript_from_style(raw_style)
+                per_segment_styles[i] = style
+                print(f"      ✅ Style generated")
+            else:
+                # Fall back to default for this segment
+                per_segment_styles[i] = default_style
+                print(f"      ⚠️ Using default (Director failed)")
+        
+        # Use the first segment's style as the base style (for fallback/display)
+        base_style = per_segment_styles.get(0, default_style)
+        
+        print(f"\n✅ Generated {len(per_segment_styles)} unique styles")
+        return {"style_instructions": base_style, "per_segment_styles": per_segment_styles}
+
+    def _strip_transcript_from_style(self, style: str) -> str:
+        """
+        Strip embedded transcript from AI Director output.
+        
+        The Director prompt instructs it to include '#### TRANSCRIPT' section.
+        We strip this because each segment needs its own transcript appended.
+        """
+        if "#### TRANSCRIPT" in style:
+            # Split on the transcript marker and take only the style part
+            style = style.split("#### TRANSCRIPT")[0].strip()
+        return style
 
     def _step4_output_config(self, input_config: dict) -> Optional[dict]:
         """Step 4: Configure output directory, mode, and naming."""
@@ -453,11 +554,11 @@ class TTSProcessor(BaseTool):
         return {"mode": output_mode, "path": str(out_path), "naming": naming}
 
     def _step5_execution_settings(self) -> Optional[dict]:
-        """Step 5: Configure delay and concurrency."""
+        """Step 5: Configure delay between requests."""
         self._print_header("🔊 TTS PROCESSOR - Step 5: Execution Settings")
 
-        default_delay = float((self.config or {}).get("tts_batch_delay", 1.0))
-        default_concurrency = int((self.config or {}).get("tts_batch_concurrency", 1))
+        # Hardcoded default
+        default_delay = 1.0
 
         print(f"\nDelay between API calls (seconds):")
         try:
@@ -466,18 +567,8 @@ class TTSProcessor(BaseTool):
         except (ValueError, EOFError, KeyboardInterrupt):
             delay = default_delay
 
-        print(f"\nConcurrent requests (1 = sequential, 2-4 = parallel):")
-        try:
-            conc_str = input(f"  [{default_concurrency}]: ").strip()
-            concurrency = max(1, min(8, int(conc_str))) if conc_str else default_concurrency
-        except (ValueError, EOFError, KeyboardInterrupt):
-            concurrency = default_concurrency
-
-        if concurrency > 1:
-            print_warning(f"⚠️  Concurrent mode ({concurrency} workers) may hit rate limits faster")
-
-        print(f"\n✅ Delay: {delay}s  |  Concurrency: {concurrency}")
-        return {"delay": delay, "concurrency": concurrency}
+        print(f"\n✅ Delay: {delay}s")
+        return {"delay": delay}
 
     # ── Execution ─────────────────────────────────────────────────────────────
 
@@ -492,7 +583,7 @@ class TTSProcessor(BaseTool):
         self._print_header("🔊 TTS PROCESSOR - Generating Audio")
         print(f"\n🚀 Processing {len(remaining)} of {total} segment(s)")
         print(f"   Voice: {cp.voice_name}  |  Model: {cp.model}")
-        print(f"   Output: {cp.output_mode}  |  Concurrency: {cp.concurrency}")
+        print(f"   Output: {cp.output_mode}")
         if HAVE_MSVCRT:
             print("\n   Controls: [P] Pause   [S] Stop & save progress")
         print("─" * 60)
@@ -501,10 +592,7 @@ class TTSProcessor(BaseTool):
         result = ToolResult(success=True, total_count=total)
 
         try:
-            if cp.concurrency > 1:
-                self._execute_concurrent(cp, remaining, result)
-            else:
-                self._execute_sequential(cp, remaining, result)
+            self._execute_sequential(cp, remaining, result)
         finally:
             self._stop_keyboard_listener()
 
@@ -596,46 +684,15 @@ class TTSProcessor(BaseTool):
             if loop_idx < len(remaining) - 1 and cp.delay_between_requests > 0:
                 time.sleep(cp.delay_between_requests)
 
-    def _execute_concurrent(self, cp: TTSCheckpoint, remaining: List[int], result: ToolResult):
-        """Process segments in parallel using ThreadPoolExecutor."""
-        # Lazily import concurrent.futures to avoid atexit issues during module load
-        _ensure_concurrent_futures()
-        
-        lock = threading.Lock()
-
-        def process_with_lock(idx: int):
-            seg_text = cp.segments[idx]
-            output_file = self._process_single_segment(idx, seg_text, cp)
-            with lock:
-                if output_file:
-                    cp.mark_completed(idx, output_file)
-                    print(f"   ✅ Segment {idx + 1} → {Path(output_file).name}")
-                else:
-                    print(f"   ❌ Segment {idx + 1} failed")
-                self.checkpoint_manager.save(cp)
-            return idx, output_file
-
-        with ThreadPoolExecutor(max_workers=cp.concurrency) as executor:
-            futures = {executor.submit(process_with_lock, idx): idx for idx in remaining}
-            for future in as_completed(futures):
-                _, output_file = future.result()
-                if output_file:
-                    result.processed_count += 1
-                else:
-                    result.failed_count += 1
-
     def _process_single_segment(self, idx: int, seg_text: str, cp: TTSCheckpoint) -> Optional[str]:
         """Call Gemini TTS for one segment and save the resulting WAV. Returns output path or None."""
         try:
-            from src import web_server
-            from src.providers.gemini_native import GeminiNativeProvider
-
-            key_manager = web_server.KEY_MANAGERS.get("google")
-            if not key_manager:
-                cp.mark_failed(idx, "No Google key manager configured")
+            from src.gui.tts_tool import get_instance as get_tts_tool
+            
+            tts_tool = get_tts_tool()
+            if not tts_tool:
+                cp.mark_failed(idx, "TTS Tool not initialized")
                 return None
-
-            provider = GeminiNativeProvider(key_manager=key_manager, config=web_server.CONFIG)
 
             # Per-segment style override (dict keys may be int or str after JSON load)
             style = (
@@ -644,30 +701,49 @@ class TTSProcessor(BaseTool):
                 or cp.style_instructions
             )
 
-            # Build speaker_config for multi-speaker mode
-            speaker_config = None
-            if cp.speaker_mode == "multi" and cp.multi_speaker_config:
-                speaker_config = cp.multi_speaker_config
+            # Combine style instructions with text (TTS API expects single text field)
+            if style:
+                full_text = style
+                # Add transcript marker if style doesn't already contain the text
+                if "#### TRANSCRIPT" not in style and seg_text not in style:
+                    full_text = f"{style}\n\n#### TRANSCRIPT\n{seg_text}"
+            else:
+                full_text = seg_text
 
-            pcm_bytes, error = provider.generate_tts(
-                text=seg_text,
+            # Build multi_speaker_config for multi-speaker mode
+            multi_speaker_config = None
+            if cp.speaker_mode == "multi" and cp.multi_speaker_config:
+                multi_speaker_config = cp.multi_speaker_config
+
+            # Use async method with blocking wait
+            result = {"pcm": None, "wav": None, "duration": None, "error": None}
+            event = threading.Event()
+
+            def on_success(pcm, wav, duration):
+                result["pcm"], result["wav"], result["duration"] = pcm, wav, duration
+                event.set()
+
+            def on_error(err):
+                result["error"] = err
+                event.set()
+
+            tts_tool.generate_audio(
+                text=full_text,
                 voice_name=cp.voice_name,
                 model=cp.model,
-                style_instructions=style,
-                speaker_config=speaker_config,
+                multi_config=multi_speaker_config,
+                callback_success=on_success,
+                callback_error=on_error,
             )
+            event.wait()  # Block until callback fires
 
-            if error:
-                cp.mark_failed(idx, error[:120])
+            if result["error"]:
+                cp.mark_failed(idx, result["error"][:120])
                 return None
 
-            if not pcm_bytes:
+            if not result["pcm"]:
                 cp.mark_failed(idx, "Empty audio response from API")
                 return None
-
-            # Convert raw PCM → WAV
-            from src.audio.wav_utils import pcm_to_wav, save_wav
-            wav_bytes = pcm_to_wav(pcm_bytes)
 
             # Resolve output filename from template
             stem = Path(cp.input_path).stem
@@ -687,7 +763,25 @@ class TTSProcessor(BaseTool):
             output_path = Path(cp.output_path) / f"{naming}.wav"
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            save_wav(wav_bytes, str(output_path))
+            # Use save_audio_file from TTSToolApp for consistency
+            filename, save_error = tts_tool.save_audio_file(
+                pcm_data=result["pcm"],
+                wav_data=result["wav"],
+                directory=str(output_path.parent),
+                voice_name=cp.voice_name,
+                format_ext="wav"
+            )
+            
+            if save_error:
+                cp.mark_failed(idx, save_error[:120])
+                return None
+            
+            # Rename to match our naming template
+            if filename:
+                actual_path = Path(cp.output_path) / filename
+                if actual_path.name != f"{naming}.wav":
+                    actual_path.rename(output_path)
+            
             return str(output_path)
 
         except Exception as e:
@@ -699,28 +793,34 @@ class TTSProcessor(BaseTool):
     def _generate_style_with_director(self, text: str) -> Optional[str]:
         """Use AI Director to auto-generate TTS style instructions from text content."""
         try:
-            from src.gui.prompts import PromptsConfig
-            from src.request_pipeline import RequestPipeline
-            from src import web_server
-
-            prompts_cfg = PromptsConfig()
-            system_prompt = prompts_cfg.get_tts_director_system_prompt()
-            task_template = prompts_cfg.get_tts_director_task_template()
-            task = task_template.replace("{text}", text[:500])
-
-            pipeline = RequestPipeline(
-                config=web_server.CONFIG,
-                ai_params=web_server.AI_PARAMS,
-                key_managers=web_server.KEY_MANAGERS,
-            )
-            response, error = pipeline.execute_simple(
-                messages=[{"role": "user", "content": task}],
-                system_prompt=system_prompt,
-                origin="tts_processor:director",
-            )
-            if error or not response:
+            from src.gui.tts_tool import get_instance as get_tts_tool
+            
+            tts_tool = get_tts_tool()
+            if not tts_tool:
+                print_warning("TTS Tool not initialized")
                 return None
-            return response.strip()
+            
+            # Use async method with blocking wait
+            result = {"style": None, "error": None}
+            event = threading.Event()
+
+            def on_success(style, tokens):
+                result["style"] = style
+                event.set()
+
+            def on_error(err):
+                result["error"] = err
+                event.set()
+
+            tts_tool.run_director(text, callback_success=on_success, callback_error=on_error)
+            event.wait()  # Block until callback fires
+            
+            if result["error"]:
+                print_warning(result["error"])
+                return None
+            
+            return result["style"]
+            
         except Exception as e:
             print_warning(f"Director error: {e}")
             return None
@@ -813,7 +913,10 @@ class TTSProcessor(BaseTool):
         self._stop_requested = False
 
         def _listener():
-            while not self._keyboard_stop_event.is_set():
+            event = self._keyboard_stop_event  # Local reference to avoid race condition
+            if event is None:
+                return
+            while not event.is_set():
                 try:
                     if msvcrt.kbhit():
                         key = msvcrt.getch()

@@ -559,7 +559,6 @@ class TTSCheckpoint:
     
     # Execution settings
     delay_between_requests: float = 1.0
-    concurrency: int = 1
     
     # Progress tracking
     completed_segments: List[int] = field(default_factory=list)   # 0-based indices
@@ -663,7 +662,6 @@ class TTSCheckpoint:
             output_path=original.output_path,
             naming_template=original.naming_template,
             delay_between_requests=original.delay_between_requests,
-            concurrency=original.concurrency,
             completed_segments=[],
             failed_segments=[],
             output_files=list(original.output_files),  # Keep existing outputs for merge
@@ -761,8 +759,8 @@ class TTSCheckpointManager:
         output_path: str,
         naming_template: str,
         delay: float,
-        concurrency: int,
         multi_speaker_config: Optional[List[Dict[str, str]]] = None,
+        per_segment_styles: Optional[Dict[int, str]] = None,
     ) -> TTSCheckpoint:
         now = datetime.now().isoformat()
         return TTSCheckpoint(
@@ -777,12 +775,11 @@ class TTSCheckpointManager:
             style_instructions=style_instructions,
             speaker_mode=speaker_mode,
             multi_speaker_config=multi_speaker_config,
-            per_segment_styles={},
+            per_segment_styles=per_segment_styles or {},
             output_mode=output_mode,
             output_path=output_path,
             naming_template=naming_template,
             delay_between_requests=delay,
-            concurrency=concurrency,
             completed_segments=[],
             failed_segments=[],
             output_files=[],

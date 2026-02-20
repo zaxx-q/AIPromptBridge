@@ -111,10 +111,6 @@ DEFAULT_CONFIG = {
     "tts_save_directory": "tts_output",
     # Automatically play generated audio
     "tts_autoplay": True,
-    # Batch TTS processing defaults
-    "tts_batch_delay": 1.0,
-    "tts_batch_concurrency": 1,
-    "tts_default_style": "Read aloud naturally",
     # Chat window system prompt behavior
     # true = Use the originating action's system prompt for follow-up messages
     # false = Always use chat_window_system_instruction from prompts.json
@@ -461,14 +457,6 @@ tts_save_directory = tts_output
 # true = play immediately after generation
 # false = wait for user to press play
 tts_autoplay = true
-
-# Batch TTS Processor settings
-# Delay between API calls in batch mode (seconds)
-tts_batch_delay = 1.0
-# Number of concurrent TTS requests (1 = sequential, max 8)
-tts_batch_concurrency = 1
-# Default style instructions for batch TTS (used when AI Director is disabled)
-tts_default_style = Read aloud naturally
 
 # ============================================================
 # FLASK API ENDPOINTS (Optional)
