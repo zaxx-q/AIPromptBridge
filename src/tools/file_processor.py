@@ -3183,13 +3183,27 @@ def show_tools_menu(endpoints: Dict[str, str] = None) -> bool:
     
     elif choice == '2':
         # Import TTSProcessor lazily to avoid atexit issues during module load
+        # We need to be extra careful here because concurrent.futures/threading
+        # can trigger atexit registration issues in certain edge cases
         try:
+            # First, ensure we're not in a shutdown state
+            import sys
+            if getattr(sys, 'is_finalizing', lambda: False)():
+                print_error("\n⚠️ Cannot start TTS Processor during interpreter shutdown")
+                return True
+            
             from .tts_processor import TTSProcessor
         except RuntimeError as e:
-            if "atexit" in str(e).lower():
-                print_error("\n⚠️ TTS Processor temporarily unavailable. Please try again.")
+            # Handle atexit/shutdown errors specifically
+            error_str = str(e).lower()
+            if "atexit" in error_str or "shutdown" in error_str:
+                print_error("\n⚠️ TTS Processor temporarily unavailable (interpreter state error).")
+                print_info("Please try again - this is usually a transient error.")
                 return True
             raise
+        except ImportError as e:
+            print_error(f"\n⚠️ Failed to import TTS Processor: {e}")
+            return True
         
         from src import web_server
         processor = TTSProcessor(config=web_server.CONFIG)

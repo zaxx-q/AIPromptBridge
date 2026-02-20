@@ -6,10 +6,23 @@ import sys
 import time
 import wave
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+
+# Lazy import for concurrent.futures to avoid atexit issues during module load
+# ThreadPoolExecutor registers atexit handlers which can fail if Python is shutting down
+ThreadPoolExecutor = None
+as_completed = None
+
+def _ensure_concurrent_futures():
+    """Lazily import concurrent.futures when actually needed."""
+    global ThreadPoolExecutor, as_completed
+    if ThreadPoolExecutor is None:
+        from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
+        from concurrent.futures import as_completed as _as_completed
+        ThreadPoolExecutor = _ThreadPoolExecutor
+        as_completed = _as_completed
 
 try:
     import msvcrt
@@ -585,6 +598,9 @@ class TTSProcessor(BaseTool):
 
     def _execute_concurrent(self, cp: TTSCheckpoint, remaining: List[int], result: ToolResult):
         """Process segments in parallel using ThreadPoolExecutor."""
+        # Lazily import concurrent.futures to avoid atexit issues during module load
+        _ensure_concurrent_futures()
+        
         lock = threading.Lock()
 
         def process_with_lock(idx: int):
