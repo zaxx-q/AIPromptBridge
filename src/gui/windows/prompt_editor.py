@@ -4252,15 +4252,9 @@ class PromptEditorWindow:
             meta_text = "🔊 Mode: Direct Speech | No AI processing"
         else:
             # AI Director mode: show director prompt in preview
-            try:
-                from ..prompts import get_prompts_config
-                prompts = get_prompts_config()
-                system_text = prompts.get_tts_director_system_prompt()
-                task_template = prompts.get_tts_director_task_template()
-                user_text = task_template.replace("{text}", input_text) if input_text else task_template
-            except Exception:
-                system_text = "(Could not load director prompts)"
-                user_text = input_text
+            system_text = self._get_current_setting("tts_tool", "director_system_prompt", "(Could not load director prompts)")
+            task_template = self._get_current_setting("tts_tool", "director_task_template", "")
+            user_text = task_template.replace("{text}", input_text) if input_text else task_template
             
             total_chars = len(system_text) + len(user_text)
             token_estimate = total_chars // 4
@@ -4299,21 +4293,21 @@ class PromptEditorWindow:
         self.tts_pg_director_btn.configure(state="disabled")
         self._set_tts_status(self.tts_pg_director_status, "⏳ Generating style...", self.colors.fg)
         
+        # Get prompts from settings tab if available (live values)
+        system_prompt = self._get_current_setting("tts_tool", "director_system_prompt", "")
+        task_template = self._get_current_setting("tts_tool", "director_task_template", "")
+        
         def _target():
             try:
                 from ...request_pipeline import RequestPipeline, RequestContext, RequestOrigin
                 from ...config import load_config
                 from ...key_manager import KeyManager
-                from ..prompts import get_prompts_config
                 
                 config, ai_params_loaded, _, loaded_keys = load_config()
                 key_managers = {}
                 for prov in ["custom", "openrouter", "google"]:
                     key_managers[prov] = KeyManager(loaded_keys.get(prov, []), prov)
                 
-                prompts = get_prompts_config()
-                system_prompt = prompts.get_tts_director_system_prompt()
-                task_template = prompts.get_tts_director_task_template()
                 task = task_template.replace("{text}", input_text)
                 
                 messages = [
