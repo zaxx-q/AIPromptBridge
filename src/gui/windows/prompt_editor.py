@@ -1069,9 +1069,12 @@ class PromptEditorWindow:
         # Show compare_prompts frame initially (text_edit_tool is default)
         self.compare_prompts_frame.pack(fill="x", pady=10)
         
-        # Save action button
-        btn_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
-        btn_frame.pack(fill="x", pady=(18, 0))
+        # Populate action list after widgets are created
+        self._refresh_action_list()
+        
+        # Save action button - OUTSIDE scrollable frame so it's always visible
+        btn_frame = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
+        btn_frame.pack(fill="x", pady=(10, 0), side="bottom")
         
         create_emoji_button(
             btn_frame, "Save Action", "💾", self.colors, "success", 150, 40, self._save_current_action
@@ -1088,9 +1091,6 @@ class PromptEditorWindow:
                 bg=self.colors.bg, fg=self.colors.accent_green
             )
         self.editor_widgets["save_status"].pack(side="left", padx=15)
-        
-        # Populate action list after widgets are created
-        self._refresh_action_list()
     
     def _create_settings_tab(self, frame):
         """Create the Settings tab for _settings object."""
