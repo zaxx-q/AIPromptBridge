@@ -2615,7 +2615,7 @@ class SettingsWindow:
         # Collect values from widgets
         for key, var in self.vars.items():
             # Skip keys that shouldn't be saved to config.ini
-            if key in ["run_at_startup"]:
+            if key in ["run_at_startup", "unlock_server_settings"]:
                 continue
                 
             try:
@@ -2678,6 +2678,7 @@ class SettingsWindow:
         
         # Cleanup transient keys that shouldn't be persisted
         self.config_data.config.pop("run_at_startup", None)
+        self.config_data.config.pop("unlock_server_settings", None)
         
         # Save to file
         if save_config_full(self.config_data):
