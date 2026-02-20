@@ -195,7 +195,8 @@ class FileProcessor(BaseTool):
                 use_batch=exec_settings.get("use_batch", False),
                 audio_preprocessing=self._audio_preprocessing,
                 custom_instructions=self._custom_instructions,
-                skip_per_file_prompts=not self._ask_per_file
+                skip_per_file_prompts=not self._ask_per_file,
+                include_filename=self._include_filename
             )
             
             # Step 5: Execute processing
@@ -2393,6 +2394,9 @@ class FileProcessor(BaseTool):
         self._custom_instructions = self._current_checkpoint.custom_instructions
         self._ask_per_file = not self._current_checkpoint.skip_per_file_prompts
         
+        # Restore filename context preference from checkpoint
+        self._include_filename = self._current_checkpoint.include_filename
+        
         return self._execute_processing()
     
     def _prompt_retry_failed(self) -> Optional[bool]:
@@ -2450,6 +2454,9 @@ class FileProcessor(BaseTool):
         # Restore custom instructions from checkpoint
         self._custom_instructions = self._current_checkpoint.custom_instructions
         self._ask_per_file = not self._current_checkpoint.skip_per_file_prompts
+        
+        # Restore filename context preference from checkpoint
+        self._include_filename = self._current_checkpoint.include_filename
         
         # Clear the failed checkpoint since we're using it now
         # (A new one will be created if there are still failures)

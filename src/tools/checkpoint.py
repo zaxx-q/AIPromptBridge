@@ -55,6 +55,7 @@ class FileProcessorCheckpoint:
     custom_instructions: Optional[str] = None  # Batch-wide instructions
     per_file_instructions: Dict[str, str] = field(default_factory=dict)  # file_path -> instructions
     skip_per_file_prompts: bool = False  # User chose to skip all per-file prompts
+    include_filename: bool = True  # Whether to include filename in AI context
     
     # Progress tracking
     completed_files: List[str] = field(default_factory=list)
@@ -228,6 +229,7 @@ class FileProcessorCheckpoint:
             custom_instructions=original.custom_instructions,  # Preserve batch instructions
             per_file_instructions=failed_per_file_instructions,  # Preserve per-file for failed files
             skip_per_file_prompts=original.skip_per_file_prompts,  # Preserve skip preference
+            include_filename=original.include_filename,  # Preserve filename context preference
             completed_files=[],
             failed_files=[],  # Reset - these will be tracked fresh
             current_index=0,
@@ -416,7 +418,8 @@ class CheckpointManager:
         use_batch: bool = False,
         audio_preprocessing: Optional[Dict[str, Any]] = None,
         custom_instructions: Optional[str] = None,
-        skip_per_file_prompts: bool = False
+        skip_per_file_prompts: bool = False,
+        include_filename: bool = True
     ) -> FileProcessorCheckpoint:
         """
         Create a new checkpoint.
@@ -437,6 +440,7 @@ class CheckpointManager:
             audio_preprocessing: Audio preprocessing settings (preset, intensity, optimization)
             custom_instructions: Batch-wide custom instructions for AI context
             skip_per_file_prompts: Whether to skip per-file instruction prompts
+            include_filename: Whether to include filename in AI context
         
         Returns:
             New FileProcessorCheckpoint
@@ -463,6 +467,7 @@ class CheckpointManager:
             custom_instructions=custom_instructions,
             per_file_instructions={},
             skip_per_file_prompts=skip_per_file_prompts,
+            include_filename=include_filename,
             completed_files=[],
             failed_files=[],
             current_index=0,
