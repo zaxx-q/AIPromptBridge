@@ -163,7 +163,7 @@ To ensure robustness across different environments, AIPromptBridge includes a ce
 | -------- | --------- |
 | `ChatWindow` | Interactive AI chat with streaming |
 | `SessionBrowserWindow` | Browse and restore saved sessions |
-| `PopupWindow` | TextEditTool selection/input dialogs with dual input (Edit/Ask) and scrollable ModifierBar |
+| `PopupWindow` | TextEditTool selection/input dialogs with dual input (Edit/Ask), Compare mode, and scrollable ModifierBar |
 | `SnipPopup` | Result dialog for screen snipping with image preview and action carousel |
 | `AudioAnalyzerWindow` | Audio recording, playback, and analysis interface |
 | `TTSWindow` | Text-to-Speech generation with voice selection, AI Director, and audio playback |

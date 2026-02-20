@@ -15,6 +15,7 @@ Press **Ctrl+Space** anywhere to invoke AI on selected text:
 - **Understand** - **Explain**, **Generate Summaries**, or **Keypoints**
 - **Edit** - **Proofread** (✏️), **Rewrite** (📝), or make it **Casual** (😎)
 - **Q&A** - Use the second input box in the popup to ask any question about the text
+- **Compare** - Use the 🔀 Compare button to compare selected text with another text selection
 - **Custom prompts** - Define and group your own actions in the Prompt Editor
 
 Works in any application: browsers, IDEs, Notepad, Word, everywhere.
