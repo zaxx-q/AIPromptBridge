@@ -798,9 +798,9 @@ class PromptEditorWindow:
         else:
             self.prompt_type_frame.pack_forget()
         
-        # compare_prompts: Snip only
+        # compare_prompts: Text Edit and Snip Tool
         if hasattr(self, 'compare_prompts_frame'):
-            if is_snip:
+            if is_text_edit or is_snip:
                 self.compare_prompts_frame.pack(fill="x", pady=10)
             else:
                 self.compare_prompts_frame.pack_forget()
@@ -1045,26 +1045,29 @@ class PromptEditorWindow:
             )
         self.editor_widgets["show_chat"].pack(anchor="w")
         
-        # Compare prompts checkbox (Snip Tool only)
+        # Compare prompts checkbox (Text Edit Tool and Snip Tool)
         self.compare_prompts_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
-        # Initially hidden - shown only for snip_tool
+        # Initially shown for text_edit_tool (the default)
         
         self.editor_widgets["compare_prompts_var"] = tk.BooleanVar()
         if self.use_ctk:
             self.editor_widgets["compare_prompts"] = ctk.CTkCheckBox(
-                self.compare_prompts_frame, text="Compare mode (expects 2 images)",
+                self.compare_prompts_frame, text="Compare mode",
                 variable=self.editor_widgets["compare_prompts_var"],
                 font=get_ctk_font(13), text_color=self.colors.fg,
                 fg_color=self.colors.accent
             )
         else:
             self.editor_widgets["compare_prompts"] = tk.Checkbutton(
-                self.compare_prompts_frame, text="Compare mode (expects 2 images)",
+                self.compare_prompts_frame, text="Compare mode",
                 variable=self.editor_widgets["compare_prompts_var"],
                 font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
                 selectcolor=self.colors.input_bg
             )
         self.editor_widgets["compare_prompts"].pack(anchor="w")
+        
+        # Show compare_prompts frame initially (text_edit_tool is default)
+        self.compare_prompts_frame.pack(fill="x", pady=10)
         
         # Save action button
         btn_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
@@ -3381,6 +3384,10 @@ class PromptEditorWindow:
             self.editor_widgets["show_chat_var"].set(
                 action_data.get("show_chat_window_instead_of_replace", False)
             )
+            if "compare_prompts_var" in self.editor_widgets:
+                self.editor_widgets["compare_prompts_var"].set(
+                    action_data.get("compare_prompts", False)
+                )
         else:  # snip_tool or audio_tool
             self.editor_widgets["prompt_type_var"].set("edit")  # Not used but keep default
             self.editor_widgets["show_chat_var"].set(
@@ -3577,6 +3584,8 @@ class PromptEditorWindow:
         if self.current_tool == "text_edit_tool":
             action_dict["prompt_type"] = self.editor_widgets["prompt_type_var"].get()
             action_dict["show_chat_window_instead_of_replace"] = self.editor_widgets["show_chat_var"].get()
+            if "compare_prompts_var" in self.editor_widgets:
+                action_dict["compare_prompts"] = self.editor_widgets["compare_prompts_var"].get()
         elif self.current_tool == "snip_tool":
             action_dict["show_chat_window"] = self.editor_widgets["show_chat_var"].get()
             if "compare_prompts_var" in self.editor_widgets:
