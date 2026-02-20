@@ -1,5 +1,31 @@
 # Changelog
 
+## [5.2.0] - 2026-02-20
+
+### New Features
+
+- **Text Comparison**: Introduced "Compare mode" for the Text Edit Tool. Now it's possible to select and capture a second piece of text to perform direct comparisons.
+  - Added default comparative actions: "Compare Texts", "Find Differences", "Which is Better", and "Before/After".
+  - Added a dedicated Compare button (🔀) directly within the popup's "Ask" input field.
+- **Batch TTS Processor**: Added a new terminal tool for batch text-to-speech generation.
+  - Supports automatic style generation via AI Director (single aggregated style or unique per-segment styles).
+  - Robust progress tracking with checkpoints and the ability to resume or retry failed segments.
+  - Includes an option to merge all generated segment WAV files into a single unified output.
+- **TTS Playground**: Added a dedicated "TTS" mode to the Prompt Editor's playground area, enabling real-time testing of models, voices, and AI Director style generation without leaving the editor.
+- **Prompt Loading from File**: The CLI File Processor now supports loading custom prompts directly from text files (`[F] Load prompt from file`).
+
+### Improvements
+
+- **Audio Exporting**: Optimized FFmpeg conversion logic to use format-specific encoders (`libmp3lame`, `libvorbis`, `flac`, `aac`) for significantly better compression and quality when exporting in TTS window.
+- **File Processor**: Added an option to inject the filename directly into the AI context for non-text file types (images, audio, documents), improving the model's awareness of the processed file. This preference is now saved and restored within checkpoints.
+- **Prompt Editor UX**:
+  - Relocated the "Save Action" button outside of the scrollable area, ensuring it is always visible regardless of the list length.
+  - Added the "Compare mode" checkbox for both Text Edit Tool and Snip Tool configurations.
+- **Settings & Notifications**:
+  - Made the server settings safety unlock transient, preventing the unlocked state from persisting into `config.ini` across app restarts.
+  - Improved toast notification handling with programmatic dismissal for faster workflows.
+- **Context Handling**: Re-engineered chat requests to properly format multimodal messages, ensuring compare mode and follow-up prompts display flawlessly in the chat window.
+
 ## [5.1.1] - 2026-02-18
 
 ### Improvements
@@ -8,7 +34,7 @@
 
 ### Fixes
 
-- **Startup Manager**: Reimplemented launcher detection with a more robust multi-path search strategy to fix the "Launch on startup" feature in Nuitka-compiled production builds.
+- **Launch on startup**: Reimplemented launcher detection with a more robust multi-path search strategy to fix the "Launch on startup" feature in compiled builds.
 - **Chat Persistence**: Implemented immediate session saving after user messages and modifications, ensuring chat history is preserved and retry/regeneration is possible even if an API error occurs.
 - **Regenerate Button**: Fixed assistant message handling in the chat window to correctly support response regeneration and session state persistence.
 

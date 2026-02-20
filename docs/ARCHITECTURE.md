@@ -447,3 +447,96 @@ Workspace logic is handled inline in `main.py` via `setup_workspace()`:
 - **Stale file migration**: A non-blocking background thread moves any leftover config/data files from `bin/` to root on startup.
 
 For more details on the build process and launcher architecture, see [BUILD_PROCESS.md](BUILD_PROCESS.md).
+
+## TTS Processor (Batch TTS)
+
+The `TTSProcessor` (`src/tools/tts_processor.py`) provides batch text-to-speech generation capabilities through an interactive terminal wizard.
+
+### Features
+
+- **Text Splitting**: Four modes for segmenting input text
+  - Lines: One segment per non-empty line
+  - Paragraphs: One segment per blank-line-separated block
+  - Sentences: One segment per sentence (simple regex-based splitting)
+  - Whole file: Single segment containing entire file
+
+- **Voice & Model Configuration**:
+  - Single speaker mode with 30 prebuilt Gemini voices
+  - Multi-speaker mode (up to 2 speakers) with individual voice assignment
+  - Model selection: `gemini-2.5-flash-preview-tts` (fast) or `gemini-2.5-pro-preview-tts` (quality)
+
+- **Style Instructions**:
+  - Manual: Enter custom style instructions
+  - Default: Use "Read aloud naturally" as default style
+  - No style: Send text directly to TTS without any style prefix
+  - AI Director (Single): Analyze sample segments to generate one unified style
+  - AI Director (Per-Segment): Generate unique style for each segment
+
+- **Output Modes**:
+  - Individual WAV: One `.wav` file per segment
+  - Merged WAV: All segments concatenated into single file
+
+### Architecture
+
+```mermaid
+flowchart TB
+    subgraph Wizard["Interactive Wizard"]
+        S1["Step 1: Input & Text Splitting"]
+        S2["Step 2: Voice & Model"]
+        S3["Step 3: Style Instructions"]
+        S4["Step 4: Output Configuration"]
+        S5["Step 5: Execution Settings"]
+    end
+    
+    subgraph Checkpoint["Checkpoint System"]
+        CM["TTSCheckpointManager"]
+        CP["TTSCheckpoint"]
+        FC["Failed Checkpoint"]
+    end
+    
+    subgraph TTS["TTS Generation"]
+        TD["TTSToolApp"]
+        DIR["AI Director"]
+        API["GeminiNativeProvider"]
+    end
+    
+    S1 --> S2 --> S3 --> S4 --> S5
+    S5 --> CM
+    CM --> CP
+    CP --> TD
+    TD --> DIR
+    TD --> API
+    CP --> FC
+```
+
+### Checkpoint System
+
+The `TTSCheckpointManager` extends the base checkpoint system with TTS-specific functionality:
+
+| Method | Purpose |
+|--------|---------|
+| `create()` | Create new checkpoint with all TTS parameters |
+| `save()` | Save checkpoint to `tts_checkpoint.json` |
+| `load()` | Load existing checkpoint |
+| `load_failed()` | Load failed-segments checkpoint |
+| `create_failed_checkpoint()` | Save failed segments for retry |
+
+### Keyboard Controls
+
+During processing, the following keyboard controls are available:
+
+| Key | Action |
+|-----|--------|
+| `P` | Pause processing |
+| `S` | Stop and save progress |
+| `Enter` | Resume from pause |
+| `q` | Quit during pause |
+
+### Integration
+
+The TTS Processor integrates with existing TTS infrastructure:
+
+- **Voice Constants**: Uses `TTS_VOICES` from `src/audio/tts_constants.py`
+- **TTSToolApp**: Delegates audio generation to existing `TTSToolApp` instance
+- **AI Director**: Uses the same director logic as the GUI TTS window
+- **WAV Utilities**: Uses `src/audio/wav_utils.py` for audio handling

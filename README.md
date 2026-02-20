@@ -106,6 +106,15 @@ The **File Processor** tool enables bulk operations:
   - **Checkpoints**: Resume interrupted jobs or retry failures
   - **Interactive Mode**: Pause (`P`), Stop (`S`), or Abort (`Esc`) during processing
 
+The **TTS Processor** tool enables batch text-to-speech generation:
+- **Text Splitting**: Lines, paragraphs, sentences, or whole file modes
+- **Voice Selection**: 30 prebuilt Gemini voices with single or multi-speaker support
+- **Style Instructions**: Manual, default, no style, or AI Director (single/per-segment)
+- **AI Director**: Auto-generates expressive style instructions for nuanced speech
+- **Output Modes**: Individual WAV files per segment or merged into single file
+- **Checkpoints**: Full resume support with failure retry
+- **Interactive Mode**: Pause (`P`), Stop (`S`) during generation
+
 ## 🚀 Quick Start
 
 ### Download (Recommended)
