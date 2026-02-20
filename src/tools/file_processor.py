@@ -104,6 +104,7 @@ class FileProcessor(BaseTool):
         # Custom instructions state
         self._custom_instructions: Optional[str] = None  # Batch-wide instructions
         self._ask_per_file: bool = False  # Whether to prompt for per-file instructions
+        self._include_filename: bool = True  # Whether to include filename in context
     
     def run_interactive(self) -> ToolResult:
         """
@@ -163,6 +164,9 @@ class FileProcessor(BaseTool):
                 return ToolResult(success=False, message="Cancelled")
             
             self._custom_instructions, self._ask_per_file = custom_result
+            
+            # Step 2.6: Filename context (optional)
+            self._include_filename = self._step_filename_context()
             
             # Step 3: Output configuration
             output_config = self._step_output_configuration(scan_result, prompt_key)
@@ -1490,6 +1494,7 @@ class FileProcessor(BaseTool):
             print(f"\n  [E] Show Endpoint Prompts ({len(endpoint_prompts)})")
         
         print("  [C] Enter custom prompt")
+        print("  [F] Load prompt from file")
         print("  [Q] Cancel")
         
         showing_endpoints = False
@@ -1532,6 +1537,51 @@ class FileProcessor(BaseTool):
                     continue
                 
                 return "Custom", "\n".join(lines)
+            
+            if choice == 'f':
+                # Load prompt from file
+                print("\nEnter path to prompt file (or 'q' to cancel):")
+                try:
+                    prompt_path_str = input("> ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    return None, None
+                
+                if prompt_path_str.lower() == 'q':
+                    continue
+                
+                if not prompt_path_str:
+                    print_warning("No path entered")
+                    continue
+                
+                # Handle quoted paths
+                if prompt_path_str.startswith('"') and prompt_path_str.endswith('"'):
+                    prompt_path_str = prompt_path_str[1:-1]
+                
+                prompt_path = Path(prompt_path_str)
+                
+                if not prompt_path.exists():
+                    print_error(f"File does not exist: {prompt_path}")
+                    continue
+                
+                if not prompt_path.is_file():
+                    print_error(f"Not a file: {prompt_path}")
+                    continue
+                
+                try:
+                    with open(prompt_path, "r", encoding="utf-8") as f:
+                        prompt_text = f.read().strip()
+                except Exception as e:
+                    print_error(f"Failed to read file: {e}")
+                    continue
+                
+                if not prompt_text:
+                    print_warning("File is empty")
+                    continue
+                
+                # Use simple key without filename
+                print(f"\n✅ Loaded prompt from: {prompt_path.name}")
+                print(f"   ({len(prompt_text)} characters)")
+                return "File", prompt_text
             
             try:
                 idx = int(choice) - 1
@@ -1667,6 +1717,34 @@ class FileProcessor(BaseTool):
             print("\n✅ Skipping custom instructions")
             return (None, False)
     
+    def _step_filename_context(self) -> bool:
+        """
+        Ask user whether to include filename in AI context.
+        
+        Returns:
+            True to include filename, False to exclude
+        """
+        print("\n📎 Filename in Context:")
+        print("  Include the filename in the prompt sent to the AI?")
+        print("  This helps the AI understand what file it's processing.")
+        print()
+        print("  [Y] Yes, include filename (default)")
+        print("  [N] No, don't include filename")
+        
+        try:
+            choice = input("\nChoice [Y]: ").strip().lower() or "y"
+        except (EOFError, KeyboardInterrupt):
+            return True
+        
+        include = choice != 'n'
+        
+        if include:
+            print("✅ Filename will be included in context")
+        else:
+            print("✅ Filename will NOT be included in context")
+        
+        return include
+    
     def _prompt_per_file_instructions(
         self,
         filepath: Path,
@@ -1730,32 +1808,26 @@ class FileProcessor(BaseTool):
         self,
         base_prompt: str,
         batch_instructions: Optional[str],
-        per_file_instructions: Optional[str],
-        filename: Optional[str] = None
+        per_file_instructions: Optional[str]
     ) -> str:
         """
-        Build the final prompt by injecting filename and custom instructions.
+        Build the final prompt by injecting custom instructions.
+        
+        Note: Filename context is handled by FileHandler.build_api_message()
+        for text/code files, and is controlled by self._include_filename.
         
         Args:
             base_prompt: The original prompt text
             batch_instructions: Batch-wide instructions (or None)
             per_file_instructions: File-specific instructions (or None)
-            filename: Original filename to include for context (or None)
             
         Returns:
-            Final prompt with filename and instructions appended
+            Final prompt with instructions appended
         """
-        if not batch_instructions and not per_file_instructions and not filename:
+        if not batch_instructions and not per_file_instructions:
             return base_prompt
         
         parts = [base_prompt]
-        
-        if filename:
-            parts.append(f"\n\n[File: {filename}]")
-        
-        if not batch_instructions and not per_file_instructions:
-            return "\n".join(parts)
-        
         parts.append("\n\n---\nADDITIONAL CONTEXT FROM USER:")
         
         if batch_instructions:
@@ -2108,12 +2180,11 @@ class FileProcessor(BaseTool):
                             cp.per_file_instructions[str(file_path)] = per_file_result
                             self.checkpoint_manager.save(cp)
                 
-                # Build final prompt with filename and custom instructions
+                # Build final prompt with custom instructions
                 final_prompt = self._build_final_prompt(
                     cp.prompt_text,
                     self._custom_instructions,
-                    per_file_instructions,
-                    filename=file_path_obj.name
+                    per_file_instructions
                 )
                 
                 process_path = file_path_obj
@@ -2504,8 +2575,8 @@ class FileProcessor(BaseTool):
         from src.api_client import call_api_with_retry
         from src import web_server
         
-        # Build message
-        message = self.file_handler.build_api_message(filepath, prompt, include_filename=True)
+        # Build message (respect user's filename context preference)
+        message = self.file_handler.build_api_message(filepath, prompt, include_filename=self._include_filename)
         
         # Call API
         response, error = call_api_with_retry(

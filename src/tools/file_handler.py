@@ -283,14 +283,22 @@ class FileHandler:
         
         content_type, content, mime_type = self.read_file(filepath)
         
+        # Add filename prefix for non-text files when requested
+        # (Text files have filename in the <file_content> tag)
+        filename_prefix = ""
+        if include_filename and content_type in ("image", "audio", "document"):
+            filename_prefix = f"[File: {filepath.name}]\n\n"
+        
+        full_prompt = f"{filename_prefix}{prompt}" if filename_prefix else prompt
+        
         if content_type == "image":
             # Returns list of messages, we extract the user message
-            msgs = build_image_message(content, mime_type, prompt, None)
+            msgs = build_image_message(content, mime_type, full_prompt, None)
             return msgs[0]
         
         elif content_type == "audio":
             # Returns list of messages, we extract the user message
-            msgs = build_inline_message(content, mime_type, prompt, None)
+            msgs = build_inline_message(content, mime_type, full_prompt, None)
             return msgs[0]
         
         elif content_type == "document":
@@ -298,11 +306,12 @@ class FileHandler:
             # Currently src.messages doesn't have a specific document builder that returns 'file',
             # so we'll keep this logic local or map it to inline_data (preferred for Gemini)
             # Gemini Native accepts PDF as inline_data
-            msgs = build_inline_message(content, mime_type, prompt, None)
+            msgs = build_inline_message(content, mime_type, full_prompt, None)
             return msgs[0]
         
         else:
             # Text/code message - use TextEditTool-style delimiters
+            # Note: filename is already included in <file_content> tag for text files
             file_type = self.detect_type(filepath)
             
             # Build file content with appropriate formatting
@@ -326,11 +335,11 @@ class FileHandler:
             
             # Use structured delimiters (TextEditTool-style)
             if include_filename:
-                full_prompt = f"{prompt}\n\n<file_content filename=\"{filepath.name}\">\n{file_content}\n</file_content>"
+                final_prompt = f"{prompt}\n\n<file_content filename=\"{filepath.name}\">\n{file_content}\n</file_content>"
             else:
-                full_prompt = f"{prompt}\n\n<file_content>\n{file_content}\n</file_content>"
+                final_prompt = f"{prompt}\n\n<file_content>\n{file_content}\n</file_content>"
             
-            msgs = build_text_message(full_prompt, "You are a helper.")
+            msgs = build_text_message(final_prompt, "You are a helper.")
             
             # Extract user message
             for m in msgs:
@@ -338,7 +347,7 @@ class FileHandler:
                     return m
             
             # Fallback
-            return {"role": "user", "content": full_prompt}
+            return {"role": "user", "content": final_prompt}
     
     def get_output_path(
         self,
