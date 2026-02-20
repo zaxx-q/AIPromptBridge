@@ -2335,7 +2335,7 @@ class AttachedPromptPopup:
             self.edit_input.bind('<Return>', lambda e: self._on_custom_submit())
             Tooltip(edit_btn, "Edit text with custom instructions")
             
-            # Ask input
+            # Ask input with split buttons (Ask + Compare)
             ask_frame = ctk.CTkFrame(
                 content_frame,
                 fg_color=self.colors.surface0,
@@ -2345,20 +2345,41 @@ class AttachedPromptPopup:
             )
             ask_frame.pack(fill="x", pady=(0, 8))
             
-            self.ask_input = ctk.CTkEntry(
+            # Container for both buttons
+            ask_btns_container = ctk.CTkFrame(
                 ask_frame,
-                placeholder_text=self.PLACEHOLDER_ASK,
-                font=get_ctk_font(size=12),
-                height=40,
-                corner_radius=0,
-                fg_color="transparent",
-                border_width=0,
-                text_color=self.colors.text,
-                placeholder_text_color=self.colors.overlay0
+                fg_color="transparent"
             )
-            # Create a fixed-size container for the button to prevent scaling issues
+            ask_btns_container.pack(side="right")
+            
+            # Compare button (left of Ask button)
+            compare_btn_container = ctk.CTkFrame(
+                ask_btns_container,
+                width=32,
+                height=40,
+                fg_color="transparent"
+            )
+            compare_btn_container.pack(side="left", padx=(0, 1))
+            compare_btn_container.pack_propagate(False)
+
+            compare_btn = create_emoji_button(
+                compare_btn_container,
+                text="",
+                icon="🔀",
+                colors=self.colors,
+                variant="secondary",
+                width=32,
+                height=40,
+                font_size=12,
+                command=self._on_ask_compare_submit
+            )
+            compare_btn.configure(corner_radius=8)
+            compare_btn.pack(fill="both", expand=True)
+            Tooltip(compare_btn, "Compare with another text selection")
+
+            # Ask button (right)
             ask_btn_container = ctk.CTkFrame(
-                ask_frame,
+                ask_btns_container,
                 width=40,
                 height=40,
                 fg_color="transparent"
@@ -2366,7 +2387,6 @@ class AttachedPromptPopup:
             ask_btn_container.pack(side="right")
             ask_btn_container.pack_propagate(False)
 
-            # Create Ask button using helper
             ask_btn = create_emoji_button(
                 ask_btn_container,
                 text="",
@@ -2378,9 +2398,9 @@ class AttachedPromptPopup:
                 font_size=14,
                 command=self._on_ask_submit
             )
-            # Ensure proper styling
             ask_btn.configure(corner_radius=8)
             ask_btn.pack(fill="both", expand=True)
+            Tooltip(ask_btn, "Ask a question about the text")
 
             self.ask_input = ctk.CTkEntry(
                 ask_frame,
@@ -2395,7 +2415,6 @@ class AttachedPromptPopup:
             )
             self.ask_input.pack(side="left", fill="x", expand=True, padx=(10, 0))
             self.ask_input.bind('<Return>', lambda e: self._on_ask_submit())
-            Tooltip(ask_btn, "Ask a question about the text")
             
             # Action buttons
             self._create_carousel(content_frame)
@@ -2515,7 +2534,7 @@ class AttachedPromptPopup:
             self.edit_input.bind('<FocusOut>', lambda e: self._on_edit_focus_out())
             self.edit_input.bind('<Return>', lambda e: self._on_custom_submit())
             
-            # Ask input area
+            # Ask input area with split buttons (Ask + Compare)
             ask_container = tk.Frame(
                 content_frame,
                 bg=self.colors.surface0,
@@ -2524,6 +2543,23 @@ class AttachedPromptPopup:
             )
             ask_container.pack(fill=tk.X, pady=(0, 12))
             
+            # Compare button (left of Ask button)
+            compare_btn = tk.Label(
+                ask_container,
+                text="🔀",
+                font=("Arial", 10),
+                bg=self.colors.surface1,
+                fg=self.colors.text,
+                width=3,
+                pady=8,
+                cursor="hand2"
+            )
+            compare_btn.pack(side=tk.RIGHT, fill=tk.Y)
+            compare_btn.bind('<Button-1>', lambda e: self._on_ask_compare_submit())
+            compare_btn.bind('<Enter>', lambda e: compare_btn.config(bg=self.colors.surface2))
+            compare_btn.bind('<Leave>', lambda e: compare_btn.config(bg=self.colors.surface1))
+            Tooltip(compare_btn, "Compare with another text selection")
+            
             # Ask send button
             ask_send_btn = tk.Label(
                 ask_container,
@@ -2531,7 +2567,7 @@ class AttachedPromptPopup:
                 font=("Arial", 12),
                 bg=self.colors.green,
                 fg="#ffffff",
-                width=4,
+                width=3,
                 pady=8,
                 cursor="hand2"
             )
@@ -2859,6 +2895,20 @@ class AttachedPromptPopup:
         response_mode = self._get_effective_response_mode("_Ask")
         self._close()
         self.on_option_selected("_Ask", self.selected_text, ask_text, response_mode, self.active_modifiers, None)
+    
+    def _on_ask_compare_submit(self):
+        """Handle ask with compare mode - triggers second text selection."""
+        if HAVE_CTK:
+            ask_text = self.ask_input.get().strip()
+        else:
+            ask_text = self.ask_input_var.get().strip() if hasattr(self, 'ask_input_var') and self.ask_input_var else ""
+        
+        if not ask_text or ask_text == self.PLACEHOLDER_ASK:
+            return
+        
+        # Store the pending action and initiate compare text capture
+        self._pending_compare_action = ("_Ask", ask_text)
+        self._initiate_compare_text()
     
     def _get_effective_response_mode(self, option_key: str) -> str:
         """Get effective response mode, considering modifiers."""
