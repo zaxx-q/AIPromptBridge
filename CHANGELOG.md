@@ -1,5 +1,20 @@
 # Changelog
 
+## [5.3.0] - 2026-02-21
+
+### New Features
+
+- **Snip Tool**: Added a new "Type" response mode that types the AI's response directly into the active text field.
+
+### Improvements
+
+- **Settings UX**: Clarified the `auto_save_session` setting logic in the UI and documentation to explicitly state that sessions are always saved upon receiving an AI response or sending a reply, regardless of the selected trigger mode.
+
+### Fixes
+
+- **Providers**: Prevented automatic API key rotation when receiving empty responses from Gemini and OpenAI compatible endpoints. Empty responses are now handled via a standard delay-and-retry mechanism.
+- **Prompt Editor**: Fixed an initialization issue where updating the live preview could cause attribute errors if the playground tab had not yet been loaded.
+
 ## [5.2.0] - 2026-02-20
 
 ### New Features

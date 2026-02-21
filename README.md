@@ -1,9 +1,5 @@
 # AIPromptBridge
 
-<p align="center">
-  <strong>• AI Desktop Tools & Integration Bridge •</strong>
-</p>
-
 **AIPromptBridge** is a Windows desktop application that brings AI assistance to your fingertips. Use global hotkeys to edit text using AI, capture and analyze audio or screen content, and chat with models, all from a lightweight system tray app.
 
 ## ✨ Features
@@ -30,7 +26,7 @@ Press **Ctrl+Alt+X** to capture a region of your screen and analyze it with AI:
 - **Analysis** - **Describe**, **Summarize**, or **Explain Code**
 - **Data** - **Extract Data** to tables, **Transcribe** handwriting, or **Smart Cleanup** notes
 - **Compare** - **Compare Images** to analyze differences between two screenshots
-- **Response Modes** - Choose to show result in Chat Window, Result Panel, or Copy to Clipboard
+- **Response Modes** - Choose to show result in Chat Window, Copy to Clipboard, or Type directly into active field
 
 <br clear="right"/>
 
@@ -168,7 +164,7 @@ Right-click the tray icon for:
 1. Press **Ctrl+Alt+X**
 2. Click and drag to select a screen region
 3. Choose an action (Describe, Extract Text, etc.) or ask a question
-4. Results open in a chat window with the image attached, can also directly copied to clipboard.
+4. Results open in a chat window with the image attached, can also be copied to clipboard or typed directly into the active field.
 
 ### Audio Tool
 
