@@ -2469,6 +2469,10 @@ class PromptEditorWindow:
         Update the live preview based on current action configuration.
         Matches logic in text_edit_tool.py _process_option.
         """
+        # Guard: Playground tab may not be loaded yet (lazy loading)
+        if not hasattr(self, 'playground_mode_var'):
+            return
+        
         mode = self.playground_mode_var.get()
         if mode == "tts":
             self._update_tts_playground_preview()
