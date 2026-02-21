@@ -289,7 +289,7 @@ class AttachedSnipPopup:
         
         self.response_toggle = SegmentedToggle(
             toggle_frame,
-            options=[("Default", "default"), ("Copy", "copy"), ("Show", "show")],
+            options=[("Default", "default"), ("Copy", "copy"), ("Show", "show"), ("Type", "type")],
             default_value="default"
         )
         self.response_toggle.pack(anchor="center")
@@ -495,7 +495,7 @@ class AttachedSnipPopup:
         
         self.response_toggle = SegmentedToggle(
             toggle_frame,
-            options=[("Default", "default"), ("Copy", "copy"), ("Show", "show")],
+            options=[("Default", "default"), ("Copy", "copy"), ("Show", "show"), ("Type", "type")],
             default_value="default"
         )
         self.response_toggle.pack(anchor=tk.CENTER)

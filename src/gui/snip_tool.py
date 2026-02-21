@@ -272,10 +272,14 @@ class SnipToolApp:
                     task = template.format(custom_input=custom_input)
             
             # Determine display mode
+            type_to_field = False
             if response_mode == "show":
                 show_in_chat = True
             elif response_mode == "copy":
                 show_in_chat = False
+            elif response_mode == "type":
+                show_in_chat = False
+                type_to_field = True
             else:  # "default"
                 # Check action config
                 # Default for SnipTool actions is usually show_chat_window=True
@@ -313,6 +317,14 @@ class SnipToolApp:
                 window_title = f"📷 {action_key}"
                 image_info = f"{self.current_capture.width}x{self.current_capture.height}"
             
+            # Determine output label for logging
+            if type_to_field:
+                output_label = "Type to Field"
+            elif show_in_chat:
+                output_label = "Chat Window"
+            else:
+                output_label = "Clipboard"
+            
             # Log the request
             print(f"\n{'─'*60}")
             print(f"[SnipTool] Processing: {action_key}")
@@ -321,9 +333,12 @@ class SnipToolApp:
                 print(f"[SnipTool] Compare Mode: Enabled")
             if active_modifiers:
                 print(f"[SnipTool] Modifiers: {', '.join(active_modifiers)}")
-            print(f"[SnipTool] Mode: {response_mode} (Output: {'Chat Window' if show_in_chat else 'Clipboard'})")
+            print(f"[SnipTool] Mode: {response_mode} (Output: {output_label})")
             
-            if show_in_chat:
+            if type_to_field:
+                from ..request_pipeline import RequestOrigin
+                self._type_to_active_field(messages, action_key, RequestOrigin.SNIP_TOOL)
+            elif show_in_chat:
                 from ..request_pipeline import RequestOrigin
                 # Set origin for session tracking before streaming
                 self._current_session_origin = f"snip:{action_key}"
@@ -431,6 +446,116 @@ class SnipToolApp:
             except Exception as e:
                 logging.error(f"Failed to copy to clipboard: {e}")
                 print(f"  [Error] Failed to copy: {e}")
+
+    def _type_to_active_field(self, messages, action_key, origin):
+        """
+        Execute API request and type the response into the active field.
+        
+        Delegates to the existing TextEditToolApp instance which already has
+        all the typing infrastructure (_call_api, _type_text_chunk, _paste_text_instant,
+        _start_abort_listener, etc.).
+        
+        Args:
+            messages: API messages to send
+            action_key: The action name for logging
+            origin: RequestOrigin for logging
+        """
+        from .text_edit_tool import get_instance as get_text_edit_instance
+        
+        text_edit = get_text_edit_instance()
+        if not text_edit:
+            logging.error("[SnipTool] TextEditTool instance not available for Type mode")
+            print("  [Error] TextEditTool not available - cannot type to field")
+            from .popups import show_error_popup
+            show_error_popup(
+                title="Type Mode Unavailable",
+                message="TextEditTool must be enabled to use Type mode.",
+                details="The TextEditTool instance is required for keyboard typing functionality."
+            )
+            return
+        
+        streaming_enabled = self.config.get("streaming_enabled", True)
+        
+        if streaming_enabled:
+            print(f"[AI Response] Streaming to active field... [{text_edit.abort_hotkey.title()} to abort]")
+            
+            # Use TextEditTool's abort listener and typing indicator
+            text_edit._start_abort_listener()
+            from .core import show_typing_indicator, dismiss_typing_indicator
+            show_typing_indicator(text_edit.abort_hotkey)
+            
+            # Buffer to accumulate chunks before typing (helps with Unicode)
+            chunk_buffer = []
+            buffer_size = 0
+            MIN_BUFFER_CHARS = 20
+            typing_aborted = False
+            
+            def type_chunk(chunk):
+                """Buffer chunks and type when buffer is large enough."""
+                nonlocal chunk_buffer, buffer_size, typing_aborted
+                
+                if text_edit.streaming_aborted or typing_aborted:
+                    return
+                
+                chunk_buffer.append(chunk)
+                buffer_size += len(chunk)
+                
+                if buffer_size >= MIN_BUFFER_CHARS:
+                    text_to_type = ''.join(chunk_buffer)
+                    chunk_buffer.clear()
+                    buffer_size = 0
+                    if not text_edit._type_text_chunk(text_to_type):
+                        typing_aborted = True
+            
+            try:
+                response, error = text_edit._call_api(
+                    messages,
+                    on_chunk=type_chunk,
+                    origin_override=origin
+                )
+                
+                # Type any remaining buffered text (unless aborted)
+                if chunk_buffer and not text_edit.streaming_aborted and not typing_aborted:
+                    text_edit._type_text_chunk(''.join(chunk_buffer))
+            finally:
+                text_edit._stop_abort_listener()
+                dismiss_typing_indicator()
+            
+            if error:
+                logging.error(f'Type mode request failed: {error}')
+                print(f"  [Error] {error}")
+                from .popups import show_error_popup
+                show_error_popup(
+                    title=f"'{action_key}' Failed",
+                    message="Failed to process image for typing.",
+                    details=error
+                )
+                return
+            
+            if not text_edit.streaming_aborted:
+                print(f"\n✅ Response streamed ({len(response) if response else 0} chars)")
+        else:
+            # Non-streaming: get full response then paste instantly
+            response, error = text_edit._call_api(
+                messages,
+                origin_override=origin
+            )
+            
+            if error:
+                logging.error(f'Type mode request failed: {error}')
+                print(f"  [Error] {error}")
+                from .popups import show_error_popup
+                show_error_popup(
+                    title=f"'{action_key}' Failed",
+                    message="Failed to process image for typing.",
+                    details=error
+                )
+                return
+            
+            if response:
+                print(f"[Pasting to active field...]")
+                text_edit._paste_text_instant(response)
+                print(f"✅ Response pasted ({len(response)} chars)")
 
     def _stream_to_chat_window(
         self,
