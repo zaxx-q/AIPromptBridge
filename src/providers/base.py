@@ -83,7 +83,7 @@ class BaseProvider(ABC):
     - 429 Rate Limit: Immediate key rotation, no delay
     - 401/402/403 Auth Error: Immediate key rotation
     - 5xx Server Error: 2 second delay, then retry
-    - Empty Response (0 tokens + no content): Key rotation, 2 second delay
+    - Empty Response: 2 second delay, then retry (no key rotation)
     - Network Error: Key rotation, 1 second delay
     
     Configuration (from config dict):

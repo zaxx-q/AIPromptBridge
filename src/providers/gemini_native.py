@@ -578,7 +578,6 @@ class GeminiNativeProvider(BaseProvider):
                 if self.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
                     delay = self.get_retry_delay(RetryReason.EMPTY_RESPONSE)
                     self.log_retry(RetryReason.EMPTY_RESPONSE, retry_count + 1, delay, "no audio data in response")
-                    self.rotate_key_if_possible("(empty TTS response)")
                     
                     if delay > 0:
                         time.sleep(delay)
@@ -1183,7 +1182,6 @@ class GeminiNativeProvider(BaseProvider):
                 if self.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
                     delay = self.get_retry_delay(RetryReason.EMPTY_RESPONSE)
                     self.log_retry(RetryReason.EMPTY_RESPONSE, retry_count + 1, delay, "0 output tokens, no content")
-                    self.rotate_key_if_possible("(empty response)")
                     
                     if delay > 0:
                         time.sleep(delay)
@@ -1399,7 +1397,6 @@ class GeminiNativeProvider(BaseProvider):
                 if self.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
                     delay = self.get_retry_delay(RetryReason.EMPTY_RESPONSE)
                     self.log_retry(RetryReason.EMPTY_RESPONSE, retry_count + 1, delay, "0 output tokens, no content")
-                    self.rotate_key_if_possible("(empty response)")
                     
                     if delay > 0:
                         time.sleep(delay)

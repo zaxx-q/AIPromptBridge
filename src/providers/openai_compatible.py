@@ -622,7 +622,6 @@ class OpenAICompatibleProvider(BaseProvider):
                 if self.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
                     delay = self.get_retry_delay(RetryReason.EMPTY_RESPONSE)
                     self.log_retry(RetryReason.EMPTY_RESPONSE, retry_count + 1, delay, "0 output tokens, no content")
-                    self.rotate_key_if_possible("(empty response)")
                     
                     if delay > 0:
                         time.sleep(delay)
@@ -849,7 +848,6 @@ class OpenAICompatibleProvider(BaseProvider):
                 if self.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
                     delay = self.get_retry_delay(RetryReason.EMPTY_RESPONSE)
                     self.log_retry(RetryReason.EMPTY_RESPONSE, retry_count + 1, delay, "0 output tokens, no content")
-                    self.rotate_key_if_possible("(empty response)")
                     
                     if delay > 0:
                         time.sleep(delay)
