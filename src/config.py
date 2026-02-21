@@ -41,10 +41,11 @@ DEFAULT_CONFIG = {
     #                   which is further overridden by popup radio button selection
     "show_ai_response_in_chat_window": False,
     # Session Auto-Save Setting:
-    # controls when sessions are persisted to disk.
-    # - "on_followup" (default): Save only when user sends a follow-up message in chat window.
-    # - "always_window": Save whenever a new chat window is opened.
-    # - "on_attachment": Save whenever a window is opened AND has attachments.
+    # controls when new sessions are automatically created and persisted to disk.
+    # Note: A session is ALWAYS saved when receiving an AI response or sending a reply.
+    # - "on_followup": Create session only when receiving AI response or sending a reply.
+    # - "on_attachment": Create session when chat window has attachments.
+    # - "always_window": Create session whenever a new chat window is opened from Tools.
     "auto_save_session": "on_attachment",
     # Streaming and thinking settings
     "streaming_enabled": True,
@@ -311,10 +312,11 @@ default_provider = google
 show_ai_response_in_chat_window = false
 
 # Session Auto-Save Setting:
-# controls when sessions are persisted to disk.
-# - "on_followup" (default): Save only when user sends a follow-up message in chat window.
-# - "always_window": Save whenever a new chat window is opened.
-# - "on_attachment": Save whenever a window is opened AND has attachments.
+# controls when new sessions are automatically created and persisted to disk.
+# Note: A session is ALWAYS saved when receiving an AI response or sending a reply.
+# - "on_followup": Create session only when user sends a reply.
+# - "on_attachment": Create session when replying OR when attaching files to a new window.
+# - "always_window": Create session whenever a new chat window is opened.
 auto_save_session = on_attachment
 
 # Custom API configuration

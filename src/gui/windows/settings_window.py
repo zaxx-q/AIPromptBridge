@@ -856,8 +856,12 @@ class SettingsWindow:
             )
             self.widgets["auto_save_session"].pack(side="left", padx=(12, 0))
             
-            ctk.CTkLabel(row, text="Creation trigger: reply (on_followup), open (always_window), or has files (on_attachment)", font=get_ctk_font(11),
-                        **get_ctk_label_colors(self.colors, muted=True)).pack(side="left", padx=(15, 0))
+            info_frame = ctk.CTkFrame(row, fg_color="transparent")
+            info_frame.pack(side="left", fill="both", expand=True, padx=(15, 0))
+            ctk.CTkLabel(info_frame, text="When to save new session. Sessions are ALWAYS saved when receiving an AI response or sending a reply.", font=get_ctk_font(11),
+                        anchor="w", justify="left", **get_ctk_label_colors(self.colors, muted=True)).pack(anchor="w")
+            ctk.CTkLabel(info_frame, text="on_followup: Create session only when receiving AI response or sending a reply.\non_attachment: Create session when chat window has attachments.\nalways_window: Create session whenever a new chat window is opened from Tools.", font=get_ctk_font(11),
+                        anchor="w", justify="left", **get_ctk_label_colors(self.colors, muted=True)).pack(anchor="w")
         else:
             from tkinter import ttk
             tk.Label(row, text="New session auto-creation:", font=("Segoe UI", 10), width=18, anchor="w",
@@ -869,8 +873,12 @@ class SettingsWindow:
             )
             self.widgets["auto_save_session"].pack(side="left", padx=(10, 0))
             
-            tk.Label(row, text="Creation trigger: reply (on_followup), open (always_window), or has files (on_attachment)", font=("Segoe UI", 9),
-                    bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
+            info_frame = tk.Frame(row, bg=self.colors.bg)
+            info_frame.pack(side="left", fill="both", expand=True, padx=(15, 0))
+            tk.Label(info_frame, text="When to save new session. Sessions are ALWAYS saved when receiving an AI response or sending a reply.", font=("Segoe UI", 9),
+                    anchor="w", justify="left", bg=self.colors.bg, fg=self.colors.blockquote).pack(anchor="w")
+            tk.Label(info_frame, text="on_followup: Create session only when receiving AI response or sending a reply.\non_attachment: Create session when chat window has attachments.\nalways_window: Create session whenever a new chat window is opened from Tools.", font=("Segoe UI", 9),
+                    anchor="w", justify="left", bg=self.colors.bg, fg=self.colors.blockquote).pack(anchor="w")
 
         # Limits section
         create_section_header(content_parent, "🚦 Limits", self.colors, top_padding=20)
