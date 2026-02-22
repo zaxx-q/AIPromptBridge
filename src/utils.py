@@ -112,8 +112,18 @@ def play_sound(path: str, async_play: bool = True) -> bool:
         from pathlib import Path
         
         sound_path = Path(path)
+        is_compiled = getattr(sys, "frozen", False) or "__compiled__" in dir()
+
+        if is_compiled:
+            # In compiled split-build mode, CWD is the launcher directory,
+            # but assets are bundled next to the internal executable in bin/
+            exe_dir = Path(sys.executable).parent
+            compiled_path = exe_dir / path
+            if compiled_path.exists():
+                sound_path = compiled_path
+
         if not sound_path.exists():
-            logging.debug(f"[Sound] File not found: {path}")
+            logging.debug(f"[Sound] File not found: {path} (Checked {sound_path.absolute()})")
             return False
         
         flags = winsound.SND_FILENAME

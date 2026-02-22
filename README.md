@@ -117,7 +117,7 @@ The **TTS Processor** tool enables batch text-to-speech generation:
 
 1. Download `AIPromptBridge.zip` from [GitHub Releases](https://github.com/zaxx-q/AIPromptBridge/releases)
 2. Extract and run `AIPromptBridge.exe` (use `AIPromptBridge-NoConsole.exe` to hide console)
-3. On first launch, it automatically opens the Settings window in **API Keys** tab. Enter API keys, enter key name (Optional), and click **Add**
+3. On first launch, it automatically opens the Settings window in **API Keys** tab. Enter your API keys (see [Getting API Keys](#getting-api-keys)), enter key name (Optional), and click **Add**
 4. Optionally configure selected provider, endpoint URL or models in **Provider** tab and click **Save**
 5. The app starts minimized to system tray
 
@@ -241,6 +241,11 @@ For advanced users, configuration files are stored in the application root:
 - Enable thinking mode for complex tasks
 - Use specific prompts in TextEditTool
 - Add context when asking questions
+
+### Getting API Keys
+- **Google Gemini (Recommended)**: Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- **OpenRouter**: Get an API key from [OpenRouter](https://openrouter.ai/keys)
+- **OpenAI**: Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
 
 ### API Key Management
 - Add multiple API keys (one per line) for automatic rotation

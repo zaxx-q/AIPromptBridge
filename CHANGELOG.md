@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.3.1] - 2026-02-22
+
+### Fixes
+
+- **Launch on Startup**: Fixed an issue where the standard Tkinter UI fallback setting was ignored when the app was launched automatically on Windows startup.
+- **Sounds**: Fixed an issue where notification sounds would not play when using the standalone executable package.
+
 ## [5.3.0] - 2026-02-21
 
 ### New Features
