@@ -2221,7 +2221,9 @@ class FileProcessor(BaseTool):
                         elif mode == LARGE_FILE_MODE_CHUNKING and is_audio:
                             # Use FFmpeg chunking on the processed file
                             response = self._process_audio_with_chunking(
-                                process_path, final_prompt, cp, interactive, skip_preprocessing=True
+                                process_path, final_prompt, cp, interactive,
+                                skip_preprocessing=True,
+                                original_name=file_path_obj.name
                             )
                         
                         else:
@@ -2238,7 +2240,8 @@ class FileProcessor(BaseTool):
                     else:
                         # Standard inline processing
                         response = self._process_file_inline(
-                            process_path, final_prompt, cp, interactive
+                            process_path, final_prompt, cp, interactive,
+                            original_name=file_path_obj.name
                         )
                     
                     if response is None:
@@ -2565,16 +2568,18 @@ class FileProcessor(BaseTool):
         filepath: Path,
         prompt: str,
         checkpoint: FileProcessorCheckpoint,
-        interactive: bool
+        interactive: bool,
+        original_name: Optional[str] = None
     ) -> Optional[str]:
         """
         Process a file using inline base64 data.
         
         Args:
-            filepath: Path to file
+            filepath: Path to file (may be a temp processed file)
             prompt: Processing prompt
             checkpoint: Current checkpoint
             interactive: Show progress
+            original_name: Original filename for context (when filepath is a temp file)
             
         Returns:
             Response text or None on failure
@@ -2583,7 +2588,12 @@ class FileProcessor(BaseTool):
         from src import web_server
         
         # Build message (respect user's filename context preference)
-        message = self.file_handler.build_api_message(filepath, prompt, include_filename=self._include_filename)
+        # Pass original_name so the AI sees the real filename, not a temp processed one
+        message = self.file_handler.build_api_message(
+            filepath, prompt,
+            include_filename=self._include_filename,
+            display_name=original_name
+        )
         
         # Call API
         response, error = call_api_with_retry(
@@ -2906,16 +2916,19 @@ class FileProcessor(BaseTool):
         prompt: str,
         checkpoint: FileProcessorCheckpoint,
         interactive: bool,
-        skip_preprocessing: bool = False
+        skip_preprocessing: bool = False,
+        original_name: Optional[str] = None
     ) -> Optional[str]:
         """
         Process audio file by splitting into chunks.
         
         Args:
-            filepath: Path to audio file
+            filepath: Path to audio file (may be a temp processed file)
             prompt: Processing prompt
             checkpoint: Current checkpoint
             interactive: Show progress
+            skip_preprocessing: Skip audio preprocessing (already done)
+            original_name: Original filename for context (when filepath is a temp file)
             
         Returns:
             Merged transcript or None on failure
@@ -2954,7 +2967,20 @@ class FileProcessor(BaseTool):
                     print(f"   [{i+1}/{len(result.chunks)}] Processing {chunk.time_range_str}...")
                 
                 # Build message for chunk
-                message = self.file_handler.build_api_message(chunk.path, prompt, include_filename=False)
+                # Use original filename with part number for context
+                total_chunks = len(result.chunks)
+                if original_name and total_chunks > 1:
+                    # e.g., "interview.mp3 (Part 1/3)"
+                    chunk_display = f"{original_name} (Part {i+1}/{total_chunks})"
+                elif original_name:
+                    chunk_display = original_name
+                else:
+                    chunk_display = None
+                message = self.file_handler.build_api_message(
+                    chunk.path, prompt,
+                    include_filename=self._include_filename,
+                    display_name=chunk_display
+                )
                 
                 # Call API
                 response, error = call_api_with_retry(

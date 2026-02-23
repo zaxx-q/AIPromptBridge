@@ -1,5 +1,11 @@
 # Changelog
 
+## [5.3.2] - 2026-02-23
+
+### Fixes
+
+- **File Processor**: Fixed an issue where temporary file names were injected into the AI context instead of the original user-facing filenames when processing certain media modes. Also improved context injection for chunked audio (e.g., appended `Part 1/3`).
+
 ## [5.3.1] - 2026-02-22
 
 ### Fixes

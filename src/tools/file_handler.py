@@ -266,7 +266,8 @@ class FileHandler:
         self,
         filepath: Path,
         prompt: str,
-        include_filename: bool = True
+        include_filename: bool = True,
+        display_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Build API message with file content.
@@ -275,6 +276,9 @@ class FileHandler:
             filepath: Path to file
             prompt: Processing prompt
             include_filename: Include filename in prompt for context
+            display_name: Override display name for the file (e.g., original name
+                         when filepath points to a processed temp file). If None,
+                         uses filepath.name.
         
         Returns:
             Message dict in OpenAI format (for images) or Gemini format (for audio)
@@ -283,13 +287,15 @@ class FileHandler:
         
         content_type, content, mime_type = self.read_file(filepath)
         
-        # Add filename prefix for non-text files when requested
-        # (Text files have filename in the <file_content> tag)
-        filename_prefix = ""
+        # For non-text files, filename context is appended at the end of the prompt
+        # (not prefixed) so the AI processes the main instructions first.
+        filename_context = ""
         if include_filename and content_type in ("image", "audio", "document"):
-            filename_prefix = f"[File: {filepath.name}]\n\n"
+            # Use the provided display_name, or fall back to the actual filepath name
+            name = display_name or filepath.name
+            filename_context = f"\n\n[File: {name}]"
         
-        full_prompt = f"{filename_prefix}{prompt}" if filename_prefix else prompt
+        full_prompt = f"{prompt}{filename_context}" if filename_context else prompt
         
         if content_type == "image":
             # Returns list of messages, we extract the user message
