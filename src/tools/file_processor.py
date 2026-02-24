@@ -2254,7 +2254,8 @@ class FileProcessor(BaseTool):
                             Path(cp.output_path),
                             cp.naming_template,
                             cp.output_extension,
-                            index=len(cp.completed_files)
+                            index=len(cp.completed_files),
+                            base_input_path=Path(cp.input_path) if cp.input_path else None
                         )
                         
                         # Write output

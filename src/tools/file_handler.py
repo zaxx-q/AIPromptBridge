@@ -361,7 +361,8 @@ class FileHandler:
         output_dir: Optional[Path],
         naming_template: str,
         extension: str,
-        index: int = 0
+        index: int = 0,
+        base_input_path: Optional[Path] = None
     ) -> Path:
         """
         Generate output file path based on template.
@@ -379,6 +380,9 @@ class FileHandler:
             naming_template: Naming template string
             extension: Output file extension (e.g., ".md")
             index: File index for {index} variable
+            base_input_path: Root input directory for recursive scans.
+                When provided, the subdirectory structure of input_path
+                relative to base_input_path is preserved under output_dir.
         
         Returns:
             Output file path
@@ -410,6 +414,16 @@ class FileHandler:
             out_dir = Path(output_dir)
         else:
             out_dir = input_path.parent
+        
+        # Preserve subdirectory structure for recursive scans
+        if base_input_path:
+            base = Path(base_input_path)
+            try:
+                relative_subdir = input_path.parent.relative_to(base)
+                out_dir = out_dir / relative_subdir
+            except ValueError:
+                # input_path is not under base_input_path; fall back to flat
+                pass
         
         return out_dir / output_name
     
