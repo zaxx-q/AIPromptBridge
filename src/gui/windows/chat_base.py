@@ -378,6 +378,9 @@ class ChatWindowBase(ABC):
         # Setup text tags for markdown
         setup_text_tags(self.chat_text, self.colors)
         self.chat_text.tag_bind("thinking_header", "<Button-1>", self._on_thinking_click)
+        
+        # Right-click context menu for message editing
+        self.chat_text.bind("<Button-3>", self._on_chat_right_click)
     
     def _create_input_area(self):
         """Create the message input area with attachment button."""
@@ -706,6 +709,9 @@ class ChatWindowBase(ABC):
             if i > 0:
                 self.chat_text.insert(tk.END, "\n", "card_gap")
             
+            # Track message start position for per-message tag
+            msg_start = self.chat_text.index(tk.END)
+            
             # Determine styling based on role
             if role == "user":
                 accent_tag = "user_accent_bar"
@@ -718,9 +724,31 @@ class ChatWindowBase(ABC):
                 message_tag = "assistant_message"
                 label_text = "Assistant"
             
-            # Insert accent bar + label (first line of card only)
+            # Insert accent bar + label with inline action icons
             self.chat_text.insert(tk.END, "▌ ", (accent_tag, message_tag))
-            self.chat_text.insert(tk.END, f"{label_text}\n", (label_tag, message_tag))
+            self.chat_text.insert(tk.END, label_text, (label_tag, message_tag))
+            
+            # Per-message action icon tags with click handlers
+            edit_tag = f"edit_{i}"
+            rerun_tag = f"rerun_{i}"
+            more_tag = f"more_{i}"
+            for atag in (edit_tag, rerun_tag, more_tag):
+                self.chat_text.tag_configure(atag)
+                self.chat_text.tag_bind(atag, "<Enter>",
+                    lambda e: self.chat_text.config(cursor="hand2"))
+                self.chat_text.tag_bind(atag, "<Leave>",
+                    lambda e: self.chat_text.config(cursor=""))
+            self.chat_text.tag_bind(edit_tag, "<Button-1>",
+                lambda e, idx=i: self._edit_message(idx))
+            self.chat_text.tag_bind(rerun_tag, "<Button-1>",
+                lambda e, idx=i: self._rerun_turn(idx))
+            self.chat_text.tag_bind(more_tag, "<Button-1>",
+                lambda e, idx=i: self._show_message_context_menu(e, idx))
+            
+            self.chat_text.insert(tk.END, "  ✏", ("action_icon", edit_tag, message_tag))
+            self.chat_text.insert(tk.END, " ↻", ("action_icon", rerun_tag, message_tag))
+            self.chat_text.insert(tk.END, " ⋮", ("action_icon", more_tag, message_tag))
+            self.chat_text.insert(tk.END, "\n", (message_tag,))
             
             # Render per-message attachments
             msg_attachments = msg.get("attachments", [])
@@ -776,6 +804,11 @@ class ChatWindowBase(ABC):
             
             # End of card - add trailing newline
             self.chat_text.insert(tk.END, "\n", (message_tag,))
+            
+            # Add per-message tracking tag to entire message range
+            msg_idx_tag = f"msg_{i}"
+            self.chat_text.tag_configure(msg_idx_tag)
+            self.chat_text.tag_add(msg_idx_tag, msg_start, self.chat_text.index(tk.END))
         
         self.chat_text.configure(state=tk.DISABLED)
         
@@ -1013,8 +1046,14 @@ class ChatWindowBase(ABC):
         # Trigger regeneration
         self._regenerate_response()
     
-    def _regenerate_response(self):
-        """Internal method to regenerate without adding new user message."""
+    def _regenerate_response(self, on_complete=None):
+        """Internal method to regenerate without adding new user message.
+        
+        Args:
+            on_complete: Optional callback invoked after successful response,
+                        before display update. Used by _rerun_turn() to restore
+                        saved messages via closure.
+        """
         if self._destroyed:
             return
         
@@ -1125,6 +1164,11 @@ class ChatWindowBase(ABC):
                         self.session.messages[-1]["thinking"] = thinking_content
                     
                     self.last_response = ctx.response_text
+                    
+                    # Restore saved messages if provided via closure (rerun turn)
+                    if on_complete:
+                        on_complete()
+                    
                     self._update_chat_display(scroll_to_bottom=True)
                     
                     usage_str = ""
@@ -1953,6 +1997,193 @@ class ChatWindowBase(ABC):
         threading.Thread(target=process_message, daemon=True).start()
     
     # =========================================================================
+    # Message Editing & Context Menu
+    # =========================================================================
+    
+    def _get_message_index_at(self, event) -> Optional[int]:
+        """Get message index from click position by checking msg_N tags."""
+        try:
+            index = self.chat_text.index(f"@{event.x},{event.y}")
+            tags = self.chat_text.tag_names(index)
+            for tag in tags:
+                if tag.startswith("msg_"):
+                    try:
+                        return int(tag[4:])
+                    except ValueError:
+                        pass
+        except tk.TclError:
+            pass
+        return None
+    
+    def _save_and_refresh(self):
+        """Save session and refresh display after mutation."""
+        from ... import web_server
+        add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
+        self._update_chat_display(preserve_scroll=True)
+    
+    def _on_chat_right_click(self, event):
+        """Handle right-click on chat text for context menu."""
+        index = self._get_message_index_at(event)
+        if index is not None:
+            self._show_message_context_menu(event, index)
+    
+    def _show_message_context_menu(self, event, index: int):
+        """Show context menu for a specific message."""
+        if self.is_loading or index >= len(self.session.messages):
+            return
+        
+        msg = self.session.messages[index]
+        role = msg["role"]
+        is_user = role == "user"
+        
+        menu = tk.Menu(self.root, tearoff=0)
+        
+        label_edit = "Edit Message" if is_user else "Edit Response"
+        label_copy = "Copy Message" if is_user else "Copy Response"
+        label_delete = "Delete Message" if is_user else "Delete Response"
+        
+        menu.add_command(label=f"✏  {label_edit}",
+                        command=lambda: self._edit_message(index))
+        menu.add_command(label="↻  Rerun This Turn",
+                        command=lambda: self._rerun_turn(index))
+        menu.add_command(label=f"📋  {label_copy}",
+                        command=lambda: self._copy_message(index))
+        menu.add_separator()
+        menu.add_command(label=f"🗑  {label_delete}",
+                        command=lambda: self._delete_message(index))
+        menu.add_command(label="✂  Delete From Here",
+                        command=lambda: self._delete_from_here(index))
+        menu.add_command(label="🌿  Branch From Here",
+                        command=lambda: self._branch_from_here(index))
+        
+        try:
+            menu.post(event.x_root, event.y_root)
+        except (tk.TclError, AttributeError):
+            # Fallback for events without x_root/y_root
+            x = self.chat_text.winfo_rootx() + event.x
+            y = self.chat_text.winfo_rooty() + event.y
+            menu.post(x, y)
+    
+    def _delete_message(self, index: int):
+        """Delete a single message from the session."""
+        if self.is_loading:
+            return
+        if 0 <= index < len(self.session.messages):
+            self.session.messages.pop(index)
+            self._save_and_refresh()
+            self._update_status("Message deleted")
+    
+    def _delete_from_here(self, index: int):
+        """Delete the target message and all subsequent messages."""
+        if self.is_loading:
+            return
+        if 0 <= index < len(self.session.messages):
+            count = len(self.session.messages) - index
+            if count > 1:
+                from tkinter import messagebox
+                if not messagebox.askyesno(
+                    "Confirm Delete",
+                    f"Delete {count} messages from here to end?",
+                    parent=self.root
+                ):
+                    return
+            self.session.messages = self.session.messages[:index]
+            self._save_and_refresh()
+            self._update_status(f"Deleted {count} message(s)")
+    
+    def _copy_message(self, index: int):
+        """Copy a single message's content to clipboard."""
+        if 0 <= index < len(self.session.messages):
+            content = self.session.messages[index]["content"]
+            if copy_to_clipboard(content, self.root):
+                self._update_status("✅ Copied!", self.theme.accent_green)
+            else:
+                self._update_status("✗ Failed to copy", self.theme.accent_red)
+    
+    def _edit_message(self, index: int):
+        """Open modal dialog to edit a message's content."""
+        if self.is_loading or index >= len(self.session.messages):
+            return
+        
+        msg = self.session.messages[index]
+        dialog = _EditMessageDialog(self.root, msg, self.theme, self.colors)
+        
+        if dialog.result is None:
+            return
+        
+        action, new_text = dialog.result
+        self.session.messages[index]["content"] = new_text
+        
+        if action == "save":
+            self._save_and_refresh()
+            self._update_status("✅ Message edited", self.theme.accent_green)
+        elif action == "save_rerun":
+            self._rerun_turn(index)
+    
+    def _rerun_turn(self, index: int):
+        """Rerun a turn: regenerate the assistant response without deleting subsequent messages.
+        
+        Uses closure-based state to capture and restore messages after the target,
+        avoiding fragile instance-level state.
+        """
+        if self.is_loading or index >= len(self.session.messages):
+            return
+        
+        msg = self.session.messages[index]
+        
+        if msg["role"] == "user":
+            # Target the assistant response at index+1 (if it exists)
+            assistant_idx = index + 1
+            if assistant_idx < len(self.session.messages) and \
+               self.session.messages[assistant_idx]["role"] == "assistant":
+                saved_messages = self.session.messages[assistant_idx + 1:]
+                self.session.messages = self.session.messages[:assistant_idx]
+            else:
+                # No assistant response after this user message — just generate
+                saved_messages = self.session.messages[index + 1:]
+                self.session.messages = self.session.messages[:index + 1]
+        else:
+            # Assistant message — regenerate this response
+            saved_messages = self.session.messages[index + 1:]
+            self.session.messages = self.session.messages[:index]
+        
+        def restore_after_rerun():
+            """Closure captures saved_messages — no instance state needed."""
+            self.session.messages.extend(saved_messages)
+        
+        self._update_chat_display(scroll_to_bottom=True)
+        self._update_status("Rerunning turn...")
+        self._regenerate_response(on_complete=restore_after_rerun)
+    
+    def _branch_from_here(self, index: int):
+        """Create a new session branched from the selected message and open it."""
+        if index >= len(self.session.messages):
+            return
+        
+        from ...session_manager import ChatSession
+        from ... import web_server
+        
+        # Create new session with copied messages up to and including index
+        new_session = ChatSession(origin=f"branch:{self.session.session_id}")
+        new_session.messages = [msg.copy() for msg in self.session.messages[:index + 1]]
+        new_session.title = f"Branch: {self.session.title or 'Untitled'}"
+        new_session.system_instruction = self.session.system_instruction
+        
+        # Save the branched session
+        add_session(new_session, web_server.CONFIG.get("max_sessions", 200))
+        
+        # Open new chat window via coordinator
+        from ..core import GUICoordinator
+        coordinator = GUICoordinator.get_instance()
+        if coordinator:
+            coordinator.request_chat_window(new_session)
+        
+        self._update_status(
+            f"✅ Branched to session #{new_session.session_id}",
+            self.theme.accent_green
+        )
+    
+    # =========================================================================
     # Focus & Close
     # =========================================================================
     
@@ -1980,6 +2211,170 @@ class ChatWindowBase(ABC):
         except tk.TclError:
             pass
         self.root = None
+
+
+class _EditMessageDialog:
+    """Modal dialog for editing a message's content."""
+    
+    def __init__(self, parent, message: dict, theme, colors):
+        self.result = None  # ("save", text) | ("save_rerun", text) | None
+        
+        role = message["role"]
+        title = "Edit Message" if role == "user" else "Edit Response"
+        content = message["content"]
+        
+        # Create dialog window
+        if HAVE_CTK:
+            self.dialog = ctk.CTkToplevel(parent)
+            self.dialog.configure(fg_color=theme.bg)
+        else:
+            self.dialog = tk.Toplevel(parent)
+            self.dialog.configure(bg=colors["bg"])
+        
+        self.dialog.title(title)
+        self.dialog.geometry("600x400")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        # Center on parent
+        self.dialog.update_idletasks()
+        px = parent.winfo_rootx() + (parent.winfo_width() - 600) // 2
+        py = parent.winfo_rooty() + (parent.winfo_height() - 400) // 2
+        self.dialog.geometry(f"+{max(0, px)}+{max(0, py)}")
+        
+        self.dialog.columnconfigure(0, weight=1)
+        self.dialog.rowconfigure(1, weight=1)
+        
+        # Title label
+        if HAVE_CTK:
+            ctk.CTkLabel(
+                self.dialog, text=title,
+                font=get_ctk_font(size=14, weight="bold"),
+                text_color=theme.accent
+            ).grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
+        else:
+            tk.Label(
+                self.dialog, text=title,
+                font=("Segoe UI", 12, "bold"),
+                bg=colors["bg"], fg=colors["accent"]
+            ).grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
+        
+        # Text area
+        if HAVE_CTK:
+            textbox_colors = get_ctk_textbox_colors(theme)
+            self.text_area = ctk.CTkTextbox(
+                self.dialog,
+                font=get_ctk_font(size=12),
+                corner_radius=8,
+                border_width=1,
+                wrap="word",
+                **textbox_colors
+            )
+            self.text_area.grid(row=1, column=0, padx=15, pady=5, sticky="nsew")
+            self.text_area.insert("0.0", content)
+        else:
+            self.text_area = tk.Text(
+                self.dialog,
+                font=("Segoe UI", 11),
+                wrap=tk.WORD,
+                bg=colors.get("input_bg", colors["text_bg"]),
+                fg=colors["fg"],
+                insertbackground=colors["fg"],
+                relief=tk.FLAT,
+                highlightthickness=1,
+                highlightbackground=colors["border"]
+            )
+            self.text_area.grid(row=1, column=0, padx=15, pady=5, sticky="nsew")
+            self.text_area.insert("1.0", content)
+        
+        # Button row
+        if HAVE_CTK:
+            btn_frame = ctk.CTkFrame(self.dialog, fg_color="transparent")
+            btn_frame.grid(row=2, column=0, padx=15, pady=(5, 15), sticky="e")
+            
+            warn_colors = get_ctk_button_colors(theme, "warning")
+            ctk.CTkButton(
+                btn_frame, text="Save & Rerun",
+                font=get_ctk_font(size=12),
+                width=110, height=32, corner_radius=8,
+                command=self._save_and_rerun,
+                **warn_colors
+            ).pack(side="left", padx=2)
+            
+            success_colors = get_ctk_button_colors(theme, "success")
+            ctk.CTkButton(
+                btn_frame, text="Save",
+                font=get_ctk_font(size=12),
+                width=70, height=32, corner_radius=8,
+                command=self._save,
+                **success_colors
+            ).pack(side="left", padx=2)
+            
+            sec_colors = get_ctk_button_colors(theme, "secondary")
+            ctk.CTkButton(
+                btn_frame, text="Cancel",
+                font=get_ctk_font(size=12),
+                width=70, height=32, corner_radius=8,
+                command=self._cancel,
+                **sec_colors
+            ).pack(side="left", padx=2)
+        else:
+            btn_frame = tk.Frame(self.dialog, bg=colors["bg"])
+            btn_frame.grid(row=2, column=0, padx=15, pady=(5, 15), sticky="e")
+            
+            tk.Button(
+                btn_frame, text="Save & Rerun",
+                font=("Segoe UI", 10),
+                bg=colors.get("accent_yellow", "#f9e2af"),
+                fg=colors["bg"],
+                relief=tk.FLAT, padx=10, pady=6,
+                command=self._save_and_rerun, cursor="hand2"
+            ).pack(side=tk.LEFT, padx=2)
+            
+            tk.Button(
+                btn_frame, text="Save",
+                font=("Segoe UI", 10),
+                bg=colors["accent"], fg="#ffffff",
+                relief=tk.FLAT, padx=10, pady=6,
+                command=self._save, cursor="hand2"
+            ).pack(side=tk.LEFT, padx=2)
+            
+            tk.Button(
+                btn_frame, text="Cancel",
+                font=("Segoe UI", 10),
+                bg=colors["button_bg"], fg=colors["fg"],
+                relief=tk.FLAT, padx=10, pady=6,
+                command=self._cancel, cursor="hand2"
+            ).pack(side=tk.LEFT, padx=2)
+        
+        # Keyboard shortcuts
+        self.dialog.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.dialog.bind("<Escape>", lambda e: self._cancel())
+        
+        # Focus the text area
+        self.text_area.focus_set()
+        
+        # Block until dialog closes
+        self.dialog.wait_window()
+    
+    def _get_text(self) -> str:
+        """Get current text content from the text area."""
+        if HAVE_CTK:
+            return self.text_area.get("0.0", "end-1c")
+        else:
+            return self.text_area.get("1.0", "end-1c")
+    
+    def _save(self):
+        self.result = ("save", self._get_text())
+        self.dialog.destroy()
+    
+    def _save_and_rerun(self):
+        self.result = ("save_rerun", self._get_text())
+        self.dialog.destroy()
+    
+    def _cancel(self):
+        self.result = None
+        self.dialog.destroy()
 
 
 class BrowserWindowBase(ABC):

@@ -349,6 +349,14 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         spacing1=1, spacing3=2)
     
     # =================================================================
+    # Message action icons (edit, rerun, more)
+    # =================================================================
+    
+    text_widget.tag_configure("action_icon",
+        font=(base_font, 9),
+        foreground=colors.get("overlay0", colors.get("blockquote", "#6c7086")))
+    
+    # =================================================================
     # LaTeX math display
     # =================================================================
     
