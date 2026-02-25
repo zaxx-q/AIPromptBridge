@@ -352,9 +352,15 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     # Message action icons (edit, rerun, more)
     # =================================================================
     
+    # Muted by default — accent highlight on hover is handled per-instance
     text_widget.tag_configure("action_icon",
-        font=(base_font, 9),
-        foreground=colors.get("overlay0", colors.get("blockquote", "#6c7086")))
+        font=(base_font, 10),
+        foreground=colors.get("surface1", colors.get("overlay0", "#585b70")))
+    
+    # Hover-highlighted variant
+    text_widget.tag_configure("action_icon_hover",
+        font=(base_font, 10),
+        foreground=colors.get("accent", "#89b4fa"))
     
     # =================================================================
     # LaTeX math display

@@ -728,16 +728,22 @@ class ChatWindowBase(ABC):
             self.chat_text.insert(tk.END, "▌ ", (accent_tag, message_tag))
             self.chat_text.insert(tk.END, label_text, (label_tag, message_tag))
             
-            # Per-message action icon tags with click handlers
+            # Per-message action icon tags with click handlers + hover highlight
             edit_tag = f"edit_{i}"
             rerun_tag = f"rerun_{i}"
             more_tag = f"more_{i}"
             for atag in (edit_tag, rerun_tag, more_tag):
                 self.chat_text.tag_configure(atag)
                 self.chat_text.tag_bind(atag, "<Enter>",
-                    lambda e: self.chat_text.config(cursor="hand2"))
+                    lambda e, t=atag: (
+                        self.chat_text.config(cursor="hand2"),
+                        self.chat_text.tag_configure(t, foreground=self.theme.accent)
+                    ))
                 self.chat_text.tag_bind(atag, "<Leave>",
-                    lambda e: self.chat_text.config(cursor=""))
+                    lambda e, t=atag: (
+                        self.chat_text.config(cursor=""),
+                        self.chat_text.tag_configure(t, foreground="")
+                    ))
             self.chat_text.tag_bind(edit_tag, "<Button-1>",
                 lambda e, idx=i: self._edit_message(idx))
             self.chat_text.tag_bind(rerun_tag, "<Button-1>",
@@ -745,9 +751,9 @@ class ChatWindowBase(ABC):
             self.chat_text.tag_bind(more_tag, "<Button-1>",
                 lambda e, idx=i: self._show_message_context_menu(e, idx))
             
-            self.chat_text.insert(tk.END, "  ✏", ("action_icon", edit_tag, message_tag))
-            self.chat_text.insert(tk.END, " ↻", ("action_icon", rerun_tag, message_tag))
-            self.chat_text.insert(tk.END, " ⋮", ("action_icon", more_tag, message_tag))
+            self.chat_text.insert(tk.END, "  edit", ("action_icon", edit_tag, message_tag))
+            self.chat_text.insert(tk.END, "  rerun", ("action_icon", rerun_tag, message_tag))
+            self.chat_text.insert(tk.END, "  \u00b7\u00b7\u00b7", ("action_icon", more_tag, message_tag))
             self.chat_text.insert(tk.END, "\n", (message_tag,))
             
             # Render per-message attachments
@@ -1164,19 +1170,26 @@ class ChatWindowBase(ABC):
                         self.session.messages[-1]["thinking"] = thinking_content
                     
                     self.last_response = ctx.response_text
-                    
-                    # Restore saved messages if provided via closure (rerun turn)
-                    if on_complete:
-                        on_complete()
-                    
-                    self._update_chat_display(scroll_to_bottom=True)
-                    
+                
+                # Always restore saved messages (rerun turn) — even on error
+                # so subsequent messages are never permanently lost.
+                # Pass success flag so closure can also restore the original
+                # assistant message on failure.
+                if on_complete:
+                    on_complete(success=not ctx.error)
+                
+                # Always refresh display — on success to show new response,
+                # on error to restore the original conversation state
+                self._update_chat_display(scroll_to_bottom=True)
+                
+                if not ctx.error:
                     usage_str = ""
                     if self.last_usage:
                         usage_str = f" | {self.last_usage.get('total_tokens', 0)} tokens"
                     
                     self._update_status(f"✅ Regenerated{usage_str}", self.theme.accent_green)
-                    add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
+                
+                add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
                 
                 self.is_loading = False
                 if HAVE_CTK:
@@ -2036,24 +2049,34 @@ class ChatWindowBase(ABC):
         role = msg["role"]
         is_user = role == "user"
         
-        menu = tk.Menu(self.root, tearoff=0)
+        # Theme the context menu to match the chat window
+        menu = tk.Menu(
+            self.root, tearoff=0,
+            bg=self.colors.get("surface0", self.colors.get("bg", "#1e1e2e")),
+            fg=self.colors.get("fg", "#cdd6f4"),
+            activebackground=self.colors.get("accent", "#89b4fa"),
+            activeforeground=self.colors.get("bg", "#1e1e2e"),
+            relief=tk.FLAT,
+            borderwidth=1,
+            font=("Segoe UI", 10)
+        )
         
         label_edit = "Edit Message" if is_user else "Edit Response"
         label_copy = "Copy Message" if is_user else "Copy Response"
         label_delete = "Delete Message" if is_user else "Delete Response"
         
-        menu.add_command(label=f"✏  {label_edit}",
+        menu.add_command(label=f"  {label_edit}",
                         command=lambda: self._edit_message(index))
-        menu.add_command(label="↻  Rerun This Turn",
+        menu.add_command(label="  Rerun This Turn",
                         command=lambda: self._rerun_turn(index))
-        menu.add_command(label=f"📋  {label_copy}",
+        menu.add_command(label=f"  {label_copy}",
                         command=lambda: self._copy_message(index))
         menu.add_separator()
-        menu.add_command(label=f"🗑  {label_delete}",
+        menu.add_command(label=f"  {label_delete}",
                         command=lambda: self._delete_message(index))
-        menu.add_command(label="✂  Delete From Here",
+        menu.add_command(label="  Delete From Here",
                         command=lambda: self._delete_from_here(index))
-        menu.add_command(label="🌿  Branch From Here",
+        menu.add_command(label="  Branch From Here",
                         command=lambda: self._branch_from_here(index))
         
         try:
@@ -2130,12 +2153,14 @@ class ChatWindowBase(ABC):
             return
         
         msg = self.session.messages[index]
+        removed_assistant = None  # The original assistant message being replaced
         
         if msg["role"] == "user":
             # Target the assistant response at index+1 (if it exists)
             assistant_idx = index + 1
             if assistant_idx < len(self.session.messages) and \
                self.session.messages[assistant_idx]["role"] == "assistant":
+                removed_assistant = self.session.messages[assistant_idx].copy()
                 saved_messages = self.session.messages[assistant_idx + 1:]
                 self.session.messages = self.session.messages[:assistant_idx]
             else:
@@ -2144,11 +2169,15 @@ class ChatWindowBase(ABC):
                 self.session.messages = self.session.messages[:index + 1]
         else:
             # Assistant message — regenerate this response
+            removed_assistant = self.session.messages[index].copy()
             saved_messages = self.session.messages[index + 1:]
             self.session.messages = self.session.messages[:index]
         
-        def restore_after_rerun():
-            """Closure captures saved_messages — no instance state needed."""
+        def restore_after_rerun(success=True):
+            """Closure captures saved_messages and removed_assistant.
+            On failure, restores the original assistant message too."""
+            if not success and removed_assistant:
+                self.session.messages.append(removed_assistant)
             self.session.messages.extend(saved_messages)
         
         self._update_chat_display(scroll_to_bottom=True)
@@ -2163,8 +2192,8 @@ class ChatWindowBase(ABC):
         from ...session_manager import ChatSession
         from ... import web_server
         
-        # Create new session with copied messages up to and including index
-        new_session = ChatSession(origin=f"branch:{self.session.session_id}")
+        # Carry over the parent's origin so origin-aware system prompts are preserved
+        new_session = ChatSession(origin=self.session.origin)
         new_session.messages = [msg.copy() for msg in self.session.messages[:index + 1]]
         new_session.title = f"Branch: {self.session.title or 'Untitled'}"
         new_session.system_instruction = self.session.system_instruction
