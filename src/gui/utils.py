@@ -699,6 +699,9 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
             if in_code_block:
                 # End code block - render accumulated lines
                 if code_block_lines:
+                    # Add newline before code block if there's preceding content
+                    if text_widget.index(tk.END) != "1.0":
+                        text_widget.insert(tk.END, '\n', build_tags("normal"))
                     # Apply indentation to code block lines
                     code_lines_prefixed = [line_prefix + l for l in code_block_lines]
                     code_text = '\n'.join(code_lines_prefixed)
