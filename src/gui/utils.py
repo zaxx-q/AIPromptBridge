@@ -284,8 +284,9 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         foreground=colors["user_accent"],
         spacing1=0, spacing3=2)
     
-    # User message content (transparent background)
+    # User message content (colored background)
     text_widget.tag_configure("user_message",
+        background=colors["user_bg"],
         lmargin1=0, lmargin2=0, rmargin=8,
         spacing1=0, spacing3=0)
     
@@ -300,8 +301,9 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         foreground=colors["assistant_accent"],
         spacing1=0, spacing3=2)
     
-    # Assistant message content (transparent background)
+    # Assistant message content (colored background)
     text_widget.tag_configure("assistant_message",
+        background=colors["assistant_bg"],
         lmargin1=0, lmargin2=0, rmargin=8,
         spacing1=0, spacing3=0)
     
@@ -385,6 +387,9 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     text_widget.tag_configure("latex_symbols",
         font=("Segoe UI Symbol", 24),
         foreground=colors.get("accent_yellow", colors["accent"]))
+    
+    # Raise "sel" tag priority so text selection always shows over background colors
+    text_widget.tag_raise("sel")
 
 
 def _strip_inline_formatting(text: str) -> Tuple[str, Optional[str]]:
