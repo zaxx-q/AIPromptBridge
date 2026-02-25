@@ -277,38 +277,34 @@ class EmojiRenderer:
                 # Using a single size is safer for basic GDI menus to avoid scaling issues
                 img = pil_img.resize((16, 16), Image.Resampling.LANCZOS)
                 
-                # Convert to RGBA
+                # Convert to RGBA for compositing
                 rgba = img.convert("RGBA")
-                datas = rgba.getdata()
                 
                 # FLATTEN TRANSPARENCY
-                # To completely solve the "white background" on GDI menus,
-                # we composite the icon against a common menu background color.
-                # This is a robust fallback for when true ICO transparency fails.
+                # Composite the emoji against the menu background color so
+                # Windows GDI menus don't show black/white boxes behind the icon.
                 
                 # Determine background color based on system theme
-                bg_color = (240, 240, 240, 255) # Standard Windows Light Menu Gray
+                bg_color = (240, 240, 240, 255)  # Standard Windows Light Menu Gray
                 try:
-                    # We can't import is_dark_mode directly at module level due to circular imports sometimes,
-                    # but try/except block handles it.
                     from .themes import is_dark_mode
                     if is_dark_mode():
-                        bg_color = (32, 32, 32, 255) # Approx Windows Dark Menu (0x202020)
+                        bg_color = (43, 43, 43, 255)  # Windows 11 Dark Menu (#2b2b2b)
                 except ImportError:
                     pass
                 except Exception:
                     pass
                 
-                # Create solid background
+                # Alpha composite onto solid background
                 bg = Image.new('RGBA', (16, 16), bg_color)
-                
-                # Center the emoji (which might have been resized)
-                # Alpha composite
                 combined = Image.alpha_composite(bg, rgba)
                 
-                # Save as ICO (keeping it RGBA is fine, but now alpha is all 255 everywhere)
-                # This guarantees no "white border" because the background is now gray/dark gray
-                combined.save(icon_path, format="ICO", sizes=[(16, 16)])
+                # Convert to RGB (no alpha) to prevent GDI from
+                # misinterpreting residual alpha channel data in the ICO
+                combined_rgb = combined.convert("RGB")
+                
+                # Save as ICO — fully opaque, no transparency artifacts
+                combined_rgb.save(icon_path, format="ICO", sizes=[(16, 16)])
                 return icon_path
                 
         except Exception as e:
@@ -413,13 +409,25 @@ class EmojiRenderer:
             
         return None
     
-    def get_emoji_image(self, emoji: str, size: Optional[int] = None) -> Optional[ImageTk.PhotoImage]:
+    @staticmethod
+    def _hex_to_rgba(hex_color: str) -> Tuple[int, int, int, int]:
+        """Convert a hex color string like '#1e3e2e' to an RGBA tuple."""
+        hex_color = hex_color.lstrip('#')
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        return (r, g, b, 255)
+    
+    def get_emoji_image(self, emoji: str, size: Optional[int] = None,
+                        bg_color: Optional[str] = None) -> Optional[ImageTk.PhotoImage]:
         """
         Load and cache an emoji image as PhotoImage (for tk.Text widgets).
         
         Args:
             emoji: The emoji character(s)
             size: Size in pixels (uses default if not specified)
+            bg_color: Optional hex background color (e.g. '#1e3e2e') to composite
+                      the emoji against, so transparency blends with tag backgrounds.
             
         Returns:
             PhotoImage if found, None otherwise
@@ -434,7 +442,7 @@ class EmojiRenderer:
         # keycaps often have the invisible 20E3
         
         filename = self.get_codepoint_filename(emoji)
-        cache_key = (filename, size)
+        cache_key = (filename, size, bg_color)
         
         # Check cache
         if cache_key in self._cache:
@@ -448,6 +456,13 @@ class EmojiRenderer:
         try:
             # Resize
             pil_image = pil_image.resize((size, size), Image.Resampling.LANCZOS)
+            
+            # Composite against background color if provided
+            # tk.Text embedded images composite against the widget's bg, not the tag's
+            # background. This flattens transparency against the correct tag bg color.
+            if bg_color:
+                bg = Image.new('RGBA', (size, size), self._hex_to_rgba(bg_color))
+                pil_image = Image.alpha_composite(bg, pil_image)
             
             # Convert to PhotoImage
             photo = ImageTk.PhotoImage(pil_image)
@@ -677,6 +692,20 @@ class EmojiRenderer:
                 text_widget.insert(tk.INSERT, text, tags)
             return
         
+        # Detect tag background color for emoji compositing
+        # tk.Text embedded images don't inherit tag backgrounds, so we must
+        # flatten emoji transparency against the correct bg color.
+        bg_color = None
+        if tags:
+            for tag in tags:
+                try:
+                    tag_bg = text_widget.tag_cget(tag, "background")
+                    if tag_bg:
+                        bg_color = tag_bg
+                        break
+                except Exception:
+                    pass
+        
         # Insert text segments and emojis
         pos = tk.END if at_end else tk.INSERT
         last_end = 0
@@ -686,12 +715,19 @@ class EmojiRenderer:
             if start > last_end:
                 text_widget.insert(pos, text[last_end:start], tags)
             
-            # Try to get emoji image
-            img = self.get_emoji_image(emoji_char)
+            # Try to get emoji image (with bg_color for proper blending)
+            img = self.get_emoji_image(emoji_char, bg_color=bg_color)
             
             if img:
+                # Record position before insertion so we can tag the image
+                img_idx = text_widget.index("end-1c") if at_end else text_widget.index(tk.INSERT)
                 # Insert the image
                 text_widget.image_create(pos, image=img)
+                # Tag the image position so it inherits tag backgrounds
+                # (without this, the image cell shows the widget's base bg color)
+                if tags:
+                    for tag in tags:
+                        text_widget.tag_add(tag, img_idx)
             else:
                 # Fallback: insert the emoji character as text
                 text_widget.insert(pos, emoji_char, tags)
