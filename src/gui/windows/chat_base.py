@@ -16,7 +16,6 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, List
 
 from ..platform import HAVE_CTK, ctk
-from ...utils import strip_markdown
 from ...session_manager import add_session
 from ..core import get_next_window_id, register_window, unregister_window
 from ..utils import copy_to_clipboard, render_markdown, get_color_scheme, setup_text_tags
@@ -1537,32 +1536,6 @@ class ChatWindowBase(ABC):
         self._update_status("Playback stopped")
         self._audio_playing_path = None
 
-    def _play_audio(self, file_path: str):
-        """Play audio file using system default player or internal recorder."""
-        import os
-
-        if not os.path.exists(file_path):
-            self._update_status("Audio file not found")
-            return
-
-        try:
-            # Try to use the AudioRecorder for playback
-            from ...audio.recorder import AudioRecorder
-
-            if not hasattr(self, '_audio_recorder'):
-                self._audio_recorder = AudioRecorder()
-
-            # Read the audio file
-            with open(file_path, 'rb') as f:
-                audio_data = f.read()
-
-            self._audio_recorder.play(audio_data)
-            self._update_status(f"Playing: {os.path.basename(file_path)}")
-        except Exception as e:
-            print(f"[ChatWindow] AudioRecorder playback failed: {e}")
-            # Fallback to system player
-            self._open_file_external(file_path)
-
     def _open_file_external(self, file_path: str):
         """Open file in system default application."""
         import os
@@ -1584,10 +1557,6 @@ class ChatWindowBase(ABC):
         except Exception as e:
             print(f"[ChatWindow] Failed to open file: {e}")
             self._update_status("Failed to open file")
-    
-    def _render_session_image(self, message_tag: str):
-        # Legacy method removed - use _render_message_attachments instead
-        pass
     
     def _on_image_left_click(self, event, file_path: str):
         """Show enlarged image in a modal window on left click."""

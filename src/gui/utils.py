@@ -577,6 +577,40 @@ def _render_table(text_widget: tk.Text, table_data: List[List[str]], colors: Dic
     text_widget.insert(tk.END, bottom_border + "\n", build_tags("codeblock"))
 
 
+def _apply_hanging_indent(text_widget: tk.Text, prefix_text: str, font_obj):
+    """
+    Apply a hanging indent to the current paragraph so wrapped lines
+    align with the start of the content text (past the bullet/number marker).
+    
+    Args:
+        text_widget: The tk.Text widget
+        prefix_text: The full prefix string before content (e.g. "    • ")
+        font_obj: A tkfont.Font instance for pixel measurement
+    """
+    # Calculate pixel width of the prefix
+    if font_obj:
+        try:
+            lmargin2 = font_obj.measure(prefix_text)
+        except Exception:
+            lmargin2 = len(prefix_text) * 7  # fallback estimate
+    else:
+        lmargin2 = len(prefix_text) * 7
+
+    # Get current line number
+    current_pos = text_widget.index("end-1c")
+    line_num = current_pos.split('.')[0]
+
+    # Create/configure a tag keyed by the computed margin (reuse across same-width lines)
+    tag_name = f"_hanging_{lmargin2}"
+    text_widget.tag_configure(tag_name, lmargin2=lmargin2)
+
+    # Apply to the entire current paragraph
+    text_widget.tag_add(tag_name, f"{line_num}.0", f"{line_num}.end")
+    # Raise priority so it overrides message block tags (user_message/assistant_message)
+    # which set lmargin2=0
+    text_widget.tag_raise(tag_name)
+
+
 def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                    wrap: bool = True, as_role: Optional[str] = None,
                    enable_emojis: bool = True, block_tag: Optional[str] = None,
@@ -609,6 +643,16 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
     lines = text.split('\n')
     in_code_block = False
     code_block_lines = []
+
+    # Create a font object for measuring prefix widths (hanging indent)
+    try:
+        widget_font = text_widget.cget("font")
+        _font_obj = tkfont.Font(font=widget_font)
+    except Exception:
+        try:
+            _font_obj = tkfont.Font(family="Segoe UI", size=11)
+        except Exception:
+            _font_obj = None
     
     # Apply role-based styling
     role_tag = None
@@ -746,11 +790,16 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
             indent_len = len(line) - len(line.lstrip())
             indent_str = " " * indent_len
             
+            # Build the prefix string for hanging indent measurement
+            bullet_prefix = f"{line_prefix}{indent_str}  • "
+            
             # Insert bullet marker with indentation
             tags = build_tags("bullet_marker")
             text_widget.insert(tk.END, f"{indent_str}  • ", tags)
             # Insert content with inline formatting
             _render_inline(content, text_widget, colors, role_tag, enable_emojis, block_tag)
+            # Apply hanging indent so wrapped lines align with content start
+            _apply_hanging_indent(text_widget, bullet_prefix, _font_obj)
             continue
         
         # Numbered list
@@ -761,9 +810,14 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
             indent_len = len(line) - len(line.lstrip())
             indent_str = " " * indent_len
             
+            # Build the prefix string for hanging indent measurement
+            num_prefix = f"{line_prefix}{indent_str}  {num}. "
+            
             tags = build_tags("numbered")
             text_widget.insert(tk.END, f"{indent_str}  {num}. ", tags)
             _render_inline(content, text_widget, colors, role_tag, enable_emojis, block_tag)
+            # Apply hanging indent so wrapped lines align with content start
+            _apply_hanging_indent(text_widget, num_prefix, _font_obj)
             continue
         
         # Horizontal rule
@@ -972,14 +1026,6 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
         remaining = text[pos:]
         tags = build_tags("normal")
         _insert_with_emojis(text_widget, remaining, tags, enable_emojis)
-
-
-def render_plain_text(text: str, text_widget: tk.Text, wrap: bool = True):
-    """Render plain text (markdown stripped) to a Text widget"""
-    from ..utils import strip_markdown
-    plain = strip_markdown(text)
-    text_widget.configure(wrap=tk.WORD if wrap else tk.NONE)
-    text_widget.insert(tk.END, plain)
 
 
 def hide_from_taskbar(window):
