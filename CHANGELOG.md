@@ -1,5 +1,26 @@
 # Changelog
 
+## [5.4.0] - 2026-02-26
+
+### New Features
+
+- **Chat Interface**: Added right-click context menus and inline action buttons (edit, rerun, more) to individual messages. This allows for modifying sent messages, regenerating responses without creating new user prompts, copying text, deleting, or branching off into a completely new session from any point in the conversation history.
+- **Session Browser**: Added a "Rename" button to the Session Browser, allowing custom titles to be set via a modal dialog.
+- **Text Selection Strategies**: The Text Edit Tool now utilizes low-level Win32 `SendInput` and `WM_COPY` parallel algorithms simultaneously to capture highlighted text. This significantly increases compatibility across various Windows applications where standard clipboard polling or basic Ctrl+C injection fails.
+
+### Improvements
+
+- **Markdown Rendering**: Implemented hanging indents for markdown bulleted and numbered lists. Wrapped lines now correctly align with the text content rather than wrapping back under the list marker. Also ensured that markdown code blocks are properly padded with newlines so they don't break when immediately following other text.
+- **UI & Themes**: Applied user and assistant background colors to the chat dialog instead of relying on transparent backgrounds. Improved text selection visibility by ensuring highlighted text always appears above these background colors.
+- **Window Management**: Implemented dark DWM titlebar overrides and used a withdraw-and-deiconify loading pattern for all modal windows to eliminate the bright white titlebar flash that occurs before custom scaling is applied.
+- **Emoji Rendering**: Improved the internal emoji loading pipeline. Built-in Unicode emojis rendered on standard standard Windows GDI menus now use an alpha compositing strategy against native gray/dark-mode theme hues instead of creating white-box transparency artifacts.
+
+### Fixes
+
+- **File Processor**: Fixed an issue where the directory structure was not preserved during recursive repository formatting or parsing scans.
+- **Audio Splitting**: Improved FFmpeg chunk duration estimation to account for target compression bitrates and added an optimization to pass-through the audio stream directly without transcoding when formats match, decreasing chunking times.
+- **Internal Configurations**: Centralized and fixed `_IS_COMPILED` application state detection checks for Nuitka/Pyinstaller build resolutions.
+
 ## [5.3.2] - 2026-02-23
 
 ### Fixes

@@ -14,6 +14,7 @@ Handles:
 
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
@@ -1283,23 +1284,25 @@ class AudioProcessor:
             print_error(f"Preview failed: {e}")
             return False
     
-    def estimate_chunk_duration(self, audio_info: AudioInfo) -> float:
+    def estimate_chunk_duration(self, audio_info: AudioInfo, target_bitrate_kbps: Optional[float] = None) -> float:
         """
         Estimate duration per chunk to stay under size limit.
         
         Args:
             audio_info: Audio file information
+            target_bitrate_kbps: Target bitrate if transcoding (to accurately predict size)
             
         Returns:
             Recommended chunk duration in seconds
         """
-        if audio_info.size_bytes <= TARGET_CHUNK_SIZE_BYTES:
+        if audio_info.size_bytes <= TARGET_CHUNK_SIZE_BYTES and not target_bitrate_kbps:
             return audio_info.duration_seconds
         
         # Calculate bytes per second
-        # Use estimated bitrate if info has it, otherwise derive from file size
-        # This is more accurate for VBR/compressed formats than simple size/duration division
-        if audio_info.bitrate_kbps > 0:
+        # Use target bitrate if transcoding, else use estimated from file
+        if target_bitrate_kbps and target_bitrate_kbps > 0:
+            bytes_per_second = (target_bitrate_kbps * 1000) / 8
+        elif audio_info.bitrate_kbps > 0:
             bytes_per_second = (audio_info.bitrate_kbps * 1000) / 8
         else:
             bytes_per_second = audio_info.size_bytes / audio_info.duration_seconds
@@ -1320,7 +1323,7 @@ class AudioProcessor:
     def split_audio(
         self,
         filepath: Path,
-        output_format: str = "mp3",
+        output_format: Optional[str] = None,
         target_bitrate: Optional[str] = None,
         volume_change_db: Optional[float] = None
     ) -> ChunkingResult:
@@ -1329,7 +1332,7 @@ class AudioProcessor:
         
         Args:
             filepath: Path to audio file
-            output_format: Output format for chunks (default: mp3)
+            output_format: Output format for chunks (default: follows input or mp3)
             target_bitrate: Optional target bitrate (e.g., "128k")
             volume_change_db: Optional volume adjustment in dB
             
@@ -1348,6 +1351,11 @@ class AudioProcessor:
                 success=False,
                 error=f"Could not analyze audio file: {filepath}"
             )
+        
+        if output_format is None:
+            output_format = filepath.suffix.lstrip(".").lower()
+            if not output_format:
+                output_format = "mp3"
         
         # Check if chunking is even needed
         if audio_info.size_bytes <= TARGET_CHUNK_SIZE_BYTES:
@@ -1370,7 +1378,21 @@ class AudioProcessor:
         chunks = []
         
         try:
-            chunk_duration = self.estimate_chunk_duration(audio_info)
+            target_kbps = None
+            if target_bitrate:
+                # Handle formats like "128k" or "128000"
+                try:
+                    if target_bitrate.endswith("k") or target_bitrate.endswith("K"):
+                        target_kbps = float(target_bitrate[:-1])
+                    else:
+                        target_kbps = float(target_bitrate) / 1000.0
+                except ValueError:
+                    pass
+            elif volume_change_db is not None or filepath.suffix.lstrip(".").lower() != output_format:
+                # If we are transcoding but no bitrate provided, assume default MP3/AAC ~128kbps
+                target_kbps = 128.0
+            
+            chunk_duration = self.estimate_chunk_duration(audio_info, target_kbps)
             total_duration = audio_info.duration_seconds
             
             print_info(f"Splitting {audio_info.size_mb:.1f} MB audio into ~{chunk_duration:.0f}s chunks")
@@ -1402,6 +1424,8 @@ class AudioProcessor:
                 
                 if target_bitrate:
                     cmd.extend(["-b:a", target_bitrate])
+                elif not filters and filepath.suffix.lstrip(".").lower() == output_format:
+                    cmd.extend(["-c:a", "copy"])
                 
                 cmd.append(str(chunk_path))
                 
