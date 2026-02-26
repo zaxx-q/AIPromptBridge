@@ -57,6 +57,10 @@ except ImportError:
 
 from .platform import HAVE_CTK, ctk, CTkImage
 
+# Nuitka injects __compiled__ into every compiled module's globals().
+# sys.frozen is PyInstaller only. We check both for compatibility.
+_IS_COMPILED = "__compiled__" in globals() or getattr(sys, "frozen", False)
+
 
 def get_assets_path() -> Tuple[Path, bool]:
     """
@@ -74,8 +78,8 @@ def get_assets_path() -> Tuple[Path, bool]:
     paths.append(assets_base / "emojis.zip")
     paths.append(assets_base / "emojis" / "72x72")
     
-    # 2. Relative to sys.executable (frozen executable)
-    if getattr(sys, 'frozen', False):
+    # 2. Relative to sys.executable (compiled executable)
+    if _IS_COMPILED:
         exe_dir = Path(sys.executable).parent
         assets_base = exe_dir / "assets"
         paths.append(assets_base / "emojis.zip")
@@ -84,7 +88,7 @@ def get_assets_path() -> Tuple[Path, bool]:
     # 3. Current working directory (if different from above)
     # This is important when launching from search/Run dialog where CWD might be arbitrary
     cwd = Path.cwd()
-    if cwd != module_dir and (not getattr(sys, 'frozen', False) or cwd != Path(sys.executable).parent):
+    if cwd != module_dir and (not _IS_COMPILED or cwd != Path(sys.executable).parent):
         cwd_base = cwd / "assets"
         paths.append(cwd_base / "emojis.zip")
         paths.append(cwd_base / "emojis" / "72x72")
