@@ -5,16 +5,21 @@ Utility functions for window management.
 Provides:
 - get_icon_path(): Find the application icon
 - set_window_icon(): Set window icon with CTk override handling
+- set_dark_titlebar(): Force dark titlebar on Windows 10/11
 """
 
 import os
 import sys
 
+# Nuitka injects __compiled__ into every compiled module's globals().
+# sys.frozen is PyInstaller only. We check both for compatibility.
+_IS_COMPILED = "__compiled__" in globals() or getattr(sys, "frozen", False)
+
 
 def get_icon_path():
     """Get the path to the application icon."""
-    # Handle frozen state (executable)
-    if getattr(sys, 'frozen', False):
+    # Handle compiled state (Nuitka/PyInstaller)
+    if _IS_COMPILED:
         base_dir = os.path.dirname(sys.executable)
         icon_path = os.path.join(base_dir, "icon.ico")
         if os.path.exists(icon_path):
@@ -57,3 +62,40 @@ def set_window_icon(window, delay_ms: int = 100):
             window.after(500, _set_icon)  # Extra check for slower systems/frozen starts
         except Exception:
             pass
+
+
+def set_dark_titlebar(window):
+    """
+    Force dark titlebar on Windows 10/11 using DWM API (synchronous).
+    
+    Call AFTER the window is created but BEFORE deiconify/show.
+    Requires the window to have been withdrawn first so the HWND can be
+    created via update_idletasks() without showing a white flash.
+    
+    Typical pattern::
+    
+        modal = ctk.CTkToplevel(parent)
+        modal.withdraw()           # hide before DWM is applied
+        set_dark_titlebar(modal)   # applies DWM synchronously
+        modal.geometry(...)        # position while hidden
+        modal.deiconify()          # show with dark titlebar
+    
+    Args:
+        window: The Tk/CTk window (should be withdrawn)
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        # Force HWND creation without mapping to screen
+        window.update_idletasks()
+        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+        # DWMWA_USE_IMMERSIVE_DARK_MODE = 20 (Windows 10 20H1+, Windows 11)
+        DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+        value = ctypes.c_int(1)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ctypes.byref(value), ctypes.sizeof(value)
+        )
+    except Exception:
+        pass

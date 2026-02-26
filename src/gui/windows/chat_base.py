@@ -27,7 +27,7 @@ from ..themes import (
     get_ctk_entry_colors, get_ctk_textbox_colors, get_ctk_scrollbar_colors,
     get_ctk_combobox_colors, sync_ctk_appearance
 )
-from .utils import set_window_icon
+from .utils import set_window_icon, set_dark_titlebar
 
 
 class ChatWindowBase(ABC):
@@ -1649,24 +1649,28 @@ class ChatWindowBase(ABC):
                 
                 photo = ImageTk.PhotoImage(img)
             
-            # Create modal window
+            # Create modal window (withdraw first to prevent white titlebar flash)
             if HAVE_CTK:
                 modal = ctk.CTkToplevel(self.root)
+                modal.withdraw()
                 modal.configure(fg_color=self.theme.bg)
             else:
                 modal = tk.Toplevel(self.root)
+                modal.withdraw()
                 modal.configure(bg=self.colors["bg"])
             
             modal.title("Image Preview")
             modal.transient(self.root)
+            set_window_icon(modal)
+            set_dark_titlebar(modal)
             
             # Center on screen
-            modal.update_idletasks()
             w = photo.width() + 20
             h = photo.height() + 60
             x = (self.root.winfo_screenwidth() - w) // 2
             y = (self.root.winfo_screenheight() - h) // 2
             modal.geometry(f"{w}x{h}+{x}+{y}")
+            modal.deiconify()
             
             # Display image
             img_label = tk.Label(modal, image=photo, bg=self.theme.bg if HAVE_CTK else self.colors["bg"])
@@ -2256,24 +2260,28 @@ class _EditMessageDialog:
         title = "Edit Message" if role == "user" else "Edit Response"
         content = message["content"]
         
-        # Create dialog window
+        # Create dialog window (withdraw first to prevent white titlebar flash)
         if HAVE_CTK:
             self.dialog = ctk.CTkToplevel(parent)
+            self.dialog.withdraw()
             self.dialog.configure(fg_color=theme.bg)
         else:
             self.dialog = tk.Toplevel(parent)
+            self.dialog.withdraw()
             self.dialog.configure(bg=colors["bg"])
         
         self.dialog.title(title)
         self.dialog.geometry("600x400")
         self.dialog.transient(parent)
-        self.dialog.grab_set()
+        set_window_icon(self.dialog)
+        set_dark_titlebar(self.dialog)
         
         # Center on parent
-        self.dialog.update_idletasks()
         px = parent.winfo_rootx() + (parent.winfo_width() - 600) // 2
         py = parent.winfo_rooty() + (parent.winfo_height() - 400) // 2
         self.dialog.geometry(f"+{max(0, px)}+{max(0, py)}")
+        self.dialog.deiconify()
+        self.dialog.grab_set()
         
         self.dialog.columnconfigure(0, weight=1)
         self.dialog.rowconfigure(1, weight=1)
