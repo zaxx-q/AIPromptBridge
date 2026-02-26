@@ -22,7 +22,7 @@ from ..custom_widgets import create_emoji_button
 from ..themes import ThemeColors, get_colors, get_ctk_font, sync_ctk_appearance
 from ..emoji_renderer import get_emoji_renderer, HAVE_PIL
 from .chat_base import BrowserWindowBase
-from .utils import set_window_icon
+from .utils import set_window_icon, set_dark_titlebar
 
 
 # =============================================================================
@@ -481,6 +481,10 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             ).pack(side="left", padx=2)
             
             create_emoji_button(
+                btn_frame, "Rename", "✏️", self.theme, "secondary", 100, 32, self._rename_session
+            ).pack(side="left", padx=2)
+            
+            create_emoji_button(
                 btn_frame, "Delete", "🗑️", self.theme, "danger", 90, 32, self._delete_session
             ).pack(side="left", padx=2)
             
@@ -506,6 +510,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             for text, cmd, bg_color in [
                 ("➕ New Session", self._new_session, self.colors["accent"]),
                 ("💬 Open Chat", self._open_session, self.colors["button_bg"]),
+                ("✏️ Rename", self._rename_session, self.colors["button_bg"]),
                 ("🗑️ Delete", self._delete_session, self.colors["button_bg"]),
                 ("🔄 Refresh", self._refresh, self.colors["button_bg"]),
                 ("Close", self._close, self.colors["button_bg"])
@@ -786,6 +791,10 @@ class AttachedBrowserWindow(BrowserWindowBase):
             ).pack(side="left", padx=2)
             
             create_emoji_button(
+                btn_frame, "Rename", "✏️", self.theme, "secondary", 100, 32, self._rename_session
+            ).pack(side="left", padx=2)
+            
+            create_emoji_button(
                 btn_frame, "Delete", "🗑️", self.theme, "danger", 90, 32, self._delete_session
             ).pack(side="left", padx=2)
             
@@ -809,6 +818,7 @@ class AttachedBrowserWindow(BrowserWindowBase):
             for text, cmd, bg_color in [
                 ("➕ New Session", self._new_session, self.colors["accent"]),
                 ("💬 Open Chat", self._open_session, self.colors["button_bg"]),
+                ("✏️ Rename", self._rename_session, self.colors["button_bg"]),
                 ("🗑️ Delete", self._delete_session, self.colors["button_bg"]),
                 ("🔄 Refresh", self._refresh, self.colors["button_bg"]),
                 ("Close", self._close, self.colors["button_bg"])

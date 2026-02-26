@@ -2556,6 +2556,153 @@ class BrowserWindowBase(ABC):
         """Open selected session - implemented by subclass."""
         pass
     
+    def _rename_session(self):
+        """Rename selected session title via modal dialog."""
+        if not self.selected_session_id:
+            self._update_status("No session selected")
+            return
+        
+        from ...session_manager import get_session, save_sessions
+        
+        session = get_session(self.selected_session_id)
+        if not session:
+            self._update_status("Session not found")
+            return
+        
+        current_title = session.title or ""
+        
+        # Create modal dialog with withdraw → DWM → deiconify pattern
+        if HAVE_CTK:
+            dialog = ctk.CTkToplevel(self.root)
+            dialog.withdraw()
+            dialog.configure(fg_color=self.theme.bg)
+        else:
+            dialog = tk.Toplevel(self.root)
+            dialog.withdraw()
+            dialog.configure(bg=self.colors["bg"])
+        
+        dialog.title("Rename Session")
+        dialog.geometry("400x130")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        set_window_icon(dialog)
+        set_dark_titlebar(dialog)
+        
+        # Center on parent
+        px = self.root.winfo_rootx() + (self.root.winfo_width() - 400) // 2
+        py = self.root.winfo_rooty() + (self.root.winfo_height() - 130) // 2
+        dialog.geometry(f"+{max(0, px)}+{max(0, py)}")
+        
+        dialog.deiconify()
+        dialog.grab_set()
+        
+        # Title variable and callbacks
+        title_var = tk.StringVar(value=current_title)
+        sid = self.selected_session_id
+        
+        def do_save():
+            new_title = title_var.get().strip()
+            if new_title:
+                session.title = new_title
+                save_sessions()
+                self._refresh()
+                self._update_status(f"Renamed session {sid}")
+            dialog.destroy()
+        
+        def do_cancel():
+            dialog.destroy()
+        
+        # Build UI
+        if HAVE_CTK:
+            ctk.CTkLabel(
+                dialog, text="Session Title:",
+                font=get_ctk_font(size=12),
+                text_color=self.theme.fg
+            ).pack(anchor="w", padx=20, pady=(15, 5))
+            
+            entry_colors = get_ctk_entry_colors(self.theme)
+            entry = ctk.CTkEntry(
+                dialog,
+                textvariable=title_var,
+                font=get_ctk_font(size=12),
+                height=32, corner_radius=8,
+                **entry_colors
+            )
+            entry.pack(fill="x", padx=20, pady=(0, 10))
+            
+            btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+            btn_frame.pack(fill="x", padx=20, pady=(0, 15))
+            
+            success_colors = get_ctk_button_colors(self.theme, "success")
+            ctk.CTkButton(
+                btn_frame, text="Save",
+                font=get_ctk_font(size=12),
+                width=70, height=32, corner_radius=8,
+                command=do_save,
+                **success_colors
+            ).pack(side="right", padx=(5, 0))
+            
+            sec_colors = get_ctk_button_colors(self.theme, "secondary")
+            ctk.CTkButton(
+                btn_frame, text="Cancel",
+                font=get_ctk_font(size=12),
+                width=70, height=32, corner_radius=8,
+                command=do_cancel,
+                **sec_colors
+            ).pack(side="right")
+        else:
+            tk.Label(
+                dialog, text="Session Title:",
+                font=("Segoe UI", 10),
+                bg=self.colors["bg"], fg=self.colors["fg"]
+            ).pack(anchor="w", padx=20, pady=(15, 5))
+            
+            entry = tk.Entry(
+                dialog,
+                textvariable=title_var,
+                font=("Segoe UI", 10),
+                bg=self.colors.get("input_bg", self.colors["text_bg"]),
+                fg=self.colors["fg"],
+                insertbackground=self.colors["fg"],
+                relief=tk.FLAT,
+                highlightthickness=1,
+                highlightbackground=self.colors["border"]
+            )
+            entry.pack(fill="x", padx=20, pady=(0, 10))
+            
+            btn_frame = tk.Frame(dialog, bg=self.colors["bg"])
+            btn_frame.pack(fill="x", padx=20, pady=(0, 15))
+            
+            tk.Button(
+                btn_frame, text="Save",
+                font=("Segoe UI", 10),
+                bg=self.colors["accent"], fg="#ffffff",
+                relief=tk.FLAT, padx=10, pady=6,
+                command=do_save, cursor="hand2"
+            ).pack(side="right", padx=(5, 0))
+            
+            tk.Button(
+                btn_frame, text="Cancel",
+                font=("Segoe UI", 10),
+                bg=self.colors["button_bg"], fg=self.colors["fg"],
+                relief=tk.FLAT, padx=10, pady=6,
+                command=do_cancel, cursor="hand2"
+            ).pack(side="right")
+        
+        # Select all text in entry
+        try:
+            entry.select_range(0, tk.END)
+        except (AttributeError, tk.TclError):
+            pass
+        
+        # Keyboard shortcuts
+        dialog.protocol("WM_DELETE_WINDOW", do_cancel)
+        dialog.bind("<Escape>", lambda e: do_cancel())
+        dialog.bind("<Return>", lambda e: do_save())
+        
+        entry.focus_set()
+        dialog.wait_window()
+    
     def _delete_session(self):
         """Delete selected session."""
         if not self.selected_session_id:
