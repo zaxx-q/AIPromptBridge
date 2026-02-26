@@ -16,7 +16,8 @@ This package provides:
 from .utils import get_icon_path, set_window_icon
 
 # Base classes (for extension)
-from .chat_base import ChatWindowBase, BrowserWindowBase
+from .chat_base import ChatWindowBase
+from .session_browser import BrowserWindowBase
 
 # Session list components
 from .session_browser import SessionListItem, SessionListHeader

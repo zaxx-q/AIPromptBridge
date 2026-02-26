@@ -13,15 +13,18 @@ Provides:
 import threading
 import time
 import tkinter as tk
+from abc import ABC, abstractmethod
 from typing import Optional, Dict, List
 
 from ..platform import HAVE_CTK, ctk
 from ...session_manager import add_session, get_session, ChatSession
-from ..core import register_window
+from ..core import get_next_window_id, register_window, unregister_window
 from ..custom_widgets import create_emoji_button
-from ..themes import ThemeColors, get_colors, get_ctk_font, sync_ctk_appearance
+from ..themes import (
+    ThemeColors, get_colors, get_ctk_font, sync_ctk_appearance,
+    get_ctk_button_colors, get_ctk_entry_colors, get_color_scheme
+)
 from ..emoji_renderer import get_emoji_renderer, HAVE_PIL
-from .chat_base import BrowserWindowBase
 from .utils import set_window_icon, set_dark_titlebar
 
 
@@ -263,6 +266,324 @@ class SessionListHeader(tk.Frame):
 
 
 # =============================================================================
+# Browser Window Base
+# =============================================================================
+
+class BrowserWindowBase(ABC):
+    """
+    Base class for session browser windows.
+    
+    Subclasses must implement:
+    - _create_root() -> creates the root window
+    - _get_window_tag() -> return unique window tag
+    """
+    
+    def __init__(self):
+        self.window_id = get_next_window_id()
+        
+        self.selected_session_id = None
+        self.selected_item = None
+        
+        # Theme
+        self.theme = get_colors()
+        self.colors = get_color_scheme()
+        
+        # Sorting state
+        self.sort_column = "Updated"
+        self.sort_descending = True
+        
+        self._destroyed = False
+        self.session_items: List = []
+        
+        # UI refs
+        self.root = None
+        self.list_header = None
+        self.session_list = None
+        self.status_label = None
+    
+    @abstractmethod
+    def _get_window_tag(self) -> str:
+        """Return unique window tag for registration."""
+        pass
+    
+    def _safe_after(self, delay: int, func):
+        """Schedule callback safely."""
+        if self._destroyed:
+            return
+        try:
+            if self.root and self.root.winfo_exists():
+                self.root.after(delay, func)
+        except Exception:
+            pass
+    
+    def _sort_by_column(self, column: str):
+        """Sort by column."""
+        if self.sort_column == column:
+            self.sort_descending = not self.sort_descending
+        else:
+            self.sort_column = column
+            self.sort_descending = True
+        
+        if self.list_header:
+            self.list_header.update_sort_indicators(self.sort_column, self.sort_descending)
+        
+        self._refresh()
+    
+    def _refresh(self):
+        """Refresh the session list."""
+        if self._destroyed:
+            return
+        
+        from ...session_manager import list_sessions
+        
+        # Clear existing items
+        for item in self.session_items:
+            item.destroy()
+        self.session_items.clear()
+        self.selected_item = None
+        self.selected_session_id = None
+        
+        sessions = list_sessions()
+        
+        # Sort
+        reverse = self.sort_descending
+        if self.sort_column == "ID":
+            sessions.sort(key=lambda s: s['id'] if isinstance(s['id'], int) else 0, reverse=reverse)
+        elif self.sort_column == "Title":
+            sessions.sort(key=lambda s: (s['title'] or '').lower(), reverse=reverse)
+        elif self.sort_column == "Origin":
+            sessions.sort(key=lambda s: s.get('origin', ''), reverse=reverse)
+        elif self.sort_column == "Messages":
+            sessions.sort(key=lambda s: s['messages'], reverse=reverse)
+        elif self.sort_column == "Updated":
+            sessions.sort(key=lambda s: s['updated'] or '', reverse=reverse)
+        
+        # Create items
+        for session in sessions:
+            item = SessionListItem(
+                self.session_list,
+                session,
+                self.theme,
+                on_click=self._on_select,
+                on_double_click=self._on_double_click
+            )
+            item.pack(fill="x", pady=1)
+            self.session_items.append(item)
+        
+        self._update_status(f"{len(sessions)} session(s) found")
+    
+    def _on_select(self, session_data: Dict):
+        """Handle session selection."""
+        if self.selected_item:
+            self.selected_item.set_selected(False)
+        
+        self.selected_session_id = session_data.get('id')
+        for item in self.session_items:
+            if item.session_data.get('id') == self.selected_session_id:
+                item.set_selected(True)
+                self.selected_item = item
+                break
+        
+        self._update_status(f"Selected: {self.selected_session_id}")
+    
+    def _on_double_click(self, session_data: Dict):
+        """Handle double click to open session."""
+        self._on_select(session_data)
+        self._open_session()
+    
+    def _update_status(self, text: str):
+        """Update status label."""
+        if hasattr(self, 'status_label') and self.status_label:
+            self.status_label.configure(text=text)
+    
+    @abstractmethod
+    def _new_session(self):
+        """Create a new session - implemented by subclass."""
+        pass
+    
+    @abstractmethod
+    def _open_session(self):
+        """Open selected session - implemented by subclass."""
+        pass
+    
+    def _rename_session(self):
+        """Rename selected session title via modal dialog."""
+        if not self.selected_session_id:
+            self._update_status("No session selected")
+            return
+        
+        from ...session_manager import get_session, save_sessions
+        
+        session = get_session(self.selected_session_id)
+        if not session:
+            self._update_status("Session not found")
+            return
+        
+        current_title = session.title or ""
+        
+        # Create modal dialog with withdraw → DWM → deiconify pattern
+        if HAVE_CTK:
+            dialog = ctk.CTkToplevel(self.root)
+            dialog.withdraw()
+            dialog.configure(fg_color=self.theme.bg)
+        else:
+            dialog = tk.Toplevel(self.root)
+            dialog.withdraw()
+            dialog.configure(bg=self.colors["bg"])
+        
+        dialog.title("Rename Session")
+        dialog.geometry("400x130")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        set_window_icon(dialog)
+        set_dark_titlebar(dialog)
+        
+        # Center on parent
+        px = self.root.winfo_rootx() + (self.root.winfo_width() - 400) // 2
+        py = self.root.winfo_rooty() + (self.root.winfo_height() - 130) // 2
+        dialog.geometry(f"+{max(0, px)}+{max(0, py)}")
+        
+        dialog.deiconify()
+        dialog.grab_set()
+        
+        # Title variable and callbacks
+        title_var = tk.StringVar(value=current_title)
+        sid = self.selected_session_id
+        
+        def do_save():
+            new_title = title_var.get().strip()
+            if new_title:
+                session.title = new_title
+                save_sessions()
+                self._refresh()
+                self._update_status(f"Renamed session {sid}")
+            dialog.destroy()
+        
+        def do_cancel():
+            dialog.destroy()
+        
+        # Build UI
+        if HAVE_CTK:
+            ctk.CTkLabel(
+                dialog, text="Session Title:",
+                font=get_ctk_font(size=12),
+                text_color=self.theme.fg
+            ).pack(anchor="w", padx=20, pady=(15, 5))
+            
+            entry_colors = get_ctk_entry_colors(self.theme)
+            entry = ctk.CTkEntry(
+                dialog,
+                textvariable=title_var,
+                font=get_ctk_font(size=12),
+                height=32, corner_radius=8,
+                **entry_colors
+            )
+            entry.pack(fill="x", padx=20, pady=(0, 10))
+            
+            btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+            btn_frame.pack(fill="x", padx=20, pady=(0, 15))
+            
+            success_colors = get_ctk_button_colors(self.theme, "success")
+            ctk.CTkButton(
+                btn_frame, text="Save",
+                font=get_ctk_font(size=12),
+                width=70, height=32, corner_radius=8,
+                command=do_save,
+                **success_colors
+            ).pack(side="right", padx=(5, 0))
+            
+            sec_colors = get_ctk_button_colors(self.theme, "secondary")
+            ctk.CTkButton(
+                btn_frame, text="Cancel",
+                font=get_ctk_font(size=12),
+                width=70, height=32, corner_radius=8,
+                command=do_cancel,
+                **sec_colors
+            ).pack(side="right")
+        else:
+            tk.Label(
+                dialog, text="Session Title:",
+                font=("Segoe UI", 10),
+                bg=self.colors["bg"], fg=self.colors["fg"]
+            ).pack(anchor="w", padx=20, pady=(15, 5))
+            
+            entry = tk.Entry(
+                dialog,
+                textvariable=title_var,
+                font=("Segoe UI", 10),
+                bg=self.colors.get("input_bg", self.colors["text_bg"]),
+                fg=self.colors["fg"],
+                insertbackground=self.colors["fg"],
+                relief=tk.FLAT,
+                highlightthickness=1,
+                highlightbackground=self.colors["border"]
+            )
+            entry.pack(fill="x", padx=20, pady=(0, 10))
+            
+            btn_frame = tk.Frame(dialog, bg=self.colors["bg"])
+            btn_frame.pack(fill="x", padx=20, pady=(0, 15))
+            
+            tk.Button(
+                btn_frame, text="Save",
+                font=("Segoe UI", 10),
+                bg=self.colors["accent"], fg="#ffffff",
+                relief=tk.FLAT, padx=10, pady=6,
+                command=do_save, cursor="hand2"
+            ).pack(side="right", padx=(5, 0))
+            
+            tk.Button(
+                btn_frame, text="Cancel",
+                font=("Segoe UI", 10),
+                bg=self.colors["button_bg"], fg=self.colors["fg"],
+                relief=tk.FLAT, padx=10, pady=6,
+                command=do_cancel, cursor="hand2"
+            ).pack(side="right")
+        
+        # Select all text in entry
+        try:
+            entry.select_range(0, tk.END)
+        except (AttributeError, tk.TclError):
+            pass
+        
+        # Keyboard shortcuts
+        dialog.protocol("WM_DELETE_WINDOW", do_cancel)
+        dialog.bind("<Escape>", lambda e: do_cancel())
+        dialog.bind("<Return>", lambda e: do_save())
+        
+        entry.focus_set()
+        dialog.wait_window()
+    
+    def _delete_session(self):
+        """Delete selected session."""
+        if not self.selected_session_id:
+            self._update_status("No session selected")
+            return
+        
+        from ...session_manager import delete_session, save_sessions
+        
+        sid = self.selected_session_id
+        if delete_session(sid):
+            save_sessions()
+            self.selected_session_id = None
+            self.selected_item = None
+            self._refresh()
+            self._update_status(f"Deleted session {sid}")
+        else:
+            self._update_status("Failed to delete session")
+    
+    def _close(self):
+        """Close window."""
+        self._destroyed = True
+        unregister_window(self._get_window_tag())
+        try:
+            if self.root:
+                self.root.destroy()
+        except tk.TclError:
+            pass
+        self.root = None
+
+
+# =============================================================================
 # Standalone Session Browser Window
 # =============================================================================
 
@@ -481,7 +802,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             ).pack(side="left", padx=2)
             
             create_emoji_button(
-                btn_frame, "Rename", "✏️", self.theme, "secondary", 100, 32, self._rename_session
+                btn_frame, "Rename", "✏️", self.theme, "warning", 100, 32, self._rename_session
             ).pack(side="left", padx=2)
             
             create_emoji_button(
@@ -510,14 +831,21 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             for text, cmd, bg_color in [
                 ("➕ New Session", self._new_session, self.colors["accent"]),
                 ("💬 Open Chat", self._open_session, self.colors["button_bg"]),
-                ("✏️ Rename", self._rename_session, self.colors["button_bg"]),
+                ("✏️ Rename", self._rename_session, self.colors.get("accent_yellow", "#f9e2af")),
                 ("🗑️ Delete", self._delete_session, self.colors["button_bg"]),
                 ("🔄 Refresh", self._refresh, self.colors["button_bg"]),
                 ("Close", self._close, self.colors["button_bg"])
             ]:
+                accent_yellow = self.colors.get("accent_yellow", "#f9e2af")
+                if bg_color == self.colors["accent"]:
+                    fg_color = "#ffffff"
+                elif bg_color == accent_yellow:
+                    fg_color = self.colors["bg"]
+                else:
+                    fg_color = self.colors["fg"]
                 btn = tk.Button(
                     btn_frame, text=text, font=("Segoe UI", 9),
-                    bg=bg_color, fg="#ffffff" if bg_color == self.colors["accent"] else self.colors["fg"],
+                    bg=bg_color, fg=fg_color,
                     relief=tk.FLAT, padx=10, pady=6,
                     command=cmd, cursor="hand2"
                 )
@@ -791,7 +1119,7 @@ class AttachedBrowserWindow(BrowserWindowBase):
             ).pack(side="left", padx=2)
             
             create_emoji_button(
-                btn_frame, "Rename", "✏️", self.theme, "secondary", 100, 32, self._rename_session
+                btn_frame, "Rename", "✏️", self.theme, "warning", 100, 32, self._rename_session
             ).pack(side="left", padx=2)
             
             create_emoji_button(
@@ -818,14 +1146,21 @@ class AttachedBrowserWindow(BrowserWindowBase):
             for text, cmd, bg_color in [
                 ("➕ New Session", self._new_session, self.colors["accent"]),
                 ("💬 Open Chat", self._open_session, self.colors["button_bg"]),
-                ("✏️ Rename", self._rename_session, self.colors["button_bg"]),
+                ("✏️ Rename", self._rename_session, self.colors.get("accent_yellow", "#f9e2af")),
                 ("🗑️ Delete", self._delete_session, self.colors["button_bg"]),
                 ("🔄 Refresh", self._refresh, self.colors["button_bg"]),
                 ("Close", self._close, self.colors["button_bg"])
             ]:
+                accent_yellow = self.colors.get("accent_yellow", "#f9e2af")
+                if bg_color == self.colors["accent"]:
+                    fg_color = "#ffffff"
+                elif bg_color == accent_yellow:
+                    fg_color = self.colors["bg"]
+                else:
+                    fg_color = self.colors["fg"]
                 btn = tk.Button(
                     btn_frame, text=text, font=("Segoe UI", 9),
-                    bg=bg_color, fg="#ffffff" if bg_color == self.colors["accent"] else self.colors["fg"],
+                    bg=bg_color, fg=fg_color,
                     relief=tk.FLAT, padx=10, pady=6,
                     command=cmd, cursor="hand2"
                 )
