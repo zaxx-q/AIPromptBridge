@@ -50,7 +50,7 @@ build_exe_options = {
     # We can try to exclude them explicitly in bin_excludes if they persist.
     "bin_excludes": [
         "libcrypto-3.dll", "libssl-3.dll", "unicodedata.pyd", "_hashlib.pyd", "_ssl.pyd",
-        "_ctypes.pyd", "libffi-8.dll", "_socket.pyd", "select.pyd"
+        "_ctypes.pyd", "libffi-8.dll", "_socket.pyd", "select.pyd", "zlib1.dll"
     ],
     "zip_exclude_packages": [
         "email", "importlib", "ctypes", "typing", "distutils", "setuptools",
