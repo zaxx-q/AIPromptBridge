@@ -1,5 +1,14 @@
 # Changelog
 
+## [5.4.1] - 2026-02-28
+
+### Fixes
+
+- **File Processor**: Fixed an issue where multi-modal message extraction was producing empty request bodies for image inputs.
+- **Batch API**: Corrected logic for generating Gemini Batch API requests from within the File Processor.
+- **Batch TTS**: Fixed an API timeout behavior and guaranteed the TTS internal singleton initializes correctly when entering the terminal tool interface without a prior GUI instantiation.
+- **Build Configurations**: Excluded `zlib1.dll` from packaged launcher exclusions.
+
 ## [5.4.0] - 2026-02-26
 
 ### New Features

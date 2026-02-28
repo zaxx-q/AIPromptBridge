@@ -735,7 +735,10 @@ class TTSProcessor(BaseTool):
                 callback_success=on_success,
                 callback_error=on_error,
             )
-            event.wait()  # Block until callback fires
+            event.wait(timeout=300)  # 5 min timeout per segment
+            if not event.is_set():
+                cp.mark_failed(idx, "TTS API timeout (300s)")
+                return None
 
             if result["error"]:
                 cp.mark_failed(idx, result["error"][:120])
@@ -813,7 +816,10 @@ class TTSProcessor(BaseTool):
                 event.set()
 
             tts_tool.run_director(text, callback_success=on_success, callback_error=on_error)
-            event.wait()  # Block until callback fires
+            event.wait(timeout=120)  # 2 min timeout for director
+            if not event.is_set():
+                print_warning("Director timed out (120s)")
+                return None
             
             if result["error"]:
                 print_warning(result["error"])
@@ -830,19 +836,23 @@ class TTSProcessor(BaseTool):
     def _merge_wav_files(self, wav_paths: List[str], output_path: str):
         """Concatenate multiple WAV files into one (all must be 24kHz/16-bit/mono)."""
         output = wave.open(output_path, 'wb')
-        params_set = False
+        try:
+            params_set = False
 
-        for path in wav_paths:
-            p = Path(path)
-            if not p.exists():
-                continue
-            with wave.open(str(p), 'rb') as wf:
-                if not params_set:
-                    output.setparams(wf.getparams())
-                    params_set = True
-                output.writeframes(wf.readframes(wf.getnframes()))
+            for path in wav_paths:
+                p = Path(path)
+                if not p.exists():
+                    continue
+                with wave.open(str(p), 'rb') as wf:
+                    if not params_set:
+                        output.setparams(wf.getparams())
+                        params_set = True
+                    output.writeframes(wf.readframes(wf.getnframes()))
 
-        output.close()
+            if not params_set:
+                raise ValueError("No valid WAV files found to merge")
+        finally:
+            output.close()
 
     # ── Checkpoint resume helpers ─────────────────────────────────────────────
 

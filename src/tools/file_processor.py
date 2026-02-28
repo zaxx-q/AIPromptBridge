@@ -3219,6 +3219,16 @@ def show_tools_menu(endpoints: Dict[str, str] = None) -> bool:
         from .tts_processor import TTSProcessor
         from src import web_server
         
+        # Ensure TTS tool singleton is initialized (needed for API calls)
+        from src.gui.tts_tool import get_instance as get_tts_instance, set_instance as set_tts_instance, TTSToolApp
+        if get_tts_instance() is None:
+            tts_app = TTSToolApp(
+                config=web_server.CONFIG,
+                ai_params=web_server.AI_PARAMS,
+                key_managers=web_server.KEY_MANAGERS
+            )
+            set_tts_instance(tts_app)
+        
         processor = TTSProcessor(config=web_server.CONFIG)
         result = processor.run_interactive()
         if result.success:
