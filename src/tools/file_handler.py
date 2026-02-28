@@ -298,22 +298,28 @@ class FileHandler:
         full_prompt = f"{prompt}{filename_context}" if filename_context else prompt
         
         if content_type == "image":
-            # Returns list of messages, we extract the user message
+            # Returns list of messages; extract the user message (skip system)
             msgs = build_image_message(content, mime_type, full_prompt, None)
-            return msgs[0]
+            for m in msgs:
+                if m["role"] == "user":
+                    return m
+            return msgs[-1]  # Fallback to last message
         
         elif content_type == "audio":
-            # Returns list of messages, we extract the user message
+            # Returns list of messages; extract the user message (skip system)
             msgs = build_inline_message(content, mime_type, full_prompt, None)
-            return msgs[0]
+            for m in msgs:
+                if m["role"] == "user":
+                    return m
+            return msgs[-1]  # Fallback to last message
         
         elif content_type == "document":
-            # Document (PDF) message - use generic file format
-            # Currently src.messages doesn't have a specific document builder that returns 'file',
-            # so we'll keep this logic local or map it to inline_data (preferred for Gemini)
-            # Gemini Native accepts PDF as inline_data
+            # Document (PDF) message - use inline_data (preferred for Gemini)
             msgs = build_inline_message(content, mime_type, full_prompt, None)
-            return msgs[0]
+            for m in msgs:
+                if m["role"] == "user":
+                    return m
+            return msgs[-1]  # Fallback to last message
         
         else:
             # Text/code message - use TextEditTool-style delimiters

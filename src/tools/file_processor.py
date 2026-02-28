@@ -2006,8 +2006,8 @@ class FileProcessor(BaseTool):
             "use_batch": False
         }
         
-        # Batch API (Gemini only)
-        if "gemini" in current_provider.lower():
+        # Batch API (Google/Gemini only)
+        if current_provider.lower() == "google":
             try:
                 batch_input = input("\nUse Batch API (Async)? [y/N]: ").strip().lower()
                 settings["use_batch"] = batch_input == 'y'
@@ -2233,7 +2233,7 @@ class FileProcessor(BaseTool):
                             )
                     
                     # Check for Batch API
-                    elif cp.use_batch and "gemini" in cp.provider.lower():
+                    elif cp.use_batch and cp.provider.lower() == "google":
                          response = self._process_file_batch(
                             process_path, final_prompt, cp, interactive
                         )
@@ -3074,15 +3074,21 @@ class FileProcessor(BaseTool):
             String with Batch Operation details
         """
         from src import web_server
+        from src.providers.gemini_native import GeminiNativeProvider
         # Determine content type for the message construction
         # We need to construct messages just like normal, then call create_batch
         
-        # Get provider
-        provider_name = checkpoint.provider
-        provider = web_server.get_provider(provider_name)
-        if not provider:
-            raise ValueError(f"Provider not found: {provider_name}")
-            
+        # Get provider (Batch API is Google/Gemini only)
+        provider_name = checkpoint.provider.lower()
+        if provider_name != "google":
+            raise ValueError("Batch API only supported for Google/Gemini provider")
+        
+        key_manager = web_server.KEY_MANAGERS.get(provider_name)
+        if not key_manager:
+            raise ValueError("Google key manager not found")
+        
+        provider = GeminiNativeProvider(key_manager=key_manager, config=web_server.CONFIG)
+        
         if not hasattr(provider, "create_batch"):
              raise ValueError(f"Provider {provider_name} does not support Batch API")
         
@@ -3090,7 +3096,7 @@ class FileProcessor(BaseTool):
         is_large = False
         try:
              is_large = filepath.stat().st_size > MAX_INLINE_SIZE
-        except:
+        except Exception:
              pass
         
         # Detect mime type for constructing message
