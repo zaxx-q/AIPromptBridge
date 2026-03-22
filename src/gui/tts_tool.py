@@ -17,6 +17,7 @@ from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
 from ..api_client import get_provider_for_type
 from ..audio.wav_utils import pcm_to_wav, get_pcm_duration, save_wav
 from ..audio.ffmpeg_utils import get_ffmpeg_path, get_creation_flags, is_ffmpeg_available
+from ..audio.tts_constants import get_voice_details
 
 
 class TTSToolApp:
@@ -145,10 +146,63 @@ class TTSToolApp:
     # Backend Logic - Exposed for Window and External Use
     # =========================================================================
 
+    def _build_gender_constraint(self, voice_info: Optional[Dict[str, Any]]) -> str:
+        """
+        Build a gender constraint string from voice info for the AI Director.
+        
+        Args:
+            voice_info: Dict with voice info. Single-speaker: {"voice": "Kore"}.
+                        Multi-speaker: {"multi": True, "speakers": [{"name": "...", "voice": "..."}, ...]}.
+        
+        Returns:
+            Gender constraint string to append to the director task, or empty string.
+        """
+        if not voice_info:
+            return ""
+        
+        if voice_info.get("multi"):
+            # Multi-speaker mode
+            speakers = voice_info.get("speakers", [])
+            if not speakers:
+                return ""
+            
+            parts = []
+            for s in speakers:
+                details = get_voice_details(s.get("voice", ""))
+                gender = details.get("gender", "Unknown")
+                if gender != "Unknown":
+                    parts.append(f"{s.get('name', 'Speaker')} uses a {gender} voice.")
+            
+            if not parts:
+                return ""
+            
+            speaker_info = " ".join(parts)
+            return (
+                f"\n\nVoice gender constraint: This is a multi-speaker script. "
+                f"{speaker_info} "
+                f"Each speaker's audio profile must match their voice gender."
+            )
+        else:
+            # Single-speaker mode
+            voice_name = voice_info.get("voice", "")
+            if not voice_name:
+                return ""
+            
+            details = get_voice_details(voice_name)
+            gender = details.get("gender", "Unknown")
+            if gender == "Unknown":
+                return ""
+            
+            return (
+                f"\n\nVoice gender constraint: The selected TTS voice is {gender}. "
+                f"The audio profile character must be {gender}."
+            )
+
     def run_director(
         self,
         input_text: str,
         model_override: str = "",
+        voice_info: Optional[Dict[str, Any]] = None,
         callback_success: Optional[Callable[[str, int], None]] = None,
         callback_error: Optional[Callable[[str], None]] = None
     ):
@@ -158,6 +212,9 @@ class TTSToolApp:
         Args:
             input_text: The text to analyze and style.
             model_override: Optional model name to override default provider.
+            voice_info: Optional dict with voice info for gender injection.
+                Single-speaker: {"voice": "Kore"}
+                Multi-speaker: {"multi": True, "speakers": [{"name": "S1", "voice": "Kore"}, ...]}
             callback_success: Callback function(response_text, token_count).
             callback_error: Callback function(error_message).
         """
@@ -167,6 +224,9 @@ class TTSToolApp:
                 system_prompt = self.prompts.get_tts_director_system_prompt()
                 task_template = self.prompts.get_tts_director_task_template()
                 task = task_template.replace("{text}", input_text)
+                
+                # Inject voice gender constraint
+                task += self._build_gender_constraint(voice_info)
                 
                 messages = [
                     {"role": "system", "content": system_prompt},

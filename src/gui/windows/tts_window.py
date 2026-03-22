@@ -772,6 +772,32 @@ class TTSWindow:
     # AI Director
     # =========================================================================
     
+    def _get_voice_info(self) -> dict:
+        """Build voice info dict from current UI state for gender injection.
+        
+        Returns:
+            Single-speaker: {"voice": "Kore"}
+            Multi-speaker: {"multi": True, "speakers": [{"name": "...", "voice": "..."}, ...]}
+        """
+        if self.is_multi_speaker:
+            speakers = []
+            
+            # Speaker 1
+            s1_name = self.speaker1_name_entry.get().strip() if self.speaker1_name_entry else "Speaker1"
+            s1_voice_display = self.speaker1_voice_dropdown.get() if self.speaker1_voice_dropdown else self.speaker1_voice
+            s1_voice = s1_voice_display.split(" — ")[0] if " — " in s1_voice_display else s1_voice_display
+            speakers.append({"name": s1_name or "Speaker1", "voice": s1_voice})
+            
+            # Speaker 2
+            s2_name = self.speaker2_name_entry.get().strip() if self.speaker2_name_entry else "Speaker2"
+            s2_voice_display = self.speaker2_voice_dropdown.get() if self.speaker2_voice_dropdown else self.speaker2_voice
+            s2_voice = s2_voice_display.split(" — ")[0] if " — " in s2_voice_display else s2_voice_display
+            speakers.append({"name": s2_name or "Speaker2", "voice": s2_voice})
+            
+            return {"multi": True, "speakers": speakers}
+        else:
+            return {"voice": self.selected_voice}
+    
     def _on_generate_style(self):
         """Generate style instructions using AI Director."""
         if self.is_directing:
@@ -782,8 +808,9 @@ class TTSWindow:
             self._update_status("No input text to analyze", self.colors.red)
             return
         
-        # Get director model override while on UI thread
+        # Get director model override and voice info while on UI thread
         director_model_override = self.director_model_entry.get().strip() if self.director_model_entry else ""
+        voice_info = self._get_voice_info()
         
         self.is_directing = True
         self.generate_style_btn.configure(state="disabled")
@@ -791,11 +818,11 @@ class TTSWindow:
         
         threading.Thread(
             target=self._run_director,
-            args=(input_text, director_model_override),
+            args=(input_text, director_model_override, voice_info),
             daemon=True
         ).start()
     
-    def _run_director(self, input_text: str, director_model_override: str):
+    def _run_director(self, input_text: str, director_model_override: str, voice_info: dict = None):
         """Run the AI Director in a background thread."""
         from ...gui.tts_tool import get_instance as get_tts_tool
         
@@ -829,7 +856,7 @@ class TTSWindow:
                 
             GUICoordinator.get_instance().run_on_gui_thread(update)
 
-        tool.run_director(input_text, director_model_override, on_success, on_error)
+        tool.run_director(input_text, director_model_override, voice_info, on_success, on_error)
     
     # =========================================================================
     # TTS Generation
@@ -848,6 +875,7 @@ class TTSWindow:
         # Capture UI states on main thread
         director_model = self.director_model_entry.get().strip() if self.director_model_entry else ""
         multi_config = self._get_multi_speaker_config()
+        voice_info = self._get_voice_info()
         
         # Check if auto-director mode is enabled
         if self.director_auto_var.get():
@@ -860,7 +888,7 @@ class TTSWindow:
                 self._update_status("Auto-directing then generating...", self.colors.accent)
                 threading.Thread(
                     target=self._auto_direct_then_generate,
-                    args=(input_text, director_model, multi_config), daemon=True
+                    args=(input_text, director_model, multi_config, voice_info), daemon=True
                 ).start()
                 return
         
@@ -890,7 +918,7 @@ class TTSWindow:
             daemon=True
         ).start()
     
-    def _auto_direct_then_generate(self, input_text: str, director_model_override: str, multi_config: Optional[List[Dict]]):
+    def _auto_direct_then_generate(self, input_text: str, director_model_override: str, multi_config: Optional[List[Dict]], voice_info: dict = None):
         """Run director first, then generate audio (auto mode)."""
         from ...gui.tts_tool import get_instance as get_tts_tool
         
@@ -931,7 +959,7 @@ class TTSWindow:
             lambda: self._update_status("Step 1/2: Generating style...", self.colors.accent)
         )
         
-        tool.run_director(input_text, director_model_override, on_director_success, on_director_error)
+        tool.run_director(input_text, director_model_override, voice_info, on_director_success, on_director_error)
     
     def _run_tts_generation(self, full_prompt: str, multi_config: Optional[List[Dict]] = None):
         """Run TTS generation in a background thread."""
