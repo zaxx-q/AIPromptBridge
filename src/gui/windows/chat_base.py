@@ -785,18 +785,21 @@ class ChatWindowBase(ABC):
                 
                 # Insert thinking header
                 thinking_header = "▶ Thinking..." if is_collapsed else "▼ Thinking:"
-                self.chat_text.insert(tk.END, f"  {thinking_header}\n", (thinking_tag, message_tag))
+                self.chat_text.insert(tk.END, f"  {thinking_header}\n", (thinking_tag, "thinking_block_layout"))
                 
                 # Show thinking content if expanded
                 if not is_collapsed:
                     if self.markdown:
                         render_markdown(thinking, self.chat_text, self.colors,
                                       wrap=self.wrapped, as_role="thinking",
-                                      block_tag=message_tag, enable_emojis=True,
+                                      block_tag="thinking_block_layout", enable_emojis=True,
                                       line_prefix="    ")
                     else:
                         for t_line in thinking.split('\n'):
-                            self.chat_text.insert(tk.END, "    " + t_line + "\n", ("thinking_content", message_tag))
+                            self.chat_text.insert(tk.END, "    " + t_line + "\n", ("thinking_content", "thinking_block_layout"))
+                    
+                    # Insert separator between thinking and answer
+                    self.chat_text.insert(tk.END, "  " + "─" * 36 + "\n", ("thinking_end_sep", "thinking_block_layout"))
             
             # Render content
             if self.markdown:
@@ -864,10 +867,14 @@ class ChatWindowBase(ABC):
         
         if self.streaming_thinking:
             thinking_header = "▶ Thinking..." if is_collapsed else "▼ Thinking:"
-            self.chat_text.insert(tk.END, f"  {thinking_header}\n", ("thinking_header", message_tag))
+            self.chat_text.insert(tk.END, f"  {thinking_header}\n", ("thinking_header", "thinking_block_layout"))
             if not is_collapsed:
                 for t_line in self.streaming_thinking.split('\n'):
-                    self.chat_text.insert(tk.END, "    " + t_line + "\n", ("thinking_content", message_tag))
+                    self.chat_text.insert(tk.END, "    " + t_line + "\n", ("thinking_content", "thinking_block_layout"))
+            
+            # Add separator after thinking (even while streaming)
+            if self.streaming_text:
+                self.chat_text.insert(tk.END, "  " + "─" * 36 + "\n", ("thinking_end_sep", "thinking_block_layout"))
         
         # Streaming content
         if self.streaming_text:

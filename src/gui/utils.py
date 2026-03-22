@@ -350,6 +350,19 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         lmargin1=12, lmargin2=12, rmargin=8,
         spacing1=1, spacing3=2)
     
+    # Thinking block background - visually distinct from answer area,
+    # mirrors assistant_message layout but with darker background
+    text_widget.tag_configure("thinking_block_layout",
+        background=colors["code_bg"],
+        lmargin1=0, lmargin2=0, rmargin=8,
+        spacing1=0, spacing3=0)
+    
+    # Separator between thinking and answer
+    text_widget.tag_configure("thinking_end_sep",
+        foreground=colors.get("surface2", colors.get("overlay0", "#9399b2")),
+        font=(base_font, 7),
+        spacing1=6, spacing3=4)
+    
     # =================================================================
     # Message action icons (edit, rerun, more)
     # =================================================================
@@ -382,11 +395,14 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         lmargin1=24, lmargin2=24, rmargin=24,
         spacing1=4, spacing3=4)
     
-    # Technical symbols font (center pieces) - used for characters 
+    # Technical symbols font (center pieces) - used for characters
     # that are missing or look poor in monospaced fonts.
     text_widget.tag_configure("latex_symbols",
         font=("Segoe UI Symbol", 24),
         foreground=colors.get("accent_yellow", colors["accent"]))
+    
+    # Raise thinking_block_layout above user_message/assistant_message so its background takes priority
+    text_widget.tag_raise("thinking_block_layout")
     
     # Raise "sel" tag priority so text selection always shows over background colors
     text_widget.tag_raise("sel")
