@@ -1500,6 +1500,14 @@ class SettingsWindow:
                                self.config_data.config.get("tts_autoplay", True),
                                hint="Play audio immediately after generation")
 
+        # Endpoint Section
+        create_section_header(content_parent, "🌐 Endpoint", self.colors, top_padding=20)
+
+        self._add_toggle_field(content_parent, "tts_use_official_endpoint",
+                               "Use Official Google Endpoint",
+                               self.config_data.config.get("tts_use_official_endpoint", False),
+                               hint="Always use the official Google API endpoint for TTS, ignoring gemini_endpoint")
+
     def _create_keys_tab(self, frame):
         """Create the API Keys settings tab."""
         container = ctk.CTkFrame(frame, fg_color="transparent") if self.use_ctk else tk.Frame(frame, bg=self.colors.bg)

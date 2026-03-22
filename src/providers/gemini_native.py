@@ -519,7 +519,12 @@ class GeminiNativeProvider(BaseProvider):
         key_num = self.key_manager.get_key_number()
         timeout = self.config.get("request_timeout", 120)
         
-        url = self._get_url(model, streaming=False)
+        # Use official endpoint when configured, bypassing any custom gemini_endpoint
+        if self.config.get("tts_use_official_endpoint", False):
+            tts_base = GEMINI_BASE_URL
+            url = f"{tts_base}/models/{model}:generateContent"
+        else:
+            url = self._get_url(model, streaming=False)
         headers = {
             "Content-Type": "application/json",
             "x-goog-api-key": current_key

@@ -112,6 +112,8 @@ DEFAULT_CONFIG = {
     "tts_save_directory": "tts_output",
     # Automatically play generated audio
     "tts_autoplay": True,
+    # Force TTS to use official Google endpoint even when gemini_endpoint is set
+    "tts_use_official_endpoint": False,
     # Chat window system prompt behavior
     # true = Use the originating action's system prompt for follow-up messages
     # false = Always use chat_window_system_instruction from prompts.json
@@ -459,6 +461,12 @@ tts_save_directory = tts_output
 # true = play immediately after generation
 # false = wait for user to press play
 tts_autoplay = true
+
+# Force TTS to use the official Google endpoint
+# When true, TTS always uses https://generativelanguage.googleapis.com/v1beta
+# regardless of gemini_endpoint setting (useful when using a proxy that
+# doesn't support TTS models)
+tts_use_official_endpoint = false
 
 # ============================================================
 # FLASK API ENDPOINTS (Optional)
