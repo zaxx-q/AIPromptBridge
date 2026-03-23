@@ -81,6 +81,14 @@ DEFAULT_GLOBAL_SETTINGS = {
             "forces_chat_window": False
         },
         {
+            "key": "language",
+            "icon": "🗣️",
+            "label": "Language",
+            "tooltip": "Output in a specific language (edit this modifier to change)",
+            "injection": "<modifier_language>\nRespond entirely in Indonesian. All output text must be in this language.\n</modifier_language>",
+            "forces_chat_window": False
+        },
+        {
             "key": "explain",
             "icon": "📝",
             "label": "Explain",
@@ -215,8 +223,8 @@ DEFAULT_TEXT_EDIT_ACTIONS = {
     "ESL Breakdown": {
         "icon": "🌍",
         "prompt_type": "general",
-        "system_prompt": "You help non-native English speakers understand idiomatic, nuanced, or tricky phrasing.\n\n<focus>\n- Idioms and expressions (e.g., \"hit the ground running\", \"the ball is in your court\")\n- Phrasal verbs (e.g., \"figure out\", \"put up with\")\n- Sarcasm, understatement, or implied meaning\n- Cultural references that might not translate\n- Ambiguous phrasing where tone matters\n</focus>\n\n<format>\nFor each non-obvious phrase:\n**[phrase]** — [plain-English meaning]\n\nOnly break down parts that might confuse a non-native speaker. Skip straightforward vocabulary.\n</format>\n\n<constraints>\n- If the text is already clear and literal, say: \"This text is straightforward—no tricky idioms or phrasing.\"\n- Don't explain basic vocabulary or grammar.\n- Focus on what would trip up an intermediate English learner.\n</constraints>",
-        "task": "Break down any idioms, phrasal verbs, or nuanced phrasing that might confuse a non-native English speaker. Only explain the non-obvious parts.",
+        "system_prompt": "You help non-native English speakers understand idiomatic, nuanced, or tricky phrasing.\n\n<focus>\n- Idioms and expressions (e.g., \"hit the ground running\", \"the ball is in your court\")\n- Phrasal verbs (e.g., \"figure out\", \"put up with\")\n- Sarcasm, understatement, or implied meaning\n- Cultural references that might not translate\n- Ambiguous phrasing where tone matters\n</focus>\n\n<format>\nFor each non-obvious phrase:\n\n**[phrase]**\n- **Meaning:** [Clear plain-English explanation of what it means in this context]\n- **Literal vs. Figurative:** [If applicable, explain what the words literally say vs. what they actually mean]\n- **Example:** [One additional example sentence using the same phrase in a different context]\n- **Register:** [Casual / Neutral / Formal — when and where you would typically hear or use this]\n- **Similar expressions:** [1-2 alternative ways to say the same thing, if helpful]\n\nOnly break down parts that might confuse a non-native speaker. Skip straightforward vocabulary.\n</format>\n\n<constraints>\n- If the text is already clear and literal, say: \"This text is straightforward—no tricky idioms or phrasing.\"\n- Don't explain basic vocabulary or grammar.\n- Focus on what would trip up an intermediate English learner.\n- Keep each explanation practical and educational — the goal is to help the reader USE these expressions confidently, not just understand them passively.\n</constraints>",
+        "task": "Break down any idioms, phrasal verbs, or nuanced phrasing that might confuse a non-native English speaker. For each phrase, explain the meaning, provide an example, and note the register. Only explain the non-obvious parts.",
         "show_chat_window_instead_of_replace": True
     },
     "Summary": {
@@ -569,7 +577,7 @@ DEFAULT_AUDIO_SETTINGS = {
 DEFAULT_AUDIO_ACTIONS = {
     "Transcribe": {
         "icon": "📝",
-        "system_prompt": "You are tasked with performing high-fidelity audio transcription.\n\n<guidelines>\n1. **Accuracy**: Transcribe speech EXACTLY as spoken. Preserve non-standard grammar and filler words (um, uh) if present.\n2. **Speakers**: Label speakers (Speaker 1, etc.) if multiple. Note changes with line breaks.\n3. **Non-Speech**: Note [laughter], [applause], [long pause].\n4. **Formatting**: Natural paragraph breaks.\n</guidelines>",
+        "system_prompt": "You are tasked with performing high-fidelity audio transcription.\n\n<guidelines>\n1. **Accuracy**: Transcribe speech EXACTLY as spoken. Preserve non-standard grammar and filler words (um, uh) if present.\n2. **Non-Speech**: Note [laughter], [applause], [long pause].\n3. **Formatting**: Natural paragraph breaks.\n</guidelines>",
         "task": "Transcribe this audio exactly as spoken. Output only the transcript text.",
         "show_chat_window": False
     },
