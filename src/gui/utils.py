@@ -54,6 +54,12 @@ except ImportError:
 # Import LaTeX renderer
 from .latex_renderer import latex_to_unicode, extract_latex_blocks
 
+# Sentinel markers for pre-processed inline LaTeX.
+# _preprocess_inline_latex() wraps converted Unicode with these so that
+# downstream insertion can still apply the latex_inline styling tag.
+_LATEX_SENTINEL_START = '\x02'  # STX control char – safe for tk.Text
+_LATEX_SENTINEL_END = '\x03'    # ETX control char
+
 
 def is_dark_mode() -> bool:
     """
@@ -534,6 +540,34 @@ def _extract_latex_display_blocks(text: str) -> Tuple[str, List[str]]:
     return modified, blocks
 
 
+def _preprocess_inline_latex(text: str) -> str:
+    """
+    Pre-convert ``$...$`` inline LaTeX to Unicode wrapped in sentinel markers.
+
+    This **must** run BEFORE the markdown inline-formatting regex so that
+    bold / italic / strikethrough patterns don't swallow raw LaTeX
+    delimiters.  Sentinel markers (``\\x02 … \\x03``) let downstream
+    insertion helpers apply the ``latex_inline`` styling tag to the
+    converted segments while the surrounding text keeps its own tag.
+    """
+    def _replace(m):
+        inner = m.group(1)
+        # Skip currency-like patterns ($100, $3.50)
+        if re.match(r'^\d[\d,]*\.?\d*$', inner):
+            return m.group(0)
+        try:
+            converted = latex_to_unicode(inner)
+        except Exception:
+            converted = inner
+        return f'{_LATEX_SENTINEL_START}{converted}{_LATEX_SENTINEL_END}'
+
+    return re.sub(
+        r'(?<!\$)\$(?!\$)(\S(?:[^$]*?\S)?)\$(?!\$)',
+        _replace,
+        text,
+    )
+
+
 def _render_table(text_widget: tk.Text, table_data: List[List[str]], colors: Dict[str, str],
                   role_tag: Optional[str] = None, block_tag: Optional[str] = None,
                   line_prefix: str = ""):
@@ -800,7 +834,7 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                     break
             
             if level <= 6 and len(stripped) > level and stripped[level] == ' ':
-                header_text = stripped[level+1:]
+                header_text = _preprocess_inline_latex(stripped[level+1:])
                 content, format_style = _strip_inline_formatting(header_text)
                 base_tag = f"h{min(level, 4)}"
 
@@ -811,14 +845,14 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                     tag = base_tag
 
                 tags = build_tags(tag)
-                _insert_with_emojis(text_widget, content, tags, enable_emojis)
+                _insert_with_latex_segments(text_widget, content, tags, enable_emojis)
                 continue
         
         # Blockquote
         if stripped.startswith('>'):
-            content = stripped[1:].strip()
+            content = _preprocess_inline_latex(stripped[1:].strip())
             tags = build_tags("blockquote")
-            _insert_with_emojis(text_widget, "│ " + content, tags, enable_emojis)
+            _insert_with_latex_segments(text_widget, "│ " + content, tags, enable_emojis)
             continue
         
         # Bullet points
@@ -943,11 +977,73 @@ def _insert_with_emojis(
         pass
 
 
+def _merge_latex_tags(
+    base_tags: Optional[Tuple[str, ...]],
+    latex_tag: str,
+) -> Tuple[str, ...]:
+    """Replace the primary formatting tag with *latex_tag*, keeping structural tags.
+
+    ``build_tags()`` always puts the formatting tag first (e.g. ``"bold"``),
+    followed by role_tag and block_tag.  We swap the first element so that
+    LaTeX segments receive ``latex_inline`` styling while structural tags
+    (``user_message``, ``assistant_message``, …) are preserved.
+    """
+    if not base_tags:
+        return (latex_tag,)
+    return (latex_tag,) + base_tags[1:]
+
+
+def _insert_with_latex_segments(
+    text_widget: tk.Text,
+    text: str,
+    base_tags: Optional[Tuple[str, ...]] = None,
+    enable_emojis: bool = True,
+):
+    """Insert *text*, applying ``latex_inline`` to sentinel-wrapped segments.
+
+    Sentinel markers (``\\x02 … \\x03``) are placed by
+    :func:`_preprocess_inline_latex`.  Segments **outside** sentinels use
+    *base_tags*; sentinel-wrapped segments use ``latex_inline`` plus any
+    structural tags inherited from *base_tags*.
+
+    When no sentinels are present the function falls through to
+    :func:`_insert_with_emojis` with zero overhead.
+    """
+    if _LATEX_SENTINEL_START not in text:
+        # Fast path – no LaTeX segments at all
+        _insert_with_emojis(text_widget, text, base_tags, enable_emojis)
+        return
+
+    # Split while keeping sentinel-wrapped groups as separate elements
+    parts = re.split(
+        f'({re.escape(_LATEX_SENTINEL_START)}'
+        f'[^{re.escape(_LATEX_SENTINEL_END)}]+'
+        f'{re.escape(_LATEX_SENTINEL_END)})',
+        text,
+    )
+
+    for part in parts:
+        if not part:
+            continue
+        if part.startswith(_LATEX_SENTINEL_START) and part.endswith(_LATEX_SENTINEL_END):
+            latex_content = part[1:-1]
+            latex_tags = _merge_latex_tags(base_tags, "latex_inline")
+            _insert_with_emojis(text_widget, latex_content, latex_tags, enable_emojis)
+        else:
+            _insert_with_emojis(text_widget, part, base_tags, enable_emojis)
+
+
 def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
                    role_tag: Optional[str] = None, enable_emojis: bool = True,
                    block_tag: Optional[str] = None):
     """Render inline markdown formatting (bold, italic, code) with emoji support."""
-    
+
+    # Pre-convert $...$ inline LaTeX to Unicode (sentinel-wrapped) BEFORE
+    # the markdown formatting regex runs, so bold/italic don't swallow
+    # raw LaTeX delimiters.  Standalone sentinels are then caught by the
+    # combined regex below and tagged as latex_inline.
+    text = _preprocess_inline_latex(text)
+
     def build_tags(*primary_tags):
         """Build tag tuple including role_tag and block_tag if present."""
         result = list(primary_tags)
@@ -971,14 +1067,15 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
         (r'\[([^\]]+)\]\(([^)]+)\)', 'link'),    # [text](url)
     ]
     
-    # Build a combined pattern to find all matches in order
-    # Note: $...$ inline LaTeX is matched BEFORE bold/italic underscore patterns
+    # Build a combined pattern to find all matches in order.
+    # Inline LaTeX has already been pre-processed into sentinel-wrapped
+    # Unicode by _preprocess_inline_latex(), so we match \x02…\x03 here.
     combined = r'(\*\*\*.+?\*\*\*|___.+?___|' \
                r'\*\*.+?\*\*|__.+?__|' \
                r'\*[^\*]+\*|(?<![a-zA-Z])_[^_]+_(?![a-zA-Z])|' \
                r'`[^`]+`|~~.+?~~|' \
                r'\[[^\]]+\]\([^)]+\)|' \
-               r'(?<!\$)\$(?!\$)(\S(?:[^$]*?\S)?)\$(?!\$))'
+               r'\x02[^\x03]+\x03)'
     
     pos = 0
     for match in re.finditer(combined, text):
@@ -986,7 +1083,7 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
         if match.start() > pos:
             plain_text = text[pos:match.start()]
             tags = build_tags("normal")
-            _insert_with_emojis(text_widget, plain_text, tags, enable_emojis)
+            _insert_with_latex_segments(text_widget, plain_text, tags, enable_emojis)
         
         matched_text = match.group(0)
         content = None
@@ -1031,16 +1128,10 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
                 # We'll allow spaces in tags? yes.
                 url_tag = f"url_{url}"
                 extra_tag = url_tag
-        elif matched_text.startswith('$') and matched_text.endswith('$') and not matched_text.startswith('$$'):
-            # Inline LaTeX math
-            inner = matched_text[1:-1]
-            # Skip if it looks like currency ($100)
-            if not re.match(r'^\d[\d,]*\.?\d*$', inner):
-                try:
-                    content = latex_to_unicode(inner)
-                except Exception:
-                    content = inner
-                tag = "latex_inline"
+        elif matched_text.startswith(_LATEX_SENTINEL_START) and matched_text.endswith(_LATEX_SENTINEL_END):
+            # Pre-processed inline LaTeX (sentinel-wrapped by _preprocess_inline_latex)
+            content = matched_text[1:-1]
+            tag = "latex_inline"
         elif matched_text.startswith('*') and matched_text.endswith('*'):
             content = matched_text[1:-1]
             tag = "italic"
@@ -1055,7 +1146,7 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
                 del extra_tag
             else:
                 tags = build_tags(tag)
-            _insert_with_emojis(text_widget, content, tags, enable_emojis)
+            _insert_with_latex_segments(text_widget, content, tags, enable_emojis)
         
         pos = match.end()
     
@@ -1063,7 +1154,7 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
     if pos < len(text):
         remaining = text[pos:]
         tags = build_tags("normal")
-        _insert_with_emojis(text_widget, remaining, tags, enable_emojis)
+        _insert_with_latex_segments(text_widget, remaining, tags, enable_emojis)
 
 
 def hide_from_taskbar(window):
