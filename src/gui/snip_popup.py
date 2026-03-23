@@ -46,22 +46,15 @@ from .emoji_renderer import prepare_emoji_content, get_emoji_renderer
 
 def _neutralize_tk_var(var):
     """
-    Eagerly clean up a tkinter Variable on the main thread.
+    Prevent a tkinter Variable from calling into Tcl during ``__del__``.
 
-    Performs the Tcl-side globalunsetvar (which ``__del__`` would normally do),
-    then sets ``var._tk = None`` so that ``__del__`` becomes a no-op.  This
-    prevents ``RuntimeError: main thread is not in main loop`` when the
-    Variable is garbage-collected on a background thread.
+    Must be called **after** the parent window has been destroyed (so that
+    CTk widgets can still run ``trace_remove`` on the variable during their
+    own ``destroy()``).  Sets ``var._tk = None`` so that ``__del__`` becomes
+    a harmless no-op instead of crashing with ``RuntimeError: main thread
+    is not in main loop`` when GC runs on a background thread.
     """
     try:
-        tk_ref = getattr(var, '_tk', None)
-        var_name = getattr(var, '_name', None)
-        if tk_ref and var_name:
-            try:
-                tk_ref.globalunsetvar(var_name)
-            except Exception:
-                pass
-        # Make __del__ a no-op – it checks ``if self._tk:`` before acting
         var._tk = None
     except Exception:
         pass
@@ -1153,22 +1146,22 @@ class AttachedSnipPopup:
     
     def _close(self):
         """Close the popup."""
-        # Eagerly clean up tkinter Variables while still on the main thread.
-        # This prevents Variable.__del__ from crashing with
-        # "RuntimeError: main thread is not in main loop" when the popup
-        # object is garbage-collected on a background thread (e.g., after
-        # _on_action_selected spawns a processing thread via threading.Thread).
-        for attr_name in ('source_var', 'compare_var', 'input_var'):
-            var = getattr(self, attr_name, None)
-            if isinstance(var, tk.Variable):
-                _neutralize_tk_var(var)
-
         if self.root:
             try:
                 self.root.destroy()
             except tk.TclError:
                 pass
             self.root = None
+
+        # Neutralize tkinter Variables AFTER root.destroy() so that CTk
+        # widgets can still call trace_remove() during their own destroy().
+        # Setting _tk = None makes Variable.__del__ a no-op, preventing
+        # "RuntimeError: main thread is not in main loop" when the popup
+        # object is later GC'd on a background thread.
+        for attr_name in ('source_var', 'compare_var', 'input_var'):
+            var = getattr(self, attr_name, None)
+            if isinstance(var, tk.Variable):
+                _neutralize_tk_var(var)
 
         # Release all widget references so that any CTk-internal tk.Variable
         # objects are also GC'd NOW (on the main thread) rather than later on
