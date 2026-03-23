@@ -318,13 +318,39 @@ class TTSToolApp:
 
         threading.Thread(target=_target, daemon=True).start()
 
+    @staticmethod
+    def _sanitize_filename(text: str, max_words: int = 5, max_len: int = 50) -> str:
+        """
+        Create a safe filename slug from text (first few words).
+        
+        Args:
+            text: Input text to derive filename from.
+            max_words: Maximum number of words to use.
+            max_len: Maximum character length for the slug.
+            
+        Returns:
+            Sanitized filename string (lowercase, underscored).
+        """
+        import re
+        if not text:
+            return ""
+        # Take first N words
+        words = text.split()[:max_words]
+        slug = "_".join(words)
+        # Remove non-alphanumeric chars (keep underscores)
+        slug = re.sub(r'[^\w]', '_', slug)
+        # Collapse multiple underscores
+        slug = re.sub(r'_+', '_', slug).strip('_').lower()
+        return slug[:max_len]
+
     def save_audio_file(
         self,
         pcm_data: bytes,
         wav_data: Optional[bytes],
         directory: str,
         voice_name: str,
-        format_ext: str
+        format_ext: str,
+        transcript_text: Optional[str] = None
     ) -> tuple[Optional[str], Optional[str]]:
         """
         Save audio data to a file.
@@ -335,6 +361,7 @@ class TTSToolApp:
             directory: Directory to save to.
             voice_name: Name of the voice (for filename).
             format_ext: File extension (wav, mp3, ogg, etc.).
+            transcript_text: Optional transcript to embed as metadata and use for filename.
             
         Returns:
             (filename, error_message)
@@ -345,8 +372,14 @@ class TTSToolApp:
         os.makedirs(directory, exist_ok=True)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_voice = voice_name.lower().replace(" ", "_")
-        filename = f"tts_{safe_voice}_{timestamp}.{format_ext}"
+        
+        # Build filename from transcript text (first few words) or voice name
+        slug = self._sanitize_filename(transcript_text) if transcript_text else ""
+        if slug:
+            filename = f"tts_{slug}_{timestamp}.{format_ext}"
+        else:
+            safe_voice = voice_name.lower().replace(" ", "_")
+            filename = f"tts_{safe_voice}_{timestamp}.{format_ext}"
         filepath = os.path.join(directory, filename)
         
         error = None
@@ -367,19 +400,23 @@ class TTSToolApp:
                 
                 # Format-specific encoder and quality settings.
                 # Source audio: 24kHz, 16-bit, mono PCM from Gemini TTS.
-                # 128k CBR is transparent for mono speech; AAC/Vorbis are more
-                # efficient than MP3 so 128k sounds even better there.
                 if format_ext == "mp3":
                     cmd.extend(["-c:a", "libmp3lame", "-b:a", "128k"])
                 elif format_ext == "ogg":
-                    # -q:a 4 ≈ 128 kbps VBR — transparent for speech
-                    cmd.extend(["-c:a", "libvorbis", "-q:a", "4"])
+                    # Opus is far more efficient than Vorbis for speech.
+                    # 64k Opus is transparent for mono speech and smaller than
+                    # both Vorbis and AAC at equivalent quality.
+                    cmd.extend(["-c:a", "libopus", "-b:a", "64k"])
                 elif format_ext == "flac":
                     # FLAC is lossless — no bitrate needed
                     cmd.extend(["-c:a", "flac"])
                 elif format_ext == "m4a":
-                    # AAC is very efficient for voice; 128k is more than enough
-                    cmd.extend(["-c:a", "aac", "-b:a", "128k"])
+                    # AAC is very efficient for voice; 64k is enough for mono speech
+                    cmd.extend(["-c:a", "aac", "-b:a", "64k"])
+                
+                # Embed transcript as metadata comment if provided
+                if transcript_text:
+                    cmd.extend(["-metadata", f"comment={transcript_text}"])
                 
                 cmd.append(filepath)
                 

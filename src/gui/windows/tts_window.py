@@ -148,7 +148,6 @@ class TTSWindow:
         self.play_pause_btn = None
         self.seek_slider = None
         self.position_label = None
-        self.format_dropdown = None
         self.save_btn = None
         self.status_label = None
     
@@ -522,33 +521,15 @@ class TTSWindow:
         """Create save/export section."""
         content = self._create_section_frame(parent, "Export")
         
-        # Format selection
-        row = ctk.CTkFrame(content, fg_color="transparent")
-        row.pack(fill="x", pady=(0, 5))
-        
-        ctk.CTkLabel(row, text="Format:", font=get_ctk_font(size=11),
-                     text_color=self.colors.text).pack(side="left", padx=(0, 5))
-        
-        from ...audio.ffmpeg_utils import is_ffmpeg_available
-        
-        formats = ["WAV"]
-        if is_ffmpeg_available():
-            formats.extend(["MP3", "OGG", "FLAC", "AAC"])
-            
-        self.format_dropdown = ctk.CTkOptionMenu(
-            row,
-            values=formats,
-            width=90,
-            height=24,
-            font=get_ctk_font(size=11),
-            fg_color=self.colors.surface1,
-            button_color=self.colors.surface2,
-            button_hover_color=self.colors.overlay0,
-            dropdown_fg_color=self.colors.surface0,
-            text_color=self.colors.text
+        # Format info label (read from config)
+        fmt = self.config.get("audio_output_format", "ogg").upper()
+        self._format_label = ctk.CTkLabel(
+            content,
+            text=f"Format: {fmt} (set in config)",
+            font=get_ctk_font(size=10),
+            text_color=self.colors.overlay0
         )
-        self.format_dropdown.set("WAV")
-        self.format_dropdown.pack(side="left", fill="x", expand=True)
+        self._format_label.pack(fill="x", pady=(0, 5))
 
         save_content = prepare_emoji_content("💾 Save Audio", size=12)
         self.save_btn = ctk.CTkButton(
@@ -1133,19 +1114,30 @@ class TTSWindow:
             self._update_status("TTS Tool unavailable", self.colors.red)
             return
         
-        save_dir = self.config.get("tts_save_directory", "tts_output")
-        fmt = self.format_dropdown.get().lower()
+        save_dir = self.config.get("tts_save_directory", "audio_output")
+        fmt = self.config.get("audio_output_format", "ogg").lower()
         if fmt == "aac":
             ext = "m4a"
         else:
             ext = fmt
+        
+        # Get transcript text for metadata embedding and filename
+        transcript_text = None
+        if self.input_textbox:
+            try:
+                raw = self.input_textbox.get("1.0", "end-1c").strip()
+                if raw:
+                    transcript_text = raw
+            except Exception:
+                pass
             
         filename, error = tool.save_audio_file(
             self.pcm_audio,
             self.wav_audio,
             save_dir,
             self.selected_voice,
-            ext
+            ext,
+            transcript_text=transcript_text
         )
         
         if error:

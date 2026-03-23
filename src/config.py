@@ -100,6 +100,9 @@ DEFAULT_CONFIG = {
     # - progressbar: Smooth, simple progress bar
     "audio_level_meter_style": "canvas",
     # TTS (Text-to-Speech) settings
+    # Audio output format for all tools (Audio Analyzer save, TTS save)
+    # Options: ogg (Opus, recommended), mp3, wav, flac, m4a (AAC)
+    "audio_output_format": "ogg",
     "tts_enabled": True,
     "tts_hotkey": "ctrl+alt+t",
     "tts_default_voice": "Kore",
@@ -109,7 +112,7 @@ DEFAULT_CONFIG = {
     # Model override for AI Director (empty = use default provider model)
     "tts_director_model": "",
     # Directory for saved TTS audio files
-    "tts_save_directory": "tts_output",
+    "tts_save_directory": "audio_output",
     # Automatically play generated audio
     "tts_autoplay": True,
     # Force TTS to use official Google endpoint even when gemini_endpoint is set
@@ -428,6 +431,13 @@ audio_default_loopback = true
 audio_level_meter_style = canvas
 
 # ============================================================
+# AUDIO OUTPUT FORMAT (shared across tools)
+# ============================================================
+# Format for saved audio files (Audio Analyzer, TTS)
+# Options: ogg (Opus, recommended), mp3, wav, flac, m4a (AAC)
+audio_output_format = ogg
+
+# ============================================================
 # TTS (TEXT-TO-SPEECH) - Gemini-powered speech synthesis
 # ============================================================
 # Enable/disable TTS feature
@@ -455,7 +465,7 @@ tts_director_auto_mode = false
 tts_director_model =
 
 # Directory for saved TTS audio files (relative to app root)
-tts_save_directory = tts_output
+tts_save_directory = audio_output
 
 # Automatically play generated audio
 # true = play immediately after generation

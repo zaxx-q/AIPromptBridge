@@ -254,20 +254,20 @@ def _create_top_action_bar_tk(window, parent):
     )
     window.send_btn.pack(side="left", padx=(0, 10))
     
-    # Clear
-    window.clear_btn = tk.Button(
+    # Save Audio
+    window.save_btn = tk.Button(
         right_frame,
-        text="🗑 Clear Audio",
+        text="💾 Save Audio",
         font=("Segoe UI", 10),
-        bg=colors.red,
-        fg="#ffffff",
+        bg=colors.surface1,
+        fg=colors.text,
         relief="flat",
         padx=10,
         pady=5,
-        command=window._clear_audio,
+        command=window._save_audio,
         state="disabled"
     )
-    window.clear_btn.pack(side="left")
+    window.save_btn.pack(side="left")
 
 def _create_audio_source_section_tk(window, parent):
     """Create audio source section."""

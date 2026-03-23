@@ -161,7 +161,7 @@ class AudioAnalyzerWindow:
         self.carousel = None
         self.modifier_bar = None
         self.send_btn = None
-        self.clear_btn = None
+        self.save_btn = None
         self.result_text_widget = None
         self.copy_btn = None
         self.status_label = None
@@ -366,20 +366,20 @@ class AudioAnalyzerWindow:
         )
         self.send_btn.pack(side="left", padx=(0, 10))
         
-        # Clear button
-        clear_content = prepare_emoji_content("🗑 Clear Audio", size=14)
-        self.clear_btn = ctk.CTkButton(
+        # Save Audio button
+        save_content = prepare_emoji_content("💾 Save Audio", size=14)
+        self.save_btn = ctk.CTkButton(
             right_frame,
-            **clear_content,
+            **save_content,
             font=get_ctk_font(size=11),
             width=120,
             height=36,
             corner_radius=8,
-            command=self._clear_audio,
+            command=self._save_audio,
             state="disabled",
-            **get_ctk_button_colors(self.colors, "danger")
+            **get_ctk_button_colors(self.colors, "secondary")
         )
-        self.clear_btn.pack(side="left")
+        self.save_btn.pack(side="left")
     
     # =========================================================================
     # Pack-based section methods for left column
@@ -1456,7 +1456,7 @@ class AudioAnalyzerWindow:
         if self.play_pause_btn: self.play_pause_btn.configure(state="normal")
         if self.seek_slider: self.seek_slider.configure(state="normal")
         if self.send_btn: self.send_btn.configure(state="normal")
-        if self.clear_btn: self.clear_btn.configure(state="normal")
+        if self.save_btn: self.save_btn.configure(state="normal")
         
         # Update position label
         if self.position_label:
@@ -1484,7 +1484,7 @@ class AudioAnalyzerWindow:
         self.play_pause_btn.configure(state="disabled")
         self.seek_slider.configure(state="disabled")
         self.send_btn.configure(state="disabled")
-        self.clear_btn.configure(state="disabled")
+        if self.save_btn: self.save_btn.configure(state="disabled")
         
         # Clear result
         self.result_text_widget.configure(state=tk.NORMAL)
@@ -1494,6 +1494,161 @@ class AudioAnalyzerWindow:
         self.copy_btn.configure(state="disabled")
         
         self._update_status("Audio cleared")
+    
+    def _save_audio(self):
+        """Save recorded/compressed audio to the audio_output folder.
+        
+        Uses the compression preset to process the audio, reads output format
+        from config, and embeds result text as metadata if available.
+        """
+        if not self.recorded_wav:
+            return
+        
+        import os
+        import re
+        import subprocess
+        from datetime import datetime
+        from ...audio.ffmpeg_utils import get_ffmpeg_path, get_creation_flags, is_ffmpeg_available
+        from ...audio.recorder import COMPRESSION_PRESETS
+        
+        if not is_ffmpeg_available():
+            self._update_status("FFmpeg required for saving", self.colors.red)
+            return
+        
+        ffmpeg_path = get_ffmpeg_path()
+        if not ffmpeg_path:
+            self._update_status("FFmpeg not found", self.colors.red)
+            return
+        
+        # Get format from config
+        fmt = self.config.get("audio_output_format", "ogg").lower()
+        if fmt == "aac":
+            ext = "m4a"
+        else:
+            ext = fmt
+        
+        # Build filename from result text (first few words) or device name
+        def sanitize(text, max_words=5, max_len=50):
+            if not text:
+                return ""
+            words = text.split()[:max_words]
+            slug = "_".join(words)
+            slug = re.sub(r'[^\w]', '_', slug)
+            slug = re.sub(r'_+', '_', slug).strip('_').lower()
+            return slug[:max_len]
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        slug = sanitize(self.result_text) if self.result_text else ""
+        
+        if slug:
+            filename = f"audio_{slug}_{timestamp}.{ext}"
+        else:
+            # Use device name
+            device_name = ""
+            if self.current_device:
+                device_name = sanitize(self.current_device.name, max_words=3, max_len=30)
+            filename = f"audio_{device_name}_{timestamp}.{ext}" if device_name else f"audio_{timestamp}.{ext}"
+        
+        save_dir = "audio_output"
+        os.makedirs(save_dir, exist_ok=True)
+        filepath = os.path.join(save_dir, filename)
+        
+        self._update_status("Saving audio...", self.colors.accent)
+        
+        def _save_thread():
+            try:
+                # Get compression preset args
+                preset_config = COMPRESSION_PRESETS.get(self.compression_preset, COMPRESSION_PRESETS["recommended"])
+                preset_args = preset_config.get("ffmpeg_args", "")
+                
+                # Write source audio to temp file
+                import tempfile
+                from pathlib import Path
+                
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                    tmp.write(self.recorded_wav)
+                    tmp_path = tmp.name
+                
+                try:
+                    # Build FFmpeg command with preset processing
+                    cmd = [ffmpeg_path, "-y", "-i", tmp_path, "-v", "error"]
+                    
+                    # Apply compression preset args (resampling, silence removal, etc.)
+                    cmd.extend(preset_args.split())
+                    
+                    # Override codec/format for the target output format
+                    # The preset args may set codec, but we force our target format
+                    if ext == "ogg":
+                        # Preset already uses libopus for ogg, keep it
+                        pass
+                    elif ext == "mp3":
+                        # Replace opus codec with mp3
+                        cmd = [ffmpeg_path, "-y", "-i", tmp_path, "-v", "error"]
+                        # Only use filter parts from preset (e.g., silenceremove, aformat)
+                        if "-af" in preset_args:
+                            af_idx = preset_args.split().index("-af")
+                            af_val = preset_args.split()[af_idx + 1]
+                            cmd.extend(["-af", af_val])
+                        cmd.extend(["-c:a", "libmp3lame", "-b:a", "128k", "-ar", "16000", "-ac", "1"])
+                    elif ext == "m4a":
+                        cmd = [ffmpeg_path, "-y", "-i", tmp_path, "-v", "error"]
+                        if "-af" in preset_args:
+                            af_idx = preset_args.split().index("-af")
+                            af_val = preset_args.split()[af_idx + 1]
+                            cmd.extend(["-af", af_val])
+                        cmd.extend(["-c:a", "aac", "-b:a", "64k", "-ar", "16000", "-ac", "1"])
+                    elif ext == "flac":
+                        cmd = [ffmpeg_path, "-y", "-i", tmp_path, "-v", "error"]
+                        if "-af" in preset_args:
+                            af_idx = preset_args.split().index("-af")
+                            af_val = preset_args.split()[af_idx + 1]
+                            cmd.extend(["-af", af_val])
+                        cmd.extend(["-c:a", "flac", "-ar", "16000", "-ac", "1"])
+                    elif ext == "wav":
+                        cmd = [ffmpeg_path, "-y", "-i", tmp_path, "-v", "error"]
+                        if "-af" in preset_args:
+                            af_idx = preset_args.split().index("-af")
+                            af_val = preset_args.split()[af_idx + 1]
+                            cmd.extend(["-af", af_val])
+                    
+                    # Embed result text as metadata if available
+                    if self.result_text:
+                        cmd.extend(["-metadata", f"comment={self.result_text}"])
+                    
+                    cmd.append(filepath)
+                    
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        creationflags=get_creation_flags()
+                    )
+                    
+                    if result.returncode != 0:
+                        error_msg = result.stderr.decode('utf-8', errors='replace')
+                        GUICoordinator.get_instance().run_on_gui_thread(
+                            lambda: self._update_status(f"Save failed: {error_msg[:80]}", self.colors.red)
+                        )
+                    else:
+                        # Get file size for display
+                        file_size = os.path.getsize(filepath)
+                        size_str = f"{file_size / 1024:.0f} KB" if file_size < 1024 * 1024 else f"{file_size / (1024*1024):.1f} MB"
+                        GUICoordinator.get_instance().run_on_gui_thread(
+                            lambda: self._update_status(f"✅ Saved: {filename} ({size_str})", self.colors.green)
+                        )
+                finally:
+                    try:
+                        Path(tmp_path).unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                        
+            except Exception as e:
+                logging.error(f"[AudioAnalyzer] Save error: {e}")
+                GUICoordinator.get_instance().run_on_gui_thread(
+                    lambda: self._update_status(f"Save error: {e}", self.colors.red)
+                )
+        
+        import threading
+        threading.Thread(target=_save_thread, daemon=True).start()
     
     # =========================================================================
     # Playback Controls

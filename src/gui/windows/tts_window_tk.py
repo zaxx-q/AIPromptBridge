@@ -338,26 +338,15 @@ def _create_export_section_tk(window, parent):
     colors = window.colors
     content = _create_section_frame_tk(parent, "Export", colors)
 
-    # Format selection row
-    row = tk.Frame(content, bg=colors.surface0)
-    row.pack(fill="x", pady=(0, 5))
-
-    tk.Label(row, text="Format:", font=("Segoe UI", 10),
-             bg=colors.surface0, fg=colors.text).pack(side="left", padx=(0, 5))
-
-    try:
-        from ...audio.ffmpeg_utils import is_ffmpeg_available
-        formats = ["WAV"]
-        if is_ffmpeg_available():
-            formats.extend(["MP3", "OGG", "FLAC", "AAC"])
-    except ImportError:
-        formats = ["WAV"]
-
-    window.format_dropdown = TkOptionMenuWrapper(
-        row, values=formats, width=8
-    )
-    window.format_dropdown.set("WAV")
-    window.format_dropdown.pack(side="left", fill="x", expand=True)
+    # Format info label (read from config)
+    fmt = window.config.get("audio_output_format", "ogg").upper()
+    tk.Label(
+        content,
+        text=f"Format: {fmt} (set in config)",
+        font=("Segoe UI", 9),
+        bg=colors.surface0,
+        fg=colors.overlay0
+    ).pack(fill="x", pady=(0, 5))
 
     # Save button
     window.save_btn = tk.Button(
