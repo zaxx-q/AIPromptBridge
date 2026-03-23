@@ -3517,6 +3517,7 @@ class PromptEditorWindow:
         
         if name and name not in tool_data:
             tool_data[name] = {
+                "_is_default": False,
                 "icon": "⚡",
                 "prompt_type": "edit",
                 "system_prompt": "",
@@ -3541,6 +3542,7 @@ class PromptEditorWindow:
         
         import copy
         tool_data[new_name] = copy.deepcopy(tool_data[self.current_action])
+        tool_data[new_name]["_is_default"] = False
         
         icon = tool_data[new_name].get("icon", "")
         self.action_listbox.add_item(new_name, new_name, icon)
@@ -3628,6 +3630,7 @@ class PromptEditorWindow:
         
         # Build action dict with common fields
         action_dict = {
+            "_is_default": False,
             "icon": self.editor_widgets["icon_var"].get(),
             "system_prompt": system_prompt,
             "task": self.editor_widgets["task_var"].get(),

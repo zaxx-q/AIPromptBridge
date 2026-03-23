@@ -52,6 +52,85 @@ def ensure_tools_config(filepath: str = TOOLS_CONFIG_FILE) -> Path:
     return path
 
 
+def _merge_with_defaults(user_config: Dict[str, Any]) -> tuple[Dict[str, Any], bool]:
+    """Merge user tools config with defaults, preserving customizations and updating defaults."""
+    default_config = get_default_config()
+    changed = False
+
+    # Initialize missing top-level keys
+    for k in ["_settings", "file_processor"]:
+        if k not in user_config:
+            user_config[k] = default_config.get(k, {}).copy()
+            changed = True
+
+    # Overlay _settings
+    for k, v in default_config.get("_settings", {}).items():
+        if k not in user_config["_settings"]:
+            user_config["_settings"][k] = v
+            changed = True
+
+    # Initialize file_processor sub-keys if missing
+    for k in ["output_modes", "file_type_mappings"]:
+        if k not in user_config["file_processor"]:
+            user_config["file_processor"][k] = default_config["file_processor"].get(k, {}).copy()
+            changed = True
+
+    # Overlay output_modes
+    for k, v in default_config["file_processor"].get("output_modes", {}).items():
+        if k not in user_config["file_processor"]["output_modes"]:
+            user_config["file_processor"]["output_modes"][k] = v.copy()
+            changed = True
+
+    # Overlay file_type_mappings
+    for k, v in default_config["file_processor"].get("file_type_mappings", {}).items():
+        if k not in user_config["file_processor"]["file_type_mappings"]:
+            user_config["file_processor"]["file_type_mappings"][k] = v.copy()
+            changed = True
+
+    # Merge prompts with _is_default tagging
+    if "prompts" not in user_config["file_processor"]:
+        user_config["file_processor"]["prompts"] = default_config["file_processor"]["prompts"].copy()
+        for action in user_config["file_processor"]["prompts"].values():
+            action["_is_default"] = True
+        changed = True
+    else:
+        user_prompts = user_config["file_processor"]["prompts"]
+        default_prompts = default_config["file_processor"]["prompts"]
+        
+        # Helper to compare ignoring _is_default
+        def compare_prompt(u_act, d_act):
+            u_copy = u_act.copy()
+            d_copy = d_act.copy()
+            u_copy.pop("_is_default", None)
+            d_copy.pop("_is_default", None)
+            return u_copy == d_copy
+
+        # Tag untagged actions
+        for name, u_action in user_prompts.items():
+            if not isinstance(u_action, dict): continue
+            if "_is_default" not in u_action:
+                d_action = default_prompts.get(name)
+                if d_action and compare_prompt(u_action, d_action):
+                    u_action["_is_default"] = True
+                else:
+                    u_action["_is_default"] = False
+                changed = True
+
+        # Add missing or update default
+        for name, d_action in default_prompts.items():
+            if name not in user_prompts:
+                user_prompts[name] = d_action.copy()
+                user_prompts[name]["_is_default"] = True
+                changed = True
+            elif isinstance(user_prompts[name], dict) and user_prompts[name].get("_is_default", False):
+                d_action_tagged = d_action.copy()
+                d_action_tagged["_is_default"] = True
+                if user_prompts[name] != d_action_tagged:
+                    user_prompts[name] = d_action_tagged
+                    changed = True
+
+    return user_config, changed
+
 def load_tools_config(filepath: str = TOOLS_CONFIG_FILE, create_if_missing: bool = True) -> Dict[str, Any]:
     """
     Load tools configuration from JSON file.
@@ -77,7 +156,12 @@ def load_tools_config(filepath: str = TOOLS_CONFIG_FILE, create_if_missing: bool
     
     try:
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            user_config = json.load(f)
+            merged_config, changed = _merge_with_defaults(user_config)
+            if changed:
+                with open(path, "w", encoding="utf-8") as fw:
+                    json.dump(merged_config, fw, indent=2, ensure_ascii=False)
+            return merged_config
     except (json.JSONDecodeError, IOError) as e:
         print(f"[Error] Failed to load tools config: {e}")
         return get_default_config()

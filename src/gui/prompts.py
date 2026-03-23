@@ -727,40 +727,135 @@ class PromptsConfig:
             self._config = self._get_defaults()
             self._save()
     
+    def _compare_action(self, user_action: dict, default_action: dict) -> bool:
+        """Compare two actions ignoring _is_default."""
+        u_copy = user_action.copy()
+        d_copy = default_action.copy()
+        u_copy.pop("_is_default", None)
+        d_copy.pop("_is_default", None)
+        return u_copy == d_copy
+
+    def _tag_defaults(self, section_data: dict, default_actions: dict) -> bool:
+        """Tag untagged actions by comparing with defaults."""
+        changed = False
+        for name, u_action in section_data.items():
+            if name == "_settings" or not isinstance(u_action, dict):
+                continue
+            if "_is_default" not in u_action:
+                d_action = default_actions.get(name)
+                if d_action and self._compare_action(u_action, d_action):
+                    u_action["_is_default"] = True
+                else:
+                    u_action["_is_default"] = False
+                changed = True
+        return changed
+
+    def _merge_section(self, section_data: dict, default_actions: dict, default_settings: dict) -> bool:
+        """Merge a dictionary-based tool section."""
+        changed = False
+        
+        # Tag untagged
+        if self._tag_defaults(section_data, default_actions):
+            changed = True
+            
+        # Add missing or update default
+        for name, d_action in default_actions.items():
+            if name not in section_data:
+                section_data[name] = d_action.copy()
+                section_data[name]["_is_default"] = True
+                changed = True
+            elif isinstance(section_data[name], dict) and section_data[name].get("_is_default", False):
+                # Update existing default if it changed in code
+                d_action_tagged = d_action.copy()
+                d_action_tagged["_is_default"] = True
+                if section_data[name] != d_action_tagged:
+                    section_data[name] = d_action_tagged
+                    changed = True
+
+        # Settings
+        if "_settings" not in section_data:
+            section_data["_settings"] = default_settings.copy()
+            changed = True
+        else:
+            for k, v in default_settings.items():
+                if k not in section_data["_settings"]:
+                    section_data["_settings"][k] = v
+                    changed = True
+                    
+        return changed
+
     def _ensure_sections(self):
         """Ensure all required sections exist with defaults."""
         changed = False
         
+        # Merge global settings
+        if "_global_settings" not in self._config:
+            self._config["_global_settings"] = DEFAULT_GLOBAL_SETTINGS.copy()
+            changed = True
+        else:
+            for k, v in DEFAULT_GLOBAL_SETTINGS.items():
+                if k == "modifiers":
+                    continue
+                if k not in self._config["_global_settings"]:
+                    self._config["_global_settings"][k] = v
+                    changed = True
+
         if "text_edit_tool" not in self._config:
             self._config["text_edit_tool"] = self._get_text_edit_defaults()
             changed = True
+        else:
+            if self._merge_section(self._config["text_edit_tool"], DEFAULT_TEXT_EDIT_ACTIONS, DEFAULT_TEXT_EDIT_SETTINGS):
+                changed = True
         
         if "snip_tool" not in self._config:
             self._config["snip_tool"] = {
-                "_settings": DEFAULT_SNIP_SETTINGS,
-                **DEFAULT_SNIP_ACTIONS
+                "_settings": DEFAULT_SNIP_SETTINGS.copy(),
+                **{k: {**v, "_is_default": True} for k, v in DEFAULT_SNIP_ACTIONS.items()}
             }
             changed = True
+        else:
+            if self._merge_section(self._config["snip_tool"], DEFAULT_SNIP_ACTIONS, DEFAULT_SNIP_SETTINGS):
+                changed = True
         
         if "audio_tool" not in self._config:
             self._config["audio_tool"] = {
-                "_settings": DEFAULT_AUDIO_SETTINGS,
-                **DEFAULT_AUDIO_ACTIONS
+                "_settings": DEFAULT_AUDIO_SETTINGS.copy(),
+                **{k: {**v, "_is_default": True} for k, v in DEFAULT_AUDIO_ACTIONS.items()}
             }
             changed = True
+        else:
+            if self._merge_section(self._config["audio_tool"], DEFAULT_AUDIO_ACTIONS, DEFAULT_AUDIO_SETTINGS):
+                changed = True
         
         if "tts_tool" not in self._config:
             self._config["tts_tool"] = {
-                "_settings": DEFAULT_TTS_SETTINGS
+                "_settings": DEFAULT_TTS_SETTINGS.copy()
             }
             changed = True
+        else:
+            if self._merge_section(self._config["tts_tool"], {}, DEFAULT_TTS_SETTINGS):
+                changed = True
         
         if "endpoints" not in self._config:
             self._config["endpoints"] = {
-                "_settings": DEFAULT_ENDPOINTS_SETTINGS,
+                "_settings": DEFAULT_ENDPOINTS_SETTINGS.copy(),
                 **DEFAULT_ENDPOINTS
             }
             changed = True
+        else:
+            endpoints_section = self._config["endpoints"]
+            if "_settings" not in endpoints_section:
+                endpoints_section["_settings"] = DEFAULT_ENDPOINTS_SETTINGS.copy()
+                changed = True
+            else:
+                for k, v in DEFAULT_ENDPOINTS_SETTINGS.items():
+                    if k not in endpoints_section["_settings"]:
+                        endpoints_section["_settings"][k] = v
+                        changed = True
+            for k, v in DEFAULT_ENDPOINTS.items():
+                if k not in endpoints_section:
+                    endpoints_section[k] = v
+                    changed = True
         
         if changed:
             self._save()
@@ -768,28 +863,28 @@ class PromptsConfig:
     def _get_text_edit_defaults(self) -> dict:
         """Get text edit tool defaults."""
         return {
-            "_settings": DEFAULT_TEXT_EDIT_SETTINGS,
-            **DEFAULT_TEXT_EDIT_ACTIONS
+            "_settings": DEFAULT_TEXT_EDIT_SETTINGS.copy(),
+            **{k: {**v, "_is_default": True} for k, v in DEFAULT_TEXT_EDIT_ACTIONS.items()}
         }
     
     def _get_defaults(self) -> dict:
         """Get complete default configuration."""
         return {
-            "_global_settings": DEFAULT_GLOBAL_SETTINGS,
+            "_global_settings": DEFAULT_GLOBAL_SETTINGS.copy(),
             "text_edit_tool": self._get_text_edit_defaults(),
             "snip_tool": {
-                "_settings": DEFAULT_SNIP_SETTINGS,
-                **DEFAULT_SNIP_ACTIONS
+                "_settings": DEFAULT_SNIP_SETTINGS.copy(),
+                **{k: {**v, "_is_default": True} for k, v in DEFAULT_SNIP_ACTIONS.items()}
             },
             "audio_tool": {
-                "_settings": DEFAULT_AUDIO_SETTINGS,
-                **DEFAULT_AUDIO_ACTIONS
+                "_settings": DEFAULT_AUDIO_SETTINGS.copy(),
+                **{k: {**v, "_is_default": True} for k, v in DEFAULT_AUDIO_ACTIONS.items()}
             },
             "tts_tool": {
-                "_settings": DEFAULT_TTS_SETTINGS
+                "_settings": DEFAULT_TTS_SETTINGS.copy()
             },
             "endpoints": {
-                "_settings": DEFAULT_ENDPOINTS_SETTINGS,
+                "_settings": DEFAULT_ENDPOINTS_SETTINGS.copy(),
                 **DEFAULT_ENDPOINTS
             }
         }

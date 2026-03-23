@@ -19,6 +19,7 @@ DEFAULT_TOOLS_CONFIG = {
     "file_processor": {
         "prompts": {
             "OCR (Verbatim)": {
+                "_is_default": True,
                 "icon": "📝",
                 "description": "Extract text exactly as shown, preserving formatting",
                 "input_types": ["image"],
@@ -28,6 +29,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "OCR (to Markdown)": {
+                "_is_default": True,
                 "icon": "📄",
                 "description": "Extract text and format as Markdown with structure",
                 "input_types": ["image"],
@@ -37,6 +39,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "HTR (Handwriting to Markdown)": {
+                "_is_default": True,
                 "icon": "✍️",
                 "description": "Transcribe handwritten text with Markdown formatting",
                 "input_types": ["image"],
@@ -46,6 +49,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "HTR (Smart Cleanup for messy notes, robust prompt)": {
+                "_is_default": True,
                 "icon": "🧹",
                 "description": "Transcribe messy handwriting with intelligent cleanup and reconstruction",
                 "input_types": ["image"],
@@ -55,6 +59,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "Smart Digitize (to Markdown)": {
+                "_is_default": True,
                 "icon": "🖍️",
                 "description": "Intelligently digitize any document—printed, handwritten, or mixed—with adaptive formatting",
                 "input_types": ["image"],
@@ -64,6 +69,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "Transcribe Audio (Verbatim)": {
+                "_is_default": True,
                 "icon": "🎙️",
                 "description": "Transcribe speech from audio files",
                 "input_types": ["audio"],
@@ -73,6 +79,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "Transcribe Audio (to Markdown)": {
+                "_is_default": True,
                 "icon": "🎧",
                 "description": "Transcribe audio with Markdown formatting and structure",
                 "input_types": ["audio"],
@@ -82,6 +89,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "Describe Audio": {
+                "_is_default": True,
                 "icon": "🔊",
                 "description": "Describe and analyze audio content",
                 "input_types": ["audio"],
@@ -91,6 +99,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "Describe Image": {
+                "_is_default": True,
                 "icon": "🖼️",
                 "description": "Detailed description of image contents",
                 "input_types": ["image"],
@@ -100,6 +109,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "Summarize Content": {
+                "_is_default": True,
                 "icon": "📋",
                 "description": "Summarize text or document content",
                 "input_types": ["image", "text"],
@@ -109,6 +119,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "Extract Data": {
+                "_is_default": True,
                 "icon": "📊",
                 "description": "Extract structured data (tables, lists, key-value pairs)",
                 "input_types": ["image", "text"],
@@ -118,6 +129,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "Code Review": {
+                "_is_default": True,
                 "icon": "🔍",
                 "description": "Review code for issues, improvements, and best practices",
                 "input_types": ["code", "text", "image"],
@@ -127,6 +139,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "Translate to English": {
+                "_is_default": True,
                 "icon": "🌐",
                 "description": "Translate content to English",
                 "input_types": ["image", "text"],
@@ -136,6 +149,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "Convert to JSON": {
+                "_is_default": True,
                 "icon": "📦",
                 "description": "Extract and convert content to JSON format",
                 "input_types": ["image", "text"],
@@ -145,6 +159,7 @@ DEFAULT_TOOLS_CONFIG = {
             },
 
             "Custom Prompt": {
+                "_is_default": True,
                 "icon": "⚡",
                 "description": "Enter a custom prompt for processing",
                 "input_types": ["image", "text", "code", "audio"],
