@@ -15,6 +15,7 @@ Design:
     - Multiple theme support via ThemeRegistry
 """
 
+import gc
 import logging
 import math
 import sys
@@ -2132,6 +2133,29 @@ class AttachedInputPopup:
             except tk.TclError:
                 pass
             self.root = None
+
+        # Neutralize tkinter Variables AFTER root.destroy() to prevent
+        # "RuntimeError: main thread is not in main loop" when the popup
+        # is GC'd on a background thread (the Toplevel shares the parent's
+        # live Tcl interpreter, so Variable.__del__ would still attempt
+        # a real Tcl call).
+        for attr_name in ('input_var',):
+            var = getattr(self, attr_name, None)
+            if isinstance(var, tk.Variable):
+                try:
+                    var._tk = None
+                except Exception:
+                    pass
+
+        # Release widget references so CTk-internal Variables are GC'd
+        # on the main thread NOW, not later on a background thread.
+        self.input_entry = None
+        self.response_toggle = None
+        self.input_var = None
+        if hasattr(self, 'tts_btn'):
+            self.tts_btn = None
+        gc.collect()
+
         if self.on_close_callback:
             self.on_close_callback()
 
@@ -2940,6 +2964,33 @@ class AttachedPromptPopup:
             except tk.TclError:
                 pass
             self.root = None
+
+        # Neutralize tkinter Variables AFTER root.destroy() to prevent
+        # "RuntimeError: main thread is not in main loop" when the popup
+        # is GC'd on a background thread (the Toplevel shares the parent's
+        # live Tcl interpreter, so Variable.__del__ would still attempt
+        # a real Tcl call).
+        for attr_name in ('edit_input_var', 'ask_input_var'):
+            var = getattr(self, attr_name, None)
+            if isinstance(var, tk.Variable):
+                try:
+                    var._tk = None
+                except Exception:
+                    pass
+
+        # Release widget references so CTk-internal Variables are GC'd
+        # on the main thread NOW, not later on a background thread.
+        self.edit_input = None
+        self.ask_input = None
+        self.response_toggle = None
+        self.modifier_bar = None
+        self.carousel = None
+        self.edit_input_var = None
+        self.ask_input_var = None
+        if hasattr(self, 'tts_btn'):
+            self.tts_btn = None
+        gc.collect()
+
         if self.on_close_callback:
             self.on_close_callback()
 
