@@ -66,11 +66,6 @@ class StreamingChatCallbacks:
                 # Stop streaming mode
                 self.window.is_streaming = False
                 
-                # Automatically collapse thinking when streaming is done
-                # This affects the NEXT message added (which will be at the current length position)
-                msg_idx = len(self.window.session.messages)
-                self.window.thinking_collapsed_states[msg_idx] = True
-                
                 # Add assistant message to session IF NOT ALREADY THERE
                 # Streaming handlers might have already added it to ensure persistence before autosave
                 # Check for duplication carefully to avoid duplicate messages
@@ -86,6 +81,14 @@ class StreamingChatCallbacks:
                 # Always ensure thinking content is attached if available
                 if thinking_text and len(self.window.session.messages) > 0:
                     self.window.session.messages[-1]["thinking"] = thinking_text
+                
+                # Auto-collapse thinking now that the message is in session
+                # Must be computed AFTER add_message to get the correct index,
+                # since callers (e.g. SnipTool) may add the message before
+                # this deferred callback runs, causing an off-by-one.
+                msg_idx = len(self.window.session.messages) - 1
+                if msg_idx in self.window.thinking_collapsed_states:
+                    self.window.thinking_collapsed_states[msg_idx] = True
                 
                 # Update last response for copy functionality
                 self.window.last_response = response_text

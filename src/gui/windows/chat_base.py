@@ -1179,6 +1179,11 @@ class ChatWindowBase(ABC):
                     if thinking_content and len(self.session.messages) > 0:
                         self.session.messages[-1]["thinking"] = thinking_content
                     
+                    # Auto-collapse thinking after streaming finishes
+                    msg_idx = len(self.session.messages) - 1
+                    if msg_idx in self.thinking_collapsed_states:
+                        self.thinking_collapsed_states[msg_idx] = True
+                    
                     self.last_response = ctx.response_text
                 
                 # Always restore saved messages (rerun turn) — even on error
@@ -1993,6 +1998,11 @@ class ChatWindowBase(ABC):
                     thinking_content = self.streaming_thinking or ctx.reasoning_text
                     if thinking_content and len(self.session.messages) > 0:
                         self.session.messages[-1]["thinking"] = thinking_content
+                    
+                    # Auto-collapse thinking after streaming finishes
+                    msg_idx = len(self.session.messages) - 1
+                    if msg_idx in self.thinking_collapsed_states:
+                        self.thinking_collapsed_states[msg_idx] = True
                     
                     self.last_response = ctx.response_text
                     self._update_chat_display(scroll_to_bottom=True)
