@@ -29,14 +29,29 @@ from .ffmpeg_utils import (
 
 from .recorder import AudioRecorder, COMPRESSION_PRESETS
 
+from .export import (
+    sanitize_filename,
+    get_format_ext,
+    export_audio_file,
+    export_audio_from_file,
+    build_output_filename,
+    CODEC_MAP,
+)
+
 __all__ = [
     'AudioDevice',
     'AudioRecorder',
     'COMPRESSION_PRESETS',
+    'CODEC_MAP',
     'is_ffmpeg_available',
     'is_ffprobe_available',
     'is_ffplay_available',
     'get_audio_duration',
+    'sanitize_filename',
+    'get_format_ext',
+    'export_audio_file',
+    'export_audio_from_file',
+    'build_output_filename',
     'list_input_devices',
     'list_loopback_devices',
     'get_default_input_device',

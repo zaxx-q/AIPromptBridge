@@ -45,6 +45,7 @@ AIPromptBridge/
     ├── audio/                  # Audio Subsystem
     │   ├── __init__.py
     │   ├── devices.py          # PyAudioWPatch device enumeration
+    │   ├── export.py           # Centralized audio export, compression, and metadata embedding
     │   ├── ffmpeg_utils.py     # Shared FFmpeg/FFprobe/FFplay detection and helpers
     │   ├── recorder.py         # Recorder class with recording, playback, and compression
     │   ├── tts_constants.py    # TTS voice list and model constants

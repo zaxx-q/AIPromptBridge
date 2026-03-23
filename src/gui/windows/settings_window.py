@@ -1491,14 +1491,48 @@ class SettingsWindow:
         # Export & Playback Section
         create_section_header(content_parent, "💾 Export & Playback", self.colors, top_padding=20)
 
+        # Audio output format dropdown
+        row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
+        row.pack(fill="x", pady=8)
+        
+        self.vars["audio_output_format"] = tk.StringVar(
+            master=self.root, value=self.config_data.config.get("audio_output_format", "ogg"))
+        
+        if self.use_ctk:
+            ctk.CTkLabel(row, text="Audio output format:", font=get_ctk_font(13), width=180, anchor="w",
+                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            self.widgets["audio_output_format"] = ctk.CTkComboBox(
+                row, variable=self.vars["audio_output_format"],
+                values=["ogg", "mp3", "wav", "flac", "m4a"],
+                width=100, height=34, state="readonly", font=get_ctk_font(13),
+                **get_ctk_combobox_colors(self.colors)
+            )
+            self.widgets["audio_output_format"].pack(side="left", padx=(12, 0))
+            
+            ctk.CTkLabel(row, text="Format for TTS & Audio Analyzer saved files (ogg = Opus, m4a = AAC)", font=get_ctk_font(11),
+                        **get_ctk_label_colors(self.colors, muted=True)).pack(side="left", padx=(15, 0))
+        else:
+            from tkinter import ttk
+            tk.Label(row, text="Audio output format:", font=("Segoe UI", 10), width=18, anchor="w",
+                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            self.widgets["audio_output_format"] = ttk.Combobox(
+                row, textvariable=self.vars["audio_output_format"],
+                values=["ogg", "mp3", "wav", "flac", "m4a"],
+                state="readonly", width=12
+            )
+            self.widgets["audio_output_format"].pack(side="left", padx=(10, 0))
+            
+            tk.Label(row, text="Format for TTS & Audio Analyzer saved files (ogg = Opus, m4a = AAC)", font=("Segoe UI", 9),
+                    bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
+
         self._add_entry_field(content_parent, "tts_save_directory", "Save Directory:",
-                             self.config_data.config.get("tts_save_directory", "tts_output"),
-                             width=240, hint="Folder to save generated audio files")
-                             
+                              self.config_data.config.get("tts_save_directory", "audio_output"),
+                              width=240, hint="Folder to save generated audio files")
+                              
         self._add_toggle_field(content_parent, "tts_autoplay",
-                               "Autoplay Audio",
-                               self.config_data.config.get("tts_autoplay", True),
-                               hint="Play audio immediately after generation")
+                                "Autoplay Audio",
+                                self.config_data.config.get("tts_autoplay", True),
+                                hint="Play audio immediately after generation")
 
         # Endpoint Section
         create_section_header(content_parent, "🌐 Endpoint", self.colors, top_padding=20)

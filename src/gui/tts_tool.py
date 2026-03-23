@@ -12,11 +12,9 @@ from typing import Optional, Dict, Any, List, Callable
 
 from .hotkey import HotkeyListener
 from .prompts import PromptsConfig
-from ..messages import build_text_message
 from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
 from ..api_client import get_provider_for_type
 from ..audio.wav_utils import pcm_to_wav, get_pcm_duration, save_wav
-from ..audio.ffmpeg_utils import get_ffmpeg_path, get_creation_flags, is_ffmpeg_available
 from ..audio.tts_constants import get_voice_details
 
 
@@ -318,31 +316,6 @@ class TTSToolApp:
 
         threading.Thread(target=_target, daemon=True).start()
 
-    @staticmethod
-    def _sanitize_filename(text: str, max_words: int = 5, max_len: int = 50) -> str:
-        """
-        Create a safe filename slug from text (first few words).
-        
-        Args:
-            text: Input text to derive filename from.
-            max_words: Maximum number of words to use.
-            max_len: Maximum character length for the slug.
-            
-        Returns:
-            Sanitized filename string (lowercase, underscored).
-        """
-        import re
-        if not text:
-            return ""
-        # Take first N words
-        words = text.split()[:max_words]
-        slug = "_".join(words)
-        # Remove non-alphanumeric chars (keep underscores)
-        slug = re.sub(r'[^\w]', '_', slug)
-        # Collapse multiple underscores
-        slug = re.sub(r'_+', '_', slug).strip('_').lower()
-        return slug[:max_len]
-
     def save_audio_file(
         self,
         pcm_data: bytes,
@@ -353,87 +326,47 @@ class TTSToolApp:
         transcript_text: Optional[str] = None
     ) -> tuple[Optional[str], Optional[str]]:
         """
-        Save audio data to a file.
+        Save audio data to a file using centralized export utilities.
         
         Args:
             pcm_data: Raw PCM bytes.
             wav_data: WAV bytes (optional, will be generated if None and needed).
             directory: Directory to save to.
-            voice_name: Name of the voice (for filename).
+            voice_name: Name of the voice (for filename fallback).
             format_ext: File extension (wav, mp3, ogg, etc.).
             transcript_text: Optional transcript to embed as metadata and use for filename.
             
         Returns:
             (filename, error_message)
         """
-        import subprocess
-        from datetime import datetime
+        from ..audio.export import build_output_filename, export_audio_file
         
         os.makedirs(directory, exist_ok=True)
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Build filename from transcript text (first few words) or voice name
-        slug = self._sanitize_filename(transcript_text) if transcript_text else ""
-        if slug:
-            filename = f"tts_{slug}_{timestamp}.{format_ext}"
-        else:
-            safe_voice = voice_name.lower().replace(" ", "_")
-            filename = f"tts_{safe_voice}_{timestamp}.{format_ext}"
+        # Build filename: transcript text → voice name fallback
+        fallback = voice_name.lower().replace(" ", "_")
+        filename = build_output_filename(
+            prefix="tts",
+            text_source=transcript_text,
+            fallback_name=fallback,
+            format_ext=format_ext
+        )
         filepath = os.path.join(directory, filename)
         
-        error = None
-        
+        # Ensure we have WAV data for encoding
         if format_ext == "wav":
             error = save_wav(filepath, pcm_data)
         else:
             if not wav_data:
                 wav_data = pcm_to_wav(pcm_data)
-                
-            ffmpeg_path = get_ffmpeg_path()
-            if not ffmpeg_path:
-                return None, "FFmpeg not available for conversion"
-                
-            try:
-                # Base command: read WAV from stdin
-                cmd = [ffmpeg_path, "-y", "-i", "pipe:0", "-v", "error"]
-                
-                # Format-specific encoder and quality settings.
-                # Source audio: 24kHz, 16-bit, mono PCM from Gemini TTS.
-                if format_ext == "mp3":
-                    cmd.extend(["-c:a", "libmp3lame", "-b:a", "128k"])
-                elif format_ext == "ogg":
-                    # Opus is far more efficient than Vorbis for speech.
-                    # 64k Opus is transparent for mono speech and smaller than
-                    # both Vorbis and AAC at equivalent quality.
-                    cmd.extend(["-c:a", "libopus", "-b:a", "64k"])
-                elif format_ext == "flac":
-                    # FLAC is lossless — no bitrate needed
-                    cmd.extend(["-c:a", "flac"])
-                elif format_ext == "m4a":
-                    # AAC is very efficient for voice; 64k is enough for mono speech
-                    cmd.extend(["-c:a", "aac", "-b:a", "64k"])
-                
-                # Embed transcript as metadata comment if provided
-                if transcript_text:
-                    cmd.extend(["-metadata", f"comment={transcript_text}"])
-                
-                cmd.append(filepath)
-                
-                creation_flags = get_creation_flags()
-                
-                result = subprocess.run(
-                    cmd,
-                    input=wav_data,
-                    capture_output=True,
-                    creationflags=creation_flags
-                )
-                
-                if result.returncode != 0:
-                    error = f"FFmpeg: {result.stderr.decode('utf-8', errors='replace')}"
-            except Exception as e:
-                error = str(e)
-                
+            
+            error = export_audio_file(
+                wav_data=wav_data,
+                output_path=filepath,
+                format_ext=format_ext,
+                metadata_comment=transcript_text
+            )
+        
         return (filename if not error else None), error
 
 

@@ -539,4 +539,4 @@ The TTS Processor integrates with existing TTS infrastructure:
 - **Voice Constants**: Uses `TTS_VOICES` from `src/audio/tts_constants.py`
 - **TTSToolApp**: Delegates audio generation to existing `TTSToolApp` instance
 - **AI Director**: Uses the same director logic as the GUI TTS window
-- **WAV Utilities**: Uses `src/audio/wav_utils.py` for audio handling
+- **WAV Utilities**: Uses `src/audio/wav_utils.py` for audio handling and `src/audio/export.py` for final export

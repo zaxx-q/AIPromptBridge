@@ -1500,54 +1500,30 @@ class AudioAnalyzerWindow:
         
         Uses the compression preset to process the audio, reads output format
         from config, and embeds result text as metadata if available.
+        Delegates to centralized export utilities in src/audio/export.py.
         """
         if not self.recorded_wav:
             return
         
         import os
-        import re
-        import subprocess
-        from datetime import datetime
-        from ...audio.ffmpeg_utils import get_ffmpeg_path, get_creation_flags, is_ffmpeg_available
+        import tempfile
+        from pathlib import Path
+        from ...audio.export import (
+            build_output_filename, export_audio_from_file, get_format_ext
+        )
         from ...audio.recorder import COMPRESSION_PRESETS
         
-        if not is_ffmpeg_available():
-            self._update_status("FFmpeg required for saving", self.colors.red)
-            return
-        
-        ffmpeg_path = get_ffmpeg_path()
-        if not ffmpeg_path:
-            self._update_status("FFmpeg not found", self.colors.red)
-            return
-        
         # Get format from config
-        fmt = self.config.get("audio_output_format", "ogg").lower()
-        if fmt == "aac":
-            ext = "m4a"
-        else:
-            ext = fmt
+        ext = get_format_ext(self.config.get("audio_output_format", "ogg"))
         
-        # Build filename from result text (first few words) or device name
-        def sanitize(text, max_words=5, max_len=50):
-            if not text:
-                return ""
-            words = text.split()[:max_words]
-            slug = "_".join(words)
-            slug = re.sub(r'[^\w]', '_', slug)
-            slug = re.sub(r'_+', '_', slug).strip('_').lower()
-            return slug[:max_len]
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        slug = sanitize(self.result_text) if self.result_text else ""
-        
-        if slug:
-            filename = f"audio_{slug}_{timestamp}.{ext}"
-        else:
-            # Use device name
-            device_name = ""
-            if self.current_device:
-                device_name = sanitize(self.current_device.name, max_words=3, max_len=30)
-            filename = f"audio_{device_name}_{timestamp}.{ext}" if device_name else f"audio_{timestamp}.{ext}"
+        # Build filename: result text → device name → timestamp only
+        device_name = self.current_device.name if self.current_device else None
+        filename = build_output_filename(
+            prefix="audio",
+            text_source=self.result_text,
+            fallback_name=device_name,
+            format_ext=ext
+        )
         
         save_dir = "audio_output"
         os.makedirs(save_dir, exist_ok=True)
@@ -1557,83 +1533,64 @@ class AudioAnalyzerWindow:
         
         def _save_thread():
             try:
-                # Get compression preset args
-                preset_config = COMPRESSION_PRESETS.get(self.compression_preset, COMPRESSION_PRESETS["recommended"])
+                # Get compression preset config
+                preset_config = COMPRESSION_PRESETS.get(
+                    self.compression_preset, COMPRESSION_PRESETS["recommended"]
+                )
                 preset_args = preset_config.get("ffmpeg_args", "")
                 
-                # Write source audio to temp file
-                import tempfile
-                from pathlib import Path
+                # Extract filter args (-af ...) from preset for non-ogg formats
+                # For ogg, the full preset args work directly
+                filter_args = None
+                if ext != "ogg":
+                    # Only extract the -af filter portion; codec will come from CODEC_MAP
+                    parts = preset_args.split()
+                    if "-af" in parts:
+                        af_idx = parts.index("-af")
+                        if af_idx + 1 < len(parts):
+                            filter_args = f"-af {parts[af_idx + 1]}"
                 
+                # Write source audio to temp file
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
                     tmp.write(self.recorded_wav)
                     tmp_path = tmp.name
                 
                 try:
-                    # Build FFmpeg command with preset processing
-                    cmd = [ffmpeg_path, "-y", "-i", tmp_path, "-v", "error"]
-                    
-                    # Apply compression preset args (resampling, silence removal, etc.)
-                    cmd.extend(preset_args.split())
-                    
-                    # Override codec/format for the target output format
-                    # The preset args may set codec, but we force our target format
                     if ext == "ogg":
-                        # Preset already uses libopus for ogg, keep it
-                        pass
-                    elif ext == "mp3":
-                        # Replace opus codec with mp3
-                        cmd = [ffmpeg_path, "-y", "-i", tmp_path, "-v", "error"]
-                        # Only use filter parts from preset (e.g., silenceremove, aformat)
-                        if "-af" in preset_args:
-                            af_idx = preset_args.split().index("-af")
-                            af_val = preset_args.split()[af_idx + 1]
-                            cmd.extend(["-af", af_val])
-                        cmd.extend(["-c:a", "libmp3lame", "-b:a", "128k", "-ar", "16000", "-ac", "1"])
-                    elif ext == "m4a":
-                        cmd = [ffmpeg_path, "-y", "-i", tmp_path, "-v", "error"]
-                        if "-af" in preset_args:
-                            af_idx = preset_args.split().index("-af")
-                            af_val = preset_args.split()[af_idx + 1]
-                            cmd.extend(["-af", af_val])
-                        cmd.extend(["-c:a", "aac", "-b:a", "64k", "-ar", "16000", "-ac", "1"])
-                    elif ext == "flac":
-                        cmd = [ffmpeg_path, "-y", "-i", tmp_path, "-v", "error"]
-                        if "-af" in preset_args:
-                            af_idx = preset_args.split().index("-af")
-                            af_val = preset_args.split()[af_idx + 1]
-                            cmd.extend(["-af", af_val])
-                        cmd.extend(["-c:a", "flac", "-ar", "16000", "-ac", "1"])
-                    elif ext == "wav":
-                        cmd = [ffmpeg_path, "-y", "-i", tmp_path, "-v", "error"]
-                        if "-af" in preset_args:
-                            af_idx = preset_args.split().index("-af")
-                            af_val = preset_args.split()[af_idx + 1]
-                            cmd.extend(["-af", af_val])
-                    
-                    # Embed result text as metadata if available
-                    if self.result_text:
-                        cmd.extend(["-metadata", f"comment={self.result_text}"])
-                    
-                    cmd.append(filepath)
-                    
-                    result = subprocess.run(
-                        cmd,
-                        capture_output=True,
-                        creationflags=get_creation_flags()
-                    )
-                    
-                    if result.returncode != 0:
-                        error_msg = result.stderr.decode('utf-8', errors='replace')
-                        GUICoordinator.get_instance().run_on_gui_thread(
-                            lambda: self._update_status(f"Save failed: {error_msg[:80]}", self.colors.red)
+                        # For OGG, use full preset args (includes filters + opus codec)
+                        error = export_audio_from_file(
+                            input_path=tmp_path,
+                            output_path=filepath,
+                            format_ext=ext,
+                            ffmpeg_filter_args=preset_args,
+                            codec_override=[],  # Preset already has codec
+                            metadata_comment=self.result_text or None
                         )
                     else:
-                        # Get file size for display
-                        file_size = os.path.getsize(filepath)
-                        size_str = f"{file_size / 1024:.0f} KB" if file_size < 1024 * 1024 else f"{file_size / (1024*1024):.1f} MB"
+                        # For other formats, use extracted filters + CODEC_MAP codec
+                        error = export_audio_from_file(
+                            input_path=tmp_path,
+                            output_path=filepath,
+                            format_ext=ext,
+                            ffmpeg_filter_args=filter_args,
+                            metadata_comment=self.result_text or None
+                        )
+                    
+                    if error:
                         GUICoordinator.get_instance().run_on_gui_thread(
-                            lambda: self._update_status(f"✅ Saved: {filename} ({size_str})", self.colors.green)
+                            lambda e=error: self._update_status(
+                                f"Save failed: {e[:80]}", self.colors.red
+                            )
+                        )
+                    else:
+                        file_size = os.path.getsize(filepath)
+                        size_str = (f"{file_size / 1024:.0f} KB"
+                                   if file_size < 1024 * 1024
+                                   else f"{file_size / (1024*1024):.1f} MB")
+                        GUICoordinator.get_instance().run_on_gui_thread(
+                            lambda fn=filename, ss=size_str: self._update_status(
+                                f"✅ Saved: {fn} ({ss})", self.colors.green
+                            )
                         )
                 finally:
                     try:
@@ -1644,10 +1601,9 @@ class AudioAnalyzerWindow:
             except Exception as e:
                 logging.error(f"[AudioAnalyzer] Save error: {e}")
                 GUICoordinator.get_instance().run_on_gui_thread(
-                    lambda: self._update_status(f"Save error: {e}", self.colors.red)
+                    lambda err=e: self._update_status(f"Save error: {err}", self.colors.red)
                 )
         
-        import threading
         threading.Thread(target=_save_thread, daemon=True).start()
     
     # =========================================================================
