@@ -705,6 +705,14 @@ def main():
     if not setup_workspace(args.launched_mode):
         sys.exit(1)
     
+    # ─── Startup Recovery ──────────────────────────────────────────────────
+    # Check for interrupted updates and recover before anything else
+    try:
+        from src.updater import startup_recovery
+        startup_recovery()
+    except Exception:
+        pass  # Non-critical, don't block startup
+    
     # Single instance check via named mutex (Windows only)
     # We do this early to prevent multiple instances
     mutex_handle = None
@@ -789,6 +797,13 @@ def main():
     
     # Initialize (new compact output)
     config, ai_params, endpoints = initialize()
+    
+    # ─── Background Update Check ───────────────────────────────────────────
+    try:
+        from src.updater import background_update_check
+        background_update_check(config)
+    except Exception:
+        pass  # Non-critical
     
     # Check for API keys
     has_any_keys = any(km.has_keys() for km in web_server.KEY_MANAGERS.values())

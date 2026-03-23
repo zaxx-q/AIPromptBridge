@@ -945,6 +945,70 @@ class SettingsWindow:
                                self.config_data.config.get("session_image_quality", 85),
                                1, 100, width=80, hint="Compression level for webp/jpg")
 
+        # Updates section
+        create_section_header(content_parent, "⬆️ Updates", self.colors, top_padding=20)
+        
+        # Auto-check for updates toggle
+        self._add_toggle_field(content_parent, "update_check_enabled",
+                               "Check for updates on startup",
+                               self.config_data.config.get("update_check_enabled", True),
+                               hint="Automatically check GitHub for new versions at launch")
+        
+        # Include pre-releases toggle
+        self._add_toggle_field(content_parent, "update_include_prerelease",
+                               "Include pre-release versions",
+                               self.config_data.config.get("update_include_prerelease", False),
+                               hint="Also check for beta/pre-release updates")
+        
+        # Check Now button + status label
+        update_row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
+        update_row.pack(fill="x", pady=8)
+        
+        if self.use_ctk:
+            check_btn = ctk.CTkButton(
+                update_row, text="Check Now", width=120, height=32,
+                font=get_ctk_font(13),
+                fg_color=self.colors.accent,
+                hover_color=self.colors.surface2,
+                text_color="#ffffff",
+                command=self._on_check_updates_now,
+            )
+            check_btn.pack(side="left")
+            
+            self._update_status_label = ctk.CTkLabel(
+                update_row, text="", font=get_ctk_font(11),
+                **get_ctk_label_colors(self.colors, muted=True)
+            )
+            self._update_status_label.pack(side="left", padx=(15, 0))
+        else:
+            check_btn = tk.Button(
+                update_row, text="Check Now",
+                font=("Segoe UI", 10),
+                bg=self.colors.accent, fg="#ffffff",
+                activebackground=self.colors.surface1,
+                activeforeground="#ffffff",
+                relief="flat", padx=12, pady=4,
+                command=self._on_check_updates_now,
+            )
+            check_btn.pack(side="left")
+            
+            self._update_status_label = tk.Label(
+                update_row, text="", font=("Segoe UI", 9),
+                bg=self.colors.bg, fg=self.colors.blockquote
+            )
+            self._update_status_label.pack(side="left", padx=(15, 0))
+        
+        # Show cached update info if available
+        try:
+            from ...updater import get_cached_update_info
+            cached = get_cached_update_info()
+            if cached:
+                self._update_status_label.configure(
+                    text=f"⬆️ Update available: v{cached.version}"
+                )
+        except Exception:
+            pass
+
         # Server settings section (Moved to bottom and LOCKED)
         create_section_header(content_parent, "🖥️ Server Settings", self.colors, top_padding=20)
         
@@ -1014,6 +1078,49 @@ class SettingsWindow:
             if self.use_ctk:
                  text_color = self.colors.fg if unlocked else self.colors.surface2
                  self.widgets["port"].configure(text_color=text_color)
+    
+    def _on_check_updates_now(self):
+        """Handle the 'Check Now' button click in the Updates section."""
+        if hasattr(self, '_update_status_label'):
+            self._update_status_label.configure(text="Checking...")
+        
+        # Read tk var on main thread before spawning background thread
+        include_prerelease = False
+        if "update_include_prerelease" in self.vars:
+            include_prerelease = self.vars["update_include_prerelease"].get()
+        
+        def _check_thread():
+            try:
+                from ...updater import check_for_update, is_compiled
+                from ...version import __version__
+                
+                info = check_for_update(include_prerelease)
+                
+                def _update_ui():
+                    if not hasattr(self, '_update_status_label'):
+                        return
+                    if info:
+                        self._update_status_label.configure(
+                            text=f"⬆️ v{info.version} available! "
+                                 f"{'(compiled: can auto-update)' if is_compiled() else info.release_url}"
+                        )
+                    else:
+                        self._update_status_label.configure(
+                            text=f"✅ Up to date (v{__version__})"
+                        )
+                
+                # Schedule UI update on main thread
+                self._schedule_callback(_update_ui)
+                
+            except Exception as e:
+                err_msg = str(e)
+                def _show_error():
+                    if hasattr(self, '_update_status_label'):
+                        self._update_status_label.configure(text=f"❌ Check failed: {err_msg}")
+                self._schedule_callback(_show_error)
+        
+        import threading
+        threading.Thread(target=_check_thread, daemon=True).start()
     
     def _create_provider_tab(self, frame):
         """Create the Provider settings tab."""

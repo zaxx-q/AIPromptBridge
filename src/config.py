@@ -121,6 +121,9 @@ DEFAULT_CONFIG = {
     # true = Use the originating action's system prompt for follow-up messages
     # false = Always use chat_window_system_instruction from prompts.json
     "chat_use_origin_system_prompt": True,
+    # Update settings
+    "update_check_enabled": True,       # Auto-check on startup
+    "update_include_prerelease": False,  # Include pre-release versions
 }
 
 # API URLs
@@ -519,6 +522,15 @@ session_image_quality = 85
 # true = Use the originating action's system prompt for follow-up messages
 # false = Always use chat_window_system_instruction from prompts.json
 chat_use_origin_system_prompt = true
+
+# ============================================================
+# UPDATE SETTINGS
+# ============================================================
+# Automatically check for updates on startup
+update_check_enabled = true
+
+# Include pre-release versions in update checks
+update_include_prerelease = false
 
 # ============================================================
 # AI PARAMETERS (Optional)

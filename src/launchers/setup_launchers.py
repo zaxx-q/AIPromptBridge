@@ -10,18 +10,18 @@ build_exe_options = {
     "excludes": [
         "tkinter", "unittest", "email", "http", "xml", "pydoc", "pdb",
         "distutils", "setuptools", "multiprocessing", "logging",
-        "html", "ctypes.test", "concurrent", "asyncio", "json", "sqlite3",
+        "html", "ctypes.test", "concurrent", "asyncio", "sqlite3",
         "ssl", "socket", "bz2", "lzma", "decimal",
-        "hashlib", "hmac", "secrets", "random", "bisect", "shutil",
+        "hashlib", "hmac", "secrets", "random", "bisect",
         "tempfile", "weakref", "base64", "calendar", "datetime",
         "urllib", "zipfile", "tarfile", "_hashlib", "_ssl", "_decimal",
         # Aggressive excludes for minimal launcher
         "importlib.metadata", "importlib.resources",
-        "ctypes", "ctypes.macholib", "ctypes.wintypes",
+        "ctypes.macholib", "ctypes.wintypes",
         "sysconfig", "pydoc_data", "socket",
         "zoneinfo", "typing", "difflib", "doctest", "optparse",
         "pickle", "pprint", "statistics", "textwrap", "uu", "uuid", "plistlib",
-        "platform", "inspect", "dis", "opcode", "pathlib", "fnmatch", "pkg_resources",
+        "platform", "inspect", "dis", "opcode", "pathlib", "pkg_resources",
         # Exclude specific encodings (keep utf_8, ascii, mbcs, latin_1, and Thai cp874/tis_620)
         "encodings.idna", "encodings.punycode", "encodings.hex_codec",
         "encodings.hp_roman8", "encodings.mac_roman", "encodings.mac_turkish",

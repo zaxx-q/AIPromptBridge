@@ -89,7 +89,7 @@ def print_commands_box():
             ("I", "📊", "Info"),
             ("K", "💭", "Thinking"),
             ("R", "🌊", "Streaming"),
-            ("H", "❓", "Help"),
+            ("U", "⬆️", "Update"),
         ])
         
         grid.add_row(col1, col2, col3)
@@ -110,7 +110,7 @@ def print_commands_box():
         print("  [S] 🌐 Sessions      [P] 🔄 Provider     [I] 📊 Info")
         print("  [A] 🎤 Audio         [M] 🤖 Models       [K] 💭 Thinking")
         print("  [T] 🔊 TTS           [G] 🔨 Settings     [R] 🌊 Streaming")
-        print("  [X] 🧰 Tools         [W] 📝 Prompts      [H] ❓ Help")
+        print("  [X] 🧰 Tools         [W] 📝 Prompts      [U] ⬆️ Update")
         print("─" * 64)
         print()
 
@@ -665,6 +665,14 @@ def terminal_session_manager(endpoints=None):
                     else:
                         print("\n✗ GUI not available\n")
             
+            elif key == 'u':
+                # Check for updates
+                from . import web_server
+                from .updater import check_and_prompt_terminal
+                
+                config = web_server.CONFIG or {}
+                check_and_prompt_terminal(config)
+            
             elif key == 'x':
                 # Open Tools menu
                 try:
@@ -717,6 +725,7 @@ def terminal_session_manager(endpoints=None):
                 print("   [K] 💭 Thinking      Toggle thinking mode")
                 print("   [R] 🌊 Streaming     Toggle streaming")
                 print("   [E] 📡 Endpoints     List registered endpoints")
+                print("   [U] ⬆️ Update        Check for updates")
                 print("   [H] ❓ Help          Show this help")
                 print(f"{'─'*64}\n")
             

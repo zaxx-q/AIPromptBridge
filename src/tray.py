@@ -594,6 +594,94 @@ class TrayApp:
         except Exception as e:
             print(f"[Error] Could not open TTS Window: {e}")
     
+    def _on_check_updates(self, systray):
+        """Check for updates from GitHub Releases"""
+        def _check_thread():
+            try:
+                from . import web_server
+                from .updater import (
+                    check_for_update, get_cached_update_info,
+                    is_compiled, perform_update, RELEASES_URL,
+                )
+                from .version import __version__
+                
+                config = web_server.CONFIG or {}
+                include_prerelease = config.get("update_include_prerelease", False)
+                
+                print("\n⬆️  Checking for updates...")
+                info = check_for_update(include_prerelease=include_prerelease)
+                
+                if not info:
+                    print(f"✅ You're up to date! (v{__version__})\n")
+                    return
+                
+                print(f"⬆️  Update available: v{info.version} (current: v{__version__})")
+                
+                if not is_compiled():
+                    # Source mode — notification only
+                    print(f"📦 Running from source. Download: {info.release_url}\n")
+                    return
+                
+                # Compiled mode — attempt update via GUI dialog or direct
+                try:
+                    from .gui.core import GUICoordinator, HAVE_GUI
+                    if HAVE_GUI:
+                        coordinator = GUICoordinator.get_instance()
+                        
+                        # Schedule a confirmation dialog on the GUI thread
+                        def _show_update_dialog():
+                            import tkinter as tk
+                            from tkinter import messagebox
+                            
+                            size_str = ""
+                            if info.asset_size > 0:
+                                size_mb = info.asset_size / (1024 * 1024)
+                                size_str = f" ({size_mb:.1f} MB)"
+                            
+                            notes_preview = ""
+                            if info.release_notes:
+                                lines = info.release_notes.strip().split("\n")[:5]
+                                notes_preview = "\n".join(l.strip() for l in lines)
+                                if len(info.release_notes.strip().split("\n")) > 5:
+                                    notes_preview += "\n..."
+                            
+                            message = (
+                                f"A new version is available!\n\n"
+                                f"Current: v{__version__}\n"
+                                f"New: v{info.version}{size_str}\n"
+                            )
+                            if notes_preview:
+                                message += f"\nRelease Notes:\n{notes_preview}\n"
+                            message += "\nDownload and install now?"
+                            
+                            result = messagebox.askyesno(
+                                "AIPromptBridge Update",
+                                message,
+                            )
+                            
+                            if result:
+                                # Run update in background thread
+                                import threading
+                                def _do_update():
+                                    success, msg = perform_update(info)
+                                    if not success:
+                                        print(f"❌ {msg}")
+                                threading.Thread(target=_do_update, daemon=True).start()
+                        
+                        coordinator.schedule_callback(_show_update_dialog)
+                        return
+                except Exception:
+                    pass
+                
+                # Fallback: console prompt
+                print(f"   Press U in the terminal to install.\n")
+                
+            except Exception as e:
+                print(f"[Error] Update check failed: {e}")
+        
+        import threading
+        threading.Thread(target=_check_thread, daemon=True).start()
+    
     def _on_edit_config(self, systray):
         """Open config.ini in default editor"""
         config_path = Path.cwd() / "config.ini"
@@ -697,6 +785,7 @@ class TrayApp:
         
         raw_options.extend([
             SEP,
+            ("⬆️ Check for Updates", self._on_check_updates),
             ("🔄 Restart", self._on_restart),
             SEP # Separator before "Quit" (which is added automatically)
         ])
