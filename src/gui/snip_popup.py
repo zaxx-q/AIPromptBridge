@@ -13,6 +13,7 @@ Threading Note:
     Uses CTkToplevel when CustomTkinter is available.
 """
 
+import gc
 import io
 import logging
 import tkinter as tk
@@ -41,6 +42,29 @@ from .popups import (
 from .screen_snip import CaptureResult
 from .prompts import get_prompts_config
 from .emoji_renderer import prepare_emoji_content, get_emoji_renderer
+
+
+def _neutralize_tk_var(var):
+    """
+    Eagerly clean up a tkinter Variable on the main thread.
+
+    Performs the Tcl-side globalunsetvar (which ``__del__`` would normally do),
+    then sets ``var._tk = None`` so that ``__del__`` becomes a no-op.  This
+    prevents ``RuntimeError: main thread is not in main loop`` when the
+    Variable is garbage-collected on a background thread.
+    """
+    try:
+        tk_ref = getattr(var, '_tk', None)
+        var_name = getattr(var, '_name', None)
+        if tk_ref and var_name:
+            try:
+                tk_ref.globalunsetvar(var_name)
+            except Exception:
+                pass
+        # Make __del__ a no-op – it checks ``if self._tk:`` before acting
+        var._tk = None
+    except Exception:
+        pass
 
 
 class AttachedSnipPopup:
@@ -1129,13 +1153,46 @@ class AttachedSnipPopup:
     
     def _close(self):
         """Close the popup."""
+        # Eagerly clean up tkinter Variables while still on the main thread.
+        # This prevents Variable.__del__ from crashing with
+        # "RuntimeError: main thread is not in main loop" when the popup
+        # object is garbage-collected on a background thread (e.g., after
+        # _on_action_selected spawns a processing thread via threading.Thread).
+        for attr_name in ('source_var', 'compare_var', 'input_var'):
+            var = getattr(self, attr_name, None)
+            if isinstance(var, tk.Variable):
+                _neutralize_tk_var(var)
+
         if self.root:
             try:
                 self.root.destroy()
             except tk.TclError:
                 pass
             self.root = None
-        
+
+        # Release all widget references so that any CTk-internal tk.Variable
+        # objects are also GC'd NOW (on the main thread) rather than later on
+        # a background thread where their __del__ would crash.
+        self.source_dropdown = None
+        self.input_entry = None
+        self.compare_checkbox = None
+        self.compare_indicator = None
+        self.carousel = None
+        self.modifier_bar = None
+        self.response_toggle = None
+        self.thumbnail_photo = None
+        self.source_var = None
+        self.compare_var = None
+        if hasattr(self, 'input_var'):
+            self.input_var = None
+        if hasattr(self, 'source_label'):
+            self.source_label = None
+
+        # Force immediate collection of any CTk-internal Variables that
+        # survive in circular references (CTk widgets <-> callbacks <-> vars).
+        # Without this, GC may defer collection to a background thread.
+        gc.collect()
+
         if self.on_close_callback:
             self.on_close_callback()
 
