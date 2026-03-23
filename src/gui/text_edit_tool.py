@@ -65,7 +65,8 @@ class TextEditToolApp:
         self.popup = None
         self.chat_window = None
         self.current_selected_text = ""
-        self.is_processing = False
+        self._active_tasks = 0
+        self._tasks_lock = threading.Lock()
         self.cancel_requested = False
         
         # Streaming abort state
@@ -73,6 +74,22 @@ class TextEditToolApp:
         self._abort_listener = None
         
         logging.debug('TextEditToolApp initialized')
+    
+    def _begin_task(self):
+        """Increment active task counter (thread-safe)."""
+        with self._tasks_lock:
+            self._active_tasks += 1
+    
+    def _end_task(self):
+        """Decrement active task counter (thread-safe)."""
+        with self._tasks_lock:
+            self._active_tasks = max(0, self._active_tasks - 1)
+    
+    @property
+    def is_processing(self):
+        """Check if any tasks are currently active (thread-safe)."""
+        with self._tasks_lock:
+            return self._active_tasks > 0
     
     def _get_setting(self, key: str, default=None):
         """Get a setting from the _settings section of options.
@@ -129,13 +146,8 @@ class TextEditToolApp:
         """Handle hotkey press event."""
         logging.debug('Hotkey pressed')
         
-        if self.is_processing:
-            logging.debug('Already processing, ignoring hotkey')
-            return
-        
-        self.cancel_requested = False
-        
         # Show popup immediately in a new thread
+        # Multiple concurrent invocations are allowed - each operates independently
         threading.Thread(target=self._show_popup, daemon=True).start()
     
     def _show_popup(self):
@@ -144,19 +156,19 @@ class TextEditToolApp:
         
         from .core import GUICoordinator
         
-        # Get selected text with quick check first, then retry if empty
-        # Use default optimized polling settings
-        self.current_selected_text = self.text_handler.get_selected_text()
+        # Get selected text (captured locally to avoid race conditions
+        # when multiple hotkey presses trigger concurrent popups)
+        selected_text = self.text_handler.get_selected_text()
         
-        if self.current_selected_text:
-            logging.debug(f'Selected text: "{self.current_selected_text[:50]}..."')
+        if selected_text:
+            logging.debug(f'Selected text: "{selected_text[:50]}..."')
             # Text selected - show prompt selection popup via coordinator
             # Pass live options from PromptsConfig (including _settings for popup_items_per_page)
             GUICoordinator.get_instance().request_prompt_popup(
                 options=self.prompts.get_text_edit_tool(),
                 on_option_selected=self._on_option_selected,
                 on_close=self._on_popup_closed,
-                selected_text=self.current_selected_text,
+                selected_text=selected_text,
                 on_tts=self._on_tts_requested,
                 on_request_compare_text=self._on_request_compare_text
             )
@@ -202,7 +214,7 @@ class TextEditToolApp:
         """
         logging.debug(f'Direct chat input: {user_input[:50]}..., mode: {response_mode}')
         
-        self.is_processing = True
+        self._begin_task()
         
         threading.Thread(
             target=self._process_direct_chat,
@@ -333,7 +345,7 @@ class TextEditToolApp:
         
         logging.debug(f'Option selected: {option_key}, mode: {response_mode}, modifiers: {active_modifiers}, compare={bool(compare_text)}')
         
-        self.is_processing = True
+        self._begin_task()
         
         threading.Thread(
             target=self._process_option,
@@ -445,10 +457,6 @@ class TextEditToolApp:
                 self.streaming_aborted = True
                 self.cancel_requested = True
                 logging.debug("Abort hotkey pressed - stopping stream")
-                
-                # Immediately unlock hotkey so new triggers work right away
-                # The background API call will continue but we don't need to wait for it
-                self.is_processing = False
                 
                 # Provide immediate visual feedback
                 from .core import dismiss_typing_indicator
@@ -660,6 +668,7 @@ class TextEditToolApp:
                 - "replace": Force type to active field
                 - "default": Use show_ai_response_in_chat_window config setting
         """
+        self.cancel_requested = False
         try:
             from ..messages import build_text_message
 
@@ -721,8 +730,6 @@ class TextEditToolApp:
                             message="Failed to get response from AI provider.",
                             details=error
                         )
-                        
-                        self.is_processing = False
                         return
                     
                     if response:
@@ -807,8 +814,6 @@ class TextEditToolApp:
                         message="Failed to get response from AI provider.",
                         details=error
                     )
-                    
-                    self.is_processing = False
                     return
                 
                 if streaming_enabled and not self.streaming_aborted:
@@ -819,7 +824,7 @@ class TextEditToolApp:
         except Exception as e:
             logging.error(f'Error in direct chat: {e}')
         finally:
-            self.is_processing = False
+            self._end_task()
     
     def _process_option(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None):
         """
@@ -859,6 +864,7 @@ class TextEditToolApp:
         if active_modifiers is None:
             active_modifiers = []
         
+        self.cancel_requested = False
         try:
             action_options = self._get_action_options()
             option = action_options.get(option_key, {})
@@ -998,13 +1004,10 @@ class TextEditToolApp:
                             message="Failed to process your request.",
                             details=error
                         )
-                        
-                        self.is_processing = False
                         return
                     
                     if not response:
                         logging.error('No response from AI')
-                        self.is_processing = False
                         return
                     
                     # Show chat window with response
@@ -1087,13 +1090,10 @@ class TextEditToolApp:
                         message="Failed to process your request.",
                         details=error
                     )
-                    
-                    self.is_processing = False
                     return
                 
                 if not response:
                     logging.error('No response from AI')
-                    self.is_processing = False
                     return
                 
                 if streaming_enabled and not self.streaming_aborted:
@@ -1104,7 +1104,7 @@ class TextEditToolApp:
         except Exception as e:
             logging.error(f'Error processing option: {e}')
         finally:
-            self.is_processing = False
+            self._end_task()
     
     def _build_modifier_injections(self, active_modifiers: list, modifier_defs: list) -> str:
         """

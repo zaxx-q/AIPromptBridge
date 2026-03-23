@@ -65,11 +65,25 @@ class AudioToolApp:
         
         # State
         self.hotkey_listener: Optional[HotkeyListener] = None
-        self.is_processing = False
+        self._active_tasks = 0
+        self._tasks_lock = threading.Lock()
         self.cancel_requested = False
         self._window_open = False
         
         logging.debug('AudioToolApp initialized')
+    
+    def _begin_task(self):
+        with self._tasks_lock:
+            self._active_tasks += 1
+    
+    def _end_task(self):
+        with self._tasks_lock:
+            self._active_tasks = max(0, self._active_tasks - 1)
+    
+    @property
+    def is_processing(self):
+        with self._tasks_lock:
+            return self._active_tasks > 0
     
     def start(self):
         """Start the audio tool with hotkey listener."""
@@ -163,7 +177,7 @@ class AudioToolApp:
             logging.error('No audio data available for action')
             return
         
-        self.is_processing = True
+        self._begin_task()
         
         # Process in background thread
         threading.Thread(
@@ -389,7 +403,7 @@ class AudioToolApp:
                 details=str(e)
             )
         finally:
-            self.is_processing = False
+            self._end_task()
     
     # _build_audio_message removed in favor of src/gui/messages.py
     # _get_audio_format removed as it's no longer needed for inline_data

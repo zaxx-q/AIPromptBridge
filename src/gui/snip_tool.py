@@ -61,10 +61,24 @@ class SnipToolApp:
         # State
         self.hotkey_listener: Optional[HotkeyListener] = None
         self.current_capture: Optional[CaptureResult] = None
-        self.is_processing = False
+        self._active_tasks = 0
+        self._tasks_lock = threading.Lock()
         self.cancel_requested = False
         
         logging.debug('SnipToolApp initialized')
+    
+    def _begin_task(self):
+        with self._tasks_lock:
+            self._active_tasks += 1
+    
+    def _end_task(self):
+        with self._tasks_lock:
+            self._active_tasks = max(0, self._active_tasks - 1)
+    
+    @property
+    def is_processing(self):
+        with self._tasks_lock:
+            return self._active_tasks > 0
     
     def start(self):
         """Start the snip tool with hotkey listener."""
@@ -106,10 +120,6 @@ class SnipToolApp:
         """Handle hotkey press - show snip overlay."""
         logging.debug('SnipTool hotkey pressed')
         
-        if self.is_processing:
-            logging.debug('Already processing, ignoring hotkey')
-            return
-        
         self.cancel_requested = False
         
         # Request overlay via GUICoordinator (runs on GUI thread)
@@ -127,7 +137,15 @@ class SnipToolApp:
     def _on_image_captured(self, capture_result: CaptureResult):
         """Handle successful capture - show popup."""
         logging.debug(f'Image captured: {capture_result.width}x{capture_result.height}')
-        self.current_capture = capture_result
+        self.current_capture = capture_result  # backward compat
+        
+        # Capture locally for closure - enables parallel task execution
+        captured = capture_result
+        
+        def on_action_with_capture(source, action_key, custom_input, active_modifiers=None,
+                                    compare_mode=False, compare_capture=None, response_mode="default"):
+            self._on_action_selected(source, action_key, custom_input, active_modifiers,
+                                      compare_mode, compare_capture, response_mode, capture=captured)
         
         # Get combined prompts for popup
         prompts_config = self._get_combined_prompts()
@@ -136,7 +154,7 @@ class SnipToolApp:
         GUICoordinator.get_instance().request_snip_popup(
             capture_result=capture_result,
             prompts_config=prompts_config,
-            on_action=self._on_action_selected,
+            on_action=on_action_with_capture,
             on_close=self._on_popup_closed,
             on_request_compare_capture=self._on_request_compare_capture
         )
@@ -176,7 +194,8 @@ class SnipToolApp:
         active_modifiers: List[str] = None,
         compare_mode: bool = False,
         compare_capture: Optional[CaptureResult] = None,
-        response_mode: str = "default"
+        response_mode: str = "default",
+        capture: Optional[CaptureResult] = None
     ):
         """
         Handle action selection from popup.
@@ -189,22 +208,23 @@ class SnipToolApp:
             compare_mode: Whether compare mode is enabled
             compare_capture: Second capture result (if compare mode)
             response_mode: "default", "copy", or "show"
+            capture: The captured image (passed via closure for parallel safety)
         """
         if active_modifiers is None:
             active_modifiers = []
         
         logging.debug(f'Action selected: source={source}, key={action_key}, custom={bool(custom_input)}, modifiers={active_modifiers}, compare={compare_mode}, mode={response_mode}')
         
-        if not self.current_capture:
+        if not capture:
             logging.error('No capture available for action')
             return
         
-        self.is_processing = True
+        self._begin_task()
         
         # Process in background thread
         threading.Thread(
             target=self._process_action,
-            args=(source, action_key, custom_input, active_modifiers, compare_mode, compare_capture, response_mode),
+            args=(source, action_key, custom_input, active_modifiers, compare_mode, compare_capture, response_mode, capture),
             daemon=True
         ).start()
     
@@ -235,7 +255,8 @@ class SnipToolApp:
         active_modifiers: List[str] = None,
         compare_mode: bool = False,
         compare_capture: Optional[CaptureResult] = None,
-        response_mode: str = "default"
+        response_mode: str = "default",
+        capture: Optional[CaptureResult] = None
     ):
         """Process the selected action with image context."""
         if active_modifiers is None:
@@ -299,23 +320,23 @@ class SnipToolApp:
             # Build multimodal message (single or comparison)
             if compare_mode and compare_capture:
                 messages = build_comparison_message(
-                    image1_b64=self.current_capture.image_base64,
+                    image1_b64=capture.image_base64,
                     image2_b64=compare_capture.image_base64,
-                    mime_type=self.current_capture.mime_type,
+                    mime_type=capture.mime_type,
                     task=task,
                     system_prompt=system_prompt
                 )
                 window_title = f"🔀 {action_key}"
-                image_info = f"{self.current_capture.width}x{self.current_capture.height} vs {compare_capture.width}x{compare_capture.height}"
+                image_info = f"{capture.width}x{capture.height} vs {compare_capture.width}x{compare_capture.height}"
             else:
                 messages = build_image_message(
-                    image_b64=self.current_capture.image_base64,
-                    mime_type=self.current_capture.mime_type,
+                    image_b64=capture.image_base64,
+                    mime_type=capture.mime_type,
                     task=task,
                     system_prompt=system_prompt
                 )
                 window_title = f"📷 {action_key}"
-                image_info = f"{self.current_capture.width}x{self.current_capture.height}"
+                image_info = f"{capture.width}x{capture.height}"
             
             # Determine output label for logging
             if type_to_field:
@@ -340,13 +361,13 @@ class SnipToolApp:
                 self._type_to_active_field(messages, action_key, RequestOrigin.SNIP_TOOL)
             elif show_in_chat:
                 from ..request_pipeline import RequestOrigin
-                # Set origin for session tracking before streaming
-                self._current_session_origin = f"snip:{action_key}"
                 self._stream_to_chat_window(
                     messages=messages,
                     window_title=window_title,
                     origin=RequestOrigin.SNIP_TOOL,
-                    compare_capture=compare_capture
+                    compare_capture=compare_capture,
+                    capture=capture,
+                    session_origin=f"snip:{action_key}"
                 )
             else:
                 self._copy_to_clipboard_with_notification(messages, action_key)
@@ -363,7 +384,7 @@ class SnipToolApp:
                 details=str(e)
             )
         finally:
-            self.is_processing = False
+            self._end_task()
     
     def _get_file_processor_prompt(self, action_key: str) -> tuple:
         """
@@ -562,7 +583,9 @@ class SnipToolApp:
         messages: List[Dict[str, Any]],
         window_title: str,
         origin,
-        compare_capture: Optional[CaptureResult] = None
+        compare_capture: Optional[CaptureResult] = None,
+        capture: Optional[CaptureResult] = None,
+        session_origin: str = "snip"
     ):
         """
         Open a chat window and stream API response into it.
@@ -572,16 +595,13 @@ class SnipToolApp:
             window_title: Title for the chat window
             origin: RequestOrigin for logging
             compare_capture: Optional second capture for comparison mode
+            capture: The captured image for attachment persistence
+            session_origin: Origin string for session tracking (e.g., "snip:Describe")
         """
         from .core import GUICoordinator
         from ..session_manager import ChatSession
         from ..attachment_manager import AttachmentManager
         from ..request_pipeline import RequestPipeline, RequestContext, StreamCallback
-        
-        # Determine session origin from action context
-        # The window_title contains the action info (e.g., "📷 Describe")
-        # We extract it from the title prefix pattern
-        session_origin = getattr(self, '_current_session_origin', 'snip')
         
         # Create session (empty image initially, properly utilizing attachments)
         session = ChatSession(
@@ -601,8 +621,8 @@ class SnipToolApp:
         # Save primary image to external file for persistence
         attachment_path = AttachmentManager.save_image(
             session_id=session.session_id,
-            image_base64=self.current_capture.image_base64,
-            mime_type=self.current_capture.mime_type,
+            image_base64=capture.image_base64,
+            mime_type=capture.mime_type,
             message_index=0
         )
         
