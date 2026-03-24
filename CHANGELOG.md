@@ -1,5 +1,32 @@
 # Changelog
 
+## [6.0.0] - 2026-03-24
+
+### New Features
+
+- **Auto-Update System**: Introduced a seamless self-update mechanism with automatic background checks and safe startup recovery. Automatically checks GitHub for new versions on launch (configurable in Settings), allowing you to update directly from within the app or system tray.
+- **Model Presets**: Added a new model presets system. You can now define custom AI configurations (e.g., choosing a specific provider, model, temperature, or enabling Gemini thinking mode) and assign them directly to individual tool actions (like Snip, Audio, or Text Edit tasks) in the Prompt Editor.
+- **Preset Manager**: Added a new GUI dialog in the Prompt Editor to easily create, edit, duplicate, and delete model presets interactively.
+- **Parallel Task Execution**: The Audio Tool, Snip Tool, and Text Edit Tool can now process multiple requests concurrently without resetting or interrupting each other's processing states.
+- **Smart Digitize Format**: Added a new "Smart Digitize (to Markdown)" built-in robust prompt designed to intelligently extract and format textual content from mixed printed and handwritten documents.
+- **Language Modifier**: Added a new global "Language" modifier that allows you to force AI outputs into a specific language (defaults to Indonesian).
+- **TTS AI Director Constraints**: The AI Director now automatically receives the selected voice's gender information context, ensuring generated style prompts correctly match character genders for more natural and coherent speech synthesis.
+- **Official Google Endpoint Fallback for TTS**: Added a setting to force Text-to-Speech interactions to route through the official Google Generative Language endpoint. This is useful if you are using a custom Google-compatible proxy for chat that doesn't support Gemini's TTS model.
+
+### Improvements
+
+- **Audio Export Centralization**: Standardized audio output formats (Opus, MP3, WAV, FLAC, AAC) across both the Text-to-Speech and Audio Analyzer tools. A single output configuration setting (`audio_output_format`) now governs saved formats across the application.
+- **Audio Output**: The Audio Analyzer now uses ffmpeg (if available) to export highly optimized Opus or AAC files, and automatically embeds transcripts or OCR outputs as audio metadata properties.
+- **Prompt Configuration Integrity**: Improved prompt configuration to utilize deep-merging. Changes to internal default prompts will now safely merge without overwriting your customizations. Additionally, built-in defaults that you explicitly delete will remain deleted and won't reappear upon restarting the app.
+- **Markdown Rendering**: Improved line-wrapping and visualization for "Thinking" response blocks, giving them a distinct background color and separating line to differentiate the thought process from the final answer.
+- **Inline Math Formulation**: Improved Markdown rendering by proactively processing inline LaTeX (`$...$`). This fixes an issue where math symbols wrapped in markdown formatting blocks (like bold or italics) could break formatting or be parsed incorrectly.
+- **TTS UX**: Updated default configurations to rename `tts_output` directories simply to `audio_output` to reflect unified exports.
+
+### Fixes
+
+- **Memory Leaks**: Implemented eager destruction logic and explicit garbage collection for `tkinter` variables during background thread lifetimes in popup windows. This eliminates persistent `RuntimeError: main thread is not in main loop` crashes commonly encountered after repeated popup usage.
+- **State Updates**: Resolved an off-by-one index error that caused thinking blocks in the chat window to improperly expand/collapse when external modules (like the Snip Tool) injected multi-stage payloads.
+
 ## [5.4.1] - 2026-02-28
 
 ### Fixes
@@ -28,7 +55,7 @@
 
 - **File Processor**: Fixed an issue where the directory structure was not preserved during recursive repository formatting or parsing scans.
 - **Audio Splitting**: Improved FFmpeg chunk duration estimation to account for target compression bitrates and added an optimization to pass-through the audio stream directly without transcoding when formats match, decreasing chunking times.
-- **Internal Configurations**: Centralized and fixed `_IS_COMPILED` application state detection checks for Nuitka/Pyinstaller build resolutions.
+- **Internal Configurations**: Centralized and fixed `_IS_COMPILED` application state detection checks.
 
 ## [5.3.2] - 2026-02-23
 

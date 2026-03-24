@@ -253,6 +253,11 @@ class ThemedInputDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         else:
             self.configure(bg=colors.bg)
         
+        self.withdraw()
+        from .utils import set_dark_titlebar
+        set_dark_titlebar(self)
+        set_window_icon(self)
+        
         # Center on parent
         self.update_idletasks()
         x = parent.winfo_x() + (parent.winfo_width() // 2) - 200
@@ -321,6 +326,8 @@ class ThemedInputDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         self.entry.bind('<Return>', lambda e: self._ok())
         self.bind('<Escape>', lambda e: self._cancel())
         self.protocol("WM_DELETE_WINDOW", self._cancel)
+        
+        self.deiconify()
     
     def _ok(self):
         """Accept the input."""
@@ -489,7 +496,7 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         ("max_tokens", "Max Tokens", "entry", None),
         ("request_timeout", "Request Timeout", "entry", None),
         ("custom_url", "Custom URL", "entry", None),
-        ("gemini_endpoint", "Gemini Endpoint", "combobox", ["", "generateContent", "streamGenerateContent"]),
+        ("gemini_endpoint", "Gemini Endpoint", "entry", None),
         ("api_key_name", "API Key Name", "entry", None),
     ]
     
@@ -512,9 +519,15 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         else:
             self.configure(bg=colors.bg)
         
+        self.withdraw()
+        from .utils import set_dark_titlebar
+        set_dark_titlebar(self)
+        
         set_window_icon(self)
         self._build_ui()
         self._refresh_list()
+        
+        self.deiconify()
     
     def _build_ui(self):
         """Build the preset manager UI."""
@@ -768,13 +781,23 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                     widget_info["var"].set("")
     
     def _duplicate_preset(self):
-        """Duplicate the selected preset."""
+        """Duplicate the selected preset and save immediately."""
         if not self.current_preset:
             return
         name = ask_themed_string(self, "Duplicate Preset", "Enter new preset name:", self.colors)
         if name:
+            from ..prompts import get_prompts_config
+            pc = get_prompts_config()
+            source = pc.get_model_preset(self.current_preset) or {}
+            pc.set_model_preset(name, dict(source))
+            self.current_preset = name
             self.name_var.set(name)
-            self.current_preset = None  # Will create new on save
+            self._refresh_list()
+            self.preset_listbox.select(name)
+            if self.use_ctk:
+                self.save_status.configure(text=f"✅ Duplicated as '{name}'")
+            else:
+                self.save_status.configure(text=f"✅ Duplicated as '{name}'")
     
     def _delete_preset(self):
         """Delete the selected preset."""
@@ -865,7 +888,7 @@ class PromptEditorWindow:
                 self.root.configure(bg=self.colors.bg)
         
         self.root.title("AIPromptBridge Prompt Editor")
-        self.root.geometry("1000x736")
+        self.root.geometry("1000x825")
         self.root.minsize(900, 600)
         
         # Set icon
