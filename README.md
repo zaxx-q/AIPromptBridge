@@ -91,6 +91,7 @@ Customizable appearance with:
 - **Streaming support** - Real-time responses
 - **Batch Processing** - Async processing for large workloads (Gemini Batch API)
 - **Attachment Manager** - Efficient external storage for session images, audio, and files
+- **Self-Update** - Check for updates and install directly from the app (via tray menu, terminal `U` key, or on startup)
 
 ### 🧰 Tools System (Not accessible in No Console mode)
 The **File Processor** tool enables bulk operations:
@@ -147,6 +148,7 @@ Right-click the tray icon for:
 - **Prompt Editor** - Edit TextEditTool prompts
 - **Edit config.ini** - Open configuration file (only visible with `--show-console` arg)
 - **Edit prompts.json** - Open prompts file (only visible with `--show-console` arg)
+- **Check for Updates** - Check GitHub for new releases and install
 - **Restart** - Restart the application
 - **Quit** - Exit completely
 
@@ -200,6 +202,7 @@ When console is visible, press these keys:
 | `R` | Toggle streaming mode |
 | `G` | Open Settings window |
 | `W` | Open prompt editor |
+| `U` | Check for updates |
 | `H` | Show help |
 
 ## ⚙️ Configuration
@@ -214,7 +217,7 @@ Access via **System Tray > Settings**. This window manages the core application 
 - **Providers**: Select default models and configure endpoint URLs.
 - **Tools**: Configure hotkeys and behavior for TextEditTool, SnipTool, and AudioTool.
 - **Theme**: Switch between 7 themes and toggle Dark/Light modes.
-- **System**: Configure server host/port and startup options.
+- **System**: Configure server host/port, startup options, and auto-update checks.
 
 ### ✏️ Prompt Editor
 ![Prompt Editor](docs/images/window_prompt_editor.png)

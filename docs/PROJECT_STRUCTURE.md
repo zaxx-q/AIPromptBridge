@@ -38,6 +38,7 @@ AIPromptBridge/
     ├── session_manager.py      # Session persistence with sequential IDs
     ├── terminal.py             # Interactive terminal commands (includes Tools menu)
     ├── tray.py                 # System tray application (Windows)
+    ├── updater.py              # Self-update: GitHub Releases check, download, staging, trigger
     ├── utils.py                # Utility functions (strip_markdown, etc.)
     ├── version.py              # Application version source of truth
     ├── web_server.py           # Flask server and API endpoints
@@ -111,6 +112,7 @@ AIPromptBridge/
 | `request_pipeline.py` | Unified logging and token tracking for all requests |
 | `session_manager.py` | Chat session persistence to JSON |
 | `attachment_manager.py`| Manages external file storage for session attachments |
+| `updater.py` | Self-update: GitHub API, download, extraction, launcher signaling |
 
 ### GUI (`src/gui/`)
 

@@ -16,6 +16,7 @@ AIPromptBridge is a Windows application consisting of:
 8. **Settings Infrastructure** - GUI editors for config.ini and prompt options with hot-reload
 9. **Tools Subsystem** - Batch file processing framework with checkpoints and audio optimization
 10. **TTS (Text-to-Speech)** - Gemini-powered speech synthesis with AI Director for expressive style control
+11. **Self-Update System** - Two-phase update from GitHub Releases with rollback protection
 
 ## Component Diagram
 
@@ -232,6 +233,20 @@ Prompts are managed centrally via `PromptsConfig` (loading `prompts.json` or def
 - `endpoints`: Flask API endpoint prompts
 - `_global_settings`: Shared modifiers and system instructions
 
+#### Config Preservation (`_is_default` Tagging)
+
+To keep developer-crafted prompts up-to-date across app updates without overwriting user customizations, each action/prompt carries an `_is_default` boolean:
+
+| Tag Value | Meaning | On Update |
+|-----------|---------|----------|
+| `true` | Stock default, unmodified | Replaced with latest version |
+| `false` | User-created or modified | Never overwritten |
+| *(missing)* | Pre-tagging migration | Compared to defaults and auto-tagged |
+
+Merge logic runs at load time in `_ensure_sections()` (for `prompts.json`) and `load_tools_config()` (for `tools_config.json`). New default actions are added automatically; missing `_settings` keys are overlaid without overwriting existing values. User-owned arrays (`popup_groups`, `modifiers`) are never touched.
+
+When a user deletes a default action via the Prompt Editor, its name is recorded in `_settings.deleted_defaults` (a list). The merge logic skips any name in this list, preventing deleted defaults from reappearing on reload.
+
 #### Modes
 - **Edit Mode** (`"edit"`): Strict text replacement (e.g., Proofread). Uses `base_output_rules_edit`.
 - **General Mode** (`"general"`): Conversational responses (e.g., Explain). Uses `base_output_rules_general`.
@@ -419,6 +434,7 @@ GUI editor for `prompts.json` (`src/gui/prompt_editor.py`):
 - **Groups Tab**: Organize actions into popup groups for both tools
 - **Playground Tab**: Test actions and endpoints with live preview
 - **Hot-Reload**: Triggers `reload_options()` on save for immediate effect
+- **Default Tagging**: Saving, adding, or duplicating an action marks it `_is_default: false`, protecting it from future update overwrites
 
 ### Access Methods
 
@@ -447,6 +463,62 @@ Workspace logic is handled inline in `main.py` via `setup_workspace()`:
 - **Stale file migration**: A non-blocking background thread moves any leftover config/data files from `bin/` to root on startup.
 
 For more details on the build process and launcher architecture, see [BUILD_PROCESS.md](BUILD_PROCESS.md).
+
+## Self-Update System
+
+AIPromptBridge includes a built-in self-update system that checks GitHub Releases for new versions.
+
+### Two-Phase Architecture
+
+The update process is split across two executables to work around Windows file locking:
+
+| Phase | Executor | Purpose |
+|-------|----------|---------|
+| **1. Detection & Download** | `src/updater.py` (Main App) | Query GitHub API, download zip, extract to `_update_staging/` |
+| **2. File Replacement** | `launcher_console.py` (Launcher) | Swap `bin/` directories, update root files, relaunch |
+
+### Signal Flow
+
+- **Console mode**: Internal.exe exits with code 42 → launcher catches it → applies update → relaunches
+- **GUI mode**: Internal.exe spawns `AIPromptBridge.exe --apply-update <PID>` → exits → launcher waits for PID → applies → relaunches
+
+### Behavior by Install Type
+
+| Install Type | Behavior |
+|--------------|----------|
+| Compiled (exe) | Full self-update: download, extract, apply, relaunch |
+| Source (python) | Notification-only with link to releases page |
+
+### Entry Points
+
+| Entry Point | Location |
+|-------------|----------|
+| Startup auto-check | `main.py` → `background_update_check()` (non-blocking thread) |
+| Terminal `U` key | `terminal.py` → `check_and_prompt_terminal()` |
+| Tray menu | `tray.py` → `_on_check_updates()` (GUI confirmation dialog) |
+| Settings toggle | `settings_window.py` → `update_check_enabled` checkbox |
+
+### Startup Recovery
+
+`startup_recovery()` in `src/updater.py` runs early in `main()` to handle interrupted updates:
+
+| Scenario | Recovery |
+|----------|----------|
+| `_bin_old/` exists, `bin/` missing | Rollback: rename `_bin_old/` → `bin/` |
+| Stale manifest without staging dir | Remove manifest |
+| Leftover staging without manifest | Remove staging dir |
+| Leftover backup after success | Remove `_bin_old/` |
+
+### Root File Update Strategy (Windows)
+
+The launcher uses a rename trick (`file.exe` → `file.exe.old`) because Windows allows renaming a running executable even though it cannot be deleted. `.old` files are cleaned up on the next startup.
+
+### Configuration
+
+```ini
+[settings]
+update_check_enabled = true   # Auto-check on startup
+```
 
 ## TTS Processor (Batch TTS)
 
