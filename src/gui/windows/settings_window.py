@@ -954,12 +954,6 @@ class SettingsWindow:
                                self.config_data.config.get("update_check_enabled", True),
                                hint="Automatically check GitHub for new versions at launch")
         
-        # Include pre-releases toggle
-        self._add_toggle_field(content_parent, "update_include_prerelease",
-                               "Include pre-release versions",
-                               self.config_data.config.get("update_include_prerelease", False),
-                               hint="Also check for beta/pre-release updates")
-        
         # Check Now button + status label
         update_row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         update_row.pack(fill="x", pady=8)
@@ -1084,17 +1078,12 @@ class SettingsWindow:
         if hasattr(self, '_update_status_label'):
             self._update_status_label.configure(text="Checking...")
         
-        # Read tk var on main thread before spawning background thread
-        include_prerelease = False
-        if "update_include_prerelease" in self.vars:
-            include_prerelease = self.vars["update_include_prerelease"].get()
-        
         def _check_thread():
             try:
                 from ...updater import check_for_update, is_compiled
                 from ...version import __version__
                 
-                info = check_for_update(include_prerelease)
+                info = check_for_update()
                 
                 def _update_ui():
                     if not hasattr(self, '_update_status_label'):

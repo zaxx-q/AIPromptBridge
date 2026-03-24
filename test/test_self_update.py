@@ -196,7 +196,6 @@ def test_github_api_parsing():
         "html_url": "https://github.com/zaxx-q/AIPromptBridge/releases/tag/v5.5.0",
         "body": "## Changelog\n- New feature\n- Bug fix",
         "published_at": "2026-03-20T10:00:00Z",
-        "prerelease": False,
         "assets": [
             {
                 "name": "AIPromptBridge-v5.5.0-Windows.zip",
@@ -254,18 +253,12 @@ def test_github_api_parsing():
         release_notes=mock_release.get("body", ""),
         release_url=mock_release.get("html_url", ""),
         published_at=mock_release.get("published_at", ""),
-        is_prerelease=mock_release.get("prerelease", False),
     )
 
     if info.version == "5.5.0":
         ok(f"UpdateInfo.version == '{info.version}'")
     else:
         fail("UpdateInfo.version", f"got '{info.version}'")
-
-    if not info.is_prerelease:
-        ok("UpdateInfo.is_prerelease == False")
-    else:
-        fail("UpdateInfo.is_prerelease", "expected False")
 
     # Test with no zip assets
     mock_release_no_zip = dict(mock_release)
@@ -795,14 +788,6 @@ def test_config_integration():
     else:
         fail("update_check_enabled", "missing from DEFAULT_CONFIG")
 
-    if "update_include_prerelease" in DEFAULT_CONFIG:
-        if DEFAULT_CONFIG["update_include_prerelease"] is False:
-            ok("DEFAULT_CONFIG has update_include_prerelease = False")
-        else:
-            fail("update_include_prerelease default", f"got {DEFAULT_CONFIG['update_include_prerelease']}")
-    else:
-        fail("update_include_prerelease", "missing from DEFAULT_CONFIG")
-
 
 # ════════════════════════════════════════════════════════════════════════════
 # TEST 10: Constants Consistency
@@ -950,11 +935,6 @@ def test_settings_integration():
         ok("Settings window has update_check_enabled toggle")
     else:
         fail("Settings update_check_enabled", "not found")
-
-    if "update_include_prerelease" in settings_source:
-        ok("Settings window has update_include_prerelease toggle")
-    else:
-        fail("Settings update_include_prerelease", "not found")
 
     if "Check Now" in settings_source:
         ok("Settings window has 'Check Now' button")

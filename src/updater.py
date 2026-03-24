@@ -48,7 +48,6 @@ class UpdateInfo:
     release_notes: str     # Release body markdown
     release_url: str       # HTML URL to release page
     published_at: str      # ISO timestamp
-    is_prerelease: bool = False
 
 
 # ─── Module State ──────────────────────────────────────────────────────────────
@@ -89,8 +88,7 @@ def parse_version(version_str: str) -> Tuple[int, ...]:
         try:
             parts.append(int(part))
         except ValueError:
-            # Handle pre-release suffixes like "5.4.1-beta"
-            # Take only the numeric prefix
+            # Take only the numeric prefix of any non-standard part
             numeric = ""
             for ch in part:
                 if ch.isdigit():
@@ -133,12 +131,9 @@ def is_compiled() -> bool:
 # ─── GitHub API ────────────────────────────────────────────────────────────────
 
 
-def check_for_update(include_prerelease: bool = False) -> Optional[UpdateInfo]:
+def check_for_update() -> Optional[UpdateInfo]:
     """
     Check GitHub Releases API for a newer version.
-
-    Args:
-        include_prerelease: Whether to consider pre-release versions
 
     Returns:
         UpdateInfo if a newer version is available, None otherwise
@@ -159,12 +154,8 @@ def check_for_update(include_prerelease: bool = False) -> Optional[UpdateInfo]:
             "User-Agent": f"AIPromptBridge/{__version__}",
         }
 
-        if include_prerelease:
-            # Get all releases (includes pre-releases)
-            url = f"{GITHUB_API_URL}?per_page=10"
-        else:
-            # Get only the latest stable release
-            url = f"{GITHUB_API_URL}/latest"
+        # Get only the latest stable release
+        url = f"{GITHUB_API_URL}/latest"
 
         response = requests.get(url, headers=headers, timeout=15)
 
@@ -179,14 +170,7 @@ def check_for_update(include_prerelease: bool = False) -> Optional[UpdateInfo]:
 
         response.raise_for_status()
 
-        if include_prerelease:
-            releases = response.json()
-            if not releases:
-                return None
-            # Find newest release (including pre-releases)
-            release = releases[0]
-        else:
-            release = response.json()
+        release = response.json()
 
         tag_name = release.get("tag_name", "")
         if not tag_name:
@@ -236,7 +220,6 @@ def check_for_update(include_prerelease: bool = False) -> Optional[UpdateInfo]:
             release_notes=release.get("body", "") or "",
             release_url=release.get("html_url", RELEASES_URL),
             published_at=release.get("published_at", ""),
-            is_prerelease=release.get("prerelease", False),
         )
 
         _cached_update_info = info
@@ -578,11 +561,9 @@ def background_update_check(config: dict):
     if not config.get("update_check_enabled", True):
         return
 
-    include_prerelease = config.get("update_include_prerelease", False)
-
     def _check():
         try:
-            info = check_for_update(include_prerelease=include_prerelease)
+            info = check_for_update()
             if info:
                 _print_update_notification(info)
         except Exception:
@@ -689,8 +670,7 @@ def check_and_prompt_terminal(config: dict) -> bool:
     else:
         print("\n⬆️  Checking for updates...")
 
-    include_prerelease = config.get("update_include_prerelease", False)
-    info = check_for_update(include_prerelease=include_prerelease)
+    info = check_for_update()
 
     if not info:
         if HAVE_RICH:

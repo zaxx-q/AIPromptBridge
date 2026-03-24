@@ -606,10 +606,9 @@ class TrayApp:
                 from .version import __version__
                 
                 config = web_server.CONFIG or {}
-                include_prerelease = config.get("update_include_prerelease", False)
-                
+
                 print("\n⬆️  Checking for updates...")
-                info = check_for_update(include_prerelease=include_prerelease)
+                info = check_for_update()
                 
                 if not info:
                     print(f"✅ You're up to date! (v{__version__})\n")

@@ -123,7 +123,6 @@ DEFAULT_CONFIG = {
     "chat_use_origin_system_prompt": True,
     # Update settings
     "update_check_enabled": True,       # Auto-check on startup
-    "update_include_prerelease": False,  # Include pre-release versions
 }
 
 # API URLs
@@ -528,9 +527,6 @@ chat_use_origin_system_prompt = true
 # ============================================================
 # Automatically check for updates on startup
 update_check_enabled = true
-
-# Include pre-release versions in update checks
-update_include_prerelease = false
 
 # ============================================================
 # AI PARAMETERS (Optional)
