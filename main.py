@@ -25,7 +25,7 @@ import ctypes
 from pathlib import Path
 
 from src.console import console, Panel, Table, print_panel, print_success, print_error, print_warning, HAVE_RICH
-from src.config import load_config, generate_example_config, CONFIG_FILE, OPENROUTER_URL
+from src.config import load_config, load_key_names, generate_example_config, CONFIG_FILE, OPENROUTER_URL
 from src.version import __version__
 from src.key_manager import KeyManager
 from src.session_manager import load_sessions, list_sessions
@@ -124,8 +124,11 @@ def initialize():
     web_server.ENDPOINTS = endpoints
     
     # Initialize key managers
+    key_names = load_key_names()
     for provider in ["custom", "openrouter", "google"]:
-        web_server.KEY_MANAGERS[provider] = KeyManager(keys[provider], provider)
+        web_server.KEY_MANAGERS[provider] = KeyManager(
+            keys[provider], provider, key_names=key_names.get(provider, [])
+        )
     
     # ─── Configuration Summary ────────────────────────────────────────────
     provider = config.get('default_provider', 'google')

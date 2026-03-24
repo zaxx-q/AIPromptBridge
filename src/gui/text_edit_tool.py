@@ -353,7 +353,7 @@ class TextEditToolApp:
             daemon=True
         ).start()
     
-    def _call_api(self, messages, provider=None, model=None, on_chunk=None, origin_override=None):
+    def _call_api(self, messages, provider=None, model=None, on_chunk=None, origin_override=None, action_config=None):
         """
         Call the AI API with streaming support when enabled.
         
@@ -363,26 +363,30 @@ class TextEditToolApp:
             model: Optional model override
             on_chunk: Optional callback for each text chunk (for real-time typing)
             origin_override: Optional RequestOrigin override
+            action_config: Optional action config dict (may contain model_preset)
         """
         from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin, StreamCallback
         from ..session_manager import ChatSession
+        from ..preset_resolver import resolve_preset
+        
+        # Resolve preset overrides from action config
+        resolved = resolve_preset(action_config, self.config, self.ai_params, self.key_managers)
         
         if not provider:
-            provider = self.config.get("default_provider", "google")
+            provider = resolved.provider
         
-        streaming_enabled = self.config.get("streaming_enabled", True)
+        streaming_enabled = resolved.config.get("streaming_enabled", True)
         
         # Determine origin
         origin = origin_override or RequestOrigin.POPUP_INPUT
         
         # Setup context
-        thinking_enabled = self.config.get("thinking_enabled", False)
         ctx = RequestContext(
             origin=origin,
             provider=provider,
-            model=model or self.config.get(f"{provider}_model"),
+            model=model or resolved.model,
             streaming=streaming_enabled,
-            thinking_enabled=thinking_enabled
+            thinking_enabled=resolved.thinking_enabled
         )
         
         if streaming_enabled:
@@ -414,9 +418,9 @@ class TextEditToolApp:
             ctx = RequestPipeline.execute_streaming(
                 ctx,
                 session,
-                self.config,
-                self.ai_params,
-                self.key_managers,
+                resolved.config,
+                resolved.ai_params,
+                resolved.key_managers,
                 callbacks
             )
             
@@ -429,9 +433,9 @@ class TextEditToolApp:
             ctx = RequestPipeline.execute_simple(
                 ctx,
                 messages,
-                self.config,
-                self.ai_params,
-                self.key_managers
+                resolved.config,
+                resolved.ai_params,
+                resolved.key_managers
             )
             
             if self.cancel_requested:
@@ -869,6 +873,12 @@ class TextEditToolApp:
             action_options = self._get_action_options()
             option = action_options.get(option_key, {})
             
+            # Store action config for preset resolution in streaming paths
+            self._current_action_config = option
+            
+            # Resolve preset early for streaming_enabled checks
+            from ..preset_resolver import resolve_preset
+            resolved = resolve_preset(option, self.config, self.ai_params, self.key_managers)
             # Get modifier definitions from global settings
             modifier_defs = self.prompts.get_modifiers()
             
@@ -976,7 +986,7 @@ class TextEditToolApp:
             
             if show_in_chat_window:
                 # Stream directly into chat window for real-time display
-                streaming_enabled = self.config.get("streaming_enabled", True)
+                streaming_enabled = resolved.config.get("streaming_enabled", True)
                 
                 print(f"\n{'─'*60}")
                 print(f"[AI Response] Opening chat window{'...' if streaming_enabled else ' (non-streaming)...'}")
@@ -992,7 +1002,7 @@ class TextEditToolApp:
                     )
                 else:
                     # Non-streaming: wait for response, then show window
-                    response, error = self._call_api(messages, origin_override=RequestOrigin.POPUP_PROMPT)
+                    response, error = self._call_api(messages, origin_override=RequestOrigin.POPUP_PROMPT, action_config=option)
                     
                     if error:
                         logging.error(f'Option processing failed: {error}')
@@ -1022,7 +1032,7 @@ class TextEditToolApp:
                 print(f"{'─'*60}\n")
             else:
                 # Replace mode: type response to active field (same as direct chat)
-                streaming_enabled = self.config.get("streaming_enabled", True)
+                streaming_enabled = resolved.config.get("streaming_enabled", True)
                 
                 if streaming_enabled:
                     print(f"[AI Response] Streaming to active field... [{self.abort_hotkey.title()} to abort]")
@@ -1058,7 +1068,7 @@ class TextEditToolApp:
                                 typing_aborted = True
                     
                     try:
-                        response, error = self._call_api(messages, on_chunk=type_chunk, origin_override=RequestOrigin.POPUP_PROMPT)
+                        response, error = self._call_api(messages, on_chunk=type_chunk, origin_override=RequestOrigin.POPUP_PROMPT, action_config=option)
                         
                         # Type any remaining buffered text (unless aborted)
                         if chunk_buffer and not self.streaming_aborted and not typing_aborted:
@@ -1072,7 +1082,7 @@ class TextEditToolApp:
                     # so we don't need to show it again here
                 else:
                     # Non-streaming: get full response then paste instantly
-                    response, error = self._call_api(messages, origin_override=RequestOrigin.POPUP_PROMPT)
+                    response, error = self._call_api(messages, origin_override=RequestOrigin.POPUP_PROMPT, action_config=option)
                     
                     # Paste the full response instantly using clipboard
                     if response and not error:
@@ -1215,16 +1225,22 @@ class TextEditToolApp:
         full_response = []
         full_thinking = []
         
-        provider = self.config.get("default_provider", "google")
+        # Resolve preset from action_config if available
+        from ..preset_resolver import resolve_preset
+        resolved = resolve_preset(
+            getattr(self, '_current_action_config', None),
+            self.config, self.ai_params, self.key_managers
+        )
+        
+        provider = resolved.provider
         
         # Setup context
-        thinking_enabled = self.config.get("thinking_enabled", False)
         ctx = RequestContext(
             origin=origin,
             provider=provider,
-            model=self.config.get(f"{provider}_model"),
+            model=resolved.model,
             streaming=True,
-            thinking_enabled=thinking_enabled
+            thinking_enabled=resolved.thinking_enabled
         )
         
         # Stream callbacks
@@ -1253,9 +1269,9 @@ class TextEditToolApp:
         ctx = RequestPipeline.execute_unified_stream(
             ctx,
             messages,  # Use the original messages with correct system prompt
-            self.config,
-            self.ai_params,
-            self.key_managers,
+            resolved.config,
+            resolved.ai_params,
+            resolved.key_managers,
             stream_callbacks
         )
         

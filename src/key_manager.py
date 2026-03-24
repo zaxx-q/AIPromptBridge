@@ -9,12 +9,15 @@ import threading
 class KeyManager:
     """Manages API keys with rotation on failures"""
     
-    def __init__(self, keys, provider_name):
+    def __init__(self, keys, provider_name, key_names=None):
         self.keys = [k for k in keys if k]
         self.current_index = 0
         self.exhausted_keys = set()
         self.provider_name = provider_name
         self.lock = threading.Lock()
+        # Optional display names for keys (parallel list, same length as self.keys)
+        # Used by preset resolver to select keys by name
+        self.key_names = key_names or [""] * len(self.keys)
     
     def get_current_key(self):
         """Get the current active API key"""
@@ -62,3 +65,21 @@ class KeyManager:
         """Reset exhausted keys tracking"""
         with self.lock:
             self.exhausted_keys.clear()
+    
+    def get_key_by_name(self, name: str):
+        """
+        Get an API key by its display name.
+        
+        Args:
+            name: The display name to search for (from config.ini inline comment).
+            
+        Returns:
+            The API key string if found, None otherwise.
+        """
+        if not name or not self.key_names:
+            return None
+        name_lower = name.lower().strip()
+        for i, kn in enumerate(self.key_names):
+            if kn and kn.lower().strip() == name_lower:
+                return self.keys[i]
+        return None

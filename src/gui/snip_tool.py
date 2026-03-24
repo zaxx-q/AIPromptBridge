@@ -358,7 +358,7 @@ class SnipToolApp:
             
             if type_to_field:
                 from ..request_pipeline import RequestOrigin
-                self._type_to_active_field(messages, action_key, RequestOrigin.SNIP_TOOL)
+                self._type_to_active_field(messages, action_key, RequestOrigin.SNIP_TOOL, action_config=action)
             elif show_in_chat:
                 from ..request_pipeline import RequestOrigin
                 self._stream_to_chat_window(
@@ -367,10 +367,11 @@ class SnipToolApp:
                     origin=RequestOrigin.SNIP_TOOL,
                     compare_capture=compare_capture,
                     capture=capture,
-                    session_origin=f"snip:{action_key}"
+                    session_origin=f"snip:{action_key}",
+                    action_config=action
                 )
             else:
-                self._copy_to_clipboard_with_notification(messages, action_key)
+                self._copy_to_clipboard_with_notification(messages, action_key, action_config=action)
             
             print(f"{'─'*60}\n")
             
@@ -416,24 +417,24 @@ class SnipToolApp:
     
     # _build_image_message and _build_comparison_message removed in favor of src/gui/messages.py
     
-    def _copy_to_clipboard_with_notification(self, messages, action_key):
+    def _copy_to_clipboard_with_notification(self, messages, action_key, action_config=None):
         """Execute non-streaming request, copy to clipboard, show notification."""
         from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
+        from ..preset_resolver import resolve_preset
         import pyperclip
         
-        provider = self.config.get("default_provider", "google")
+        resolved = resolve_preset(action_config, self.config, self.ai_params, self.key_managers)
         
-        thinking_enabled = self.config.get("thinking_enabled", False)
         ctx = RequestContext(
             origin=RequestOrigin.SNIP_TOOL,
-            provider=provider,
-            model=self.config.get(f"{provider}_model"),
+            provider=resolved.provider,
+            model=resolved.model,
             streaming=False,  # Must be non-streaming for copy mode
-            thinking_enabled=thinking_enabled
+            thinking_enabled=resolved.thinking_enabled
         )
         
         ctx = RequestPipeline.execute_simple(
-            ctx, messages, self.config, self.ai_params, self.key_managers
+            ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers
         )
         
         if ctx.error:
@@ -468,7 +469,7 @@ class SnipToolApp:
                 logging.error(f"Failed to copy to clipboard: {e}")
                 print(f"  [Error] Failed to copy: {e}")
 
-    def _type_to_active_field(self, messages, action_key, origin):
+    def _type_to_active_field(self, messages, action_key, origin, action_config=None):
         """
         Execute API request and type the response into the active field.
         
@@ -480,8 +481,10 @@ class SnipToolApp:
             messages: API messages to send
             action_key: The action name for logging
             origin: RequestOrigin for logging
+            action_config: Optional action config dict (may contain model_preset)
         """
         from .text_edit_tool import get_instance as get_text_edit_instance
+        from ..preset_resolver import resolve_preset
         
         text_edit = get_text_edit_instance()
         if not text_edit:
@@ -495,7 +498,8 @@ class SnipToolApp:
             )
             return
         
-        streaming_enabled = self.config.get("streaming_enabled", True)
+        resolved = resolve_preset(action_config, self.config, self.ai_params, self.key_managers)
+        streaming_enabled = resolved.config.get("streaming_enabled", True)
         
         if streaming_enabled:
             print(f"[AI Response] Streaming to active field... [{text_edit.abort_hotkey.title()} to abort]")
@@ -585,7 +589,8 @@ class SnipToolApp:
         origin,
         compare_capture: Optional[CaptureResult] = None,
         capture: Optional[CaptureResult] = None,
-        session_origin: str = "snip"
+        session_origin: str = "snip",
+        action_config: Optional[Dict[str, Any]] = None
     ):
         """
         Open a chat window and stream API response into it.
@@ -674,7 +679,9 @@ class SnipToolApp:
             session.system_instruction = self.prompts.get_chat_window_system_instruction()
         
         # Check if streaming is enabled
-        streaming_enabled = self.config.get("streaming_enabled", True)
+        from ..preset_resolver import resolve_preset
+        resolved = resolve_preset(action_config, self.config, self.ai_params, self.key_managers)
+        streaming_enabled = resolved.config.get("streaming_enabled", True)
         
         if streaming_enabled:
             # Request streaming chat window
@@ -689,16 +696,15 @@ class SnipToolApp:
             full_response = []
             full_thinking = []
             
-            provider = self.config.get("default_provider", "google")
+            provider = resolved.provider
             
             # Setup context
-            thinking_enabled = self.config.get("thinking_enabled", False)
             ctx = RequestContext(
                 origin=origin,
                 provider=provider,
-                model=self.config.get(f"{provider}_model"),
+                model=resolved.model,
                 streaming=True,
-                thinking_enabled=thinking_enabled
+                thinking_enabled=resolved.thinking_enabled
             )
             
             # Stream callbacks
@@ -726,9 +732,9 @@ class SnipToolApp:
             ctx = RequestPipeline.execute_unified_stream(
                 ctx,
                 messages,
-                self.config,
-                self.ai_params,
-                self.key_managers,
+                resolved.config,
+                resolved.ai_params,
+                resolved.key_managers,
                 stream_callbacks
             )
             
@@ -761,23 +767,20 @@ class SnipToolApp:
             print(f"  ✅ Response streamed to chat window ({len(response_text)} chars)")
         else:
             # Non-streaming: execute simple request, then show window
-            provider = self.config.get("default_provider", "google")
-            
-            thinking_enabled = self.config.get("thinking_enabled", False)
             ctx = RequestContext(
                 origin=origin,
-                provider=provider,
-                model=self.config.get(f"{provider}_model"),
+                provider=resolved.provider,
+                model=resolved.model,
                 streaming=False,
-                thinking_enabled=thinking_enabled
+                thinking_enabled=resolved.thinking_enabled
             )
             
             ctx = RequestPipeline.execute_simple(
                 ctx,
                 messages,
-                self.config,
-                self.ai_params,
-                self.key_managers
+                resolved.config,
+                resolved.ai_params,
+                resolved.key_managers
             )
             
             if ctx.error:

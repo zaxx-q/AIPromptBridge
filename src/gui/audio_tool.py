@@ -247,9 +247,11 @@ class AudioToolApp:
                 
                 messages = []
                 
-                # Determine provider/model
-                req_provider = provider or self.config.get("default_provider", "google")
-                req_model = model or self.config.get(f"{req_provider}_model")
+                # Determine provider/model using preset resolution
+                from ..preset_resolver import resolve_preset
+                resolved = resolve_preset(action, self.config, self.ai_params, self.key_managers)
+                req_provider = provider or resolved.provider
+                req_model = model or resolved.model
                 
                 # Check for large file support (Gemini only)
                 # Upload if > 15MB
@@ -269,9 +271,9 @@ class AudioToolApp:
                             f.write(audio_data)
                             temp_file_path = f.name
                         
-                        key_manager = self.key_managers.get("google")
+                        key_manager = resolved.key_managers.get("google")
                         if key_manager:
-                            prov_instance = get_provider_for_type("google", key_manager, self.config)
+                            prov_instance = get_provider_for_type("google", key_manager, resolved.config)
                             uploaded_file, error = prov_instance.upload_file(Path(temp_file_path))
                             
                             if uploaded_file:
@@ -298,18 +300,17 @@ class AudioToolApp:
                         system_prompt=system_prompt
                     )
                 
-                thinking_enabled = self.config.get("thinking_enabled", False)
                 ctx = RequestContext(
                     origin=RequestOrigin.AUDIO_TOOL,
                     provider=req_provider,
                     model=req_model,
-                    streaming=self.config.get("streaming_enabled", True),
-                    thinking_enabled=thinking_enabled
+                    streaming=resolved.config.get("streaming_enabled", True),
+                    thinking_enabled=resolved.thinking_enabled
                 )
                 
                 # Execute simple (non-streaming result for this method)
                 ctx = RequestPipeline.execute_simple(
-                    ctx, messages, self.config, self.ai_params, self.key_managers
+                    ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers
                 )
                 
                 if ctx.error:
@@ -388,7 +389,8 @@ class AudioToolApp:
                 duration=duration,
                 provider=provider,
                 model=model,
-                session_origin=session_origin
+                session_origin=session_origin,
+                action_config=action
             )
             
             print(f"{'─'*60}\n")
@@ -418,7 +420,8 @@ class AudioToolApp:
         duration: float,
         provider: Optional[str] = None,
         model: Optional[str] = None,
-        session_origin: str = "audio"
+        session_origin: str = "audio",
+        action_config: Optional[Dict[str, Any]] = None
     ):
         """
         Open a chat window and stream API response into it.
@@ -484,7 +487,9 @@ class AudioToolApp:
             session.system_instruction = self.prompts.get_chat_window_system_instruction()
         
         # Check if streaming is enabled
-        streaming_enabled = self.config.get("streaming_enabled", True)
+        from ..preset_resolver import resolve_preset
+        resolved = resolve_preset(action_config, self.config, self.ai_params, self.key_managers)
+        streaming_enabled = resolved.config.get("streaming_enabled", True)
         
         if streaming_enabled:
             # Request streaming chat window
@@ -499,18 +504,17 @@ class AudioToolApp:
             full_response = []
             full_thinking = []
             
-            # Use provided settings or fallback to config defaults
-            req_provider = provider or self.config.get("default_provider", "google")
-            req_model = model or self.config.get(f"{req_provider}_model")
+            # Use provided settings or fallback to resolved preset defaults
+            req_provider = provider or resolved.provider
+            req_model = model or resolved.model
             
             # Setup context
-            thinking_enabled = self.config.get("thinking_enabled", False)
             ctx = RequestContext(
                 origin=origin,
                 provider=req_provider,
                 model=req_model,
                 streaming=True,
-                thinking_enabled=thinking_enabled
+                thinking_enabled=resolved.thinking_enabled
             )
             
             # Stream callbacks
@@ -538,9 +542,9 @@ class AudioToolApp:
             ctx = RequestPipeline.execute_unified_stream(
                 ctx,
                 messages,
-                self.config,
-                self.ai_params,
-                self.key_managers,
+                resolved.config,
+                resolved.ai_params,
+                resolved.key_managers,
                 stream_callbacks
             )
             
@@ -573,24 +577,23 @@ class AudioToolApp:
             print(f"  ✅ Response streamed to chat window ({len(response_text)} chars)")
         else:
             # Non-streaming: execute simple request, then show window
-            req_provider = provider or self.config.get("default_provider", "google")
-            req_model = model or self.config.get(f"{req_provider}_model")
+            req_provider = provider or resolved.provider
+            req_model = model or resolved.model
             
-            thinking_enabled = self.config.get("thinking_enabled", False)
             ctx = RequestContext(
                 origin=origin,
                 provider=req_provider,
                 model=req_model,
                 streaming=False,
-                thinking_enabled=thinking_enabled
+                thinking_enabled=resolved.thinking_enabled
             )
             
             ctx = RequestPipeline.execute_simple(
                 ctx,
                 messages,
-                self.config,
-                self.ai_params,
-                self.key_managers
+                resolved.config,
+                resolved.ai_params,
+                resolved.key_managers
             )
             
             if ctx.error:

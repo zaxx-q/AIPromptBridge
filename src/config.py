@@ -5,6 +5,7 @@ Configuration loading and management
 
 import os
 import re
+import logging
 from pathlib import Path
 
 # Configuration file paths
@@ -234,6 +235,62 @@ def load_config(filepath=CONFIG_FILE):
         print(f"[Error] Failed to load config: {e}")
     
     return config, ai_params, endpoints, keys
+
+
+def load_key_names(filepath=CONFIG_FILE):
+    """
+    Load API key display names from config.ini inline comments.
+    
+    Parses lines like:
+        sk-abc123   # My Key Name
+    and returns the name part for each key, in order.
+    
+    This is separate from load_config() to avoid breaking its return type.
+    
+    Returns:
+        Dict[str, List[str]]: Mapping of provider -> list of key names.
+        Names are empty strings for keys without inline comments.
+    """
+    key_names = {"custom": [], "openrouter": [], "google": []}
+    
+    if not Path(filepath).exists():
+        return key_names
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        current_section = None
+        
+        for line in lines:
+            stripped = line.strip()
+            
+            if not stripped or stripped.startswith('#'):
+                continue
+            
+            if stripped.startswith('[') and stripped.endswith(']'):
+                current_section = stripped[1:-1].lower()
+                continue
+            
+            if current_section in key_names:
+                if stripped and not stripped.startswith('#'):
+                    match = re.search(r'\s+#\s*(.+)$', stripped)
+                    if match:
+                        name = match.group(1).strip()
+                    else:
+                        name = ""
+                    # Only append if there's an actual key part
+                    key_match = re.search(r'\s+#', stripped)
+                    if key_match:
+                        key_part = stripped[:key_match.start()].strip()
+                    else:
+                        key_part = stripped.strip()
+                    if key_part:
+                        key_names[current_section].append(name)
+    except Exception as e:
+        logging.debug(f"[Config] Failed to load key names: {e}")
+    
+    return key_names
 
 
 def save_config_value(key: str, value, filepath=CONFIG_FILE):
