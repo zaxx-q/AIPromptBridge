@@ -87,11 +87,16 @@ def _merge_with_defaults(user_config: Dict[str, Any]) -> tuple[Dict[str, Any], b
             user_config["file_processor"]["file_type_mappings"][k] = v.copy()
             changed = True
 
+    # Access deleted defaults from settings
+    deleted_defaults = user_config.get("_settings", {}).get("deleted_defaults", [])
+
     # Merge prompts with _is_default tagging
     if "prompts" not in user_config["file_processor"]:
-        user_config["file_processor"]["prompts"] = default_config["file_processor"]["prompts"].copy()
-        for action in user_config["file_processor"]["prompts"].values():
-            action["_is_default"] = True
+        user_config["file_processor"]["prompts"] = {}
+        for name, action in default_config["file_processor"]["prompts"].items():
+            if name not in deleted_defaults:
+                user_config["file_processor"]["prompts"][name] = action.copy()
+                user_config["file_processor"]["prompts"][name]["_is_default"] = True
         changed = True
     else:
         user_prompts = user_config["file_processor"]["prompts"]
@@ -118,6 +123,9 @@ def _merge_with_defaults(user_config: Dict[str, Any]) -> tuple[Dict[str, Any], b
 
         # Add missing or update default
         for name, d_action in default_prompts.items():
+            if name in deleted_defaults:
+                continue # Skip re-adding defaults the user explicitly deleted
+                
             if name not in user_prompts:
                 user_prompts[name] = d_action.copy()
                 user_prompts[name]["_is_default"] = True

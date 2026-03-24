@@ -3941,6 +3941,24 @@ class PromptEditorWindow:
         
         if messagebox.askyesno("Delete Action", f"Delete action '{self.current_action}'?", parent=self.root):
             tool_data = self.options_data.get(self.current_tool, {})
+            
+            # Check if this was a default action before removing
+            from src.gui.prompts import DEFAULT_TEXT_EDIT_ACTIONS, DEFAULT_SNIP_ACTIONS, DEFAULT_AUDIO_ACTIONS
+            
+            is_default = False
+            if self.current_tool == "text_edit_tool" and self.current_action in DEFAULT_TEXT_EDIT_ACTIONS:
+                is_default = True
+            elif self.current_tool == "snip_tool" and self.current_action in DEFAULT_SNIP_ACTIONS:
+                is_default = True
+            elif self.current_tool == "audio_tool" and self.current_action in DEFAULT_AUDIO_ACTIONS:
+                is_default = True
+                
+            if is_default:
+                _settings = tool_data.setdefault("_settings", {})
+                deleted_defaults = _settings.setdefault("deleted_defaults", [])
+                if self.current_action not in deleted_defaults:
+                    deleted_defaults.append(self.current_action)
+            
             if self.current_action in tool_data:
                 del tool_data[self.current_action]
             self.action_listbox.delete(self.current_action)

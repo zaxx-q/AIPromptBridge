@@ -759,8 +759,14 @@ class PromptsConfig:
         if self._tag_defaults(section_data, default_actions):
             changed = True
             
+        settings = section_data.get("_settings", {})
+        deleted_defaults = settings.get("deleted_defaults", [])
+            
         # Add missing or update default
         for name, d_action in default_actions.items():
+            if name in deleted_defaults:
+                continue # Skip re-adding defaults the user explicitly deleted
+                
             if name not in section_data:
                 section_data[name] = d_action.copy()
                 section_data[name]["_is_default"] = True
