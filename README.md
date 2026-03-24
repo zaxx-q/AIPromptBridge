@@ -85,6 +85,7 @@ Customizable appearance with:
 
 ### 🔄 Robust Backend
 - **Multi-provider support** - Google Gemini, OpenRouter, custom endpoints
+- **Model Presets** - Per-action AI configuration presets (provider, model, thinking, streaming, and advanced params)
 - **Automatic key rotation** - Switch API keys on rate limits (429, 401, 403)
 - **Smart retry logic** - Handles errors gracefully with configurable delays
 - **Empty response detection** - Automatically retries with next key
@@ -224,6 +225,7 @@ Access via **System Tray > Settings**. This window manages the core application 
 
 Access via **System Tray > Prompt Editor**. This window lets you customize how the AI responds (`prompts.json`):
 - **Actions**: Create, edit, and organize actions for Text, Snip, and Audio tools.
+- **Model Presets**: Assign per-action AI presets (provider, model, thinking, streaming, temperature, etc.).
 - **Modifiers**: Customize the modifier bar buttons (e.g., "Shorter", "Professional").
 - **Playground**: Test your prompts in real-time with text, images, or audio before saving.
 - **Hot-Reload**: Changes apply immediately without restarting the app.

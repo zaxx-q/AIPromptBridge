@@ -32,8 +32,9 @@ AIPromptBridge/
     ├── attachment_manager.py   # Persistent storage for session attachments
     ├── config.py               # Custom INI parser, configuration management
     ├── console.py              # Centralized Rich console configuration
-    ├── key_manager.py          # API key rotation with exhaustion tracking
+    ├── key_manager.py          # API key rotation with exhaustion tracking and named key lookup
     ├── messages.py             # Multimodal message construction factory
+    ├── preset_resolver.py      # Model preset resolution (per-action AI config overrides)
     ├── request_pipeline.py     # Unified request processing with logging
     ├── session_manager.py      # Session persistence with sequential IDs
     ├── terminal.py             # Interactive terminal commands (includes Tools menu)
@@ -107,8 +108,9 @@ AIPromptBridge/
 | `web_server.py` | Flask REST API endpoints for image processing |
 | `terminal.py` | Interactive terminal commands when console is visible |
 | `console.py` | Centralized Rich console configuration with custom theme |
-| `config.py` | Custom INI parser with multiline support |
-| `key_manager.py` | Multi-key management with automatic rotation |
+| `config.py` | Custom INI parser with multiline support, key name parsing |
+| `key_manager.py` | Multi-key management with automatic rotation and named key lookup |
+| `preset_resolver.py` | Per-action model preset resolution (merges preset overrides with global config) |
 | `request_pipeline.py` | Unified logging and token tracking for all requests |
 | `session_manager.py` | Chat session persistence to JSON |
 | `attachment_manager.py`| Manages external file storage for session attachments |

@@ -264,6 +264,42 @@ Sessions do NOT store provider/model. This allows:
 - No migration needed when changing default provider
 - Current config is always used at request time
 
+## Model Presets
+
+Model presets allow per-action AI configuration overrides, enabling seamless switching between different AI profiles without manual settings changes.
+
+### Storage
+
+Presets are stored in `prompts.json` under `_global_settings.model_presets`. Each action can reference a preset by name via its `model_preset` field.
+
+### Resolution Chain
+
+At request time, `src/preset_resolver.py` merges settings:
+
+```
+Action's model_preset → Preset fields → config.ini globals (fallback)
+```
+
+If no preset is assigned or a preset field is empty, the global `config.ini` default is used.
+
+### Preset Fields
+
+| Field | Overrides | Type |
+|-------|-----------|------|
+| `provider` | `default_provider` | `google`, `openrouter`, `custom` |
+| `model` | `{provider}_model` | string |
+| `streaming` | `streaming_enabled` | bool |
+| `thinking` | `thinking_enabled` | bool |
+| `thinking_budget` | `thinking_budget` | int |
+| `thinking_level` | `thinking_level` | `low`, `high` |
+| `reasoning_effort` | `reasoning_effort` | `low`, `medium`, `high` |
+| `temperature` | `temperature` (ai_params) | float |
+| `max_tokens` | `max_tokens` (ai_params) | int |
+| `request_timeout` | `request_timeout` | int |
+| `custom_url` | `custom_url` | string |
+| `gemini_endpoint` | `gemini_endpoint` | string |
+| `api_key_name` | Selects key by display name | string |
+
 ## System Tray (Windows)
 
 The tray application (`src/tray.py`) manages:
@@ -428,7 +464,8 @@ GUI editor for `config.ini` (`src/gui/settings_window.py`):
 
 GUI editor for `prompts.json` (`src/gui/prompt_editor.py`):
 
-- **Actions Tab**: Edit actions for both TextEditTool and SnipTool
+- **Actions Tab**: Edit actions for TextEditTool, SnipTool, and AudioTool
+- **Model Presets**: Per-action dropdown to assign presets; "Manage..." button opens the preset manager dialog
 - **Settings Tab**: Edit text output rules and system instructions
 - **Modifiers Tab**: Manage global modifier buttons
 - **Groups Tab**: Organize actions into popup groups for both tools
