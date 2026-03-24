@@ -471,6 +471,336 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
 
 # =============================================================================
+# Model Preset Manager Dialog
+# =============================================================================
+
+class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
+    """Dialog for creating, editing, and deleting model presets."""
+    
+    PRESET_FIELDS = [
+        ("provider", "Provider", "combobox", ["google", "openrouter", "custom"]),
+        ("model", "Model", "entry", None),
+        ("streaming", "Streaming", "checkbox", None),
+        ("thinking", "Thinking", "checkbox", None),
+        ("thinking_budget", "Thinking Budget", "entry", None),
+        ("thinking_level", "Thinking Level", "combobox", ["", "low", "high"]),
+        ("reasoning_effort", "Reasoning Effort", "combobox", ["", "low", "medium", "high"]),
+        ("temperature", "Temperature", "entry", None),
+        ("max_tokens", "Max Tokens", "entry", None),
+        ("request_timeout", "Request Timeout", "entry", None),
+        ("custom_url", "Custom URL", "entry", None),
+        ("gemini_endpoint", "Gemini Endpoint", "combobox", ["", "generateContent", "streamGenerateContent"]),
+        ("api_key_name", "API Key Name", "entry", None),
+    ]
+    
+    def __init__(self, parent, colors: ThemeColors, on_close=None):
+        super().__init__(parent)
+        self.colors = colors
+        self.on_close = on_close
+        self.use_ctk = HAVE_CTK
+        self.field_widgets = {}
+        self.current_preset = None
+        
+        self.title("Manage Model Presets")
+        self.geometry("700x620")
+        self.minsize(600, 500)
+        self.transient(parent)
+        self.grab_set()
+        
+        if self.use_ctk:
+            self.configure(fg_color=colors.bg)
+        else:
+            self.configure(bg=colors.bg)
+        
+        set_window_icon(self)
+        self._build_ui()
+        self._refresh_list()
+    
+    def _build_ui(self):
+        """Build the preset manager UI."""
+        c = self.colors
+        
+        # Title
+        if self.use_ctk:
+            ctk.CTkLabel(self, text="⚙️  Model Presets", font=get_ctk_font(16, "bold"),
+                        **get_ctk_label_colors(c)).pack(anchor="w", padx=20, pady=(15, 10))
+        else:
+            tk.Label(self, text="⚙️  Model Presets", font=("Segoe UI", 14, "bold"),
+                    bg=c.bg, fg=c.fg).pack(anchor="w", padx=20, pady=(15, 10))
+        
+        # Main container: left list + right editor
+        container = ctk.CTkFrame(self, fg_color="transparent") if self.use_ctk else tk.Frame(self, bg=c.bg)
+        container.pack(fill="both", expand=True, padx=15, pady=(0, 10))
+        
+        # Left panel: preset list
+        left = ctk.CTkFrame(container, fg_color="transparent", width=200) if self.use_ctk else tk.Frame(container, bg=c.bg, width=200)
+        left.pack(side="left", fill="y", padx=(0, 10))
+        left.pack_propagate(False)
+        
+        self.preset_listbox = ScrollableButtonList(
+            left, c, command=self._on_preset_select,
+            **({"corner_radius": 8, "fg_color": c.input_bg} if self.use_ctk else {"bg": c.input_bg})
+        )
+        self.preset_listbox.pack(fill="both", expand=True)
+        
+        # Buttons
+        btn_frame = ctk.CTkFrame(left, fg_color="transparent") if self.use_ctk else tk.Frame(left, bg=c.bg)
+        btn_frame.pack(fill="x", pady=(8, 0))
+        
+        create_emoji_button(btn_frame, "New", "➕", c, "success", 70, 30, self._new_preset).pack(side="left", padx=2)
+        create_emoji_button(btn_frame, "", "📋", c, "secondary", 35, 30, self._duplicate_preset).pack(side="left", padx=2)
+        create_emoji_button(btn_frame, "", "🗑️", c, "danger", 35, 30, self._delete_preset).pack(side="left", padx=2)
+        
+        # Right panel: editor
+        right = ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=c.bg)
+        right.pack(side="left", fill="both", expand=True)
+        
+        # Scrollable editor area
+        if self.use_ctk:
+            editor = ctk.CTkScrollableFrame(right, fg_color="transparent")
+        else:
+            editor = TkScrollableFrame(right, bg_color=c.bg)
+            editor = editor.scrollable_frame if hasattr(editor, 'scrollable_frame') else editor
+        editor.pack(fill="both", expand=True) if not isinstance(editor, tk.Frame) else None
+        # For TkScrollableFrame, the parent already handles packing
+        try:
+            editor.pack(fill="both", expand=True)
+        except Exception:
+            pass
+        
+        # Preset name
+        row = ctk.CTkFrame(editor, fg_color="transparent") if self.use_ctk else tk.Frame(editor, bg=c.bg)
+        row.pack(fill="x", pady=5)
+        if self.use_ctk:
+            ctk.CTkLabel(row, text="Preset Name:", font=get_ctk_font(13, "bold"), width=130, anchor="w",
+                        **get_ctk_label_colors(c)).pack(side="left")
+            self.name_var = tk.StringVar()
+            self.name_entry = ctk.CTkEntry(row, textvariable=self.name_var, font=get_ctk_font(13),
+                                           height=32, **get_ctk_entry_colors(c))
+            self.name_entry.pack(side="left", fill="x", expand=True, padx=(8, 0))
+        else:
+            tk.Label(row, text="Preset Name:", font=("Segoe UI", 10, "bold"), width=14, anchor="w",
+                    bg=c.bg, fg=c.fg).pack(side="left")
+            self.name_var = tk.StringVar()
+            self.name_entry = tk.Entry(row, textvariable=self.name_var, font=("Segoe UI", 10),
+                                       bg=c.input_bg, fg=c.fg)
+            self.name_entry.pack(side="left", fill="x", expand=True, padx=(5, 0))
+        
+        # Separator
+        if self.use_ctk:
+            ctk.CTkFrame(editor, fg_color=c.surface1, height=1).pack(fill="x", pady=8)
+        else:
+            tk.Frame(editor, bg=c.surface1, height=1).pack(fill="x", pady=8)
+        
+        # Field note
+        if self.use_ctk:
+            ctk.CTkLabel(editor, text="Leave fields empty to use global defaults",
+                        font=get_ctk_font(11), text_color=c.surface2).pack(anchor="w", pady=(0, 5))
+        else:
+            tk.Label(editor, text="Leave fields empty to use global defaults",
+                    font=("Segoe UI", 9), bg=c.bg, fg=c.surface2).pack(anchor="w", pady=(0, 5))
+        
+        # Build fields
+        for key, label, field_type, options in self.PRESET_FIELDS:
+            row = ctk.CTkFrame(editor, fg_color="transparent") if self.use_ctk else tk.Frame(editor, bg=c.bg)
+            row.pack(fill="x", pady=3)
+            
+            if field_type == "checkbox":
+                var = tk.BooleanVar()
+                enabled_var = tk.BooleanVar(value=False)  # Whether this override is active
+                
+                if self.use_ctk:
+                    # Enable checkbox
+                    enable_cb = ctk.CTkCheckBox(row, text="", variable=enabled_var, width=20,
+                                                fg_color=c.accent, checkbox_width=18, checkbox_height=18)
+                    enable_cb.pack(side="left", padx=(0, 4))
+                    ctk.CTkLabel(row, text=f"{label}:", font=get_ctk_font(12), width=130, anchor="w",
+                                **get_ctk_label_colors(c)).pack(side="left")
+                    cb = ctk.CTkCheckBox(row, text="Enabled", variable=var,
+                                         font=get_ctk_font(12), text_color=c.fg, fg_color=c.accent)
+                    cb.pack(side="left", padx=(8, 0))
+                else:
+                    enable_cb = tk.Checkbutton(row, text="", variable=enabled_var,
+                                               bg=c.bg, selectcolor=c.input_bg)
+                    enable_cb.pack(side="left", padx=(0, 4))
+                    tk.Label(row, text=f"{label}:", font=("Segoe UI", 9), width=14, anchor="w",
+                            bg=c.bg, fg=c.fg).pack(side="left")
+                    cb = tk.Checkbutton(row, text="Enabled", variable=var,
+                                        bg=c.bg, fg=c.fg, selectcolor=c.input_bg)
+                    cb.pack(side="left", padx=(5, 0))
+                
+                self.field_widgets[key] = {"var": var, "enabled_var": enabled_var, "type": "checkbox"}
+            
+            elif field_type == "combobox":
+                var = tk.StringVar()
+                if self.use_ctk:
+                    ctk.CTkLabel(row, text=f"{label}:", font=get_ctk_font(12), width=150, anchor="w",
+                                **get_ctk_label_colors(c)).pack(side="left")
+                    combo = ctk.CTkComboBox(row, variable=var, values=options or [],
+                                            width=200, height=30, state="readonly",
+                                            font=get_ctk_font(12), **get_ctk_combobox_colors(c))
+                    combo.pack(side="left", padx=(8, 0))
+                else:
+                    from tkinter import ttk as ttk_local
+                    tk.Label(row, text=f"{label}:", font=("Segoe UI", 9), width=14, anchor="w",
+                            bg=c.bg, fg=c.fg).pack(side="left")
+                    combo = ttk_local.Combobox(row, textvariable=var, values=options or [],
+                                               state="readonly", width=18)
+                    combo.pack(side="left", padx=(5, 0))
+                
+                self.field_widgets[key] = {"var": var, "type": "combobox"}
+            
+            else:  # entry
+                var = tk.StringVar()
+                if self.use_ctk:
+                    ctk.CTkLabel(row, text=f"{label}:", font=get_ctk_font(12), width=150, anchor="w",
+                                **get_ctk_label_colors(c)).pack(side="left")
+                    entry = ctk.CTkEntry(row, textvariable=var, font=get_ctk_font(12),
+                                         height=30, width=250, **get_ctk_entry_colors(c))
+                    entry.pack(side="left", padx=(8, 0))
+                else:
+                    tk.Label(row, text=f"{label}:", font=("Segoe UI", 9), width=14, anchor="w",
+                            bg=c.bg, fg=c.fg).pack(side="left")
+                    entry = tk.Entry(row, textvariable=var, font=("Segoe UI", 9),
+                                     bg=c.input_bg, fg=c.fg, width=25)
+                    entry.pack(side="left", padx=(5, 0))
+                
+                self.field_widgets[key] = {"var": var, "type": "entry"}
+        
+        # Save button
+        btn_row = ctk.CTkFrame(right, fg_color="transparent") if self.use_ctk else tk.Frame(right, bg=c.bg)
+        btn_row.pack(fill="x", pady=(10, 5))
+        
+        create_emoji_button(btn_row, "Save Preset", "💾", c, "success", 140, 36, self._save_preset).pack(side="left")
+        
+        if self.use_ctk:
+            self.save_status = ctk.CTkLabel(btn_row, text="", font=get_ctk_font(11),
+                                            text_color=c.accent_green)
+        else:
+            self.save_status = tk.Label(btn_row, text="", font=("Segoe UI", 9),
+                                        bg=c.bg, fg=c.accent_green)
+        self.save_status.pack(side="left", padx=12)
+    
+    def _refresh_list(self):
+        """Refresh the preset list."""
+        from ..prompts import get_prompts_config
+        self.preset_listbox.clear()
+        for name in get_prompts_config().get_preset_names():
+            self.preset_listbox.add_item(name, name, "⚙️")
+    
+    def _on_preset_select(self, name):
+        """Load preset into editor."""
+        from ..prompts import get_prompts_config
+        self.current_preset = name
+        preset = get_prompts_config().get_model_preset(name) or {}
+        
+        self.name_var.set(name)
+        
+        for key, widget_info in self.field_widgets.items():
+            val = preset.get(key)
+            if widget_info["type"] == "checkbox":
+                if val is not None:
+                    widget_info["enabled_var"].set(True)
+                    widget_info["var"].set(bool(val))
+                else:
+                    widget_info["enabled_var"].set(False)
+                    widget_info["var"].set(False)
+            else:
+                widget_info["var"].set(str(val) if val is not None else "")
+    
+    def _save_preset(self):
+        """Save the current preset."""
+        from ..prompts import get_prompts_config
+        name = self.name_var.get().strip()
+        if not name:
+            messagebox.showwarning("Missing Name", "Please enter a preset name.", parent=self)
+            return
+        
+        preset = {}
+        for key, widget_info in self.field_widgets.items():
+            if widget_info["type"] == "checkbox":
+                if widget_info["enabled_var"].get():
+                    preset[key] = widget_info["var"].get()
+            elif widget_info["type"] in ("entry", "combobox"):
+                val = widget_info["var"].get().strip()
+                if val:
+                    # Try to convert numeric values
+                    if key in ("temperature",):
+                        try:
+                            preset[key] = float(val)
+                        except ValueError:
+                            preset[key] = val
+                    elif key in ("thinking_budget", "max_tokens", "request_timeout"):
+                        try:
+                            preset[key] = int(val)
+                        except ValueError:
+                            preset[key] = val
+                    else:
+                        preset[key] = val
+        
+        pc = get_prompts_config()
+        
+        # Handle rename
+        if self.current_preset and self.current_preset != name:
+            pc.delete_model_preset(self.current_preset)
+        
+        pc.set_model_preset(name, preset)
+        self.current_preset = name
+        self._refresh_list()
+        self.preset_listbox.select(name)
+        
+        if self.use_ctk:
+            self.save_status.configure(text=f"✅ Saved '{name}'")
+        else:
+            self.save_status.configure(text=f"✅ Saved '{name}'")
+    
+    def _new_preset(self):
+        """Create a new empty preset."""
+        name = ask_themed_string(self, "New Preset", "Enter preset name:", self.colors)
+        if name:
+            self.current_preset = None
+            self.name_var.set(name)
+            for widget_info in self.field_widgets.values():
+                if widget_info["type"] == "checkbox":
+                    widget_info["enabled_var"].set(False)
+                    widget_info["var"].set(False)
+                else:
+                    widget_info["var"].set("")
+    
+    def _duplicate_preset(self):
+        """Duplicate the selected preset."""
+        if not self.current_preset:
+            return
+        name = ask_themed_string(self, "Duplicate Preset", "Enter new preset name:", self.colors)
+        if name:
+            self.name_var.set(name)
+            self.current_preset = None  # Will create new on save
+    
+    def _delete_preset(self):
+        """Delete the selected preset."""
+        if not self.current_preset:
+            return
+        if messagebox.askyesno("Delete Preset", f"Delete preset '{self.current_preset}'?", parent=self):
+            from ..prompts import get_prompts_config
+            get_prompts_config().delete_model_preset(self.current_preset)
+            self.current_preset = None
+            self.name_var.set("")
+            for widget_info in self.field_widgets.values():
+                if widget_info["type"] == "checkbox":
+                    widget_info["enabled_var"].set(False)
+                    widget_info["var"].set(False)
+                else:
+                    widget_info["var"].set("")
+            self._refresh_list()
+    
+    def destroy(self):
+        """Override destroy to call on_close callback."""
+        if self.on_close:
+            self.on_close()
+        super().destroy()
+
+
+# =============================================================================
 # Prompt Editor Window (CTk version)
 # =============================================================================
 
@@ -1070,7 +1400,41 @@ class PromptEditorWindow:
         # Show compare_prompts frame initially (text_edit_tool is default)
         self.compare_prompts_frame.pack(fill="x", pady=10)
         
-        # Populate action list after widgets are created
+        # Model Preset dropdown (all tools)
+        self.preset_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        self.preset_frame.pack(fill="x", pady=8)
+        
+        if self.use_ctk:
+            ctk.CTkLabel(self.preset_frame, text="Model Preset:", font=get_ctk_font(13), width=120, anchor="w",
+                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            self.editor_widgets["preset_var"] = tk.StringVar(master=self.root, value="(None)")
+            self.editor_widgets["preset_combo"] = ctk.CTkComboBox(
+                self.preset_frame, variable=self.editor_widgets["preset_var"],
+                values=["(None)"], width=220, height=34, state="readonly",
+                font=get_ctk_font(13), **get_ctk_combobox_colors(self.colors)
+            )
+            self.editor_widgets["preset_combo"].pack(side="left", padx=(12, 8))
+            ctk.CTkButton(
+                self.preset_frame, text="Manage...", font=get_ctk_font(12),
+                width=90, height=34, **get_ctk_button_colors(self.colors, "secondary"),
+                command=self._open_preset_manager
+            ).pack(side="left")
+        else:
+            from tkinter import ttk
+            tk.Label(self.preset_frame, text="Model Preset:", font=("Segoe UI", 10), width=12, anchor="w",
+                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            self.editor_widgets["preset_var"] = tk.StringVar(master=self.root, value="(None)")
+            self.editor_widgets["preset_combo"] = ttk.Combobox(
+                self.preset_frame, textvariable=self.editor_widgets["preset_var"],
+                values=["(None)"], state="readonly", width=20
+            )
+            self.editor_widgets["preset_combo"].pack(side="left", padx=(10, 5))
+            tk.Button(self.preset_frame, text="Manage...", font=("Segoe UI", 9),
+                     bg=self.colors.surface1, fg=self.colors.fg,
+                     command=self._open_preset_manager).pack(side="left")
+        
+        # Refresh preset dropdown values
+        self._refresh_preset_dropdown()
         self._refresh_action_list()
         
         # Save action button - OUTSIDE scrollable frame so it's always visible
@@ -3451,6 +3815,11 @@ class PromptEditorWindow:
                     action_data.get("compare_prompts", False)
                 )
         
+        # Load model preset (all tools)
+        if "preset_var" in self.editor_widgets:
+            preset_name = action_data.get("model_preset", "") or ""
+            self.editor_widgets["preset_var"].set(preset_name if preset_name else "(None)")
+        
         # Update field visibility
         self._update_editor_visibility()
     
@@ -3509,6 +3878,24 @@ class PromptEditorWindow:
             self.editor_widgets["icon_var"].set(emoji)
         
         EmojiPicker(self.root, on_select, self.colors)
+    
+    def _refresh_preset_dropdown(self):
+        """Refresh the model preset dropdown values from prompts config."""
+        from ..prompts import get_prompts_config
+        pc = get_prompts_config()
+        preset_names = pc.get_preset_names()
+        values = ["(None)"] + preset_names
+        
+        if "preset_combo" in self.editor_widgets:
+            combo = self.editor_widgets["preset_combo"]
+            if self.use_ctk:
+                combo.configure(values=values)
+            else:
+                combo["values"] = values
+    
+    def _open_preset_manager(self):
+        """Open the Manage Presets dialog."""
+        PresetManagerDialog(self.root, self.colors, on_close=self._refresh_preset_dropdown)
     
     def _add_action(self):
         """Add a new action."""
@@ -3648,6 +4035,12 @@ class PromptEditorWindow:
                 action_dict["compare_prompts"] = self.editor_widgets["compare_prompts_var"].get()
         else:  # audio_tool
             action_dict["show_chat_window"] = self.editor_widgets["show_chat_var"].get()
+        
+        # Save model preset (all tools)
+        if "preset_var" in self.editor_widgets:
+            preset_val = self.editor_widgets["preset_var"].get()
+            if preset_val and preset_val != "(None)":
+                action_dict["model_preset"] = preset_val
         
         tool_data = self.options_data.setdefault(self.current_tool, {})
         tool_data[self.current_action] = action_dict
