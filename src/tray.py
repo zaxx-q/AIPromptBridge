@@ -11,9 +11,7 @@ import subprocess
 import ctypes
 from pathlib import Path
 
-# Nuitka injects __compiled__ into every compiled module's globals().
-# sys.frozen is PyInstaller only. We check both for compatibility.
-_IS_COMPILED = "__compiled__" in globals() or getattr(sys, "frozen", False)
+from .utils import is_compiled
 import threading
 
 # Try to import infi.systray
@@ -372,7 +370,7 @@ class TrayApp:
         # Find icon path
         if icon_path is None:
             # Look for icon.ico
-            if _IS_COMPILED:
+            if is_compiled():
                 # Frozen: uses sys.executable parent
                 icon_path = Path(sys.executable).parent / "icon.ico"
             else:
@@ -426,7 +424,7 @@ class TrayApp:
         args = sys.argv[1:]
         
         # Detect mode
-        is_compiled = _IS_COMPILED
+        app_is_compiled = is_compiled()
         
         launched_mode = None
         for arg in sys.argv:
@@ -448,7 +446,7 @@ class TrayApp:
             pass
             
         # Strategy 1: Compiled Mode - Restart via Launcher
-        if is_compiled and launched_mode:
+        if app_is_compiled and launched_mode:
             try:
                 bin_dir = Path(sys.executable).parent
                 root_dir = bin_dir.parent

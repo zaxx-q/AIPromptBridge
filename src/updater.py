@@ -22,6 +22,7 @@ from typing import Optional, Callable, Tuple
 
 from .version import __version__
 from .console import console, print_success, print_error, print_warning, print_info, HAVE_RICH
+from .utils import is_compiled
 
 # ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -113,19 +114,6 @@ def is_newer_version(remote_version: str, local_version: str = None) -> bool:
     if local_version is None:
         local_version = __version__
     return parse_version(remote_version) > parse_version(local_version)
-
-
-# ─── Compiled Mode Detection ──────────────────────────────────────────────────
-
-
-def is_compiled() -> bool:
-    """Check if running as a compiled executable (Nuitka/PyInstaller)."""
-    return (
-        "__compiled__" in globals() or
-        getattr(sys, "frozen", False) or
-        (sys.executable.lower().endswith(".exe") and
-         "python" not in os.path.basename(sys.executable).lower())
-    )
 
 
 # ─── GitHub API ────────────────────────────────────────────────────────────────

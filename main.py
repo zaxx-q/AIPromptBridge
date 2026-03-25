@@ -463,13 +463,7 @@ Examples:
     return parser.parse_args()
 
 
-def _is_compiled():
-    """Check if running as a compiled executable (Nuitka/PyInstaller)."""
-    return (
-        "__compiled__" in globals() or
-        getattr(sys, 'frozen', False) or
-        (sys.executable.lower().endswith(".exe") and "python" not in os.path.basename(sys.executable).lower())
-    )
+from src.utils import is_compiled as _is_compiled
 
 
 def _move_if_exists(src: Path, dst: Path):

@@ -12,14 +12,13 @@ import os
 import sys
 
 # Nuitka injects __compiled__ into every compiled module's globals().
-# sys.frozen is PyInstaller only. We check both for compatibility.
-_IS_COMPILED = "__compiled__" in globals() or getattr(sys, "frozen", False)
+from ...utils import is_compiled
 
 
 def get_icon_path():
     """Get the path to the application icon."""
     # Handle compiled state (Nuitka/PyInstaller)
-    if _IS_COMPILED:
+    if is_compiled():
         base_dir = os.path.dirname(sys.executable)
         icon_path = os.path.join(base_dir, "icon.ico")
         if os.path.exists(icon_path):

@@ -759,7 +759,7 @@ def test_old_file_cleanup():
 def test_source_mode():
     section("TEST 8: Source Mode Detection")
 
-    from src.updater import is_compiled
+    from src.utils import is_compiled
 
     # When running from source (python test_self_update.py), we should NOT be compiled
     compiled = is_compiled()

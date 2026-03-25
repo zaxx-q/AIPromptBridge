@@ -13,8 +13,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 # Nuitka injects __compiled__ into every compiled module's globals().
-# sys.frozen is PyInstaller only. We check both for compatibility.
-_IS_COMPILED = "__compiled__" in globals() or getattr(sys, "frozen", False)
+from .utils import is_compiled
 
 # Registry key path
 RUN_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -58,7 +57,7 @@ def get_launcher_path() -> Optional[str]:
     # 2. Determine potential root directories
     search_roots = []
     
-    if _IS_COMPILED:
+    if is_compiled():
         exe_path = Path(sys.executable).resolve()
         
         # PATH STRATEGY 1: Split Structure (bin/Internal.exe -> ../Launcher.exe)
@@ -95,7 +94,7 @@ def get_launcher_path() -> Optional[str]:
     
     # 4. Dev Fallback: Return script path if no exe found
     # (Only in dev mode)
-    if not _IS_COMPILED:
+    if not is_compiled():
         for root in search_roots:
             if preferred_launcher == "AIPromptBridge-NoConsole.exe":
                 candidate = root / "launcher_gui.py"

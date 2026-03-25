@@ -6,9 +6,16 @@ Utility functions for text processing and error detection
 import re
 import sys
 
-# Nuitka injects __compiled__ into every compiled module's globals().
-# sys.frozen is PyInstaller only. We check both for compatibility.
-_IS_COMPILED = "__compiled__" in globals() or getattr(sys, "frozen", False)
+import os
+
+def is_compiled() -> bool:
+    """Check if running as a compiled executable (Nuitka/PyInstaller)."""
+    return (
+        "__compiled__" in globals() or
+        getattr(sys, "frozen", False) or
+        (sys.executable.lower().endswith(".exe") and
+         "python" not in os.path.basename(sys.executable).lower())
+    )
 
 
 def strip_markdown(text):
@@ -117,7 +124,7 @@ def play_sound(path: str, async_play: bool = True) -> bool:
         
         sound_path = Path(path)
 
-        if _IS_COMPILED:
+        if is_compiled():
             # In compiled split-build mode, CWD is the launcher directory,
             # but assets are bundled next to the internal executable in bin/
             exe_dir = Path(sys.executable).parent

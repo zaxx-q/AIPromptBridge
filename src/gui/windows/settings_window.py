@@ -1080,7 +1080,8 @@ class SettingsWindow:
         
         def _check_thread():
             try:
-                from ...updater import check_for_update, is_compiled
+                from ...updater import check_for_update
+                from ...utils import is_compiled
                 from ...version import __version__
                 
                 info = check_for_update()

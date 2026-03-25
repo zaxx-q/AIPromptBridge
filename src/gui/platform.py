@@ -8,8 +8,7 @@ import sys
 from pathlib import Path
 
 # Nuitka injects __compiled__ into every compiled module's globals().
-# sys.frozen is PyInstaller only. We check both for compatibility.
-_IS_COMPILED = "__compiled__" in globals() or getattr(sys, "frozen", False)
+from ..utils import is_compiled
 
 
 def _read_force_standard_tk() -> bool:
@@ -26,7 +25,7 @@ def _read_force_standard_tk() -> bool:
         which is the parent of the bin/ directory containing the executable.
       - Source (python main.py): config lives in the current working directory.
     """
-    if _IS_COMPILED:
+    if is_compiled():
         # App is always deployed in split-build layout (launcher + bin/Internal.exe).
         # Internal.exe refuses to run without launcher args, so config is always
         # in the parent directory of the executable's folder.
