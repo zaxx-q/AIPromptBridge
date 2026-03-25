@@ -788,6 +788,36 @@ class PromptsConfig:
                 if k not in section_data["_settings"]:
                     section_data["_settings"][k] = v
                     changed = True
+                elif k == "popup_groups" and isinstance(v, list):
+                    # Deep merge popup_groups
+                    user_groups = section_data["_settings"]["popup_groups"]
+                    deleted_groups = section_data["_settings"].get("deleted_groups", [])
+                    deleted_group_items = section_data["_settings"].get("deleted_group_items", {})
+                    
+                    user_group_names = [g.get("name") for g in user_groups if isinstance(g, dict)]
+                    
+                    for d_group in v:
+                        if not isinstance(d_group, dict): continue
+                        g_name = d_group.get("name")
+                        if not g_name or g_name in deleted_groups:
+                            continue
+                            
+                        if g_name not in user_group_names:
+                            user_groups.append(d_group.copy())
+                            changed = True
+                        else:
+                            # Merge items inside group
+                            # Find the user group
+                            u_group = next((g for g in user_groups if isinstance(g, dict) and g.get("name") == g_name), None)
+                            if u_group and "items" in u_group:
+                                d_items = d_group.get("items", [])
+                                u_items = u_group["items"]
+                                deleted_items = deleted_group_items.get(g_name, [])
+                                
+                                for d_item in d_items:
+                                    if d_item not in u_items and d_item not in deleted_items:
+                                        u_items.append(d_item)
+                                        changed = True
                     
         return changed
 

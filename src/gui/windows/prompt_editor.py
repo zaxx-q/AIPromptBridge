@@ -4266,6 +4266,19 @@ class PromptEditorWindow:
         
         if 0 <= index < len(groups):
             if messagebox.askyesno("Delete Group", "Delete this group?", parent=self.root):
+                deleted_group = groups[index]
+                g_name = deleted_group.get("name")
+                
+                # Check if it was a default group
+                from src.gui.prompts import PromptsConfig
+                defaults = PromptsConfig.get_instance()._get_defaults()
+                tool_defaults = defaults.get(self.current_tool, {}).get("_settings", {}).get("popup_groups", [])
+                
+                if any(dg.get("name") == g_name for dg in tool_defaults):
+                    deleted_groups = settings.setdefault("deleted_groups", [])
+                    if g_name and g_name not in deleted_groups:
+                        deleted_groups.append(g_name)
+
                 del groups[index]
                 self._refresh_group_list()
     
@@ -4330,11 +4343,45 @@ class PromptEditorWindow:
                 items_text = self.group_widgets["items"].get("1.0", "end").strip()
             items = [item.strip() for item in items_text.split("\n") if item.strip()]
             
+            old_group = groups[index]
+            old_name = old_group.get("name")
+            new_name = self.group_widgets["name_var"].get()
+            
             groups[index] = {
-                "name": self.group_widgets["name_var"].get(),
+                "name": new_name,
                 "enabled": self.group_widgets["enabled_var"].get(),
                 "items": items
             }
+            
+            # Check for deleted default items and name tracking
+            from src.gui.prompts import PromptsConfig
+            defaults = PromptsConfig.get_instance()._get_defaults()
+            tool_defaults = defaults.get(self.current_tool, {}).get("_settings", {}).get("popup_groups", [])
+            
+            # If renamed, consider the old default group deleted to avoid duplicate spawn
+            is_default = any(dg.get("name") == old_name for dg in tool_defaults)
+            if is_default and old_name != new_name:
+                deleted_groups = settings.setdefault("deleted_groups", [])
+                if old_name not in deleted_groups:
+                    deleted_groups.append(old_name)
+                    
+            # Check for deleted items within the default group
+            target_name = new_name if old_name == new_name else old_name
+            default_g = next((dg for dg in tool_defaults if dg.get("name") == target_name), None)
+            
+            if default_g and old_name == new_name:
+                default_items = default_g.get("items", [])
+                deleted_items = [di for di in default_items if di not in items]
+                
+                deleted_group_items = settings.setdefault("deleted_group_items", {})
+                group_deleted = deleted_group_items.setdefault(new_name, [])
+                
+                for di in deleted_items:
+                    if di not in group_deleted:
+                        group_deleted.append(di)
+                for item in items:
+                    if item in group_deleted:
+                        group_deleted.remove(item)
             
             self._refresh_group_list()
             self.group_listbox.select(str(index))
