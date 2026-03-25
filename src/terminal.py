@@ -98,14 +98,14 @@ def print_commands_box():
         console.print(Align.center(Panel.fit(
             grid,
             title="[bold blue] COMMANDS [/bold blue]",
-            subtitle="[dim] Ctrl+C to stop [/dim]",
+            subtitle="[dim]Press H to show all commands[/dim]",
             border_style="blue",
             padding=(0, 2),
         )))
         console.print()
     else:
         print("─" * 64)
-        print("  COMMANDS                                       Ctrl+C to stop")
+        print("  COMMANDS                                       Press H to show all commands")
         print("─" * 64)
         print("  [S] 🌐 Sessions      [P] 🔄 Provider     [I] 📊 Info")
         print("  [A] 🎤 Audio         [M] 🤖 Models       [K] 💭 Thinking")
