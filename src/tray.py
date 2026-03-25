@@ -612,6 +612,20 @@ class TrayApp:
                 
                 if not info:
                     print(f"✅ You're up to date! (v{__version__})\n")
+                    if is_compiled():
+                        try:
+                            from .gui.core import GUICoordinator, HAVE_GUI
+                            if HAVE_GUI:
+                                coordinator = GUICoordinator.get_instance()
+                                def _show_uptodate_dialog():
+                                    from tkinter import messagebox
+                                    messagebox.showinfo(
+                                        "AIPromptBridge Update",
+                                        f"You're up to date!\n\nCurrent version: v{__version__}"
+                                    )
+                                coordinator.schedule_callback(_show_uptodate_dialog)
+                        except Exception as e:
+                            print(f"[Error] Failed to show up-to-date dialog: {e}")
                     return
                 
                 print(f"⬆️  Update available: v{info.version} (current: v{__version__})")
