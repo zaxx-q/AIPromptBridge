@@ -806,6 +806,23 @@ class PromptsConfig:
                 if k not in self._config["_global_settings"]:
                     self._config["_global_settings"][k] = v
                     changed = True
+                    
+            # Safely merge modifiers without overwriting existing ones
+            if "modifiers" not in self._config["_global_settings"]:
+                self._config["_global_settings"]["modifiers"] = DEFAULT_GLOBAL_SETTINGS.get("modifiers", []).copy()
+                changed = True
+            else:
+                user_modifiers = self._config["_global_settings"]["modifiers"]
+                deleted_modifiers = self._config["_global_settings"].get("deleted_modifiers", [])
+                
+                # Get current keys to avoid duplicates
+                user_mod_keys = [m.get("key") for m in user_modifiers if isinstance(m, dict)]
+                
+                for d_mod in DEFAULT_GLOBAL_SETTINGS.get("modifiers", []):
+                    m_key = d_mod.get("key")
+                    if m_key and m_key not in user_mod_keys and m_key not in deleted_modifiers:
+                        user_modifiers.append(d_mod.copy())
+                        changed = True
             # Ensure model_presets exists (migration for existing installs)
             if "model_presets" not in self._config["_global_settings"]:
                 self._config["_global_settings"]["model_presets"] = {}

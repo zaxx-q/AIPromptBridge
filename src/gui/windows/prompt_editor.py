@@ -4133,6 +4133,18 @@ class PromptEditorWindow:
         
         if 0 <= index < len(modifiers):
             if messagebox.askyesno("Delete Modifier", "Delete this modifier?", parent=self.root):
+                deleted_mod = modifiers[index]
+                mod_key = deleted_mod.get("key")
+                
+                # Check if it was a default modifier
+                from src.gui.prompts import DEFAULT_GLOBAL_SETTINGS
+                is_default = any(d.get("key") == mod_key for d in DEFAULT_GLOBAL_SETTINGS.get("modifiers", []))
+                
+                if is_default and mod_key:
+                    deleted_modifiers = settings.setdefault("deleted_modifiers", [])
+                    if mod_key not in deleted_modifiers:
+                        deleted_modifiers.append(mod_key)
+
                 del modifiers[index]
                 # Rebuild list because indices shifted
                 self.modifier_listbox.clear()
