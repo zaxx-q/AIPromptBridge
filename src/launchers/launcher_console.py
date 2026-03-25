@@ -264,31 +264,6 @@ def relaunch_from_manifest(root_dir, manifest=None):
         print(f"⚠️  Failed to relaunch: {e}")
 
 
-def which(program):
-    """
-    Minimal implementation of shutil.which to avoid importing shutil (and its dependencies).
-    """
-    def is_exe(fpath):
-        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
-
-    fpath, fname = os.path.split(program)
-    if fpath:
-        if is_exe(program):
-            return program
-    else:
-        # Use PATH environment variable
-        for path in os.environ.get("PATH", "").split(os.pathsep):
-            path = path.strip('"')
-            exe_file = os.path.join(path, program)
-            if is_exe(exe_file):
-                return exe_file
-            # Check with .exe extension if not provided
-            if not program.lower().endswith(".exe"):
-                 exe_file_ext = os.path.join(path, program + ".exe")
-                 if is_exe(exe_file_ext):
-                     return exe_file_ext
-    return None
-
 def ensure_windows_terminal() -> bool:
     """
     Check if running in legacy Windows Console and relaunch in Windows Terminal if available.
@@ -306,7 +281,7 @@ def ensure_windows_terminal() -> bool:
         return False
     
     # Check if Windows Terminal is installed
-    wt_path = which("wt.exe")
+    wt_path = shutil.which("wt.exe")
     if not wt_path:
         return False
     
