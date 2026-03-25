@@ -4448,6 +4448,28 @@ class PromptEditorWindow:
                         section_data = self.options_data.setdefault(section, {})
                         target = section_data.setdefault("_settings", {})
                     
+                    # Track string modifications
+                    if isinstance(val, str):
+                        try:
+                            from ..prompts import PromptsConfig
+                            defaults = PromptsConfig.get_instance()._get_defaults()
+                            
+                            if section == "global":
+                                default_target = defaults.get("_global_settings", {})
+                            else:
+                                default_target = defaults.get(section, {}).get("_settings", {})
+                                
+                            if key in default_target and isinstance(default_target[key], str):
+                                modified_settings = target.setdefault("modified_settings", [])
+                                if val != default_target[key]:
+                                    if key not in modified_settings:
+                                        modified_settings.append(key)
+                                else:
+                                    if key in modified_settings:
+                                        modified_settings.remove(key)
+                        except Exception as e:
+                            print(f"[PromptEditor] Error tracking setting modification for '{key}': {e}")
+                            
                     target[key] = val
         
         # Save to file

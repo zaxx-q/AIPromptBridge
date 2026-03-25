@@ -784,10 +784,27 @@ class PromptsConfig:
             section_data["_settings"] = default_settings.copy()
             changed = True
         else:
+            settings_dict = section_data["_settings"]
+            
+            # Legacy Config Hook: Initalize modified_settings if missing
+            if "modified_settings" not in settings_dict:
+                settings_dict["modified_settings"] = []
+                for k, v in default_settings.items():
+                    if isinstance(v, str) and k in settings_dict and settings_dict[k] != v:
+                        settings_dict["modified_settings"].append(k)
+                changed = True
+                
+            modified_settings = settings_dict.get("modified_settings", [])
+            
             for k, v in default_settings.items():
-                if k not in section_data["_settings"]:
-                    section_data["_settings"][k] = v
+                if k not in settings_dict:
+                    settings_dict[k] = v
                     changed = True
+                elif isinstance(v, str):
+                    # Update string setting if user hasn't modified it
+                    if k not in modified_settings and settings_dict[k] != v:
+                        settings_dict[k] = v
+                        changed = True
                 elif k == "popup_groups" and isinstance(v, list):
                     # Deep merge popup_groups
                     user_groups = section_data["_settings"]["popup_groups"]
