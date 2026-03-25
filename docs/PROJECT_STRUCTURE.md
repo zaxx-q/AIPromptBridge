@@ -40,7 +40,7 @@ AIPromptBridge/
     ├── terminal.py             # Interactive terminal commands (includes Tools menu)
     ├── tray.py                 # System tray application (Windows)
     ├── updater.py              # Self-update: GitHub Releases check, download, staging, trigger
-    ├── utils.py                # Utility functions (strip_markdown, etc.)
+    ├── utils.py                # Utility functions and build state detection (is_compiled)
     ├── version.py              # Application version source of truth
     ├── web_server.py           # Flask server and API endpoints
     │

@@ -233,19 +233,30 @@ Prompts are managed centrally via `PromptsConfig` (loading `prompts.json` or def
 - `endpoints`: Flask API endpoint prompts
 - `_global_settings`: Shared modifiers and system instructions
 
-#### Config Preservation (`_is_default` Tagging)
+#### Config Preservation & Deep Merging
 
-To keep developer-crafted prompts up-to-date across app updates without overwriting user customizations, each action/prompt carries an `_is_default` boolean:
+To keep developer-crafted prompts up-to-date across app updates without overwriting user customizations, the system employs multiple merge strategies during load:
 
+**1. Action Tagging (`_is_default`)**
+Each action/prompt dictionary carries an `_is_default` boolean:
 | Tag Value | Meaning | On Update |
 |-----------|---------|----------|
 | `true` | Stock default, unmodified | Replaced with latest version |
 | `false` | User-created or modified | Never overwritten |
 | *(missing)* | Pre-tagging migration | Compared to defaults and auto-tagged |
 
-Merge logic runs at load time in `_ensure_sections()` (for `prompts.json`) and `load_tools_config()` (for `tools_config.json`). New default actions are added automatically; missing `_settings` keys are overlaid without overwriting existing values. User-owned arrays (`popup_groups`, `modifiers`) are never touched.
+Merge logic runs at load time in `_ensure_sections()` (for `prompts.json`). Missing `_settings` keys are overlaid without overwriting existing values. When a user deletes a default action via the Prompt Editor, its name is recorded in `_settings.deleted_defaults` (a list). The merge logic skips any name in this list, preventing deleted defaults from reappearing on reload.
 
-When a user deletes a default action via the Prompt Editor, its name is recorded in `_settings.deleted_defaults` (a list). The merge logic skips any name in this list, preventing deleted defaults from reappearing on reload.
+**2. String Settings Tracking (`modified_settings`)**
+For string values inside `_settings` (e.g., `chat_system_instruction`), the `PromptEditor` actively tracks user overrides:
+- Changing a default string adds its key to `_settings.modified_settings`.
+- Reverting a string back to the exact default removes it from the list.
+During updates, any string *not* present in `_settings.modified_settings` will automatically absorb the latest default value.
+
+**3. Deep Merged Arrays (`popup_groups`)**
+Instead of leaving `popup_groups` entirely isolated, the system performs a non-destructive deep merge:
+- New default groups are appended unless the group name appears in `_settings.deleted_groups`.
+- New default items within existing groups are appended unless the item appears in `_settings.deleted_group_items`.
 
 #### Modes
 - **Edit Mode** (`"edit"`): Strict text replacement (e.g., Proofread). Uses `base_output_rules_edit`.
@@ -492,6 +503,9 @@ To support clean deployment with Nuitka, the application uses a split structure:
 
 - **Root**: Contains lightweight launchers (`AIPromptBridge.exe`, `AIPromptBridge-NoConsole.exe`) and user config files.
 - **Bin**: Contains the heavy standalone application (`bin/AIPromptBridge_Internal.exe`) and dependencies.
+
+### Compilation State Detection
+The application relies heavily on knowing whether it's running from source or compiled to determine where to find assets, configs, and the launcher. This logic is centralized in `src.utils.is_compiled()`, providing a single source of truth across all modules by checking for Nuitka (`__compiled__`) and PyInstaller (`sys.frozen`) build flags.
 
 Workspace logic is handled inline in `main.py` via `setup_workspace()`:
 - **From source**: No CWD change needed; runs in the project directory as-is.
