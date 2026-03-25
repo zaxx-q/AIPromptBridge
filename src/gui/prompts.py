@@ -452,8 +452,8 @@ DEFAULT_SNIP_SETTINGS = {
     "popup_use_groups": True,
     "popup_items_per_page": 6,
     "popup_groups": [
+        {"name": "Text/Data", "enabled": True, "items": ["Quick Extract", "Exact Extract", "Smart Extract", "To Markdown", "Handwriting Cleanup", "Translate to English"]},
         {"name": "Analysis", "enabled": True, "items": ["Explain", "Describe", "Summarize"]},
-        {"name": "Text/Data", "enabled": True, "items": ["Extract Text", "OCR to Markdown", "Extract Data", "Transcribe", "Smart Cleanup", "Translate to English"]},
         {"name": "Compare", "enabled": True, "items": ["Compare Images", "Spot Differences", "Before/After", "Which is Better"]}
     ],
     "custom_task_template": "Regarding this image: {custom_input}",
@@ -482,38 +482,38 @@ DEFAULT_SNIP_ACTIONS = {
         "show_chat_window": True,
         "compare_prompts": False
     },
-    "Extract Text": {
-        "icon": "📄",
-        "system_prompt": "You are an OCR specialist who extracts text with high accuracy.",
-        "task": "Extract all text from this image. Preserve the original formatting, line breaks, and layout as closely as possible. Do not use code blocks.",
+    "Quick Extract": {
+        "icon": "⚡",
+        "system_prompt": "You are a fast OCR tool. Output ONLY plain text.\n\n<rules>\n- Ignore complex formatting, tables, or markdown styling.\n- Ignore visual symbols and emojis.\n- Output the raw text/words/numbers as quickly as possible.\n- DO NOT read for comprehension. DO NOT analyze the meaning of the text. DO NOT summarize.\n</rules>",
+        "task": "Quickly extract the text in this image. Output only plain text.",
         "show_chat_window": False,
         "compare_prompts": False
     },
-    "Extract Data": {
-        "icon": "📊",
-        "system_prompt": "You are a data extraction specialist who structures information accurately.",
-        "task": "Extract any structured data from this image (tables, lists, key-value pairs, forms). Format it clearly using Markdown.",
+    "Exact Extract": {
+        "icon": "👁️",
+        "system_prompt": "You are a high-accuracy OCR and text extraction tool. Extract the text from the image exactly as it appears. Preserve the original formatting, line breaks, and layout as closely as possible.",
+        "task": "Extract all text from this image as-is.",
+        "show_chat_window": False,
+        "compare_prompts": False
+    },
+    "Smart Extract": {
+        "icon": "🧠",
+        "system_prompt": "You are tasked with intelligent document digitization. Your goal is to extract ALL textual content from the image and produce clean, readable text optimized for reading.\n\n<core_philosophy>\nYou are creating the best possible DIGITAL VERSION of this content—not a pixel-perfect visual replica. Think of yourself as a skilled human typist who reads, understands, and retypes the content in its ideal digital form. Adapt the layout: merge awkward line breaks caused by small paper or narrow columns, reflow paragraphs naturally, and structure the content logically. The output should read as if the author wrote it digitally from the start.\n</core_philosophy>\n\n<content_extraction>\n1. **Text**: Transcribe with high accuracy. Preserve the author's original wording, spelling, and terminology faithfully.\n2. **Handwritten Text**: Transcribe using contextual analysis to resolve ambiguous characters.\n3. **Formatting**: Output as clean PLAIN TEXT. Avoid excessive Markdown formatting (no heavy use of #, *, or `) unless absolutely necessary for clarity. Use simple line spacing for paragraphs.\n</content_extraction>\n\n<output_rules>\n- Provide ONLY the cleaned, formatted text.\n- No preamble, no explanations.\n- Merge unnecessary line breaks within paragraphs.\n</output_rules>",
+        "task": "Intelligently extract the text from this image. Merge awkward line breaks, reflow paragraphs naturally, and output clean, readable plain text without excessive Markdown.",
         "show_chat_window": True,
         "compare_prompts": False
     },
-    "Transcribe": {
-        "icon": "✍️",
-        "system_prompt": "You are a transcription specialist for handwritten text and documents.",
-        "task": "Transcribe any handwritten or printed text in this image as accurately as possible. Output ONLY the raw text.",
-        "show_chat_window": False,
+    "To Markdown": {
+        "icon": "📄",
+        "system_prompt": "You are tasked with performing high-fidelity text extraction with intelligent Markdown formatting. Extract all text from the image and format it as clean, well-structured Markdown.\n\n<extraction_requirements>\n1. Transcribe ALL text with 100% accuracy.\n2. Handle unclear text with [unclear] markers.\n</extraction_requirements>\n\n<markdown_formatting>\n1. **Document Structure**: Use # for main titles, ## for sections. Use --- for horizontal rules where visual separators exist.\n2. **Text Formatting**: Use **Bold**, *Italic*, or `code` for code snippets and technical terms.\n3. **Lists & Tables**: Convert tabular data to Markdown tables. Preserve list nesting with proper indentation.\n4. **Code Blocks**: Use ```language for multi-line code.\n</markdown_formatting>\n\n<output_rules>\n- Provide ONLY the formatted Markdown.\n- No preamble, explanations, or wrapper text.\n- Begin directly with the content.\n</output_rules>",
+        "task": "Extract all text from this image and format it as clean, well-structured Markdown. Convert tables, lists, code, and headings appropriately.",
+        "show_chat_window": True,
         "compare_prompts": False
     },
-    "Smart Cleanup": {
+    "Handwriting Cleanup": {
         "icon": "🧹",
-        "system_prompt": "You are tasked with performing intelligent Handwriting Text Recognition (HTR) with active reconstruction. The objective is to transform messy, abbreviated, or fragmented handwritten notes into clean, readable text.\n\n<reconstruction_approach>\nThis mode PRIORITIZES READABILITY over strict fidelity. Actively:\n- Expand abbreviations and shorthand (w/ -> with, b/c -> because)\n- Complete truncated words\n- Fix obvious spelling errors\n- Infer missing words from context\n- Reconstruct fragmented thoughts into coherent sentences\n</reconstruction_approach>\n\n<guidelines>\n- Detect and use the source language(s) for expansion.\n- Convert fragments into complete sentences where intent is clear.\n- Use [?] for low confidence, [illegible] for unreadable.\n- Identify document type/structure and match it.\n</guidelines>\n\n<formatting>\n- Use Markdown structure (#, ##, - lists).\n- *Italic* for reconstructed text requiring inference.\n- **Bold** for emphasis.\n</formatting>\n\n<output_rules>\n- Provide ONLY the cleaned, formatted Markdown.\n- No preamble.\n- The output should read as if the notes were carefully written, not hastily jotted.\n</output_rules>",
-        "task": "Transcribe this handwriting with smart cleanup. Reconstruct messy notes into a clean, readable document.",
-        "show_chat_window": True,
-        "compare_prompts": False
-    },
-    "OCR to Markdown": {
-        "icon": "📄",
-        "system_prompt": "You are tasked with performing high-fidelity Optical Character Recognition (OCR) with intelligent Markdown formatting. Extract all text from the image and format it as clean, well-structured Markdown.\n\n<formatting_rules>\n1. **Structure**: Use # for headings, ## for sections. Use --- for separators.\n2. **Emphasis**: Use **Bold**, *Italic*, `code`.\n3. **Lists**: Use - for bullets, 1. for numbered lists. Preserve nesting.\n4. **Tables**: Convert tabular data to Markdown tables.\n5. **Code Blocks**: Use ```language for code.\n</formatting_rules>\n\n<constraints>\n- Transcribe ALL text with high accuracy.\n- PRIORITIZE VISUAL EVIDENCE: Do not 'autocorrect' technical terms or proper nouns.\n- Handle unclear text with [unclear] markers.\n- Provide ONLY the formatted Markdown.\n</constraints>",
-        "task": "Extract all text from this image and format it as clean Markdown, preserving structure and layout.",
+        "system_prompt": "You are tasked with performing intelligent Handwriting Text Recognition (HTR) with active reconstruction. The objective is to transform messy, abbreviated, or fragmented handwritten notes into clean, readable text.\n\n<reconstruction_approach>\nThis mode PRIORITIZES READABILITY over strict fidelity. You should actively:\n- Expand abbreviations and shorthand\n- Complete truncated words\n- Fix obvious spelling errors\n- Infer missing words from context\n- Reconstruct fragmented thoughts into coherent sentences\n</reconstruction_approach>\n\n<guidelines>\n- Trust language patterns over visual uncertainty.\n- Expand common abbreviations (e.g., w/ → with, b/c → because).\n- Convert fragments into complete sentences where intent is clear.\n- Connect related bullet points or fragments into coherent thoughts.\n</guidelines>\n\n<output_rules>\n- Provide ONLY the cleaned, reconstructed text.\n- Use minimal necessary formatting (simple lists or paragraphs).\n- No preamble. The output should read as if the notes were carefully written, not hastily jotted.\n</output_rules>",
+        "task": "Transcribe this messy handwriting with smart cleanup. Expand abbreviations, fix obvious errors, and reconstruct fragmented notes into clean, readable text.",
         "show_chat_window": True,
         "compare_prompts": False
     },

@@ -1,5 +1,23 @@
 # Changelog
 
+## [6.1.0] - 2026-03-26
+
+### New Features
+
+- **Snip Tool**: Completely revamped text extraction actions. Introduced distinct `Quick Extract` (fast, unformatted text only) and `Exact Extract` (preserves spatial formatting but ignores typographical markdown syntax)
+- **Config Tracking**: A new tracking mechanism explicitly monitors and preserves user-customized text strings/prompts during internal migrations. This ensures your customized `system_prompt`s or `task` definitions are fully insulated from internal app updates.
+- **Modifiers Recovery**: Implemented deep merging for prompt modifiers ensuring built-in features (like the new `language` modifier) populate automatically even if you had customized your global settings previously.
+- **Terminal UX**: Updated the terminal hotkey hint to more clearly reflect that `[H]` is used to list all active commands.
+
+### Improvements
+
+- **Updater Notifications**: Added a graphical message box when checking for updates manually via the system tray, providing clear visual feedback if you're already on the latest version.
+
+### Fixes
+
+- **Dialog Editor**: Fixed a bug where multi-line strings with explicit newline characters (e.g. `\n`) were dropping their escape formatting when viewed inside single-line entry widgets in the Prompt Editor, safely displaying them as literal backslash-n sequences.
+- **Prompt Resurgence**: Fixed instances where default popup groups or modifiers that you previously deleted completely would stubbornly reappear after restarting the application.
+
 ## [6.0.0] - 2026-03-24
 
 ### New Features
