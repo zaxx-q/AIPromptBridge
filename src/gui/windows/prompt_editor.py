@@ -1513,6 +1513,9 @@ class PromptEditorWindow:
             if override_val is not None:
                 val = override_val
 
+            if not multiline and isinstance(val, str):
+                val = val.replace("\n", "\\n")
+
             widget_key = f"{section_key}:{key}"
 
             if multiline:
@@ -4430,6 +4433,8 @@ class PromptEditorWindow:
                 val = None
                 if widget_type == "entry":
                     val = widget.get()
+                    if isinstance(val, str):
+                        val = val.replace("\\n", "\n")
                 elif widget_type == "text":
                     if self.use_ctk:
                         val = widget.get("0.0", "end").strip()
