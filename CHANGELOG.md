@@ -1,6 +1,6 @@
 # Changelog
 
-## [6.1.0] - 2026-03-26
+## [6.1.1] - 2026-03-27
 
 ### New Features
 
@@ -11,12 +11,13 @@
 
 ### Improvements
 
-- **Updater Notifications**: Added a graphical message box when checking for updates manually via the system tray, providing clear visual feedback if you're already on the latest version.
+- **Updater**: Added a graphical message box when checking for updates manually via the system tray, providing clear visual feedback if you're already on the latest version.
 
 ### Fixes
 
 - **Dialog Editor**: Fixed a bug where multi-line strings with explicit newline characters (e.g. `\n`) were dropping their escape formatting when viewed inside single-line entry widgets in the Prompt Editor, safely displaying them as literal backslash-n sequences.
 - **Prompt Resurgence**: Fixed instances where default popup groups or modifiers that you previously deleted completely would stubbornly reappear after restarting the application.
+- **Updater Dialog**: Fixed an issue where graphical update triggered from the system tray would occasionally fail to display or cause thread-locking by strictly piping them to the main UI thread.
 
 ## [6.0.0] - 2026-03-24
 

@@ -621,7 +621,7 @@ class TrayApp:
                                         "AIPromptBridge Update",
                                         f"You're up to date!\n\nCurrent version: v{__version__}"
                                     )
-                                coordinator.schedule_callback(_show_uptodate_dialog)
+                                coordinator.run_on_gui_thread(_show_uptodate_dialog)
                         except Exception as e:
                             print(f"[Error] Failed to show up-to-date dialog: {e}")
                     return
@@ -679,7 +679,7 @@ class TrayApp:
                                         print(f"❌ {msg}")
                                 threading.Thread(target=_do_update, daemon=True).start()
                         
-                        coordinator.schedule_callback(_show_update_dialog)
+                        coordinator.run_on_gui_thread(_show_update_dialog)
                         return
                 except Exception:
                     pass
