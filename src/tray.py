@@ -610,30 +610,45 @@ class TrayApp:
                 
                 if not info:
                     print(f"✅ You're up to date! (v{__version__})\n")
-                    if is_compiled():
-                        try:
-                            from .gui.core import GUICoordinator, HAVE_GUI
-                            if HAVE_GUI:
-                                coordinator = GUICoordinator.get_instance()
-                                def _show_uptodate_dialog():
-                                    from tkinter import messagebox
-                                    messagebox.showinfo(
-                                        "AIPromptBridge Update",
-                                        f"You're up to date!\n\nCurrent version: v{__version__}"
-                                    )
-                                coordinator.run_on_gui_thread(_show_uptodate_dialog)
-                        except Exception as e:
-                            print(f"[Error] Failed to show up-to-date dialog: {e}")
+                    try:
+                        from .gui.core import GUICoordinator, HAVE_GUI
+                        if HAVE_GUI:
+                            coordinator = GUICoordinator.get_instance()
+                            def _show_uptodate_dialog():
+                                from .gui.platform import ctk
+                                from .gui.windows.utils import set_window_icon, set_dark_titlebar
+                                
+                                dialog = ctk.CTkToplevel()
+                                dialog.withdraw()
+                                dialog.title("AIPromptBridge Update")
+                                dialog.resizable(False, False)
+                                dialog.attributes('-topmost', True)
+                                
+                                set_dark_titlebar(dialog)
+                                set_window_icon(dialog)
+                                
+                                lbl = ctk.CTkLabel(dialog, text=f"You're up to date!\n\nCurrent version: v{__version__}", font=("Segoe UI", 13))
+                                lbl.pack(expand=True, padx=30, pady=20)
+                                
+                                btn = ctk.CTkButton(dialog, text="OK", width=120, command=dialog.destroy)
+                                btn.pack(pady=(0, 20))
+                                
+                                dialog.update_idletasks()
+                                w = max(350, dialog.winfo_reqwidth())
+                                h = max(180, dialog.winfo_reqheight())
+                                x = (dialog.winfo_screenwidth() - w) // 2
+                                y = (dialog.winfo_screenheight() - h) // 2
+                                dialog.geometry(f"{w}x{h}+{x}+{y}")
+                                dialog.deiconify()
+                                dialog.focus_force()
+                            coordinator.run_on_gui_thread(_show_uptodate_dialog)
+                    except Exception as e:
+                        print(f"[Error] Failed to show up-to-date dialog: {e}")
                     return
                 
                 print(f"⬆️  Update available: v{info.version} (current: v{__version__})")
                 
-                if not is_compiled():
-                    # Source mode — notification only
-                    print(f"📦 Running from source. Download: {info.release_url}\n")
-                    return
-                
-                # Compiled mode — attempt update via GUI dialog or direct
+                # Attempt update via GUI dialog or direct
                 try:
                     from .gui.core import GUICoordinator, HAVE_GUI
                     if HAVE_GUI:
@@ -641,8 +656,8 @@ class TrayApp:
                         
                         # Schedule a confirmation dialog on the GUI thread
                         def _show_update_dialog():
-                            import tkinter as tk
-                            from tkinter import messagebox
+                            from .gui.platform import ctk
+                            from .gui.windows.utils import set_window_icon, set_dark_titlebar
                             
                             size_str = ""
                             if info.asset_size > 0:
@@ -663,21 +678,53 @@ class TrayApp:
                             )
                             if notes_preview:
                                 message += f"\nRelease Notes:\n{notes_preview}\n"
-                            message += "\nDownload and install now?"
                             
-                            result = messagebox.askyesno(
-                                "AIPromptBridge Update",
-                                message,
-                            )
+                            dialog = ctk.CTkToplevel()
+                            dialog.withdraw()
+                            dialog.title("AIPromptBridge Update Available")
+                            dialog.resizable(False, False)
+                            dialog.attributes('-topmost', True)
                             
-                            if result:
-                                # Run update in background thread
-                                import threading
-                                def _do_update():
-                                    success, msg = perform_update(info)
-                                    if not success:
-                                        print(f"❌ {msg}")
-                                threading.Thread(target=_do_update, daemon=True).start()
+                            set_dark_titlebar(dialog)
+                            set_window_icon(dialog)
+                            
+                            lbl = ctk.CTkLabel(dialog, text=message, font=("Segoe UI", 13), justify="left")
+                            lbl.pack(padx=30, pady=20, fill="both", expand=True)
+
+                            btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+                            btn_frame.pack(fill="x", padx=30, pady=(0, 20))
+                            
+                            if is_compiled():
+                                lbl.configure(text=message + "\nDownload and install now?")
+                                
+                                def on_yes():
+                                    dialog.destroy()
+                                    import threading
+                                    def _do_update():
+                                        success, msg = perform_update(info)
+                                        if not success:
+                                            print(f"❌ {msg}")
+                                    threading.Thread(target=_do_update, daemon=True).start()
+                                    
+                                btn_yes = ctk.CTkButton(btn_frame, text="Yes", width=100, command=on_yes)
+                                btn_yes.pack(side="right", padx=(10, 0))
+                                
+                                btn_no = ctk.CTkButton(btn_frame, text="No", width=100, command=dialog.destroy, fg_color="transparent", border_width=1, text_color=("black", "white"))
+                                btn_no.pack(side="right")
+                            else:
+                                lbl.configure(text=message + "\n\nYou are running from source. Please update manually via git or downloading from GitHub.")
+                                btn_ok = ctk.CTkButton(btn_frame, text="OK", width=120, command=dialog.destroy)
+                                btn_ok.pack(side="right")
+                                print(f"📦 Running from source. Download: {info.release_url}\n")
+                            
+                            dialog.update_idletasks()
+                            w = max(450, dialog.winfo_reqwidth())
+                            h = max(250, dialog.winfo_reqheight())
+                            x = (dialog.winfo_screenwidth() - w) // 2
+                            y = (dialog.winfo_screenheight() - h) // 2
+                            dialog.geometry(f"{w}x{h}+{x}+{y}")
+                            dialog.deiconify()
+                            dialog.focus_force()
                         
                         coordinator.run_on_gui_thread(_show_update_dialog)
                         return
