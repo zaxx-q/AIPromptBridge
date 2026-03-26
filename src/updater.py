@@ -550,6 +550,9 @@ def background_update_check(config: dict):
         return
 
     def _check():
+        import time
+        # Delay to prevent import lock and GIL contention from blocking tray initialization
+        time.sleep(3)
         try:
             info = check_for_update()
             if info:

@@ -17,7 +17,7 @@
 
 - **Dialog Editor**: Fixed a bug where multi-line strings with explicit newline characters (e.g. `\n`) were dropping their escape formatting when viewed inside single-line entry widgets in the Prompt Editor, safely displaying them as literal backslash-n sequences.
 - **Prompt Resurgence**: Fixed instances where default popup groups or modifiers that you previously deleted completely would stubbornly reappear after restarting the application.
-- **Updater Dialog**: Fixed an issue where graphical update triggered from the system tray would occasionally fail to display or cause thread-locking by strictly piping them to the main UI thread.
+- **Updater Notifications**: Replaced standard system alert boxes with heavily modernized, application-themed notification dialogs indicating when updates are available or the app is already up to date. Also fixed an issue where these graphical update notifications triggered from the system tray would occasionally fail to display or cause thread-locking by strictly piping them to the main UI thread, and added a short delay to background checks to prevent startup freezing.
 
 ## [6.0.0] - 2026-03-24
 
