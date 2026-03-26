@@ -8,23 +8,38 @@ from ...updater import perform_update, is_compiled
 from ..platform import ctk
 from .utils import set_window_icon, set_dark_titlebar
 from ..core import GUICoordinator
+from ..themes import get_colors, get_ctk_font, get_ctk_button_colors, get_ctk_label_colors
 
 
 def show_up_to_date_dialog(current_version: str):
     """Show the 'You are up to date' dialog."""
+    colors = get_colors()
+
     dialog = ctk.CTkToplevel()
     dialog.withdraw()
     dialog.title("AIPromptBridge Update")
     dialog.resizable(False, False)
     dialog.attributes('-topmost', True)
+    dialog.configure(fg_color=colors.bg)
     
     set_dark_titlebar(dialog)
     set_window_icon(dialog)
     
-    lbl = ctk.CTkLabel(dialog, text=f"You're up to date!\n\nCurrent version: v{current_version}", font=("Segoe UI", 13))
+    lbl = ctk.CTkLabel(
+        dialog, 
+        text=f"You're up to date!\n\nCurrent version: v{current_version}", 
+        font=get_ctk_font(13),
+        **get_ctk_label_colors(colors)
+    )
     lbl.pack(expand=True, padx=30, pady=20)
     
-    btn = ctk.CTkButton(dialog, text="OK", width=120, command=dialog.destroy)
+    btn = ctk.CTkButton(
+        dialog, 
+        text="OK", 
+        width=120, 
+        command=dialog.destroy,
+        **get_ctk_button_colors(colors, variant="primary")
+    )
     btn.pack(pady=(0, 20))
     
     dialog.update_idletasks()
@@ -43,6 +58,7 @@ def show_update_available_dialog(info, current_version: str):
     If 'Yes' is clicked, transitions to a download progress dialog and triggers the background update.
     """
     coordinator = GUICoordinator.get_instance()
+    colors = get_colors()
     
     size_str = ""
     if info.asset_size > 0:
@@ -69,11 +85,19 @@ def show_update_available_dialog(info, current_version: str):
     dialog.title("AIPromptBridge Update Available")
     dialog.resizable(False, False)
     dialog.attributes('-topmost', True)
+    dialog.configure(fg_color=colors.bg)
     
     set_dark_titlebar(dialog)
     set_window_icon(dialog)
     
-    lbl = ctk.CTkLabel(dialog, text=message, font=("Segoe UI", 13), justify="left")
+    lbl = ctk.CTkLabel(
+        dialog, 
+        text=message, 
+        font=get_ctk_font(13), 
+        justify="left",
+        wraplength=450,
+        **get_ctk_label_colors(colors)
+    )
     lbl.pack(padx=30, pady=20, fill="both", expand=True)
 
     btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
@@ -90,7 +114,12 @@ def show_update_available_dialog(info, current_version: str):
             dialog.title("AIPromptBridge Updating...")
             lbl.configure(text=f"Downloading update v{info.version}...", justify="center")
             
-            progress_bar = ctk.CTkProgressBar(dialog, width=300)
+            progress_bar = ctk.CTkProgressBar(
+                dialog, 
+                width=300,
+                fg_color=colors.surface1,
+                progress_color=colors.accent
+            )
             progress_bar.pack(padx=30, pady=(0, 20))
             progress_bar.set(0)
             
@@ -130,25 +159,53 @@ def show_update_available_dialog(info, current_version: str):
                     # Provide an OK button to close the error
                     def show_close_button():
                         if dialog.winfo_exists():
-                            btn_err = ctk.CTkButton(dialog, text="OK", width=120, command=dialog.destroy)
+                            btn_err = ctk.CTkButton(
+                                dialog, 
+                                text="OK", 
+                                width=120, 
+                                command=dialog.destroy,
+                                **get_ctk_button_colors(colors, variant="primary")
+                            )
                             btn_err.pack(pady=(10, 20))
                     coordinator.run_on_gui_thread(show_close_button)
             
             threading.Thread(target=_do_update, daemon=True).start()
             
-        btn_yes = ctk.CTkButton(btn_frame, text="Yes", width=100, command=on_yes)
+        btn_yes = ctk.CTkButton(
+            btn_frame, 
+            text="Yes", 
+            width=100, 
+            command=on_yes,
+            **get_ctk_button_colors(colors, variant="primary")
+        )
         btn_yes.pack(side="right", padx=(10, 0))
         
-        btn_no = ctk.CTkButton(btn_frame, text="No", width=100, command=dialog.destroy, fg_color="transparent", border_width=1, text_color=("black", "white"))
+        btn_no = ctk.CTkButton(
+            btn_frame, 
+            text="No", 
+            width=100, 
+            command=dialog.destroy, 
+            fg_color="transparent", 
+            border_width=1, 
+            border_color=colors.surface1,
+            text_color=colors.fg,
+            hover_color=colors.surface0
+        )
         btn_no.pack(side="right")
     else:
         lbl.configure(text=message + "\n\nYou are running from source. Please update manually via git or downloading from GitHub.")
-        btn_ok = ctk.CTkButton(btn_frame, text="OK", width=120, command=dialog.destroy)
+        btn_ok = ctk.CTkButton(
+            btn_frame, 
+            text="OK", 
+            width=120, 
+            command=dialog.destroy,
+            **get_ctk_button_colors(colors, variant="primary")
+        )
         btn_ok.pack(side="right")
         print(f"📦 Running from source. Download: {info.release_url}\n")
     
     dialog.update_idletasks()
-    w = max(450, dialog.winfo_reqwidth())
+    w = max(500, dialog.winfo_reqwidth())
     h = max(250, dialog.winfo_reqheight())
     x = (dialog.winfo_screenwidth() - w) // 2
     y = (dialog.winfo_screenheight() - h) // 2

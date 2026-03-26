@@ -1,9 +1,10 @@
 # Changelog
 
-## [6.1.3] - 2026-03-27
+## [6.1.4] - 2026-03-27
 
 - **Updater**: Replaced standard system alert boxes with modernized, theme-aware dialogs indicating when updates are available or the app is already up to date. This dialog now includes a fully functional progress bar during download and extraction. Also fixed an issue where graphical update notifications triggered from the system tray would occasionally fail to display or cause thread-locking, and added a short delay to background checks to prevent startup freezing.
-- **Update Cleanup**: Implemented automatic cleanup of `.old` file remnants on startup, safely removing files left behind by previous application updates.
+- **Update Cleanup**: Implemented automatic cleanup of `.old` file remnants on startup, safely removing files left behind by previous application updates and streamlining updater dialog background logic into a dedicated module.
+- **Theme Consistency**: Applied the centralized custom color theming system to the `Update Available` and `Up To Date` notifications, creating a visually consistent appearance instead of relying on default styles.
 
 ## [6.1.0] - 2026-03-27
 
