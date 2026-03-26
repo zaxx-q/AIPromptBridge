@@ -1,6 +1,11 @@
 # Changelog
 
-## [6.1.1] - 2026-03-27
+## [6.1.3] - 2026-03-27
+
+- **Updater**: Replaced standard system alert boxes with modernized, theme-aware dialogs indicating when updates are available or the app is already up to date. This dialog now includes a fully functional progress bar during download and extraction. Also fixed an issue where graphical update notifications triggered from the system tray would occasionally fail to display or cause thread-locking, and added a short delay to background checks to prevent startup freezing.
+- **Update Cleanup**: Implemented automatic cleanup of `.old` file remnants on startup, safely removing files left behind by previous application updates.
+
+## [6.1.0] - 2026-03-27
 
 ### New Features
 
@@ -17,7 +22,6 @@
 
 - **Dialog Editor**: Fixed a bug where multi-line strings with explicit newline characters (e.g. `\n`) were dropping their escape formatting when viewed inside single-line entry widgets in the Prompt Editor, safely displaying them as literal backslash-n sequences.
 - **Prompt Resurgence**: Fixed instances where default popup groups or modifiers that you previously deleted completely would stubbornly reappear after restarting the application.
-- **Updater Notifications**: Replaced standard system alert boxes with heavily modernized, application-themed notification dialogs indicating when updates are available or the app is already up to date. Also fixed an issue where these graphical update notifications triggered from the system tray would occasionally fail to display or cause thread-locking by strictly piping them to the main UI thread, and added a short delay to background checks to prevent startup freezing.
 
 ## [6.0.0] - 2026-03-24
 

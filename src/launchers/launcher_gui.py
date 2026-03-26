@@ -9,6 +9,27 @@ in GUI mode (no console).
 import sys
 import os
 import subprocess
+import shutil
+
+ROOT_UPDATE_ALLOWLIST = [
+    "AIPromptBridge.exe",
+    "AIPromptBridge-NoConsole.exe",
+    "python313.dll",
+    "lib",
+    "frozen_application_license.txt",
+]
+
+def cleanup_old_files(root_dir):
+    """Remove .old files left by a previous update."""
+    for name in ROOT_UPDATE_ALLOWLIST:
+        old_path = os.path.join(root_dir, name + ".old")
+        try:
+            if os.path.isdir(old_path):
+                shutil.rmtree(old_path)
+            elif os.path.isfile(old_path):
+                os.remove(old_path)
+        except OSError:
+            pass  # Still locked, will try next launch
 
 # Nuitka Configuration:
 # (Moved to .github/workflows/manual_release.yml)
@@ -26,6 +47,9 @@ def main():
     else:
         # Development mode
         root_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # 1.5 Clean up .old files from a previous update
+    cleanup_old_files(root_dir)
 
     # 2. Construct path to internal executable
     internal_exe = os.path.join(root_dir, "bin", "AIPromptBridge_Internal.exe")

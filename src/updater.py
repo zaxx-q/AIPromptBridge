@@ -480,7 +480,7 @@ def _trigger_update_gui_mode():
         # Spawn the console launcher to wait for us and apply
         subprocess.Popen(
             [str(console_launcher), "--apply-update", str(my_pid)],
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0x00000010),
         )
     except Exception as e:
         print_error(f"Failed to spawn updater process: {e}")
