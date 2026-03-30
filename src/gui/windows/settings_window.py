@@ -1901,8 +1901,11 @@ class SettingsWindow:
                 result["error"] = "Custom URL not configured"
                 return result
         
-        # Get keys from UI (not saved config)
-        keys_data = self.widgets.get(f"keys_{provider}_data", [])
+        # Get keys from UI if tab has been loaded, otherwise fall back to parsed config
+        keys_data = self.widgets.get(f"keys_{provider}_data")
+        if keys_data is None:
+            # API Keys tab not loaded yet (lazy loading) - use config data directly
+            keys_data = self.config_data.keys.get(provider, [])
         if not keys_data:
             result["error"] = f"No API keys configured for {provider}"
             return result
