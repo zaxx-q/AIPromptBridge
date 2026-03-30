@@ -381,14 +381,15 @@ class ModifierBar:
         self,
         parent,
         modifiers: List[Dict],
-        on_change: Optional[Callable[[List[str]], None]] = None
+        on_change: Optional[Callable[[List[str]], None]] = None,
+        default_active: Optional[List[str]] = None
     ):
         self.parent = parent
         self.modifiers = modifiers
         self.on_change = on_change
         
         self.colors = get_colors()
-        self.active_modifiers: set = set()
+        self.active_modifiers: set = set(default_active) if default_active else set()
         self.buttons: Dict[str, object] = {}
         self.tooltips: List[Tooltip] = []
         
@@ -479,6 +480,12 @@ class ModifierBar:
             self.inner_frame.bind('<MouseWheel>', self._on_mousewheel)
             self.inner_frame.bind('<Button-4>', self._on_mousewheel)
             self.inner_frame.bind('<Button-5>', self._on_mousewheel)
+        
+        # Apply default-active button states and notify parent
+        if self.active_modifiers:
+            self._update_button_states()
+            if self.on_change:
+                self.on_change(list(self.active_modifiers))
     
     def _on_mousewheel_ctk(self, event):
         """Handle mouse wheel for horizontal scrolling in CTk."""
@@ -2348,11 +2355,13 @@ class AttachedPromptPopup:
             # Modifier bar - get from global settings
             from .prompts import get_prompts_config
             modifiers = get_prompts_config().get_modifiers()
+            default_active = get_prompts_config().get_default_modifier_keys_for_tool("text_edit_tool")
             if modifiers:
                 self.modifier_bar = ModifierBar(
                     content_frame,
                     modifiers=modifiers,
-                    on_change=self._on_modifiers_changed
+                    on_change=self._on_modifiers_changed,
+                    default_active=default_active
                 )
                 self.modifier_bar.pack(fill="x")
             
@@ -2568,11 +2577,13 @@ class AttachedPromptPopup:
             # Modifier bar - get from global settings
             from .prompts import get_prompts_config
             modifiers = get_prompts_config().get_modifiers()
+            default_active = get_prompts_config().get_default_modifier_keys_for_tool("text_edit_tool")
             if modifiers:
                 self.modifier_bar = ModifierBar(
                     content_frame,
                     modifiers=modifiers,
-                    on_change=self._on_modifiers_changed
+                    on_change=self._on_modifiers_changed,
+                    default_active=default_active
                 )
                 self.modifier_bar.pack(fill=tk.X)
             

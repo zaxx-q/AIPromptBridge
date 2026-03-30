@@ -396,11 +396,13 @@ class AttachedSnipPopup:
         
         # Modifier bar (get from global settings)
         global_modifiers = get_prompts_config().get_modifiers()
+        default_active = get_prompts_config().get_default_modifier_keys_for_tool("snip_tool")
         if global_modifiers:
             self.modifier_bar = ModifierBar(
                 content,
                 modifiers=global_modifiers,
-                on_change=self._on_modifiers_changed
+                on_change=self._on_modifiers_changed,
+                default_active=default_active
             )
             self.modifier_bar.pack(fill="x", pady=(0, 8))
         
@@ -604,11 +606,13 @@ class AttachedSnipPopup:
         
         # Modifier bar (get from global settings) - tk version
         global_modifiers = get_prompts_config().get_modifiers()
+        default_active = get_prompts_config().get_default_modifier_keys_for_tool("snip_tool")
         if global_modifiers:
             self.modifier_bar = ModifierBar(
                 content,
                 modifiers=global_modifiers,
-                on_change=self._on_modifiers_changed
+                on_change=self._on_modifiers_changed,
+                default_active=default_active
             )
             self.modifier_bar.pack(fill=tk.X, pady=(10, 0))
         

@@ -1893,6 +1893,42 @@ class PromptEditorWindow:
                           font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
                           selectcolor=self.colors.input_bg).pack(anchor="w")
         
+        # Default for Tools section
+        row = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
+        row.pack(fill="x", pady=(8, 0))
+        
+        if self.use_ctk:
+            ctk.CTkLabel(row, text="Default for Tools:", font=get_ctk_font(13),
+                        **get_ctk_label_colors(self.colors)).pack(anchor="w")
+        else:
+            tk.Label(row, text="Default for Tools:", font=("Segoe UI", 10),
+                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w")
+        
+        tools_row = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
+        tools_row.pack(fill="x", pady=4)
+        
+        self.modifier_widgets["default_text_edit_var"] = tk.BooleanVar()
+        self.modifier_widgets["default_snip_var"] = tk.BooleanVar()
+        self.modifier_widgets["default_audio_var"] = tk.BooleanVar()
+        
+        tool_checkboxes = [
+            ("default_text_edit_var", "✏️ TextEdit"),
+            ("default_snip_var", "✂️ SnipTool"),
+            ("default_audio_var", "🎤 AudioTool"),
+        ]
+        
+        for var_key, label_text in tool_checkboxes:
+            if self.use_ctk:
+                ctk.CTkCheckBox(tools_row, text=label_text,
+                               variable=self.modifier_widgets[var_key],
+                               font=get_ctk_font(12), text_color=self.colors.fg,
+                               fg_color=self.colors.accent, width=20, height=20).pack(side="left", padx=(0, 12))
+            else:
+                tk.Checkbutton(tools_row, text=label_text,
+                              variable=self.modifier_widgets[var_key],
+                              font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.fg,
+                              selectcolor=self.colors.input_bg).pack(side="left", padx=(0, 8))
+        
         # Save button
         create_emoji_button(
             right_panel, "Save Modifier", "💾", self.colors, "success", 160, 40, self._save_current_modifier
@@ -3874,6 +3910,12 @@ class PromptEditorWindow:
                 self.modifier_widgets["injection"].insert("1.0", mod.get("injection", ""))
             
             self.modifier_widgets["forces_chat_var"].set(mod.get("forces_chat_window", False))
+            
+            # Load default_tools checkboxes
+            default_tools = mod.get("default_tools", [])
+            self.modifier_widgets["default_text_edit_var"].set("text_edit_tool" in default_tools)
+            self.modifier_widgets["default_snip_var"].set("snip_tool" in default_tools)
+            self.modifier_widgets["default_audio_var"].set("audio_tool" in default_tools)
     
     def _on_group_select(self, group_id_str):
         """Handle group selection."""
@@ -4224,13 +4266,23 @@ class PromptEditorWindow:
             else:
                 injection = self.modifier_widgets["injection"].get("1.0", "end").strip()
             
+            # Build default_tools list from checkboxes
+            default_tools = []
+            if self.modifier_widgets["default_text_edit_var"].get():
+                default_tools.append("text_edit_tool")
+            if self.modifier_widgets["default_snip_var"].get():
+                default_tools.append("snip_tool")
+            if self.modifier_widgets["default_audio_var"].get():
+                default_tools.append("audio_tool")
+            
             modifiers[index] = {
                 "key": self.modifier_widgets["key_var"].get(),
                 "icon": self.modifier_widgets["icon_var"].get(),
                 "label": self.modifier_widgets["label_var"].get(),
                 "tooltip": self.modifier_widgets["tooltip_var"].get(),
                 "injection": injection,
-                "forces_chat_window": self.modifier_widgets["forces_chat_var"].get()
+                "forces_chat_window": self.modifier_widgets["forces_chat_var"].get(),
+                "default_tools": default_tools
             }
             
             # Rebuild list to update display

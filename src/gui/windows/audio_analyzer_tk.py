@@ -595,9 +595,11 @@ def _create_prompt_section_tk(window, parent, row, col):
         
     # Modifier Bar (Handles fallback internally)
     global_modifiers = window.prompts.get_modifiers()
+    default_active = window.prompts.get_default_modifier_keys_for_tool("audio_tool")
     if global_modifiers:
         window.modifier_bar = ModifierBar(
-            content, modifiers=global_modifiers, on_change=window._on_modifiers_changed
+            content, modifiers=global_modifiers, on_change=window._on_modifiers_changed,
+            default_active=default_active
         )
         window.modifier_bar.pack(fill="x")
 

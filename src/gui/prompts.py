@@ -71,7 +71,8 @@ DEFAULT_GLOBAL_SETTINGS = {
             "label": "Variations",
             "tooltip": "Generate 3 alternative versions to choose from",
             "injection": "<modifier_variations>\nProvide exactly 3 alternative versions:\n**Version 1:** (subtle refinement)\n**Version 2:** (moderate changes)\n**Version 3:** (creative interpretation)\n</modifier_variations>",
-            "forces_chat_window": True
+            "forces_chat_window": True,
+            "default_tools": []
         },
         {
             "key": "direct",
@@ -79,7 +80,8 @@ DEFAULT_GLOBAL_SETTINGS = {
             "label": "Direct",
             "tooltip": "Be direct and concise, no fluff",
             "injection": "<modifier_direct>\nBe direct and concise. Eliminate unnecessary words and get straight to the point.\n</modifier_direct>",
-            "forces_chat_window": False
+            "forces_chat_window": False,
+            "default_tools": []
         },
         {
             "key": "language",
@@ -87,7 +89,8 @@ DEFAULT_GLOBAL_SETTINGS = {
             "label": "Language",
             "tooltip": "Output in a specific language (edit this modifier to change)",
             "injection": "<modifier_language>\nRespond entirely in Indonesian. All output text must be in this language.\n</modifier_language>",
-            "forces_chat_window": False
+            "forces_chat_window": False,
+            "default_tools": []
         },
         {
             "key": "explain",
@@ -95,7 +98,8 @@ DEFAULT_GLOBAL_SETTINGS = {
             "label": "Explain",
             "tooltip": "Explain what was done and why",
             "injection": "<modifier_explain>\nAfter the result, add:\n**What I did:**\n- List the key actions and rationale\n</modifier_explain>",
-            "forces_chat_window": True
+            "forces_chat_window": True,
+            "default_tools": []
         },
         {
             "key": "creative",
@@ -103,7 +107,8 @@ DEFAULT_GLOBAL_SETTINGS = {
             "label": "Creative",
             "tooltip": "Be more creative, take liberties",
             "injection": "<modifier_creative>\nBe more creative and take liberties. Don't stick too close to the original.\n</modifier_creative>",
-            "forces_chat_window": False
+            "forces_chat_window": False,
+            "default_tools": []
         },
         {
             "key": "literal",
@@ -111,7 +116,8 @@ DEFAULT_GLOBAL_SETTINGS = {
             "label": "Literal",
             "tooltip": "Stay as close to original as possible",
             "injection": "<modifier_literal>\nStay as close to the original as possible. Make only the minimum necessary changes.\n</modifier_literal>",
-            "forces_chat_window": False
+            "forces_chat_window": False,
+            "default_tools": []
         },
         {
             "key": "shorter",
@@ -119,7 +125,8 @@ DEFAULT_GLOBAL_SETTINGS = {
             "label": "Shorter",
             "tooltip": "Make the result more concise",
             "injection": "<modifier_shorter>\nMake the result significantly more concise. Aim for 30-50% reduction.\n</modifier_shorter>",
-            "forces_chat_window": False
+            "forces_chat_window": False,
+            "default_tools": []
         },
         {
             "key": "longer",
@@ -127,7 +134,8 @@ DEFAULT_GLOBAL_SETTINGS = {
             "label": "Longer",
             "tooltip": "Expand with more detail",
             "injection": "<modifier_longer>\nExpand with more detail and elaboration. Add context, examples, or nuance.\n</modifier_longer>",
-            "forces_chat_window": False
+            "forces_chat_window": False,
+            "default_tools": []
         },
         {
             "key": "formal",
@@ -135,7 +143,8 @@ DEFAULT_GLOBAL_SETTINGS = {
             "label": "Formal",
             "tooltip": "Professional/business context",
             "injection": "<modifier_context>\nThis is for a professional/business context. Ensure appropriate formality.\n</modifier_context>",
-            "forces_chat_window": False
+            "forces_chat_window": False,
+            "default_tools": []
         },
         {
             "key": "informal",
@@ -143,7 +152,8 @@ DEFAULT_GLOBAL_SETTINGS = {
             "label": "Informal",
             "tooltip": "Casual/personal context",
             "injection": "<modifier_context>\nThis is for informal/personal communication. Keep it relaxed and approachable.\n</modifier_context>",
-            "forces_chat_window": False
+            "forces_chat_window": False,
+            "default_tools": []
         },
         {
             "key": "global",
@@ -151,7 +161,8 @@ DEFAULT_GLOBAL_SETTINGS = {
             "label": "Global",
             "tooltip": "Avoid idioms, globally understandable",
             "injection": "<modifier_global>\nAvoid idioms, slang, and cultural references. Make it understandable to an international audience.\n</modifier_global>",
-            "forces_chat_window": False
+            "forces_chat_window": False,
+            "default_tools": []
         }
     ]
 }
@@ -884,6 +895,12 @@ class PromptsConfig:
                     if m_key and m_key not in user_mod_keys and m_key not in deleted_modifiers:
                         user_modifiers.append(d_mod.copy())
                         changed = True
+                
+                # Migration: ensure all existing modifiers have `default_tools` field
+                for mod in user_modifiers:
+                    if isinstance(mod, dict) and "default_tools" not in mod:
+                        mod["default_tools"] = []
+                        changed = True
             # Ensure model_presets exists (migration for existing installs)
             if "model_presets" not in self._config["_global_settings"]:
                 self._config["_global_settings"]["model_presets"] = {}
@@ -1099,6 +1116,21 @@ class PromptsConfig:
     def get_modifiers(self) -> List[dict]:
         """Get global modifier definitions."""
         return self.get_global_setting("modifiers", [])
+    
+    def get_default_modifier_keys_for_tool(self, tool_name: str) -> List[str]:
+        """Get modifier keys that should be pre-active for a given tool.
+        
+        Args:
+            tool_name: One of "text_edit_tool", "snip_tool", "audio_tool"
+            
+        Returns:
+            List of modifier key strings that have this tool in their default_tools list.
+        """
+        return [
+            mod["key"]
+            for mod in self.get_modifiers()
+            if isinstance(mod, dict) and tool_name in mod.get("default_tools", [])
+        ]
     
     # =========================================================================
     # Model Preset Accessors

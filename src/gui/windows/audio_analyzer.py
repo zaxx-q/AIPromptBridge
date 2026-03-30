@@ -769,11 +769,13 @@ class AudioAnalyzerWindow:
             
         # Modifier bar (Fixed position at bottom of prompt section)
         global_modifiers = self.prompts.get_modifiers()
+        default_active = self.prompts.get_default_modifier_keys_for_tool("audio_tool")
         if global_modifiers:
             self.modifier_bar = ModifierBar(
                 content,
                 modifiers=global_modifiers,
-                on_change=self._on_modifiers_changed
+                on_change=self._on_modifiers_changed,
+                default_active=default_active
             )
             self.modifier_bar.pack(fill="x")
     
