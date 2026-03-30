@@ -125,16 +125,19 @@ class SegmentedToggle:
         parent,
         options: List[Tuple[str, str]],  # [(display_text, value), ...]
         default_value: str = None,
-        on_change: Optional[Callable[[str], None]] = None
+        on_change: Optional[Callable[[str], None]] = None,
+        tooltips: Optional[Dict[str, str]] = None
     ):
         self.parent = parent
         self.options = options
         self.on_change = on_change
         self.current_value = default_value or options[0][1]
+        self.tooltips_map = tooltips or {}
         
         self.colors = get_colors()
         self.frame = None
         self.segments: List = []
+        self._segment_tooltips: List[Tooltip] = []
         
         self._create_widget()
     
@@ -192,6 +195,27 @@ class SegmentedToggle:
                 segment.bind('<Leave>', lambda e, seg=segment, v=value: self._on_hover(seg, v, False))
                 
                 self.segments.append(segment)
+        
+        # Apply tooltips to individual segments
+        self._apply_tooltips()
+    
+    def _apply_tooltips(self):
+        """Attach tooltips to individual segment buttons."""
+        if not self.tooltips_map:
+            return
+        
+        if HAVE_CTK and hasattr(self.frame, '_buttons_dict'):
+            # CTkSegmentedButton stores internal buttons in _buttons_dict
+            for display_text, btn in self.frame._buttons_dict.items():
+                tip_text = self.tooltips_map.get(display_text, "")
+                if tip_text:
+                    self._segment_tooltips.append(Tooltip(btn, tip_text))
+        elif not HAVE_CTK:
+            # tk fallback - segments are stored in self.segments
+            for segment, (display_text, _) in zip(self.segments, self.options):
+                tip_text = self.tooltips_map.get(display_text, "")
+                if tip_text:
+                    self._segment_tooltips.append(Tooltip(segment, tip_text))
     
     def _on_ctk_select(self, selected_text: str):
         """Handle CTk segmented button selection."""
@@ -1220,7 +1244,12 @@ class InputPopup(BasePopup):
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
-                default_value="default"
+                default_value="default",
+                tooltips={
+                    "Default": "Use the action's configured response mode",
+                    "Replace": "Replace the selected text with the response",
+                    "Show": "Show the response in a chat window"
+                }
             )
             self.response_toggle.pack(anchor="center")
             
@@ -1289,7 +1318,12 @@ class InputPopup(BasePopup):
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
-                default_value="default"
+                default_value="default",
+                tooltips={
+                    "Default": "Use the action's configured response mode",
+                    "Replace": "Replace the selected text with the response",
+                    "Show": "Show the response in a chat window"
+                }
             )
             self.response_toggle.pack(anchor=tk.CENTER)
             
@@ -1486,7 +1520,12 @@ class PromptSelectionPopup(BasePopup):
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
-                default_value="default"
+                default_value="default",
+                tooltips={
+                    "Default": "Use the action's configured response mode",
+                    "Replace": "Replace the selected text with the response",
+                    "Show": "Show the response in a chat window"
+                }
             )
             self.response_toggle.pack(anchor="center")
             
@@ -1562,7 +1601,12 @@ class PromptSelectionPopup(BasePopup):
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
-                default_value="default"
+                default_value="default",
+                tooltips={
+                    "Default": "Use the action's configured response mode",
+                    "Replace": "Replace the selected text with the response",
+                    "Show": "Show the response in a chat window"
+                }
             )
             self.response_toggle.pack(anchor=tk.CENTER)
             
@@ -1853,7 +1897,12 @@ class AttachedInputPopup:
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
-                default_value="default"
+                default_value="default",
+                tooltips={
+                    "Default": "Use the action's configured response mode",
+                    "Replace": "Replace the selected text with the response",
+                    "Show": "Show the response in a chat window"
+                }
             )
             self.response_toggle.pack(anchor="center")
             
@@ -1950,7 +1999,12 @@ class AttachedInputPopup:
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
-                default_value="default"
+                default_value="default",
+                tooltips={
+                    "Default": "Use the action's configured response mode",
+                    "Replace": "Replace the selected text with the response",
+                    "Show": "Show the response in a chat window"
+                }
             )
             self.response_toggle.pack(anchor=tk.CENTER)
             
@@ -2282,7 +2336,12 @@ class AttachedPromptPopup:
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
-                default_value="default"
+                default_value="default",
+                tooltips={
+                    "Default": "Use the action's configured response mode",
+                    "Replace": "Replace the selected text with the response",
+                    "Show": "Show the response in a chat window"
+                }
             )
             self.response_toggle.pack(anchor="center")
             
@@ -2497,7 +2556,12 @@ class AttachedPromptPopup:
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
-                default_value="default"
+                default_value="default",
+                tooltips={
+                    "Default": "Use the action's configured response mode",
+                    "Replace": "Replace the selected text with the response",
+                    "Show": "Show the response in a chat window"
+                }
             )
             self.response_toggle.pack(anchor=tk.CENTER)
             

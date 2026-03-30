@@ -307,7 +307,13 @@ class AttachedSnipPopup:
         self.response_toggle = SegmentedToggle(
             toggle_frame,
             options=[("Default", "default"), ("Copy", "copy"), ("Show", "show"), ("Type", "type")],
-            default_value="default"
+            default_value="default",
+            tooltips={
+                "Default": "Use the action's configured response mode",
+                "Copy": "Copy the response to clipboard",
+                "Show": "Show the response in a chat window",
+                "Type": "Type the response into the active window"
+            }
         )
         self.response_toggle.pack(anchor="center")
         
@@ -513,7 +519,13 @@ class AttachedSnipPopup:
         self.response_toggle = SegmentedToggle(
             toggle_frame,
             options=[("Default", "default"), ("Copy", "copy"), ("Show", "show"), ("Type", "type")],
-            default_value="default"
+            default_value="default",
+            tooltips={
+                "Default": "Use the action's configured response mode",
+                "Copy": "Copy the response to clipboard",
+                "Show": "Show the response in a chat window",
+                "Type": "Type the response into the active window"
+            }
         )
         self.response_toggle.pack(anchor=tk.CENTER)
         
