@@ -849,7 +849,15 @@ class TTSWindow:
             return
         
         input_text = self.input_textbox.get("1.0", "end-1c").strip()
-        if not input_text:
+        
+        # Get style/director text early to check for existing transcript
+        style_text = self.style_textbox.get("1.0", "end-1c").strip()
+        if style_text.startswith("(Style instructions"):
+            style_text = ""  # Ignore placeholder
+        
+        # Allow generation if input text exists OR director field already has a transcript
+        has_director_transcript = bool(style_text and "#### TRANSCRIPT" in style_text)
+        if not input_text and not has_director_transcript:
             self._update_status("No input text", self.colors.red)
             return
         
@@ -858,11 +866,9 @@ class TTSWindow:
         multi_config = self._get_multi_speaker_config()
         voice_info = self._get_voice_info()
         
-        # Check if auto-director mode is enabled
-        if self.director_auto_var.get():
-            # Check if style textbox has actual content (not placeholder)
-            style_text = self.style_textbox.get("1.0", "end-1c").strip()
-            if not style_text or style_text.startswith("(Style instructions"):
+        # Check if auto-director mode is enabled (requires input text to analyze)
+        if input_text and self.director_auto_var.get():
+            if not style_text:
                 # Auto-run director first, then generate
                 self.is_generating = True
                 self.generate_audio_btn.configure(state="disabled")
@@ -878,17 +884,12 @@ class TTSWindow:
         self.generate_audio_btn.configure(state="disabled")
         self._update_status("Generating audio...", self.colors.accent)
         
-        # Get style instructions
-        style_text = self.style_textbox.get("1.0", "end-1c").strip()
-        if style_text.startswith("(Style instructions"):
-            style_text = ""  # Ignore placeholder
-        
         # Combine style + transcript
         if style_text:
             full_prompt = style_text
             # Robust detection: check for transcript marker OR exact content match
             # This prevents duplication if AI output varies slightly in whitespace
-            if "#### TRANSCRIPT" not in style_text and input_text not in style_text:
+            if input_text and "#### TRANSCRIPT" not in style_text and input_text not in style_text:
                 full_prompt += f"\n\n#### TRANSCRIPT\n{input_text}"
         else:
             full_prompt = input_text
