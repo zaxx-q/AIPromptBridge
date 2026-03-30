@@ -842,8 +842,13 @@ class ScrollableComboBox:
         except tk.TclError:
             self._close_dropdown()
     
-    def _close_dropdown(self):
-        """Close the dropdown."""
+    def _close_dropdown(self, _value_already_set: bool = False):
+        """Close the dropdown.
+        
+        Args:
+            _value_already_set: Internal flag - True when called from _select_value
+                               to skip redundant value application.
+        """
         # Cancel timers
         if self._focus_check_id:
             try:
@@ -876,12 +881,25 @@ class ScrollableComboBox:
             root.unbind("<Button-1>")
         except tk.TclError:
             pass
+        
+        # Apply typed value on close (handles click-away without pressing Enter)
+        if not _value_already_set:
+            try:
+                typed_text = self.entry.get().strip()
+                if typed_text and typed_text != self._selected_value:
+                    self._selected_value = typed_text
+                    if self.variable:
+                        self.variable.set(typed_text)
+                    if self.command:
+                        self.command(typed_text)
+            except tk.TclError:
+                pass
     
     def _select_value(self, value: str):
         """Select a value."""
         self._selected_value = value
         self._update_entry_text()
-        self._close_dropdown()
+        self._close_dropdown(_value_already_set=True)
         
         if self.variable:
             self.variable.set(value)
