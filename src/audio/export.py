@@ -34,7 +34,10 @@ from .wav_utils import save_wav, pcm_to_wav
 # Format → (codec, extra_args) mapping for FFmpeg
 # Used when encoding from WAV/PCM to target format
 CODEC_MAP = {
-    "ogg": (["-c:a", "libopus", "-b:a", "64k"], ".ogg"),
+    # Opus: 32k mono is transparent for speech; Opus always resamples to 48kHz
+    # internally (spec requirement), so a lower target bitrate properly leverages
+    # its superior compression efficiency vs AAC/MP3.
+    "ogg": (["-c:a", "libopus", "-b:a", "32k"], ".ogg"),
     "mp3": (["-c:a", "libmp3lame", "-b:a", "128k"], ".mp3"),
     "m4a": (["-c:a", "aac", "-b:a", "64k"], ".m4a"),
     "flac": (["-c:a", "flac"], ".flac"),
