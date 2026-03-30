@@ -56,7 +56,8 @@ def get_provider_for_type(
         "reasoning_effort": config.get("reasoning_effort", "high"),
         "thinking_budget": config.get("thinking_budget", -1),
         "thinking_level": config.get("thinking_level", "high"),
-        "gemini_endpoint": config.get("gemini_endpoint")
+        "gemini_endpoint": config.get("gemini_endpoint"),
+        "tts_use_official_endpoint": config.get("tts_use_official_endpoint", False),
     }
     
     if provider_type == "custom":
