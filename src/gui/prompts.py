@@ -189,7 +189,7 @@ DEFAULT_TEXT_EDIT_SETTINGS = {
         {
             "name": "Suggestor",
             "enabled": True,
-            "items": ["Table", "Continue", "Reply Suggest", "Emojify", "Kaomojify", "Kaomoji Suggest"]
+            "items": ["Answer", "Table", "Continue", "Reply Suggest", "Emojify", "Kaomojify", "Kaomoji Suggest"]
         },
         {
             "name": "Compare",
@@ -347,6 +347,13 @@ DEFAULT_TEXT_EDIT_ACTIONS = {
         "task": "Analyze the emotional tone of this text and suggest appropriate kaomoji that could accompany it.",
         "show_chat_window_instead_of_replace": True
     },
+    "Answer": {
+        "icon": "✅",
+        "prompt_type": "general",
+        "system_prompt": "You are an expert problem solver and answer engine. You accurately solve questions, exercises, and problems of any kind—math, logic, science, trivia, language, programming, and more.\n\n<approach>\n1. **Identify** the question or problem in the text.\n2. **Show your work** — provide step-by-step reasoning, calculations, or logical deductions.\n3. **State the final answer** clearly and unambiguously.\n</approach>\n\n<constraints>\n- Be accurate above all else. If uncertain, state your confidence level.\n- If the text contains multiple questions, answer each one separately.\n- Use Markdown formatting for clarity (bold answers, numbered steps, code blocks for code).\n- If the text does not contain a clear question or problem, state that and offer to help if given more context.\n</constraints>",
+        "task": "Solve or answer the question/problem in the following text. Show your reasoning step by step, then provide a clear final answer.",
+        "show_chat_window_instead_of_replace": True
+    },
     "Translate to English": {
         "icon": "🇬🇧",
         "prompt_type": "edit",
@@ -453,7 +460,7 @@ DEFAULT_SNIP_SETTINGS = {
     "popup_items_per_page": 6,
     "popup_groups": [
         {"name": "Text/Data", "enabled": True, "items": ["Quick Extract", "Exact Extract", "Smart Extract", "To Markdown", "Handwriting Cleanup", "Translate to English"]},
-        {"name": "Analysis", "enabled": True, "items": ["Explain", "Describe", "Summarize"]},
+        {"name": "Analysis", "enabled": True, "items": ["Answer", "Explain", "Describe", "Summarize"]},
         {"name": "Compare", "enabled": True, "items": ["Compare Images", "Spot Differences", "Before/After", "Which is Better"]}
     ],
     "custom_task_template": "Regarding this image: {custom_input}",
@@ -479,6 +486,13 @@ DEFAULT_SNIP_ACTIONS = {
         "icon": "📝",
         "system_prompt": "You are a summarization expert.",
         "task": "Summarize the content of this image. Capture the main points concisely.",
+        "show_chat_window": True,
+        "compare_prompts": False
+    },
+    "Answer": {
+        "icon": "✅",
+        "system_prompt": "You are an expert problem solver and answer engine. You accurately solve questions, exercises, and problems of any kind—math, logic, science, trivia, language, programming, and more.\n\n<approach>\n1. **Identify** the question or problem visible in the image.\n2. **Show your work** — provide step-by-step reasoning, calculations, or logical deductions.\n3. **State the final answer** clearly and unambiguously.\n</approach>\n\n<constraints>\n- Be accurate above all else. If uncertain, state your confidence level.\n- If the image contains multiple questions, answer each one separately.\n- Use Markdown formatting for clarity (bold answers, numbered steps, code blocks for code).\n- If the image does not contain a clear question or problem, state that and describe what you see instead.\n</constraints>",
+        "task": "Examine this image for any questions, problems, or exercises. Solve or answer them accurately. Show your reasoning step by step, then provide a clear final answer.",
         "show_chat_window": True,
         "compare_prompts": False
     },
