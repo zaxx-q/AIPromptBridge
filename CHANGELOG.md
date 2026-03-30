@@ -1,5 +1,19 @@
 # Changelog
 
+## [6.1.5] - 2026-03-30
+
+### Improvements
+
+- **Audio Export**: Reduced the default Opus (OGG) export bitrate from 64k to 32k, significantly decreasing file size while maintaining transparent speech quality thanks to Opus's superior compression efficiency.
+- **TTS Output**: Voice name is now always included in saved TTS audio filenames for easier identification, instead of only appearing as a fallback when transcript text was unavailable.
+
+### Fixes
+
+- **TTS Generation**: Fixed an issue where generating audio directly from an existing AI Director transcript would incorrectly display a "No input text" error, requiring text in the input field even when a complete transcript was already present in the director panel.
+- **TTS Endpoint**: Fixed the `tts_use_official_endpoint` setting being silently ignored, causing TTS requests to always route through the custom Gemini endpoint instead of the official Google endpoint when configured.
+- **Settings**: Fixed an issue where testing API connectivity from the Settings window would fail with a "No API keys configured" error if the API Keys tab had not been opened yet during the current session.
+- **Combobox**: Fixed an issue where manually typed text in dropdown comboboxes was discarded when clicking away without pressing Enter, requiring users to explicitly confirm their input.
+
 ## [6.1.4] - 2026-03-27
 
 - **Updater**: Replaced standard system alert boxes with modernized, theme-aware dialogs indicating when updates are available or the app is already up to date. This dialog now includes a fully functional progress bar during download and extraction. Also fixed an issue where graphical update notifications triggered from the system tray would occasionally fail to display or cause thread-locking, and added a short delay to background checks to prevent startup freezing.

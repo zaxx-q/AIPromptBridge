@@ -1,6 +1,6 @@
 # AIPromptBridge
 
-**AIPromptBridge** is a Windows desktop application that brings AI assistance to your fingertips. Use global hotkeys to edit text using AI, capture and analyze audio or screen content, and chat with models, all from a lightweight system tray app.
+**AIPromptBridge** is a Windows system-wide app that brings AI assistance to your fingertips. Use global hotkeys to edit text using AI, capture and analyze audio or screen content, and chat with models, all from a lightweight system tray app.
 
 ## ✨ Features
 
@@ -179,9 +179,9 @@ Right-click the tray icon for:
 
 ### API Endpoints
 
-**Note: These endpoints are largely deprecated.**
-- **ShareX Users**: ShareX 19.0.1+ now has a native "Analyze image" feature.
-- **Desktop Users**: The built-in SnipTool (**Ctrl+Alt+X**) offers better integration.
+**Note: These endpoints are largely deprecated. Reasons:**
+- ShareX 19.0.1+ now has a native "Analyze image" feature.
+- The built-in SnipTool (**Ctrl+Alt+X**) offers better integration.
 
 Endpoints allow HTTP POST access (disabled by default). See [ShareX Setup Guide](docs/SHAREX_SETUP.md) if needed.
 
@@ -238,14 +238,15 @@ For advanced users, configuration files are stored in the application root:
 ## 💡 Tips
 
 ### For Faster Responses
-- Use non-reasoning models (e.g., `gemini-2.0-flash` instead of `gemini-2.5-pro`)
-- Disable thinking mode: Press `T` in console or set `thinking_enabled = false`
+- Use non-reasoning models (e.g., `gemini-3.1-flash-lite-preview` instead of `gemini-3.1-pro-preview`)
+- Disable thinking parameter: Press `T` in console or set `thinking_enabled = false`
 - Keep streaming enabled for perceived faster responses
 
 ### For Better Results
 - Enable thinking mode for complex tasks
-- Use specific prompts in TextEditTool
-- Add context when asking questions
+- Edit the actions/prompts to your needs in Prompt Editor
+- Add (more) context when selecting text or asking questions.
+- Set the right temperature for the task (e.g., low temperature for OCR tasks, high temp for more creativity)
 
 ### Getting API Keys
 - **Google Gemini (Recommended)**: Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)

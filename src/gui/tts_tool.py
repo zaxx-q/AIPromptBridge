@@ -343,12 +343,11 @@ class TTSToolApp:
         
         os.makedirs(directory, exist_ok=True)
         
-        # Build filename: transcript text → voice name fallback
-        fallback = voice_name.lower().replace(" ", "_")
+        # Build filename: always include voice name, transcript slug added when available
+        voice_slug = voice_name.lower().replace(" ", "_")
         filename = build_output_filename(
-            prefix="tts",
+            prefix=f"tts_{voice_slug}",
             text_source=transcript_text,
-            fallback_name=fallback,
             format_ext=format_ext
         )
         filepath = os.path.join(directory, filename)
