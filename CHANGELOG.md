@@ -1,5 +1,16 @@
 # Changelog
 
+## [6.2.0] - 2026-03-30
+
+### New Features
+
+- **Answer Action**: Added a new "Answer" action to both the Text Edit Tool and Snip Tool. This action acts as an expert problem solver, analyzing selected text or captured screenshots containing questions, exercises, or problems (math, logic, programming, etc.) and providing step-by-step reasoning alongside a clear final answer.
+- **Default Active Modifiers**: Modifiers can now be configured to activate automatically for specific tools. A new "Default for Tools" section in the Prompt Editor lets you choose which tools (TextEdit, SnipTool, AudioTool) should have each modifier pre-selected when their popup opens, eliminating the need to manually toggle frequently used modifiers every time.
+
+### Improvements
+
+- **Popup Tooltips**: Added descriptive tooltips to response mode toggle buttons (Default, Replace, Show, Copy, Type) across all popup windows, making it easier to understand what each mode does at a glance.
+
 ## [6.1.5] - 2026-03-30
 
 ### Improvements

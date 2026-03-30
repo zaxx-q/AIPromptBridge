@@ -1912,19 +1912,34 @@ class PromptEditorWindow:
         self.modifier_widgets["default_audio_var"] = tk.BooleanVar()
         
         tool_checkboxes = [
-            ("default_text_edit_var", "✏️ TextEdit"),
-            ("default_snip_var", "✂️ SnipTool"),
-            ("default_audio_var", "🎤 AudioTool"),
+            ("default_text_edit_var", "✏️", "TextEdit"),
+            ("default_snip_var", "✂️", "SnipTool"),
+            ("default_audio_var", "🎤", "AudioTool"),
         ]
         
-        for var_key, label_text in tool_checkboxes:
+        for var_key, emoji_char, label_text in tool_checkboxes:
             if self.use_ctk:
-                ctk.CTkCheckBox(tools_row, text=label_text,
+                pair = ctk.CTkFrame(tools_row, fg_color="transparent")
+                pair.pack(side="left", padx=(0, 12))
+                
+                ctk.CTkCheckBox(pair, text="",
                                variable=self.modifier_widgets[var_key],
                                font=get_ctk_font(12), text_color=self.colors.fg,
-                               fg_color=self.colors.accent, width=20, height=20).pack(side="left", padx=(0, 12))
+                               fg_color=self.colors.accent, width=20, height=20).pack(side="left")
+                
+                # Render emoji as color image via emoji renderer
+                emoji_img = None
+                if HAVE_EMOJI:
+                    renderer = get_emoji_renderer()
+                    emoji_img = renderer.get_ctk_image(emoji_char, size=16)
+                
+                if emoji_img:
+                    ctk.CTkLabel(pair, text="", image=emoji_img, width=16).pack(side="left", padx=(2, 0))
+                
+                ctk.CTkLabel(pair, text=label_text, font=get_ctk_font(12),
+                            **get_ctk_label_colors(self.colors)).pack(side="left", padx=(2, 0))
             else:
-                tk.Checkbutton(tools_row, text=label_text,
+                tk.Checkbutton(tools_row, text=f"{emoji_char} {label_text}",
                               variable=self.modifier_widgets[var_key],
                               font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.fg,
                               selectcolor=self.colors.input_bg).pack(side="left", padx=(0, 8))
