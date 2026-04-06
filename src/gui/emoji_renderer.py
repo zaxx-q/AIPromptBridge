@@ -179,6 +179,9 @@ class EmojiRenderer:
         # This is safe because we've already created (and know the path of) our current dir
         threading.Thread(target=self._clean_stale_dirs, daemon=True).start()
         
+        # Preload app emojis in background so PIL cache is warm by first popup
+        threading.Thread(target=self._preload_app_emojis, daemon=True).start()
+        
         # ZIP file handling
         self.zip_file: Optional[zipfile.ZipFile] = None
         self.zip_data: Optional[bytes] = None
@@ -195,11 +198,16 @@ class EmojiRenderer:
         # Cache for PhotoImage (tk.Text widgets)
         self._cache: Dict[Tuple[str, int], ImageTk.PhotoImage] = {}
         
+        # Cache for PIL Image objects (keyed by codepoint filename, e.g. "1f600")
+        # This is the primary performance cache — avoids re-reading the ZIP and
+        # re-decoding PNGs on every call. Benefits all consumers:
+        # get_emoji_image(), get_ctk_image(), get_emoji_icon_path().
+        self._pil_cache: Dict[str, Image.Image] = {}
+        
         # Cache for CTkImage (CTkButton/CTkLabel widgets)
         # We DO NOT cache CTkImage objects because they are bound to the Tk instance
         # they were created in. If multiple threads/windows create their own roots,
         # sharing CTkImage objects causes "pyimage doesn't exist" errors.
-        # We only cache the underlying PIL images.
         
         # Track missing files to avoid repeated lookups
         self._missing_cache: set = set()
@@ -343,7 +351,12 @@ class EmojiRenderer:
     
     def _load_pil_image(self, emoji: str) -> Optional[Image.Image]:
         """
-        Load PIL Image for an emoji from assets.
+        Load PIL Image for an emoji from assets, with PIL-level caching.
+        
+        The returned Image is the full-resolution RGBA source (typically 72x72).
+        Callers resize as needed. Caching at this level avoids repeated ZIP
+        reads and PNG decoding across all consumers (get_emoji_image,
+        get_ctk_image, get_emoji_icon_path).
         
         Args:
             emoji: The emoji character(s)
@@ -370,11 +383,16 @@ class EmojiRenderer:
         # Avoid duplicates
         filenames_to_try = list(dict.fromkeys(filenames_to_try))
         
+        # Check PIL cache first (any variant key resolves to the same image)
+        for filename in filenames_to_try:
+            if filename in self._pil_cache:
+                return self._pil_cache[filename]
+        
         # Check if we already know ALL variants are missing
         if all(f in self._missing_cache for f in filenames_to_try):
             return None
         
-        # Try to load the image
+        # Try to load the image from disk/ZIP
         for filename in filenames_to_try:
             if filename in self._missing_cache:
                 continue
@@ -395,14 +413,21 @@ class EmojiRenderer:
                             # Must read into memory because Image.open is lazy
                             # and the zip file handle will close when we exit the block
                             img_data = f.read()
-                            return Image.open(io.BytesIO(img_data)).convert("RGBA")
+                            img = Image.open(io.BytesIO(img_data)).convert("RGBA")
+                            # Cache under all tried filenames so both VS16 variants hit
+                            for fn in filenames_to_try:
+                                self._pil_cache[fn] = img
+                            return img
                 
                 elif not self.is_zip and self.assets_path.exists():
                     # Look in directory
                     for name in name_variants:
                         image_path = self.assets_path / name
                         if image_path.exists():
-                            return Image.open(image_path).convert("RGBA")
+                            img = Image.open(image_path).convert("RGBA")
+                            for fn in filenames_to_try:
+                                self._pil_cache[fn] = img
+                            return img
             
             except Exception:
                 pass
@@ -497,7 +522,7 @@ class EmojiRenderer:
         
         size = size or self.CTK_DEFAULT_SIZE
         
-        # Load PIL image (this IS cached internally)
+        # Load PIL image (cached via _pil_cache in _load_pil_image)
         pil_image = self._load_pil_image(emoji)
         if pil_image is None:
             return None
@@ -744,22 +769,63 @@ class EmojiRenderer:
     def clear_cache(self):
         """Clear all image caches."""
         self._cache.clear()
+        self._pil_cache.clear()
         self._missing_cache.clear()
     
-    def preload_common_emojis(self):
-        """Preload commonly used emojis into cache."""
-        common_emojis = [
-            "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂",
-            "🙂", "🙃", "😉", "😊", "😇", "🥰", "😍", "🤩",
-            "😘", "😗", "☺", "😚", "😙", "🥲", "😋", "😛",
-            "✅", "❌", "⚠️", "❓", "❗", "💡", "🔥", "🔥", "⭐",
-            "📋", "📂", "📡", "🤖", "🌊", "💭", "🔑", "🚀",
-            "🖥️", "⚙️", "✏️", "🔲", "📟", "🔄", "🗑️", "💬",
-            "👍", "👎", "👏", "🙌", "🤝", "🙏", "✍️", "💪",
-        ]
+    def _preload_app_emojis(self):
+        """Preload PIL images for emojis actually used by the app.
         
-        for emoji_char in common_emojis:
-            self.get_emoji_image(emoji_char)
+        Warms _pil_cache in a background thread so the first popup/window
+        open doesn't pay the ZIP-read + PNG-decode cost for every icon.
+        
+        Sources:
+        1. All "icon" fields from prompt action defaults (text_edit, snip, audio, modifiers)
+        2. Hardcoded GUI emojis used directly by window code
+        """
+        if not HAVE_PIL:
+            return
+        
+        emojis = set()
+        
+        # --- 1. Extract icons from prompt defaults ---
+        try:
+            from .prompts import (
+                DEFAULT_GLOBAL_SETTINGS,
+                DEFAULT_TEXT_EDIT_ACTIONS,
+                DEFAULT_SNIP_ACTIONS,
+                DEFAULT_AUDIO_ACTIONS,
+            )
+            
+            # Modifier icons
+            for mod in DEFAULT_GLOBAL_SETTINGS.get("modifiers", []):
+                icon = mod.get("icon")
+                if icon:
+                    emojis.add(icon)
+            
+            # Action icons from all tool sections
+            for actions_dict in (DEFAULT_TEXT_EDIT_ACTIONS, DEFAULT_SNIP_ACTIONS, DEFAULT_AUDIO_ACTIONS):
+                for action in actions_dict.values():
+                    if isinstance(action, dict):
+                        icon = action.get("icon")
+                        if icon:
+                            emojis.add(icon)
+        except ImportError:
+            pass
+        
+        # --- 2. Hardcoded GUI emojis (used directly by windows/widgets) ---
+        gui_emojis = [
+            "✍️", "❌", "📷", "📤", "💾", "🔴", "📁", "▶", "⏹", "⏸",
+            "✏️", "🗑️", "🔄", "⚙️", "🎛️", "🎙️", "🧪", "🔊", "🎬",
+            "📋", "📄", "📊", "💬", "📝",
+        ]
+        emojis.update(gui_emojis)
+        
+        # --- 3. Preload into PIL cache ---
+        for emoji_char in emojis:
+            try:
+                self._load_pil_image(emoji_char)
+            except Exception:
+                pass
 
 
 # Global renderer instance
