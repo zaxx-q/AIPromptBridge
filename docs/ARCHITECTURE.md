@@ -205,6 +205,7 @@ Sessions are stored in `chat_sessions.json` with sequential IDs.
     "id": 1,
     "origin": "textedit:Explain",
     "title": "First message preview...",
+    "model_override": "gemini-3.1-pro-high",
     "messages": [
       {"role": "user", "content": "..."},
       {"role": "assistant", "content": "..."}
@@ -215,6 +216,8 @@ Sessions are stored in `chat_sessions.json` with sequential IDs.
   }
 }
 ```
+
+> `model_override` is only present when a per-session model has been selected; `null`/absent means the session uses the global model from `config.ini`.
 
 ### Context Injection
 
@@ -269,11 +272,12 @@ Instead of leaving `popup_groups` entirely isolated, the system performs a non-d
 
 ### Design Decision
 
-Sessions do NOT store provider/model. This allows:
+Sessions do NOT store provider info (read dynamically at call time for hot-switching). However, sessions **can** store a `model_override` for per-session model selection:
 
-- Hot-switching providers mid-conversation
-- No migration needed when changing default provider
-- Current config is always used at request time
+- `model_override = None` → uses the global model from `config.ini` at request time
+- `model_override = "gemini-3.1-pro-high"` → always uses this model regardless of global setting
+- The chat window dropdown shows a `"(Use Global: <model>)"` sentinel entry that follows the current global model
+- Sentinel updates are **event-driven** via `subscribe_config_change()` in `src/config.py`
 
 ## Model Presets
 
@@ -359,6 +363,7 @@ The config parser (`src/config.py`) is a custom INI parser, NOT Python's `config
 - API keys are one per line in their section
 - Comments with `#` or `;`
 - `{lang}` placeholder support for dynamic language in prompts
+- **Change Notification**: `subscribe_config_change(callback)` / `notify_config_change(key, value)` — thread-safe pub/sub for reacting to config mutations (used by chat windows for model sentinel updates)
 
 ### Example
 

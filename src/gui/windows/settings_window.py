@@ -2881,6 +2881,10 @@ class SettingsWindow:
                 if self.config_data.ai_params:
                     print(f"[Settings] AI params: {self.config_data.ai_params}")
                 
+                # Notify config change listeners (e.g., chat windows updating model sentinel)
+                from ...config import notify_config_change
+                notify_config_change("_bulk_update")
+                
             except (ImportError, AttributeError) as e:
                 print(f"[Settings] Note: Could not update in-memory config: {e}")
             

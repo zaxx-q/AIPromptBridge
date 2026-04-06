@@ -30,13 +30,13 @@ AIPromptBridge/
     ├── __init__.py
     ├── api_client.py           # Unified API interface using providers
     ├── attachment_manager.py   # Persistent storage for session attachments
-    ├── config.py               # Custom INI parser, configuration management
+    ├── config.py               # Custom INI parser, configuration management, change notification pub/sub
     ├── console.py              # Centralized Rich console configuration
     ├── key_manager.py          # API key rotation with exhaustion tracking and named key lookup
     ├── messages.py             # Multimodal message construction factory
     ├── preset_resolver.py      # Model preset resolution (per-action AI config overrides)
     ├── request_pipeline.py     # Unified request processing with logging
-    ├── session_manager.py      # Session persistence with sequential IDs
+    ├── session_manager.py      # Session persistence with sequential IDs and per-session model override
     ├── terminal.py             # Interactive terminal commands (includes Tools menu)
     ├── tray.py                 # System tray application (Windows)
     ├── updater.py              # Self-update: GitHub Releases check, download, staging, trigger
@@ -108,11 +108,11 @@ AIPromptBridge/
 | `web_server.py` | Flask REST API endpoints for image processing |
 | `terminal.py` | Interactive terminal commands when console is visible |
 | `console.py` | Centralized Rich console configuration with custom theme |
-| `config.py` | Custom INI parser with multiline support, key name parsing |
+| `config.py` | Custom INI parser with multiline support, key name parsing, change notification pub/sub |
 | `key_manager.py` | Multi-key management with automatic rotation and named key lookup |
 | `preset_resolver.py` | Per-action model preset resolution (merges preset overrides with global config) |
 | `request_pipeline.py` | Unified logging and token tracking for all requests |
-| `session_manager.py` | Chat session persistence to JSON |
+| `session_manager.py` | Chat session persistence to JSON with per-session model override |
 | `attachment_manager.py`| Manages external file storage for session attachments |
 | `updater.py` | Self-update: GitHub API, download, extraction, launcher signaling |
 

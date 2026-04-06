@@ -6,6 +6,7 @@ Configuration loading and management
 import os
 import re
 import logging
+import threading
 from pathlib import Path
 
 # Configuration file paths
@@ -299,6 +300,50 @@ def load_key_names(filepath=CONFIG_FILE):
     return key_names
 
 
+# ──────────────────────────────────────────────────────────────
+# Config change notification (pub/sub)
+# ──────────────────────────────────────────────────────────────
+_config_listeners = []
+_config_listeners_lock = threading.Lock()
+
+
+def subscribe_config_change(callback):
+    """Register a callback for config value changes.
+    
+    Callback signature: callback(key: str, value: Any)
+    Called whenever a config value is saved via save_config_value() or
+    explicitly via notify_config_change().
+    """
+    with _config_listeners_lock:
+        if callback not in _config_listeners:
+            _config_listeners.append(callback)
+
+
+def unsubscribe_config_change(callback):
+    """Remove a previously registered config change callback."""
+    with _config_listeners_lock:
+        try:
+            _config_listeners.remove(callback)
+        except ValueError:
+            pass
+
+
+def notify_config_change(key: str, value=None):
+    """Fire all registered config change callbacks.
+    
+    Safe to call from any thread. Callbacks are invoked synchronously
+    on the caller's thread — GUI-bound listeners must marshal to the
+    main thread themselves.
+    """
+    with _config_listeners_lock:
+        listeners = list(_config_listeners)
+    for cb in listeners:
+        try:
+            cb(key, value)
+        except Exception:
+            pass  # Never let a listener crash the caller
+
+
 def save_config_value(key: str, value, filepath=CONFIG_FILE):
     """Update a single config value in the config file"""
     try:
@@ -349,6 +394,7 @@ def save_config_value(key: str, value, filepath=CONFIG_FILE):
         with open(filepath, 'w', encoding='utf-8') as f:
             f.writelines(new_lines)
         
+        notify_config_change(key, value)
         return True
     except Exception as e:
         print(f"[Error] Failed to save config: {e}")

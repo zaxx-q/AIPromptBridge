@@ -152,6 +152,10 @@ class ChatWindowBase(ABC):
         
         register_window(self._get_window_tag())
         self.root.protocol("WM_DELETE_WINDOW", self._close)
+        
+        # Subscribe to config changes for global sentinel updates
+        from ...config import subscribe_config_change
+        subscribe_config_change(self._on_config_changed)
     
     def _create_info_label(self):
         """Create session info label."""
@@ -1052,13 +1056,23 @@ class ChatWindowBase(ABC):
                         pass
                 
                 self._safe_after(0, update_dropdown)
-                # Start periodic global sentinel refresh
-                self._safe_after(3000, self._refresh_global_sentinel)
         except Exception as e:
             print(f"[ChatWindowBase] Error loading models: {e}")
     
+    def _on_config_changed(self, key: str, value=None):
+        """Handle config change events — marshal to GUI thread for sentinel update.
+        
+        Called from any thread (config pub/sub). Uses _safe_after to schedule
+        the actual UI update on the main thread.
+        """
+        if self._destroyed:
+            return
+        # Only react to model/provider changes or bulk updates
+        if key.endswith("_model") or key == "default_provider" or key == "_bulk_update":
+            self._safe_after(0, self._refresh_global_sentinel)
+    
     def _refresh_global_sentinel(self):
-        """Periodically check if the global model has changed and update the sentinel label."""
+        """Update the global sentinel label in the dropdown when the global model changes."""
         if self._destroyed:
             return
         try:
@@ -1085,9 +1099,6 @@ class ChatWindowBase(ABC):
                         self.model_dropdown.set(new_sentinel)
         except Exception:
             pass
-        
-        # Re-schedule every 3 seconds
-        self._safe_after(3000, self._refresh_global_sentinel)
     
     def _on_model_select(self, selected: str):
         """Handle model selection — per-session, not global."""
@@ -2662,6 +2673,10 @@ class ChatWindowBase(ABC):
         self._destroyed = True
         self.is_streaming = False
         unregister_window(self._get_window_tag())
+        
+        # Unsubscribe from config change events
+        from ...config import unsubscribe_config_change
+        unsubscribe_config_change(self._on_config_changed)
         
         # Clean up any remaining clipboard temp files
         import os

@@ -1,5 +1,25 @@
 # Changelog
 
+## [6.3.0] - 2026-04-06
+
+### New Features
+
+- **Chat Clipboard Paste**: You can now paste images and files directly into the chat input using `Ctrl+V`. Bitmap screenshots from the clipboard are attached as PNG, and files copied from Explorer (images, audio, PDFs) are attached automatically — no file picker needed.
+- **Per-Session Model Selection**: The model dropdown in the chat window now sets a per-session override instead of changing the global model. A new "(Use Global: …)" sentinel entry lets you follow the global default, while selecting any other model pins that session to it. Branched sessions inherit the parent's model override.
+- **Session Management in Chat**: Added rename (✏️) and delete (🗑️) buttons directly in the chat toolbar for quick session management without opening the Session Browser.
+- **Custom Chat Backgrounds**: New settings to customize or disable the colored backgrounds for user and assistant messages in the chat window. Configure hex colors or turn off background tinting entirely via Settings or `config.ini`.
+
+### Improvements
+
+- **Session Browser Auto-Refresh**: Renaming or deleting a session from the chat window now automatically refreshes any open Session Browser windows.
+- **Emoji Preloading**: Application-used emoji icons are now preloaded in a background thread on startup, minimizing the first-open delay when displaying popup windows and toolbars.
+- **Config Change Notifications**: Replaced periodic polling with an event-driven publish/subscribe system for configuration changes. Chat windows now update their global model sentinel instantly when the model is changed in Settings.
+
+### Fixes
+
+- **Inline Image Context Menu**: Fixed an issue where right-clicking on inline images in the chat window would open both the image in default app and the general message context menu simultaneously.
+- **Clipboard Attachment Saving**: Fixed a race condition where temporary files from clipboard pastes could be deleted before being copied to permanent session storage.
+
 ## [6.2.0] - 2026-03-30
 
 ### New Features
