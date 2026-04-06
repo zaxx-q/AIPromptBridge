@@ -696,8 +696,9 @@ def extract_latex_blocks(text: str) -> List[Tuple[str, int, int, bool]]:
                 break
         
         if not inside_display and content.strip():
-            # Skip if this looks like currency ($ followed by digits only)
-            if re.match(r'^\d[\d,]*\.?\d*$', content):
+            # Skip if this looks like currency ($100, $3.50, $1,000)
+            # but NOT single digits which are valid LaTeX math ($9$, $3$)
+            if re.match(r'^\d{2,}[\d,]*\.?\d*$|^\d[\d,]*\.\d+$|^\d[\d,]+$', content):
                 continue
             blocks.append((content, start, end, False))
     

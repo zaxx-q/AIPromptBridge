@@ -579,8 +579,9 @@ def _preprocess_inline_latex(text: str) -> str:
     """
     def _replace(m):
         inner = m.group(1)
-        # Skip currency-like patterns ($100, $3.50)
-        if re.match(r'^\d[\d,]*\.?\d*$', inner):
+        # Skip currency-like patterns ($100, $3.50, $1,000) but NOT single
+        # digits which are common in LaTeX math ($9$, $3$, $n$).
+        if re.match(r'^\d{2,}[\d,]*\.?\d*$|^\d[\d,]*\.\d+$|^\d[\d,]+$', inner):
             return m.group(0)
         try:
             converted = latex_to_unicode(inner)
