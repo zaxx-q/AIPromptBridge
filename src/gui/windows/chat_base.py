@@ -1451,19 +1451,8 @@ class ChatWindowBase(ABC):
     
     def _clear_pending_attachments(self):
         """Clear all pending attachments after sending."""
-        import os
-        
         self.pending_attachments.clear()
         self._attachment_thumbnails.clear()
-        
-        # Clean up clipboard temp files (permanent copies are in session_attachments/)
-        for tmp in self._clipboard_temp_files:
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
-        self._clipboard_temp_files.clear()
-        
         self._update_attachments_display()
     
     def _render_message_attachments(self, attachments: List[Dict], message_tag: str):
@@ -1991,8 +1980,10 @@ class ChatWindowBase(ABC):
             self._update_status("Please enter a message")
             return
         
-        # Capture pending attachments before clearing
+        # Capture pending attachments and temp files before clearing
         attachments_to_send = list(self.pending_attachments)
+        clipboard_temps_to_clean = list(self._clipboard_temp_files)
+        self._clipboard_temp_files.clear()
         
         # Disable input
         self.is_loading = True
@@ -2049,6 +2040,14 @@ class ChatWindowBase(ABC):
                             "mime_type": attach.get("mime_type", "application/octet-stream"),
                             "filename": attach.get("filename", "attachment")
                         })
+            
+            # Clean up clipboard temp files now that save_file() has copied them
+            import os
+            for tmp in clipboard_temps_to_clean:
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
             
             # Add message with attachments
             self.session.add_message("user", user_input, attachments=message_attachments)
