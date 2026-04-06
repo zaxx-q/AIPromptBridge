@@ -2060,6 +2060,17 @@ class ChatWindowBase(ABC):
     
     def _on_chat_right_click(self, event):
         """Handle right-click on chat text for context menu."""
+        # Don't show context menu when right-clicking on inline images
+        # (they have their own <Button-3> handler via img_ tags)
+        try:
+            pos = self.chat_text.index(f"@{event.x},{event.y}")
+            tags = self.chat_text.tag_names(pos)
+            for tag in tags:
+                if tag.startswith("img_"):
+                    return
+        except tk.TclError:
+            pass
+        
         index = self._get_message_index_at(event)
         if index is not None:
             self._show_message_context_menu(event, index)
