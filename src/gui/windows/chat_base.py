@@ -98,6 +98,7 @@ class ChatWindowBase(ABC):
         self.attachments_frame = None
         self.pending_attachments = []  # List of {"path": str, "thumbnail": PhotoImage, "mime_type": str}
         self._attachment_thumbnails = []  # Keep references to prevent garbage collection
+        self._clipboard_temp_files = []  # Temp files from clipboard paste (cleaned up after send/close)
         # Audio playback state
         self._audio_playing_path = None  # Currently playing audio file path
         self._audio_play_buttons = {}  # Map file_path -> play button widget
@@ -521,6 +522,7 @@ class ChatWindowBase(ABC):
             self.input_text.bind('<FocusOut>', on_focus_out)
             self.input_text.bind('<Return>', on_key_return)
             self.input_text.bind('<Control-BackSpace>', on_ctrl_backspace)
+            self.input_text.bind('<Control-v>', self._on_paste)
         else:
             input_frame = tk.Frame(self.root, bg=self.colors["bg"])
             # Moved up to row 3 (was 4), removed header frame
@@ -590,6 +592,7 @@ class ChatWindowBase(ABC):
             self.input_text.bind('<FocusIn>', on_focus_in)
             self.input_text.bind('<FocusOut>', on_focus_out)
             self.input_text.bind('<Return>', on_key_return)
+            self.input_text.bind('<Control-v>', self._on_paste)
     
     def _create_action_buttons(self):
         """Create the action button row."""
@@ -1291,6 +1294,74 @@ class ChatWindowBase(ABC):
     # Attachment Handling
     # =========================================================================
     
+    def _on_paste(self, event):
+        """Handle Ctrl+V: attach clipboard image if present, otherwise allow normal text paste."""
+        try:
+            from PIL import ImageGrab
+            
+            clip = ImageGrab.grabclipboard()
+            
+            if clip is None:
+                # No image in clipboard — fall through to default text paste
+                return None
+            
+            # Case 1: PIL Image (bitmap from clipboard — screenshot, snip, etc.)
+            if hasattr(clip, 'save'):
+                import tempfile
+                import os
+                
+                # Save clipboard image to a temp .png file
+                fd, tmp_path = tempfile.mkstemp(suffix=".png", prefix="clipboard_")
+                os.close(fd)
+                clip.save(tmp_path, "PNG")
+                self._clipboard_temp_files.append(tmp_path)
+                self._add_pending_attachment(tmp_path)
+                
+                # Clear placeholder text if still showing
+                if self._has_placeholder:
+                    if HAVE_CTK:
+                        self.input_text.delete("0.0", "end")
+                        self.input_text.configure(text_color=self.theme.fg)
+                    else:
+                        self.input_text.delete("1.0", tk.END)
+                        self.input_text.configure(fg=self.colors["fg"])
+                    self._has_placeholder = False
+                
+                return "break"  # Consume the event — don't paste image as text
+            
+            # Case 2: List of file paths (files copied from Explorer)
+            if isinstance(clip, list):
+                image_exts = {"png", "jpg", "jpeg", "gif", "webp", "bmp"}
+                audio_exts = {"wav", "mp3", "ogg", "opus", "flac", "webm", "m4a"}
+                other_exts = {"pdf"}
+                supported_exts = image_exts | audio_exts | other_exts
+                
+                added = False
+                for fpath in clip:
+                    if isinstance(fpath, str):
+                        ext = fpath.rsplit('.', 1)[-1].lower() if '.' in fpath else ''
+                        if ext in supported_exts:
+                            self._add_pending_attachment(fpath)
+                            added = True
+                
+                if added:
+                    # Clear placeholder text if still showing
+                    if self._has_placeholder:
+                        if HAVE_CTK:
+                            self.input_text.delete("0.0", "end")
+                            self.input_text.configure(text_color=self.theme.fg)
+                        else:
+                            self.input_text.delete("1.0", tk.END)
+                            self.input_text.configure(fg=self.colors["fg"])
+                        self._has_placeholder = False
+                    return "break"
+            
+        except Exception as e:
+            print(f"[ChatWindow] Clipboard paste check failed: {e}")
+        
+        # Fall through to default text paste behavior
+        return None
+    
     def _on_attach_click(self):
         """Open file selector for attachments."""
         from tkinter import filedialog
@@ -1380,8 +1451,19 @@ class ChatWindowBase(ABC):
     
     def _clear_pending_attachments(self):
         """Clear all pending attachments after sending."""
+        import os
+        
         self.pending_attachments.clear()
         self._attachment_thumbnails.clear()
+        
+        # Clean up clipboard temp files (permanent copies are in session_attachments/)
+        for tmp in self._clipboard_temp_files:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        self._clipboard_temp_files.clear()
+        
         self._update_attachments_display()
     
     def _render_message_attachments(self, attachments: List[Dict], message_tag: str):
@@ -2520,6 +2602,14 @@ class ChatWindowBase(ABC):
         self._destroyed = True
         self.is_streaming = False
         unregister_window(self._get_window_tag())
+        
+        # Clean up any remaining clipboard temp files
+        import os
+        for tmp in getattr(self, '_clipboard_temp_files', []):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
         
         try:
             if self.root:
