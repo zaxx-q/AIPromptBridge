@@ -83,6 +83,8 @@ class ChatWindowBase(ABC):
         self.scroll_btn = None
         self.send_btn = None
         self.regen_btn = None
+        self.rename_btn = None
+        self.delete_btn = None
         self.input_text = None
         self.chat_text = None
         self.model_dropdown = None
@@ -168,18 +170,41 @@ class ChatWindowBase(ABC):
             ).grid(row=0, column=0, sticky=tk.W, padx=15, pady=(5, 2))
     
     def _create_toolbar(self):
-        """Create the toolbar with toggle buttons and model dropdown."""
+        """Create the toolbar with session actions, toggle buttons, and model dropdown."""
         if HAVE_CTK:
             btn_frame = ctk.CTkFrame(self.root, fg_color="transparent")
             btn_frame.grid(row=1, column=0, sticky="ew", padx=15, pady=5)
             
-            ctk.CTkLabel(
+            # Session action buttons (left side)
+            warn_colors = get_ctk_button_colors(self.theme, "warning")
+            rename_content = prepare_emoji_content("✏️", size=14)
+            self.rename_btn = ctk.CTkButton(
                 btn_frame,
-                text="Conversation:",
-                font=get_ctk_font(size=12, weight="bold"),
-                text_color=self.theme.accent
-            ).pack(side="left", padx=(0, 10))
+                **rename_content,
+                font=get_ctk_font(size=12),
+                width=32,
+                height=28,
+                corner_radius=6,
+                command=self._rename_session,
+                **warn_colors
+            )
+            self.rename_btn.pack(side="left", padx=(0, 2))
             
+            danger_colors = get_ctk_button_colors(self.theme, "danger")
+            delete_content = prepare_emoji_content("🗑️", size=14)
+            self.delete_btn = ctk.CTkButton(
+                btn_frame,
+                **delete_content,
+                font=get_ctk_font(size=12),
+                width=32,
+                height=28,
+                corner_radius=6,
+                command=self._delete_session,
+                **danger_colors
+            )
+            self.delete_btn.pack(side="left", padx=(0, 8))
+            
+            # Toggle buttons
             btn_colors = get_ctk_button_colors(self.theme, "secondary")
             
             self.wrap_btn = ctk.CTkButton(
@@ -218,13 +243,7 @@ class ChatWindowBase(ABC):
             )
             self.scroll_btn.pack(side="left", padx=2)
             
-            ctk.CTkLabel(
-                btn_frame,
-                text="Model:",
-                font=get_ctk_font(size=11),
-                text_color=self.theme.fg
-            ).pack(side="left", padx=(15, 5))
-            
+            # Model dropdown (right-aligned)
             self.model_dropdown = ScrollableComboBox(
                 btn_frame,
                 colors=self.theme,
@@ -233,18 +252,40 @@ class ChatWindowBase(ABC):
                 height=28,
                 command=self._on_model_select
             )
-            self.model_dropdown.pack(side="left", padx=5)
+            self.model_dropdown.pack(side="right", padx=(5, 0))
             self.model_dropdown.set(self.selected_model or "(default)")
+            
+            ctk.CTkLabel(
+                btn_frame,
+                text="Model:",
+                font=get_ctk_font(size=11),
+                text_color=self.theme.fg
+            ).pack(side="right", padx=(0, 5))
         else:
             from tkinter import ttk
             btn_frame = tk.Frame(self.root, bg=self.colors["bg"])
             btn_frame.grid(row=1, column=0, sticky=tk.EW, padx=15, pady=5)
             
-            tk.Label(
-                btn_frame, text="Conversation:", font=("Segoe UI", 10, "bold"),
-                bg=self.colors["bg"], fg=self.colors["accent"]
-            ).pack(side=tk.LEFT, padx=(0, 10))
+            # Session action buttons (left side)
+            self.rename_btn = tk.Button(
+                btn_frame, text="✏️", font=("Segoe UI", 10),
+                bg=self.colors.get("accent_yellow", "#f9e2af"),
+                fg=self.colors["bg"],
+                relief=tk.FLAT, padx=4, pady=4,
+                command=self._rename_session, cursor="hand2"
+            )
+            self.rename_btn.pack(side=tk.LEFT, padx=(0, 2))
             
+            self.delete_btn = tk.Button(
+                btn_frame, text="🗑️", font=("Segoe UI", 10),
+                bg=self.colors.get("accent_red", "#f38ba8"),
+                fg="#ffffff",
+                relief=tk.FLAT, padx=4, pady=4,
+                command=self._delete_session, cursor="hand2"
+            )
+            self.delete_btn.pack(side=tk.LEFT, padx=(0, 8))
+            
+            # Toggle buttons
             self.wrap_btn = tk.Button(
                 btn_frame, text="Wrap: ON", font=("Segoe UI", 9),
                 bg=self.colors["button_bg"], fg=self.colors["fg"],
@@ -269,17 +310,18 @@ class ChatWindowBase(ABC):
             )
             self.scroll_btn.pack(side=tk.LEFT, padx=2)
             
-            tk.Label(
-                btn_frame, text="Model:", font=("Segoe UI", 9),
-                bg=self.colors["bg"], fg=self.colors["fg"]
-            ).pack(side=tk.LEFT, padx=(15, 5))
-            
+            # Model dropdown (right-aligned)
             self.model_dropdown = ttk.Combobox(
                 btn_frame, values=["(loading...)"], width=30, state="readonly"
             )
-            self.model_dropdown.pack(side=tk.LEFT, padx=5)
+            self.model_dropdown.pack(side=tk.RIGHT, padx=(5, 0))
             self.model_dropdown.set(self.selected_model or "(default)")
             self.model_dropdown.bind("<<ComboboxSelected>>", lambda e: self._on_model_select(self.model_dropdown.get()))
+            
+            tk.Label(
+                btn_frame, text="Model:", font=("Segoe UI", 9),
+                bg=self.colors["bg"], fg=self.colors["fg"]
+            ).pack(side=tk.RIGHT, padx=(0, 5))
         
         # Schedule model loading
         self._schedule_model_loading()
@@ -1079,6 +1121,10 @@ class ChatWindowBase(ABC):
             self.send_btn.configure(state="disabled")
             if hasattr(self, 'regen_btn') and self.regen_btn:
                 self.regen_btn.configure(state="disabled")
+            if self.rename_btn:
+                self.rename_btn.configure(state="disabled")
+            if self.delete_btn:
+                self.delete_btn.configure(state="disabled")
             self.input_text.configure(state="disabled")
             if self.attach_btn:
                 self.attach_btn.configure(state="disabled")
@@ -1086,6 +1132,10 @@ class ChatWindowBase(ABC):
             self.send_btn.configure(state=tk.DISABLED)
             if hasattr(self, 'regen_btn') and self.regen_btn:
                 self.regen_btn.configure(state=tk.DISABLED)
+            if self.rename_btn:
+                self.rename_btn.configure(state=tk.DISABLED)
+            if self.delete_btn:
+                self.delete_btn.configure(state=tk.DISABLED)
             self.input_text.configure(state=tk.DISABLED)
             if self.attach_btn:
                 self.attach_btn.configure(state=tk.DISABLED)
@@ -1211,6 +1261,10 @@ class ChatWindowBase(ABC):
                     self.send_btn.configure(state="normal")
                     if hasattr(self, 'regen_btn') and self.regen_btn:
                         self.regen_btn.configure(state="normal")
+                    if self.rename_btn:
+                        self.rename_btn.configure(state="normal")
+                    if self.delete_btn:
+                        self.delete_btn.configure(state="normal")
                     self.input_text.configure(state="normal")
                     if self.attach_btn:
                         self.attach_btn.configure(state="normal")
@@ -1218,6 +1272,10 @@ class ChatWindowBase(ABC):
                     self.send_btn.configure(state=tk.NORMAL)
                     if hasattr(self, 'regen_btn') and self.regen_btn:
                         self.regen_btn.configure(state=tk.NORMAL)
+                    if self.rename_btn:
+                        self.rename_btn.configure(state=tk.NORMAL)
+                    if self.delete_btn:
+                        self.delete_btn.configure(state=tk.NORMAL)
                     self.input_text.configure(state=tk.NORMAL)
                     if self.attach_btn:
                         self.attach_btn.configure(state=tk.NORMAL)
@@ -1858,11 +1916,19 @@ class ChatWindowBase(ABC):
         self.is_loading = True
         if HAVE_CTK:
             self.send_btn.configure(state="disabled")
+            if self.rename_btn:
+                self.rename_btn.configure(state="disabled")
+            if self.delete_btn:
+                self.delete_btn.configure(state="disabled")
             self.input_text.configure(state="disabled")
             if self.attach_btn:
                 self.attach_btn.configure(state="disabled")
         else:
             self.send_btn.configure(state=tk.DISABLED)
+            if self.rename_btn:
+                self.rename_btn.configure(state=tk.DISABLED)
+            if self.delete_btn:
+                self.delete_btn.configure(state=tk.DISABLED)
             self.input_text.configure(state=tk.DISABLED)
             if self.attach_btn:
                 self.attach_btn.configure(state=tk.DISABLED)
@@ -2017,11 +2083,19 @@ class ChatWindowBase(ABC):
                 self.is_loading = False
                 if HAVE_CTK:
                     self.send_btn.configure(state="normal")
+                    if self.rename_btn:
+                        self.rename_btn.configure(state="normal")
+                    if self.delete_btn:
+                        self.delete_btn.configure(state="normal")
                     self.input_text.configure(state="normal")
                     if self.attach_btn:
                         self.attach_btn.configure(state="normal")
                 else:
                     self.send_btn.configure(state=tk.NORMAL)
+                    if self.rename_btn:
+                        self.rename_btn.configure(state=tk.NORMAL)
+                    if self.delete_btn:
+                        self.delete_btn.configure(state=tk.NORMAL)
                     self.input_text.configure(state=tk.NORMAL)
                     if self.attach_btn:
                         self.attach_btn.configure(state=tk.NORMAL)
@@ -2246,6 +2320,178 @@ class ChatWindowBase(ABC):
             f"✅ Branched to session #{new_session.session_id}",
             self.theme.accent_green
         )
+    
+    # =========================================================================
+    # Session Rename & Delete
+    # =========================================================================
+    
+    def _rename_session(self):
+        """Rename current chat session via modal dialog."""
+        if self.is_loading or self._destroyed:
+            return
+        
+        from ...session_manager import save_sessions
+        
+        current_title = self.session.title or ""
+        
+        # Create modal dialog (withdraw → DWM → deiconify pattern)
+        if HAVE_CTK:
+            dialog = ctk.CTkToplevel(self.root)
+            dialog.withdraw()
+            dialog.configure(fg_color=self.theme.bg)
+        else:
+            dialog = tk.Toplevel(self.root)
+            dialog.withdraw()
+            dialog.configure(bg=self.colors["bg"])
+        
+        dialog.title("Rename Session")
+        dialog.geometry("400x130")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        set_window_icon(dialog)
+        set_dark_titlebar(dialog)
+        
+        # Center on parent
+        px = self.root.winfo_rootx() + (self.root.winfo_width() - 400) // 2
+        py = self.root.winfo_rooty() + (self.root.winfo_height() - 130) // 2
+        dialog.geometry(f"+{max(0, px)}+{max(0, py)}")
+        
+        dialog.deiconify()
+        dialog.grab_set()
+        
+        title_var = tk.StringVar(value=current_title)
+        
+        def do_save():
+            new_title = title_var.get().strip()
+            if new_title:
+                self.session.title = new_title
+                save_sessions()
+                # Update window title bar
+                try:
+                    if self.root and not self._destroyed:
+                        self.root.title(f"Chat - {new_title}")
+                except Exception:
+                    pass
+                self._update_status(f"✅ Renamed: {new_title}", self.theme.accent_green)
+            dialog.destroy()
+        
+        def do_cancel():
+            dialog.destroy()
+        
+        # Build UI
+        if HAVE_CTK:
+            ctk.CTkLabel(
+                dialog, text="Session Title:",
+                font=get_ctk_font(size=12),
+                text_color=self.theme.fg
+            ).pack(anchor="w", padx=20, pady=(15, 5))
+            
+            entry_colors = get_ctk_entry_colors(self.theme)
+            entry = ctk.CTkEntry(
+                dialog,
+                textvariable=title_var,
+                font=get_ctk_font(size=12),
+                height=32, corner_radius=8,
+                **entry_colors
+            )
+            entry.pack(fill="x", padx=20, pady=(0, 10))
+            
+            btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+            btn_frame.pack(fill="x", padx=20, pady=(0, 15))
+            
+            success_colors = get_ctk_button_colors(self.theme, "success")
+            ctk.CTkButton(
+                btn_frame, text="Save",
+                font=get_ctk_font(size=12),
+                width=70, height=32, corner_radius=8,
+                command=do_save,
+                **success_colors
+            ).pack(side="right", padx=(5, 0))
+            
+            sec_colors = get_ctk_button_colors(self.theme, "secondary")
+            ctk.CTkButton(
+                btn_frame, text="Cancel",
+                font=get_ctk_font(size=12),
+                width=70, height=32, corner_radius=8,
+                command=do_cancel,
+                **sec_colors
+            ).pack(side="right")
+        else:
+            tk.Label(
+                dialog, text="Session Title:",
+                font=("Segoe UI", 10),
+                bg=self.colors["bg"], fg=self.colors["fg"]
+            ).pack(anchor="w", padx=20, pady=(15, 5))
+            
+            entry = tk.Entry(
+                dialog,
+                textvariable=title_var,
+                font=("Segoe UI", 10),
+                bg=self.colors.get("input_bg", self.colors["text_bg"]),
+                fg=self.colors["fg"],
+                insertbackground=self.colors["fg"],
+                relief=tk.FLAT,
+                highlightthickness=1,
+                highlightbackground=self.colors["border"]
+            )
+            entry.pack(fill="x", padx=20, pady=(0, 10))
+            
+            btn_frame = tk.Frame(dialog, bg=self.colors["bg"])
+            btn_frame.pack(fill="x", padx=20, pady=(0, 15))
+            
+            tk.Button(
+                btn_frame, text="Save",
+                font=("Segoe UI", 10),
+                bg=self.colors["accent"], fg="#ffffff",
+                relief=tk.FLAT, padx=10, pady=6,
+                command=do_save, cursor="hand2"
+            ).pack(side="right", padx=(5, 0))
+            
+            tk.Button(
+                btn_frame, text="Cancel",
+                font=("Segoe UI", 10),
+                bg=self.colors["button_bg"], fg=self.colors["fg"],
+                relief=tk.FLAT, padx=10, pady=6,
+                command=do_cancel, cursor="hand2"
+            ).pack(side="right")
+        
+        # Select all text
+        try:
+            entry.select_range(0, tk.END)
+        except (AttributeError, tk.TclError):
+            pass
+        
+        # Keyboard shortcuts
+        dialog.protocol("WM_DELETE_WINDOW", do_cancel)
+        dialog.bind("<Escape>", lambda e: do_cancel())
+        dialog.bind("<Return>", lambda e: do_save())
+        
+        entry.focus_set()
+        dialog.wait_window()
+    
+    def _delete_session(self):
+        """Delete current chat session after confirmation."""
+        if self.is_loading or self._destroyed:
+            return
+        
+        from tkinter import messagebox
+        from ...session_manager import delete_session, save_sessions
+        
+        session_title = self.session.title or f"Session {self.session.session_id}"
+        
+        if not messagebox.askyesno(
+            "Delete Session",
+            f"Permanently delete \"{session_title}\"?\n\nThis will close the chat window and remove all messages.",
+            parent=self.root
+        ):
+            return
+        
+        sid = self.session.session_id
+        if delete_session(sid):
+            save_sessions()
+            self._close()
+        else:
+            self._update_status("Failed to delete session", self.theme.accent_red)
     
     # =========================================================================
     # Focus & Close
