@@ -44,6 +44,8 @@ class ChatSession:
         # System instruction for follow-up messages in chat window
         # Not persisted, only used for active sessions
         self.system_instruction = None
+        # Per-session model override (None = use global config model)
+        self.model_override = None
     
     def add_message(self, role, content, attachments=None):
         """
@@ -139,6 +141,9 @@ class ChatSession:
             "title": self.title,
             "messages": self.messages,
         }
+        # Only include model_override when set (keep JSON clean)
+        if self.model_override is not None:
+            d["model_override"] = self.model_override
         return d
     
     @classmethod
@@ -160,6 +165,7 @@ class ChatSession:
         session.updated_at = data.get("updated_at", session.created_at)
         session.title = data.get("title")
         session.messages = data.get("messages", [])
+        session.model_override = data.get("model_override", None)
         
         return session
 

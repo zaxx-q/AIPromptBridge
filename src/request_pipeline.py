@@ -248,9 +248,11 @@ class RequestPipeline:
                 if callbacks.on_error:
                     callbacks.on_error(content)
         
-        # Execute the actual API call
+        # Execute the actual API call — pass model_override so per-session
+        # model selection is respected in the streaming path
         text, reasoning, usage, error = call_api_chat_stream(
-            session, config, ai_params, key_managers, stream_wrapper
+            session, config, ai_params, key_managers, stream_wrapper,
+            model_override=ctx.model
         )
         
         ctx.elapsed_time = time.time() - start_time

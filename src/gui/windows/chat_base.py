@@ -61,11 +61,13 @@ class ChatWindowBase(ABC):
         self.thinking_collapsed_states: Dict[int, bool] = {}
         self.last_usage = None
         
-        # Model selection
+        # Model selection — per-session override takes priority over global
         self.available_models: List[Dict] = []
         from ... import web_server
         provider = web_server.CONFIG.get("default_provider", "google")
-        self.selected_model = web_server.CONFIG.get(f"{provider}_model", "")
+        # Use session's model_override if set, otherwise None (will show global sentinel)
+        self.selected_model = self.session.model_override  # None = use global
+        self._last_global_model = web_server.CONFIG.get(f"{provider}_model", "")
         
         # Theme
         self.theme = get_colors()
@@ -254,7 +256,7 @@ class ChatWindowBase(ABC):
                 command=self._on_model_select
             )
             self.model_dropdown.pack(side="right", padx=(5, 0))
-            self.model_dropdown.set(self.selected_model or "(default)")
+            self.model_dropdown.set(self.selected_model or self._get_global_sentinel())
             
             ctk.CTkLabel(
                 btn_frame,
@@ -316,7 +318,7 @@ class ChatWindowBase(ABC):
                 btn_frame, values=["(loading...)"], width=30, state="readonly"
             )
             self.model_dropdown.pack(side=tk.RIGHT, padx=(5, 0))
-            self.model_dropdown.set(self.selected_model or "(default)")
+            self.model_dropdown.set(self.selected_model or self._get_global_sentinel())
             self.model_dropdown.bind("<<ComboboxSelected>>", lambda e: self._on_model_select(self.model_dropdown.get()))
             
             tk.Label(
@@ -1001,6 +1003,13 @@ class ChatWindowBase(ABC):
             if color:
                 self.status_label.configure(fg=color)
     
+    def _get_global_sentinel(self) -> str:
+        """Build the '(Use Global: <model>)' sentinel label from current config."""
+        from ... import web_server
+        provider = web_server.CONFIG.get("default_provider", "google")
+        global_model = web_server.CONFIG.get(f"{provider}_model", "")
+        return f"(Use Global: {global_model})" if global_model else "(Use Global)"
+    
     def _load_models(self):
         """Load available models in background."""
         if self._destroyed:
@@ -1019,37 +1028,87 @@ class ChatWindowBase(ABC):
                     if self._destroyed:
                         return
                     try:
-                        provider = web_server.CONFIG.get("default_provider", "google")
-                        current = web_server.CONFIG.get(f"{provider}_model", "")
+                        # Prepend dynamic global sentinel to dropdown values
+                        sentinel = self._get_global_sentinel()
+                        dropdown_values = [sentinel] + model_ids
+                        
                         if HAVE_CTK:
-                            self.model_dropdown.configure(values=model_ids)
-                            if current and current in model_ids:
-                                self.model_dropdown.set(current)
-                            elif model_ids:
-                                self.model_dropdown.set(current if current else model_ids[0])
+                            self.model_dropdown.configure(values=dropdown_values)
+                        else:
+                            self.model_dropdown.configure(values=dropdown_values)
+                        
+                        # Set dropdown value based on session override
+                        if self.session.model_override:
+                            # Session has a specific model override
+                            if self.session.model_override in model_ids:
+                                self.model_dropdown.set(self.session.model_override)
                             else:
-                                self.model_dropdown.set("(no models)")
+                                # Model not in list but still use it
+                                self.model_dropdown.set(self.session.model_override)
+                        else:
+                            # No override — show global sentinel
+                            self.model_dropdown.set(sentinel)
                     except Exception:
                         pass
                 
                 self._safe_after(0, update_dropdown)
+                # Start periodic global sentinel refresh
+                self._safe_after(3000, self._refresh_global_sentinel)
         except Exception as e:
             print(f"[ChatWindowBase] Error loading models: {e}")
     
+    def _refresh_global_sentinel(self):
+        """Periodically check if the global model has changed and update the sentinel label."""
+        if self._destroyed:
+            return
+        try:
+            from ... import web_server
+            provider = web_server.CONFIG.get("default_provider", "google")
+            current_global = web_server.CONFIG.get(f"{provider}_model", "")
+            
+            if current_global != self._last_global_model:
+                self._last_global_model = current_global
+                new_sentinel = self._get_global_sentinel()
+                
+                # Rebuild dropdown values with updated sentinel
+                if self.available_models:
+                    model_ids = [m['id'] for m in self.available_models]
+                    dropdown_values = [new_sentinel] + model_ids
+                    
+                    if HAVE_CTK:
+                        self.model_dropdown.configure(values=dropdown_values)
+                    else:
+                        self.model_dropdown.configure(values=dropdown_values)
+                    
+                    # If session is using global (no override), update display
+                    if self.session.model_override is None:
+                        self.model_dropdown.set(new_sentinel)
+        except Exception:
+            pass
+        
+        # Re-schedule every 3 seconds
+        self._safe_after(3000, self._refresh_global_sentinel)
+    
     def _on_model_select(self, selected: str):
-        """Handle model selection."""
-        from ...config import save_config_value
+        """Handle model selection — per-session, not global."""
         from ... import web_server
         
-        if selected and selected not in ("(loading...)", "(no models)", "(default)"):
+        if not selected or selected in ("(loading...)", "(no models)"):
+            return
+        
+        if selected.startswith("(Use Global"):
+            # User selected the global sentinel — clear override
+            self.session.model_override = None
+            self.selected_model = None
+            self._update_status(f"✅ Using global model", self.theme.accent_green)
+        else:
+            # User selected a specific model — set per-session override
+            self.session.model_override = selected
             self.selected_model = selected
-            provider = web_server.CONFIG.get("default_provider", "google")
-            config_key = f"{provider}_model"
-            if save_config_value(config_key, selected):
-                web_server.CONFIG[config_key] = selected
-                self._update_status(f"✅ Model: {selected}", self.theme.accent_green)
-            else:
-                self._update_status(f"Model: {selected} (not saved)")
+            self._update_status(f"✅ Session model: {selected}", self.theme.accent_green)
+        
+        # Persist to session storage (not global config)
+        add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
     
     # =========================================================================
     # Clipboard
@@ -1155,7 +1214,7 @@ class ChatWindowBase(ABC):
             
             streaming_enabled = web_server.CONFIG.get("streaming_enabled", True)
             current_provider = web_server.CONFIG.get("default_provider", "google")
-            current_model = self.selected_model or web_server.CONFIG.get(f"{current_provider}_model", "")
+            current_model = self.session.model_override or web_server.CONFIG.get(f"{current_provider}_model", "")
             
             ctx = RequestContext(
                 origin=RequestOrigin.CHAT_WINDOW,
@@ -2068,7 +2127,7 @@ class ChatWindowBase(ABC):
             
             streaming_enabled = web_server.CONFIG.get("streaming_enabled", True)
             current_provider = web_server.CONFIG.get("default_provider", "google")
-            current_model = self.selected_model or web_server.CONFIG.get(f"{current_provider}_model", "")
+            current_model = self.session.model_override or web_server.CONFIG.get(f"{current_provider}_model", "")
             
             ctx = RequestContext(
                 origin=RequestOrigin.CHAT_WINDOW,
@@ -2387,6 +2446,8 @@ class ChatWindowBase(ABC):
         new_session.messages = [msg.copy() for msg in self.session.messages[:index + 1]]
         new_session.title = f"Branch: {self.session.title or 'Untitled'}"
         new_session.system_instruction = self.session.system_instruction
+        # Carry over model override so branched sessions use the same model
+        new_session.model_override = self.session.model_override
         
         # Save the branched session
         add_session(new_session, web_server.CONFIG.get("max_sessions", 200))
