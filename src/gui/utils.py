@@ -148,9 +148,22 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         text_widget: A tk.Text widget (not CTkTextbox)
         colors: Color scheme dict or ThemeColors dataclass
     """
+    # Read chat message background config
+    try:
+        from .. import web_server
+        _config = web_server.CONFIG
+    except (ImportError, AttributeError):
+        _config = {}
+    
+    chat_bg_enabled = _config.get("chat_message_bg_enabled", True)
+    custom_user_bg = _config.get("chat_user_bg_color", "")
+    custom_assistant_bg = _config.get("chat_assistant_bg_color", "")
+    
     # Convert ThemeColors to dict if needed
     if hasattr(colors, '__dataclass_fields__'):
         color_dict = {
+            "bg": colors.bg,
+            "text_bg": colors.text_bg,
             "header1": colors.accent,
             "header2": colors.accent,
             "header3": colors.accent,
@@ -171,6 +184,20 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
             "select_fg": colors.bg,
         }
         colors = color_dict
+    
+    # Apply chat message background overrides from config
+    if not chat_bg_enabled:
+        # Disable backgrounds entirely — use the chat area's text_bg (transparent look)
+        text_bg = colors.get("text_bg", colors.get("bg", ""))
+        if text_bg:
+            colors["user_bg"] = text_bg
+            colors["assistant_bg"] = text_bg
+    else:
+        # Apply custom colors if specified (non-empty hex strings)
+        if custom_user_bg and custom_user_bg.startswith("#"):
+            colors["user_bg"] = custom_user_bg
+        if custom_assistant_bg and custom_assistant_bg.startswith("#"):
+            colors["assistant_bg"] = custom_assistant_bg
     
     # Configure text selection colors
     select_bg = colors.get("select_bg", colors.get("accent", "#89b4fa"))

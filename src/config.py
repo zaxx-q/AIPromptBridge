@@ -122,6 +122,12 @@ DEFAULT_CONFIG = {
     # true = Use the originating action's system prompt for follow-up messages
     # false = Always use chat_window_system_instruction from prompts.json
     "chat_use_origin_system_prompt": True,
+    # Chat message background coloring
+    # Enable/disable colored backgrounds for user/assistant messages
+    "chat_message_bg_enabled": True,
+    # Custom background colors (hex, empty = use theme default)
+    "chat_user_bg_color": "",
+    "chat_assistant_bg_color": "",
     # Update settings
     "update_check_enabled": True,       # Auto-check on startup
 }
@@ -578,6 +584,17 @@ session_image_quality = 85
 # true = Use the originating action's system prompt for follow-up messages
 # false = Always use chat_window_system_instruction from prompts.json
 chat_use_origin_system_prompt = true
+
+# Chat message background coloring
+# Enable/disable colored backgrounds for user/assistant messages in the chat window
+# false = transparent (no background tinting)
+chat_message_bg_enabled = true
+
+# Custom background colors for chat messages (hex color, empty = use theme default)
+# Examples: #1e3a5f (blue-ish for user), #1e3e2e (green-ish for assistant)
+# Leave empty to use the current theme's default colors
+chat_user_bg_color =
+chat_assistant_bg_color =
 
 # ============================================================
 # UPDATE SETTINGS

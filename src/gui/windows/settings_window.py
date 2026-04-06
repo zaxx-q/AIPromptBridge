@@ -838,6 +838,23 @@ class SettingsWindow:
                                self.config_data.config.get("chat_use_origin_system_prompt", True),
                                hint="Use the action's system prompt for follow-up messages instead of global one")
         
+        # Chat message background coloring
+        self._add_toggle_field(content_parent, "chat_message_bg_enabled",
+                               "Chat message background coloring",
+                               self.config_data.config.get("chat_message_bg_enabled", True),
+                               hint="Enable colored backgrounds for user/assistant messages (disable for transparent)")
+        
+        # Custom chat background colors
+        self._add_entry_field(content_parent, "chat_user_bg_color",
+                             "User msg background:",
+                             self.config_data.config.get("chat_user_bg_color") or "",
+                             width=120, hint="Hex color override (e.g. #1e3a5f). Empty = theme default")
+        
+        self._add_entry_field(content_parent, "chat_assistant_bg_color",
+                             "Assistant msg background:",
+                             self.config_data.config.get("chat_assistant_bg_color") or "",
+                             width=120, hint="Hex color override (e.g. #1e3e2e). Empty = theme default")
+        
         # Session Auto-Save
         row = ctk.CTkFrame(content_parent, fg_color="transparent") if self.use_ctk else tk.Frame(content_parent, bg=self.colors.bg)
         row.pack(fill="x", pady=8)
