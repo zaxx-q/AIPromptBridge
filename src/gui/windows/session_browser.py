@@ -29,6 +29,22 @@ from .utils import set_window_icon, set_dark_titlebar
 
 
 # =============================================================================
+# Browser Instance Registry (for cross-window refresh notifications)
+# =============================================================================
+
+_BROWSER_INSTANCES = set()
+
+def notify_browsers_refresh():
+    """Notify all open browser windows to refresh their session lists."""
+    for browser in list(_BROWSER_INSTANCES):
+        try:
+            if not browser._destroyed:
+                browser._safe_after(0, browser._refresh)
+        except Exception:
+            pass
+
+
+# =============================================================================
 # Session List Components (lightweight tk-based for performance)
 # =============================================================================
 
@@ -293,6 +309,9 @@ class BrowserWindowBase(ABC):
         self.sort_descending = True
         
         self._destroyed = False
+        
+        # Register in browser instance registry
+        _BROWSER_INSTANCES.add(self)
         self.session_items: List = []
         
         # UI refs
@@ -574,6 +593,7 @@ class BrowserWindowBase(ABC):
     def _close(self):
         """Close window."""
         self._destroyed = True
+        _BROWSER_INSTANCES.discard(self)
         unregister_window(self._get_window_tag())
         try:
             if self.root:

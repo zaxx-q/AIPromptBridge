@@ -2366,6 +2366,9 @@ class ChatWindowBase(ABC):
             if new_title:
                 self.session.title = new_title
                 save_sessions()
+                # Notify any open browser windows to refresh
+                from .session_browser import notify_browsers_refresh
+                notify_browsers_refresh()
                 # Update window title bar
                 try:
                     if self.root and not self._destroyed:
@@ -2489,6 +2492,9 @@ class ChatWindowBase(ABC):
         sid = self.session.session_id
         if delete_session(sid):
             save_sessions()
+            # Notify any open browser windows to refresh
+            from .session_browser import notify_browsers_refresh
+            notify_browsers_refresh()
             self._close()
         else:
             self._update_status("Failed to delete session", self.theme.accent_red)
