@@ -428,6 +428,32 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         lmargin1=24, lmargin2=24, rmargin=24,
         spacing1=4, spacing3=4)
     
+    # Bold/italic variants for display math wrapped in markdown formatting
+    # e.g. **$$...$$** → latex_block_bold
+    text_widget.tag_configure("latex_block_bold",
+        font=(mono_font, 11, "bold"),
+        foreground=colors.get("accent_yellow", colors["accent"]),
+        background=colors["code_bg"],
+        justify="left",
+        lmargin1=24, lmargin2=24, rmargin=24,
+        spacing1=4, spacing3=4)
+    
+    text_widget.tag_configure("latex_block_italic",
+        font=(mono_font, 11, "italic"),
+        foreground=colors.get("accent_yellow", colors["accent"]),
+        background=colors["code_bg"],
+        justify="left",
+        lmargin1=24, lmargin2=24, rmargin=24,
+        spacing1=4, spacing3=4)
+    
+    text_widget.tag_configure("latex_block_bold_italic",
+        font=(mono_font, 11, "bold italic"),
+        foreground=colors.get("accent_yellow", colors["accent"]),
+        background=colors["code_bg"],
+        justify="left",
+        lmargin1=24, lmargin2=24, rmargin=24,
+        spacing1=4, spacing3=4)
+    
     # Technical symbols font (center pieces) - used for characters
     # that are missing or look poor in monospaced fonts.
     text_widget.tag_configure("latex_symbols",
@@ -815,16 +841,34 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                 _render_table(text_widget, table_data, colors, role_tag, block_tag, line_prefix)
             continue
         
-        # Check for LaTeX display block placeholder
-        latex_match = re.match(r'^__LATEX_DISPLAY_(\d+)__$', stripped)
+        # Check for LaTeX display block placeholder (optionally wrapped in bold/italic markers)
+        # Matches: __LATEX_DISPLAY_0__, **__LATEX_DISPLAY_0__**, *__LATEX_DISPLAY_0__*,
+        #          ***__LATEX_DISPLAY_0__***, ___...___, __...__
+        latex_match = re.match(
+            r'^(\*{1,3}|_{1,3})?__LATEX_DISPLAY_(\d+)__(\*{1,3}|_{1,3})?$',
+            stripped
+        )
         if latex_match:
-            latex_idx = int(latex_match.group(1))
+            latex_idx = int(latex_match.group(2))
             if latex_idx < len(latex_display_blocks):
                 latex_content = latex_display_blocks[latex_idx]
                 try:
                     converted = latex_to_unicode(latex_content)
                 except Exception:
                     converted = latex_content
+                
+                # Determine formatting from surrounding markers
+                open_marker = latex_match.group(1) or ""
+                marker_len = len(open_marker)
+                if marker_len == 3:
+                    latex_tag = "latex_block_bold_italic"
+                elif marker_len == 2:
+                    latex_tag = "latex_block_bold"
+                elif marker_len == 1:
+                    latex_tag = "latex_block_italic"
+                else:
+                    latex_tag = "latex_block"
+                
                 # Need to handle each line separately to apply prefix correctly
                 converted_lines = converted.split('\n')
                 for idx, line_str in enumerate(converted_lines):
@@ -834,7 +878,7 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                     if line_prefix:
                         text_widget.insert(tk.END, line_prefix, build_tags("normal"))
                     
-                    tags = build_tags("latex_block")
+                    tags = build_tags(latex_tag)
                     
                     # Technical characters that need Segoe UI Symbol
                     symbol_chars = "⎨⎬"
