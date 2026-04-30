@@ -617,7 +617,8 @@ class OpenAICompatibleProvider(BaseProvider):
                 accumulated_tool_calls,
                 output_tokens
             ):
-                self.log("warn", "Empty response detected (no content, 0 output tokens)")
+                thinking_note = f", thinking: {len(accumulated_thinking)} chars" if accumulated_thinking else ""
+                self.log("warn", f"Empty response detected (no content{thinking_note})")
                 
                 if self.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
                     delay = self.get_retry_delay(RetryReason.EMPTY_RESPONSE)
@@ -843,7 +844,8 @@ class OpenAICompatibleProvider(BaseProvider):
             
             # Check for empty response
             if self.detect_empty_response(content, reasoning, tool_calls, usage_data.completion_tokens):
-                self.log("warn", "Empty response detected")
+                thinking_note = f", thinking: {len(reasoning)} chars" if reasoning else ""
+                self.log("warn", f"Empty response detected (no content{thinking_note})")
                 
                 if self.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
                     delay = self.get_retry_delay(RetryReason.EMPTY_RESPONSE)

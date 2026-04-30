@@ -1182,7 +1182,8 @@ class GeminiNativeProvider(BaseProvider):
                 accumulated_tool_calls,
                 output_tokens
             ):
-                self.log("warn", "Empty or incomplete response detected (no text/tools)")
+                thinking_note = f", thinking: {len(accumulated_thinking)} chars" if accumulated_thinking else ""
+                self.log("warn", f"Empty response detected (no content{thinking_note})")
                 
                 if self.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
                     delay = self.get_retry_delay(RetryReason.EMPTY_RESPONSE)
@@ -1397,7 +1398,8 @@ class GeminiNativeProvider(BaseProvider):
                 tool_calls,
                 usage_data.completion_tokens
             ):
-                self.log("warn", "Empty or incomplete response detected")
+                thinking_note = f", thinking: {len(accumulated_thinking)} chars" if accumulated_thinking else ""
+                self.log("warn", f"Empty response detected (no content{thinking_note})")
                 
                 if self.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
                     delay = self.get_retry_delay(RetryReason.EMPTY_RESPONSE)

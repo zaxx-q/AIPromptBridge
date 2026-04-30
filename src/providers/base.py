@@ -246,10 +246,12 @@ class BaseProvider(ABC):
         output_tokens: int
     ) -> bool:
         """
-        Detect an empty response (0 output tokens + no content).
+        Detect an empty response that should be retried.
         
-        This matches the reverse-proxy behavior where responses with
-        no actual content are detected and retried.
+        A valid response must have actual text content OR tool calls.
+        Thinking/reasoning content alone is NOT sufficient — sometimes the
+        model streams thinking but cuts off before producing the actual
+        response (upstream issue). This ensures we retry in those cases.
         
         Args:
             content: Accumulated text content
@@ -260,12 +262,11 @@ class BaseProvider(ABC):
         Returns:
             True if response is considered empty
         """
-        has_content = bool(
+        has_actual_content = bool(
             content.strip() or
-            thinking.strip() or
             tool_calls
         )
-        return output_tokens == 0 and not has_content
+        return not has_actual_content
     
     def log(self, level: str, message: str, **kwargs):
         """
