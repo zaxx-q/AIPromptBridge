@@ -204,21 +204,22 @@ class TextEditToolApp:
             initial_text=text
         )
     
-    def _on_direct_chat(self, user_input: str, response_mode: str = "default"):
+    def _on_direct_chat(self, user_input: str, response_mode: str = "default", preset_override: Optional[str] = None):
         """
         Handle direct chat input (no selected text).
         
         Args:
             user_input: The user's chat input
             response_mode: Response mode ("default", "replace", or "show")
+            preset_override: Optional model preset name to override for this request
         """
-        logging.debug(f'Direct chat input: {user_input[:50]}..., mode: {response_mode}')
+        logging.debug(f'Direct chat input: {user_input[:50]}..., mode: {response_mode}, preset: {preset_override}')
         
         self._begin_task()
         
         threading.Thread(
             target=self._process_direct_chat,
-            args=(user_input, response_mode),
+            args=(user_input, response_mode, preset_override),
             daemon=True
         ).start()
     
@@ -328,7 +329,7 @@ class TextEditToolApp:
         
         threading.Thread(target=_timeout, daemon=True).start()
     
-    def _on_option_selected(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None):
+    def _on_option_selected(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None, preset_override: Optional[str] = None):
         """
         Handle option selection from popup.
         
@@ -339,17 +340,18 @@ class TextEditToolApp:
             response_mode: Response mode ("default", "replace", or "show")
             active_modifiers: List of active modifier keys
             compare_text: Optional second text for compare mode
+            preset_override: Optional model preset name to override for this request
         """
         if active_modifiers is None:
             active_modifiers = []
         
-        logging.debug(f'Option selected: {option_key}, mode: {response_mode}, modifiers: {active_modifiers}, compare={bool(compare_text)}')
+        logging.debug(f'Option selected: {option_key}, mode: {response_mode}, modifiers: {active_modifiers}, compare={bool(compare_text)}, preset: {preset_override}')
         
         self._begin_task()
         
         threading.Thread(
             target=self._process_option,
-            args=(option_key, selected_text, custom_input, response_mode, active_modifiers, compare_text),
+            args=(option_key, selected_text, custom_input, response_mode, active_modifiers, compare_text, preset_override),
             daemon=True
         ).start()
     
@@ -661,7 +663,7 @@ class TextEditToolApp:
         # Fallback to global chat_window_system_instruction
         return self.prompts.get_chat_window_system_instruction()
     
-    def _process_direct_chat(self, user_input: str, response_mode: str = "default"):
+    def _process_direct_chat(self, user_input: str, response_mode: str = "default", preset_override: Optional[str] = None):
         """
         Process direct chat input.
         
@@ -671,6 +673,7 @@ class TextEditToolApp:
                 - "show": Force show in chat window
                 - "replace": Force type to active field
                 - "default": Use show_ai_response_in_chat_window config setting
+            preset_override: Optional model preset name to override for this request
         """
         self.cancel_requested = False
         try:
@@ -683,6 +686,12 @@ class TextEditToolApp:
             )
             
             messages = build_text_message(user_input, chat_system_instruction)
+            
+            # Build action config for preset override (direct chat has no action config)
+            action_config = {"model_preset": preset_override} if preset_override else None
+            
+            # Store action config for preset resolution in streaming paths
+            self._current_action_config = action_config
             
             # Session origin for direct chat (no text selected)
             session_origin = "directchat"
@@ -722,7 +731,7 @@ class TextEditToolApp:
                     )
                 else:
                     # Non-streaming: wait for response, then show window
-                    response, error = self._call_api(messages, origin_override=RequestOrigin.POPUP_INPUT)
+                    response, error = self._call_api(messages, origin_override=RequestOrigin.POPUP_INPUT, action_config=action_config)
                     
                     if error:
                         logging.error(f'Direct chat failed: {error}')
@@ -785,7 +794,7 @@ class TextEditToolApp:
                     
                     try:
                         from ..request_pipeline import RequestOrigin
-                        response, error = self._call_api(messages, on_chunk=type_chunk, origin_override=RequestOrigin.POPUP_INPUT)
+                        response, error = self._call_api(messages, on_chunk=type_chunk, origin_override=RequestOrigin.POPUP_INPUT, action_config=action_config)
                         
                         # Type any remaining buffered text (unless aborted)
                         if chunk_buffer and not self.streaming_aborted and not typing_aborted:
@@ -800,7 +809,7 @@ class TextEditToolApp:
                 else:
                     # Non-streaming: get full response then paste instantly
                     from ..request_pipeline import RequestOrigin
-                    response, error = self._call_api(messages, origin_override=RequestOrigin.POPUP_INPUT)
+                    response, error = self._call_api(messages, origin_override=RequestOrigin.POPUP_INPUT, action_config=action_config)
                     
                     # Paste the full response instantly using clipboard
                     if response and not error:
@@ -830,7 +839,7 @@ class TextEditToolApp:
         finally:
             self._end_task()
     
-    def _process_option(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None):
+    def _process_option(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None, preset_override: Optional[str] = None):
         """
         Process the selected option.
         
@@ -872,6 +881,11 @@ class TextEditToolApp:
         try:
             action_options = self._get_action_options()
             option = action_options.get(option_key, {})
+            
+            # Apply popup-level preset override (takes priority over action's model_preset)
+            if preset_override:
+                option = dict(option)  # Don't mutate the original
+                option["model_preset"] = preset_override
             
             # Store action config for preset resolution in streaming paths
             self._current_action_config = option
