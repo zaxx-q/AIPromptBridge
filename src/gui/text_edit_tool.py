@@ -1212,6 +1212,12 @@ class TextEditToolApp:
         session = ChatSession(origin=session_origin)
         session.title = window_title
         
+        # Carry over preset override to the chat session
+        action_config = getattr(self, '_current_action_config', None)
+        if action_config and action_config.get("model_preset"):
+            if self.config.get("preset_selector_enabled", True):
+                session.preset_override = action_config["model_preset"]
+        
         # Extract user content from the already-built messages
         user_text = self._extract_user_content_from_messages(messages)
         if user_text:
@@ -1342,6 +1348,12 @@ class TextEditToolApp:
         # Create a temporary session for this response
         session = ChatSession(origin=session_origin)
         session.title = window_title
+        
+        # Carry over preset override to the chat session
+        action_config = getattr(self, '_current_action_config', None)
+        if action_config and action_config.get("model_preset"):
+            if self.config.get("preset_selector_enabled", True):
+                session.preset_override = action_config["model_preset"]
         
         # Extract user content from the already-built messages
         user_text = self._extract_user_content_from_messages(messages)

@@ -446,6 +446,11 @@ class AudioToolApp:
         session = ChatSession(origin=session_origin)
         session.title = window_title
         
+        # Carry over preset override to the chat session
+        if action_config and action_config.get("model_preset"):
+            if self.config.get("preset_selector_enabled", True):
+                session.preset_override = action_config["model_preset"]
+        
         # Save audio to external file for persistence
         attachment_path = AttachmentManager.save_audio(
             session_id=session.session_id,

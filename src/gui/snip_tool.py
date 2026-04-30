@@ -624,6 +624,11 @@ class SnipToolApp:
         )
         session.title = window_title
         
+        # Carry over preset override to the chat session
+        if action_config and action_config.get("model_preset"):
+            if self.config.get("preset_selector_enabled", True):
+                session.preset_override = action_config["model_preset"]
+        
         attachments = []
         
         # Helper to detect mime from path
