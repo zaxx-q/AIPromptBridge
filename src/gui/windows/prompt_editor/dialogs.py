@@ -657,7 +657,8 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
     def _on_provider_change(self, provider: str = None):
         """Show/hide fields based on selected provider."""
         if not provider:
-            provider = self.field_widgets.get("provider", {}).get("var", tk.StringVar()).get()
+            provider_info = self.field_widgets.get("provider")
+            provider = provider_info["var"].get() if provider_info else ""
 
         # Unpack all field rows, then re-pack visible ones in defined order
         for key, _, _, _ in self.PRESET_FIELDS:
@@ -682,10 +683,16 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         """Fetch models from the selected provider in a background thread."""
         import threading
 
-        provider = self.field_widgets.get("provider", {}).get("var", tk.StringVar()).get()
+        # Collect all UI values on the main thread to avoid tk.StringVar
+        # access from background threads (causes RuntimeError).
+        provider_info = self.field_widgets.get("provider")
+        provider = provider_info["var"].get() if provider_info else ""
         if not provider:
             self._set_model_status("❌ Select provider first", "error")
             return
+
+        custom_url_info = self.field_widgets.get("custom_url")
+        custom_url_value = custom_url_info["var"].get() if custom_url_info else ""
 
         self._set_model_status("🔄 Loading...", "info")
 
@@ -705,11 +712,9 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 temp_config = {"request_timeout": 30}
 
                 if provider == "custom":
-                    custom_url = self.field_widgets.get("custom_url", {}).get("var", tk.StringVar()).get()
-                    if not custom_url:
-                        custom_url = config.get("custom_url", "")
-                    if custom_url:
-                        temp_config["custom_url"] = custom_url
+                    url = custom_url_value or config.get("custom_url", "")
+                    if url:
+                        temp_config["custom_url"] = url
                     else:
                         self._schedule_ui(lambda: self._set_model_status("❌ No custom URL", "error"))
                         return
@@ -718,8 +723,8 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 models, error = provider_instance.fetch_models()
 
                 if error:
-                    err = str(error)[:35]
-                    self._schedule_ui(lambda: self._set_model_status(f"❌ {err}", "error"))
+                    err_msg = f"❌ {str(error)[:35]}"
+                    self._schedule_ui(lambda: self._set_model_status(err_msg, "error"))
                     return
 
                 if not models:
@@ -738,8 +743,8 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 self._schedule_ui(_update)
 
             except Exception as e:
-                err = str(e)[:30]
-                self._schedule_ui(lambda: self._set_model_status(f"❌ {err}", "error"))
+                err_msg = f"❌ {str(e)[:30]}"
+                self._schedule_ui(lambda: self._set_model_status(err_msg, "error"))
 
         threading.Thread(target=_fetch, daemon=True).start()
 
@@ -763,12 +768,27 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self._model_status_label.configure(text=text, fg=color)
 
     def _schedule_ui(self, callback):
-        """Schedule a UI update on the main thread."""
+        """Schedule a UI update on the main thread via GUICoordinator."""
+        if self._destroyed:
+            return
+
+        def safe_wrapper():
+            if not self._destroyed:
+                try:
+                    callback()
+                except Exception:
+                    pass
+
         try:
-            if not self._destroyed and self.winfo_exists():
-                self.after(0, callback)
+            from ...core import GUICoordinator
+            GUICoordinator.get_instance().run_on_gui_thread(safe_wrapper)
         except Exception:
-            pass
+            # Fallback if GUICoordinator not available
+            try:
+                if self.winfo_exists():
+                    self.after(0, safe_wrapper)
+            except Exception:
+                pass
 
     # -------------------------------------------------------------------------
     # Summary panel
@@ -781,7 +801,8 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         overrides = []
         defaults = []
-        provider = self.field_widgets.get("provider", {}).get("var", tk.StringVar()).get()
+        provider_info = self.field_widgets.get("provider")
+        provider = provider_info["var"].get() if provider_info else ""
 
         for key, label, field_type, _ in self.PRESET_FIELDS:
             widget_info = self.field_widgets.get(key)
@@ -928,7 +949,13 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             if widget_info["type"] == "checkbox":
                 widget_info["enabled_var"].set(True)
                 widget_info["var"].set(bool(val))
-            elif widget_info["type"] in ("entry", "combobox", "model_dropdown"):
+            elif widget_info["type"] == "model_dropdown":
+                str_val = str(val) if val is not None and val != "" else ""
+                widget_info["var"].set(str_val)
+                w = widget_info.get("widget")
+                if w and hasattr(w, "set"):
+                    w.set(str_val)
+            elif widget_info["type"] in ("entry", "combobox"):
                 str_val = str(val) if val is not None and val != "" else ""
                 widget_info["var"].set(str_val)
 
@@ -997,6 +1024,14 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 else:
                     widget_info["enabled_var"].set(False)
                     widget_info["var"].set(False)
+            elif widget_info["type"] == "model_dropdown":
+                # Use .set() on the widget directly so ScrollableComboBox
+                # updates both its internal state and the entry display.
+                str_val = str(val) if val is not None else ""
+                widget_info["var"].set(str_val)
+                w = widget_info.get("widget")
+                if w and hasattr(w, "set"):
+                    w.set(str_val)
             else:
                 widget_info["var"].set(str(val) if val is not None else "")
 

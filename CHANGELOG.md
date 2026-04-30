@@ -1,5 +1,27 @@
 # Changelog
 
+## [6.4.0] - 2026-04-30
+
+### New Features
+
+- **Preset Selector Mode**: Model dropdowns in the Chat Window and Audio Analyzer now support a "preset mode" that displays saved model presets instead of raw model lists. When enabled and presets are defined, selecting a preset automatically applies its full configuration (provider, model, temperature, thinking, etc.) to the session. A new toggle in General Settings (`Use model presets in dropdowns`) controls this behavior.
+- **Popup Preset Override**: TextEdit and Snip Tool popups now include a model preset dropdown, allowing you to override the model configuration on a per-request basis without changing global settings. The selected preset is automatically carried over to any resulting chat sessions.
+- **Copy Response Mode**: Added a "Copy" option to response mode toggles in TextEdit Tool popups. Selecting "Copy" sends the AI response directly to your clipboard with a toast notification, instead of replacing text or opening a chat window.
+- **Preset Manager in Settings**: The Model Preset Manager is now accessible directly from the Settings window's Generation tab, in addition to the Prompt Editor. The manager has been enhanced with provider-specific field visibility, a model dropdown with live fetching, a summary panel showing overridden vs. default fields, a "Test" button for verifying presets, and a "Populate from Config" shortcut.
+
+### Improvements
+
+- **Prompt Editor Modularization**: The Prompt Editor has been restructured from a single large file into a dedicated package with separate modules for each tab, improving maintainability and code organization.
+- **Settings Window Modularization**: The Settings Window has been similarly restructured into a modular package with dedicated files for each settings tab and shared widget utilities.
+- **Settings Layout**: Adjusted the Settings window default size and reorganized the Theme tab to show the live preview first for immediate visual feedback. The Generation tab now includes a dedicated Model Presets section.
+- **Icon Picker**: Simplified the icon input process in the Prompt Editor by replacing the emoji picker button with direct paste instructions and a placeholder.
+
+### Fixes
+
+- **LaTeX Currency Detection**: Fixed inline LaTeX parsing to correctly render single-digit math expressions like `$3$` or `$9$` that were previously being misidentified as currency values and skipped.
+- **LaTeX Display Blocks**: Fixed an issue where display math blocks (`$$...$$`) wrapped in Markdown bold or italic markers (e.g., `**$$...$$**`) would render as raw `__LATEX_DISPLAY_N__` placeholders instead of being properly converted to Unicode.
+- **Preset Manager Thread Safety**: Fixed potential crashes in the Preset Manager where accessing UI elements from background threads during model fetching could cause RuntimeErrors.
+
 ## [6.3.0] - 2026-04-06
 
 ### New Features
