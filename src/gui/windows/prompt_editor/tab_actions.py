@@ -122,14 +122,13 @@ class ActionsTabMixin:
             self.editor_widgets["icon_var"] = tk.StringVar(master=self.root)
             self.editor_widgets["icon_entry"] = ctk.CTkEntry(
                 row_frame, textvariable=self.editor_widgets["icon_var"],
-                font=get_ctk_font(16), width=70, height=34, **get_ctk_entry_colors(self.colors)
+                font=get_ctk_font(16), width=70, height=34,
+                placeholder_text="📋",
+                **get_ctk_entry_colors(self.colors)
             )
             self.editor_widgets["icon_entry"].pack(side="left", padx=(12, 8))
-            ctk.CTkButton(
-                row_frame, text="Emoji 🎨", font=get_ctk_font(13),
-                width=100, height=34, **get_ctk_button_colors(self.colors, "secondary"),
-                command=self._pick_icon
-            ).pack(side="left")
+            ctk.CTkLabel(row_frame, text="(paste emoji here — Ctrl+V)", font=get_ctk_font(11),
+                        text_color=self.colors.surface2).pack(side="left", padx=(4, 0))
         else:
             tk.Label(row_frame, text="Icon:", font=("Segoe UI", 10), width=12, anchor="w",
                     bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
@@ -139,9 +138,8 @@ class ActionsTabMixin:
                 font=("Segoe UI", 12), width=5, bg=self.colors.input_bg, fg=self.colors.fg
             )
             self.editor_widgets["icon_entry"].pack(side="left", padx=(10, 5))
-            tk.Button(row_frame, text="Emoji 🎨", font=("Segoe UI", 9),
-                     bg=self.colors.surface1, fg=self.colors.fg,
-                     command=self._pick_icon).pack(side="left")
+            tk.Label(row_frame, text="(paste emoji here — Ctrl+V)", font=("Segoe UI", 9),
+                    bg=self.colors.bg, fg=self.colors.surface2).pack(side="left", padx=(4, 0))
         
         # Prompt type dropdown (Text Edit Tool only)
         self.prompt_type_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
@@ -456,40 +454,6 @@ class ActionsTabMixin:
         
         # Update field visibility
         self._update_editor_visibility()
-
-    def _pick_icon(self):
-        """Open the Windows native emoji picker (Win+.) and focus the icon entry."""
-        # Focus the icon entry field so the emoji picker inserts into it
-        icon_entry = self.editor_widgets.get("icon_entry")
-        if icon_entry:
-            icon_entry.focus_set()
-            # Select all existing text so the new emoji replaces it
-            if self.use_ctk:
-                icon_entry.select_range(0, "end")
-            else:
-                icon_entry.select_range(0, tk.END)
-        
-        # Trigger Windows native emoji picker via Win+.
-        try:
-            import ctypes
-            # Simulate Win+. keypress using SendInput
-            user32 = ctypes.windll.user32
-            
-            # Key codes
-            VK_LWIN = 0x5B
-            VK_OEM_PERIOD = 0xBE
-            KEYEVENTF_KEYUP = 0x0002
-            
-            # Press Win
-            user32.keybd_event(VK_LWIN, 0, 0, 0)
-            # Press .
-            user32.keybd_event(VK_OEM_PERIOD, 0, 0, 0)
-            # Release .
-            user32.keybd_event(VK_OEM_PERIOD, 0, KEYEVENTF_KEYUP, 0)
-            # Release Win
-            user32.keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0)
-        except Exception as e:
-            print(f"[PromptEditor] Could not open emoji picker: {e}")
 
     def _refresh_preset_dropdown(self):
         """Refresh the model preset dropdown values from prompts config."""
