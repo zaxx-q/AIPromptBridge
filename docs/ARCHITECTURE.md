@@ -468,7 +468,24 @@ The `EmojiRenderer` class manages the loading, caching, and rendering of emoji i
 
 GUI editor for `config.ini` (`src/gui/settings_window.py`):
 
-- **Tabbed Interface**: General, Provider, Streaming, TextEditTool, API Keys, Endpoints, Theme
+Modularized as a package (`src/gui/windows/settings_window/`):
+
+| Module | Contents |
+|--------|----------|
+| `config_io.py` | `ConfigData`, `parse_config_full()`, `save_config_full()` — pure data layer |
+| `widgets.py` | `ToggleSwitch`, `FormFieldsMixin` — uniform layout constants and field helpers |
+| `core.py` | Core `SettingsWindow` composing all tab mixins, window lifecycle, save/reset |
+| `tab_general.py` | `GeneralTabMixin` — startup, behavior, updates, server settings |
+| `tab_provider.py` | `ProviderTabMixin` — providers, models, request settings, model fetching |
+| `tab_generation.py` | `GenerationTabMixin` — streaming, thinking, typing speed, AI parameters |
+| `tab_tools.py` | `ToolsTabMixin` — TextEditTool, ScreenSnip, Audio Tool |
+| `tab_tts.py` | `TTSTabMixin` — TTS voice, AI Director, export & playback |
+| `tab_keys.py` | `KeysTabMixin` — API key management per provider |
+| `tab_endpoints.py` | `EndpointsTabMixin` — Flask endpoints, prompt editor |
+| `tab_theme.py` | `ThemeTabMixin` — theme/mode, chat colors, live preview |
+
+- **Tabbed Interface**: General, Provider, Generation, Tools, TTS, API Keys, Endpoints, Theme
+- **Uniform Layout**: Standardized field widths and hint positioning via `FormFieldsMixin`
 - **API Key Naming**: Supports associative names for API keys via inline comments
 - **Model Dropdowns**: Interactive dropdowns for model selection with background refreshing
 - **Live Preview**: Theme tab shows real-time preview of color changes

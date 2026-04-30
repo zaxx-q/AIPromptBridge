@@ -88,7 +88,19 @@ AIPromptBridge/
     │       │   ├── tab_playground.py   # Playground tab mixin
     │       │   └── tab_tts_playground.py # TTS playground mixin
     │       ├── session_browser.py  # Session history browser
-    │       ├── settings_window.py  # GUI editor for config.ini
+    │       ├── settings_window/    # Settings window package (modularized)
+    │       │   ├── __init__.py         # Public API re-exports
+    │       │   ├── config_io.py        # ConfigData, parse/save config.ini
+    │       │   ├── widgets.py          # ToggleSwitch, FormFieldsMixin (uniform layout)
+    │       │   ├── core.py             # Core SettingsWindow (mixin composition)
+    │       │   ├── tab_general.py      # General tab mixin (startup, behavior, updates)
+    │       │   ├── tab_provider.py     # Provider tab mixin (providers, models, requests)
+    │       │   ├── tab_generation.py   # Generation tab mixin (streaming, thinking, typing, AI params)
+    │       │   ├── tab_tools.py        # Tools tab mixin (TextEdit, ScreenSnip, Audio)
+    │       │   ├── tab_tts.py          # TTS tab mixin (voice, director, export)
+    │       │   ├── tab_keys.py         # API Keys tab mixin
+    │       │   ├── tab_endpoints.py    # Endpoints tab mixin
+    │       │   └── tab_theme.py        # Theme tab mixin (theme, chat colors, preview)
     │       ├── tts_window.py       # TTS UI (voice selection, AI Director, playback)
     │       └── utils.py            # Window management utilities
     │
@@ -140,7 +152,7 @@ AIPromptBridge/
 | `popups.py` | Themed popup dialogs with dual inputs (Edit/Ask) and scrollable ModifierBar |
 | `hotkey.py` | pynput-based global hotkey listener |
 | `themes.py` | ThemeRegistry with 7 themes, dark/light variants, system detection |
-| `settings_window.py` | GUI editor for config.ini with tabbed interface |
+| `windows/settings_window/` | Modular settings window package (mixin-based, 12 files) |
 | `windows/prompt_editor/` | Modular prompt editor package (mixin-based, 10 files) |
 
 ### Providers (`src/providers/`)
