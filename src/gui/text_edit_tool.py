@@ -210,7 +210,7 @@ class TextEditToolApp:
         
         Args:
             user_input: The user's chat input
-            response_mode: Response mode ("default", "replace", or "show")
+            response_mode: Response mode ("default", "copy", "replace", or "show")
             preset_override: Optional model preset name to override for this request
         """
         logging.debug(f'Direct chat input: {user_input[:50]}..., mode: {response_mode}, preset: {preset_override}')
@@ -663,14 +663,73 @@ class TextEditToolApp:
         # Fallback to global chat_window_system_instruction
         return self.prompts.get_chat_window_system_instruction()
     
+    def _copy_to_clipboard_with_notification(self, messages, action_key="AI Response", action_config=None):
+        """Execute non-streaming request, copy result to clipboard, show notification.
+        
+        Args:
+            messages: API messages to send
+            action_key: Label for logging and notification
+            action_config: Optional action config dict (may contain model_preset)
+        """
+        from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
+        from ..preset_resolver import resolve_preset
+        import pyperclip
+        
+        resolved = resolve_preset(action_config, self.config, self.ai_params, self.key_managers)
+        
+        ctx = RequestContext(
+            origin=RequestOrigin.POPUP_INPUT,
+            provider=resolved.provider,
+            model=resolved.model,
+            streaming=False,  # Must be non-streaming for copy mode
+            thinking_enabled=resolved.thinking_enabled
+        )
+        
+        ctx = RequestPipeline.execute_simple(
+            ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers
+        )
+        
+        if ctx.error:
+            logging.error(f'Copy mode request failed: {ctx.error}')
+            print(f"  [Error] {ctx.error}")
+            from .popups import show_error_popup
+            show_error_popup(
+                title="API Request Failed",
+                message="Failed to get AI response for copy.",
+                details=ctx.error
+            )
+            return
+        
+        if ctx.response_text:
+            # Copy to clipboard
+            try:
+                pyperclip.copy(ctx.response_text)
+                
+                # Play sound
+                from ..utils import play_sound
+                play_sound("assets/snip.wav")
+                
+                # Show toast notification
+                from .core import GUICoordinator
+                GUICoordinator.get_instance().request_toast_notification(
+                    title=f"{action_key}",
+                    message=ctx.response_text
+                )
+                
+                print(f"  \u2705 Copied to clipboard ({len(ctx.response_text)} chars)")
+            except Exception as e:
+                logging.error(f"Failed to copy to clipboard: {e}")
+                print(f"  [Error] Failed to copy: {e}")
+
     def _process_direct_chat(self, user_input: str, response_mode: str = "default", preset_override: Optional[str] = None):
         """
         Process direct chat input.
         
         Args:
             user_input: The user's chat input
-            response_mode: Response mode ("default", "replace", or "show")
+            response_mode: Response mode ("default", "copy", "replace", or "show")
                 - "show": Force show in chat window
+                - "copy": Copy response to clipboard
                 - "replace": Force type to active field
                 - "default": Use show_ai_response_in_chat_window config setting
             preset_override: Optional model preset name to override for this request
@@ -702,6 +761,8 @@ class TextEditToolApp:
             # 3. Config setting show_ai_response_in_chat_window
             if response_mode == "show":
                 show_gui = True
+            elif response_mode == "copy":
+                show_gui = None  # Handled separately below
             elif response_mode == "replace":
                 show_gui = False
             else:  # "default"
@@ -711,7 +772,15 @@ class TextEditToolApp:
             # Resolve followup system instruction based on origin
             followup_system_instruction = self._resolve_followup_system_instruction(session_origin)
             
-            if show_gui:
+            if response_mode == "copy":
+                # Copy mode: non-streaming request, copy result to clipboard
+                print(f"\n{'\u2500'*60}")
+                print(f"[AI Response] Copying to clipboard...")
+                
+                self._copy_to_clipboard_with_notification(messages, action_key="AI Chat", action_config=action_config)
+                
+                print(f"{'\u2500'*60}\n")
+            elif show_gui:
                 # Stream directly into chat window for real-time display
                 streaming_enabled = self.config.get("streaming_enabled", True)
                 
@@ -847,7 +916,7 @@ class TextEditToolApp:
             option_key: The selected option key (including "Custom" and "_Ask")
             selected_text: The selected text
             custom_input: Custom input text (for Custom edit or _Ask question)
-            response_mode: Response mode ("default", "replace", or "show")
+            response_mode: Response mode ("default", "copy", "replace", or "show")
             active_modifiers: List of active modifier keys
             compare_text: Optional second text for compare mode
         
@@ -906,6 +975,8 @@ class TextEditToolApp:
             # Hierarchy: radio button > compare mode > modifiers > per-action setting > default (False)
             if response_mode == "show":
                 show_in_chat_window = True
+            elif response_mode == "copy":
+                show_in_chat_window = None  # Handled separately below
             elif response_mode == "replace":
                 show_in_chat_window = False
             elif is_compare_mode:
@@ -998,7 +1069,15 @@ class TextEditToolApp:
             # Resolve followup system instruction based on origin
             followup_system_instruction = self._resolve_followup_system_instruction(session_origin)
             
-            if show_in_chat_window:
+            if response_mode == "copy":
+                # Copy mode: non-streaming request, copy result to clipboard
+                print(f"\n{'\u2500'*60}")
+                print(f"[AI Response] Copying to clipboard...")
+                
+                self._copy_to_clipboard_with_notification(messages, action_key=option_key, action_config=option)
+                
+                print(f"{'\u2500'*60}\n")
+            elif show_in_chat_window:
                 # Stream directly into chat window for real-time display
                 streaming_enabled = resolved.config.get("streaming_enabled", True)
                 

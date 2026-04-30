@@ -1352,10 +1352,11 @@ class InputPopup(BasePopup):
             
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
-                options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
+                options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
                 default_value="default",
                 tooltips={
                     "Default": "Use the action's configured response mode",
+                    "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
                     "Show": "Show the response in a chat window"
                 }
@@ -1426,10 +1427,11 @@ class InputPopup(BasePopup):
             
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
-                options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
+                options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
                 default_value="default",
                 tooltips={
                     "Default": "Use the action's configured response mode",
+                    "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
                     "Show": "Show the response in a chat window"
                 }
@@ -1628,10 +1630,11 @@ class PromptSelectionPopup(BasePopup):
             
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
-                options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
+                options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
                 default_value="default",
                 tooltips={
                     "Default": "Use the action's configured response mode",
+                    "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
                     "Show": "Show the response in a chat window"
                 }
@@ -1709,10 +1712,11 @@ class PromptSelectionPopup(BasePopup):
             
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
-                options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
+                options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
                 default_value="default",
                 tooltips={
                     "Default": "Use the action's configured response mode",
+                    "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
                     "Show": "Show the response in a chat window"
                 }
@@ -2034,10 +2038,11 @@ class AttachedInputPopup:
             
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
-                options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
+                options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
                 default_value="default",
                 tooltips={
                     "Default": "Use the action's configured response mode",
+                    "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
                     "Show": "Show the response in a chat window"
                 }
@@ -2136,10 +2141,11 @@ class AttachedInputPopup:
             
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
-                options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
+                options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
                 default_value="default",
                 tooltips={
                     "Default": "Use the action's configured response mode",
+                    "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
                     "Show": "Show the response in a chat window"
                 }
@@ -2461,10 +2467,11 @@ class AttachedPromptPopup:
             
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
-                options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
+                options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
                 default_value="default",
                 tooltips={
                     "Default": "Use the action's configured response mode",
+                    "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
                     "Show": "Show the response in a chat window"
                 }
@@ -2688,10 +2695,11 @@ class AttachedPromptPopup:
             
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
-                options=[("Default", "default"), ("Replace", "replace"), ("Show", "show")],
+                options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
                 default_value="default",
                 tooltips={
                     "Default": "Use the action's configured response mode",
+                    "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
                     "Show": "Show the response in a chat window"
                 }
