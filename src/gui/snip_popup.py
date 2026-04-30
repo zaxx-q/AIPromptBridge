@@ -273,13 +273,6 @@ class AttachedSnipPopup:
         source_frame = ctk.CTkFrame(right_side, fg_color="transparent")
         source_frame.pack(fill="x", pady=(0, 8))
         
-        ctk.CTkLabel(
-            source_frame,
-            text="Actions:",
-            font=get_ctk_font(size=11),
-            text_color=self.colors.overlay0
-        ).pack(side="left", padx=(0, 8))
-        
         # Dropdown for action source
         sources = ["Snip Actions"]
         if "text_edit_tool" in self.prompts_config:
@@ -293,7 +286,6 @@ class AttachedSnipPopup:
             values=sources,
             variable=self.source_var,
             command=self._on_source_changed,
-            width=160,
             height=28,
             corner_radius=6,
             fg_color=self.colors.surface0,
@@ -304,8 +296,14 @@ class AttachedSnipPopup:
             text_color=self.colors.text,
             font=get_ctk_font(size=11)
         )
-        self.source_dropdown.pack(side="left")
+        self.source_dropdown.pack(side="left", fill="x", expand=True)
+        Tooltip(self.source_dropdown, "Select action source category")
         
+        # Model preset dropdown (only if presets exist)
+        self.preset_var, self.preset_dropdown, preset_frame = create_preset_dropdown_ctk(right_side, self.colors)
+        if preset_frame:
+            preset_frame.pack(fill="x", pady=(0, 8))
+
         # Response mode toggle
         toggle_frame = ctk.CTkFrame(right_side, fg_color="transparent")
         toggle_frame.pack(fill="x", pady=(0, 8))
@@ -322,11 +320,6 @@ class AttachedSnipPopup:
             }
         )
         self.response_toggle.pack(anchor="center")
-        
-        # Model preset dropdown (only if presets exist)
-        self.preset_var, self.preset_dropdown, preset_frame = create_preset_dropdown_ctk(right_side, self.colors)
-        if preset_frame:
-            preset_frame.pack(fill="x", pady=(0, 8))
         
         # Custom input with send button
         input_frame = ctk.CTkFrame(
@@ -503,14 +496,6 @@ class AttachedSnipPopup:
         source_frame = tk.Frame(right_side, bg=self.colors.base)
         source_frame.pack(fill=tk.X, pady=(0, 8))
         
-        tk.Label(
-            source_frame,
-            text="Actions:",
-            font=("Arial", 10),
-            bg=self.colors.base,
-            fg=self.colors.overlay0
-        ).pack(side=tk.LEFT, padx=(0, 8))
-        
         # For tk, use a simple label toggle instead of dropdown
         self.source_label = tk.Label(
             source_frame,
@@ -522,8 +507,14 @@ class AttachedSnipPopup:
             pady=4,
             cursor="hand2"
         )
-        self.source_label.pack(side=tk.LEFT)
+        self.source_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.source_label.bind('<Button-1>', self._toggle_source_tk)
+        Tooltip(self.source_label, "Select action source category")
+        
+        # Model preset dropdown (only if presets exist)
+        self.preset_var, self.preset_dropdown, preset_frame = create_preset_dropdown_tk(right_side, self.root, self.colors)
+        if preset_frame:
+            preset_frame.pack(fill=tk.X, pady=(0, 8))
         
         # Response mode toggle
         toggle_frame = tk.Frame(right_side, bg=self.colors.base)
@@ -541,11 +532,6 @@ class AttachedSnipPopup:
             }
         )
         self.response_toggle.pack(anchor=tk.CENTER)
-        
-        # Model preset dropdown (only if presets exist)
-        self.preset_var, self.preset_dropdown, preset_frame = create_preset_dropdown_tk(right_side, self.root, self.colors)
-        if preset_frame:
-            preset_frame.pack(fill=tk.X, pady=(0, 8))
         
         # Input
         input_container = tk.Frame(

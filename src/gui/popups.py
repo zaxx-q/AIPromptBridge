@@ -1160,13 +1160,6 @@ def create_preset_dropdown_ctk(parent, colors):
     
     frame = ctk.CTkFrame(parent, fg_color="transparent")
     
-    ctk.CTkLabel(
-        frame,
-        text="Preset:",
-        font=get_ctk_font(size=11),
-        text_color=colors.overlay0
-    ).pack(side="left", padx=(0, 8))
-    
     preset_var = tk.StringVar(value="(Default)")
     dropdown = ctk.CTkOptionMenu(
         frame,
@@ -1183,7 +1176,7 @@ def create_preset_dropdown_ctk(parent, colors):
         text_color=colors.text,
         font=get_ctk_font(size=11)
     )
-    dropdown.pack(side="left")
+    dropdown.pack(side="left", fill="x", expand=True)
     Tooltip(dropdown, "Override model preset for this request")
     
     return preset_var, dropdown, frame
@@ -1203,14 +1196,6 @@ def create_preset_dropdown_tk(parent, root, colors):
     
     frame = tk.Frame(parent, bg=colors.base)
     
-    tk.Label(
-        frame,
-        text="Preset:",
-        font=("Arial", 10),
-        bg=colors.base,
-        fg=colors.overlay0
-    ).pack(side=tk.LEFT, padx=(0, 8))
-    
     preset_var = tk.StringVar(master=root, value="(Default)")
     dropdown = tk.OptionMenu(
         frame,
@@ -1227,7 +1212,7 @@ def create_preset_dropdown_tk(parent, root, colors):
         activebackground=colors.surface1,
         activeforeground=colors.text
     )
-    dropdown.pack(side=tk.LEFT)
+    dropdown.pack(side=tk.LEFT, fill=tk.X, expand=True)
     
     return preset_var, dropdown, frame
 
@@ -2481,7 +2466,7 @@ class AttachedPromptPopup:
             # Model preset dropdown (only if presets exist)
             self.preset_var, self.preset_dropdown, preset_frame = create_preset_dropdown_ctk(content_frame, self.colors)
             if preset_frame:
-                preset_frame.pack(fill="x", pady=(0, 8))
+                preset_frame.pack(anchor="center", pady=(0, 8))
             
             # Modifier bar - get from global settings
             from .prompts import get_prompts_config
@@ -2709,7 +2694,7 @@ class AttachedPromptPopup:
             # Model preset dropdown (only if presets exist)
             self.preset_var, self.preset_dropdown, preset_frame = create_preset_dropdown_tk(content_frame, self.root, self.colors)
             if preset_frame:
-                preset_frame.pack(fill=tk.X, pady=(0, 8))
+                preset_frame.pack(anchor=tk.CENTER, pady=(0, 8))
             
             # Modifier bar - get from global settings
             from .prompts import get_prompts_config

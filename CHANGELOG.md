@@ -1,5 +1,14 @@
 # Changelog
 
+## [6.4.1] - 2026-04-30
+
+### Improvements
+- **Popup UI**: Simplified layout in popup menus by removing redundant "Preset:" and "Actions:" text labels from dropdown frames, giving the dropdowns more room to expand responsively.
+
+### Fixes
+- **Chat Window**: Fixed an issue where the "Copy Last" button wouldn't work immediately when reopening an existing session. The last response is now properly initialized from the session history payload on load.
+- **Provider Reliability**: Enhanced empty response detection during API streaming to ignore incomplete responses that only contain "thinking" blocks without any actual text or tool outputs, ensuring these upstream API glitches trigger an automatic retry.
+
 ## [6.4.0] - 2026-04-30
 
 ### New Features
