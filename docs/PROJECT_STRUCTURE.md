@@ -79,7 +79,7 @@ AIPromptBridge/
     │       ├── prompt_editor/      # Prompt editor package (modularized)
     │       │   ├── __init__.py         # Public API re-exports
     │       │   ├── data.py             # JSON I/O, constants
-    │       │   ├── dialogs.py          # EmojiPicker, ThemedInputDialog, PresetManagerDialog
+    │       │   ├── dialogs.py          # ThemedInputDialog, PresetManagerDialog
     │       │   ├── editor.py           # Core PromptEditorWindow (mixin composition)
     │       │   ├── tab_actions.py      # Actions tab mixin
     │       │   ├── tab_settings.py     # Settings tab mixin

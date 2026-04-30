@@ -501,7 +501,7 @@ GUI editor for `prompts.json` — modularized as a package (`src/gui/windows/pro
 |--------|----------|
 | `editor.py` | Core `PromptEditorWindow` composing all tab mixins, window lifecycle |
 | `data.py` | JSON I/O (`load_options`, `save_options`), constants |
-| `dialogs.py` | `EmojiPicker`, `ThemedInputDialog`, `TestResultDialog`, `PresetManagerDialog` |
+| `dialogs.py` | `ThemedInputDialog`, `TestResultDialog`, `PresetManagerDialog` |
 | `tab_actions.py` | `ActionsTabMixin` — action list, editor, CRUD operations |
 | `tab_settings.py` | `SettingsTabMixin` — settings form, `_get_current_setting()` |
 | `tab_modifiers.py` | `ModifiersTabMixin` — modifier CRUD, default tools |

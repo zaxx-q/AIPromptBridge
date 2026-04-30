@@ -3,7 +3,6 @@
 Dialog windows for the Prompt Editor.
 
 Standalone dialog classes that can be used independently:
-- EmojiPicker: Simple emoji selection popup
 - ThemedInputDialog / ask_themed_string: Themed text input dialog
 - TestResultDialog: Streaming API test result viewer
 - PresetManagerDialog: Model preset CRUD manager (usable outside prompt editor)
@@ -24,7 +23,6 @@ from ...themes import (
 from ...custom_widgets import ScrollableButtonList, ScrollableComboBox, create_emoji_button, TkScrollableFrame
 from ..utils import set_window_icon
 
-from .data import COMMON_EMOJIS
 
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
 try:
@@ -33,125 +31,6 @@ try:
 except ImportError:
     HAVE_EMOJI = False
     get_emoji_renderer = None
-
-
-# =============================================================================
-# Emoji Picker (CTk version)
-# =============================================================================
-
-class EmojiPicker(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
-    """Simple emoji picker popup - CTk version."""
-    
-    def __init__(self, parent, callback: Callable[[str], None], colors: ThemeColors):
-        super().__init__(parent)
-        self.callback = callback
-        self.colors = colors
-        self.use_ctk = HAVE_CTK
-        
-        self.title("Pick Icon")
-        self.geometry("450x340")
-        self.transient(parent)
-        self.grab_set()
-        
-        if self.use_ctk:
-            self.configure(fg_color=colors.bg)
-        else:
-            self.configure(bg=colors.bg)
-        
-        # Main frame
-        main_frame = ctk.CTkFrame(self, fg_color=colors.bg) if self.use_ctk else tk.Frame(self, bg=colors.bg)
-        main_frame.pack(fill="both", expand=True, padx=15, pady=15)
-        
-        # Grid of emojis
-        emoji_frame = ctk.CTkFrame(main_frame, fg_color=colors.bg) if self.use_ctk else tk.Frame(main_frame, bg=colors.bg)
-        emoji_frame.pack(fill="both", expand=True)
-        
-        cols = 10
-        for i, emoji in enumerate(COMMON_EMOJIS):
-            row = i // cols
-            col = i % cols
-            if self.use_ctk:
-                img = None
-                btn_text = emoji
-                if HAVE_EMOJI:
-                    renderer = get_emoji_renderer()
-                    img = renderer.get_ctk_image(emoji, size=24)
-                    if img:
-                        btn_text = ""
-
-                btn = ctk.CTkButton(
-                    emoji_frame,
-                    text=btn_text,
-                    image=img,
-                    font=get_ctk_font(18),
-                    width=40,
-                    height=36,
-                    corner_radius=6,
-                    **get_ctk_button_colors(colors, "secondary"),
-                    command=lambda em=emoji: self._select(em)
-                )
-            else:
-                btn = tk.Label(
-                    emoji_frame,
-                    text=emoji,
-                    font=("Segoe UI", 18),
-                    bg=colors.surface0,
-                    fg=colors.fg,
-                    width=3,
-                    height=1,
-                    cursor="hand2"
-                )
-                btn.bind('<Button-1>', lambda e, em=emoji: self._select(em))
-            btn.grid(row=row, column=col, padx=3, pady=3)
-        
-        # Custom entry section
-        custom_frame = ctk.CTkFrame(main_frame, fg_color=colors.bg) if self.use_ctk else tk.Frame(main_frame, bg=colors.bg)
-        custom_frame.pack(fill="x", pady=(15, 0))
-        
-        if self.use_ctk:
-            ctk.CTkLabel(
-                custom_frame,
-                text="Custom:",
-                font=get_ctk_font(12),
-                **get_ctk_label_colors(colors)
-            ).pack(side="left")
-            
-            self.custom_entry = ctk.CTkEntry(
-                custom_frame,
-                width=100,
-                font=get_ctk_font(14),
-                **get_ctk_entry_colors(colors)
-            )
-            self.custom_entry.pack(side="left", padx=10)
-            
-            ctk.CTkButton(
-                custom_frame,
-                text="Use",
-                font=get_ctk_font(11),
-                width=60,
-                **get_ctk_button_colors(colors, "primary"),
-                command=self._use_custom
-            ).pack(side="left")
-        else:
-            tk.Label(custom_frame, text="Custom:", font=("Segoe UI", 11),
-                    bg=colors.bg, fg=colors.fg).pack(side="left")
-            self.custom_entry = tk.Entry(custom_frame, width=12, font=("Segoe UI", 14),
-                                        bg=colors.input_bg, fg=colors.fg)
-            self.custom_entry.pack(side="left", padx=8)
-            tk.Button(custom_frame, text="Use", command=self._use_custom,
-                     bg=colors.accent, fg="#ffffff").pack(side="left")
-    
-    def _select(self, emoji: str):
-        """Select an emoji."""
-        self.callback(emoji)
-        self.destroy()
-    
-    def _use_custom(self):
-        """Use custom text as icon."""
-        text = self.custom_entry.get().strip()
-        if text:
-            self.callback(text)
-            self.destroy()
 
 
 # =============================================================================

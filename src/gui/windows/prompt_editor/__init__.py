@@ -4,7 +4,7 @@ Prompt Editor Package for AIPromptBridge.
 
 Modular prompt editor window split into:
 - data.py: JSON I/O utilities and constants
-- dialogs.py: EmojiPicker, ThemedInputDialog, TestResultDialog, PresetManagerDialog
+- dialogs.py: ThemedInputDialog, TestResultDialog, PresetManagerDialog
 - editor.py: Core PromptEditorWindow composing all tab mixins
 - tab_actions.py: Actions tab (ActionsTabMixin)
 - tab_settings.py: Settings tab (SettingsTabMixin)
