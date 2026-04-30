@@ -140,8 +140,8 @@ class SettingsWindow(
                 self.root.configure(bg=self.colors.bg)
 
         self.root.title("AIPromptBridge Settings")
-        self.root.geometry("1000x700")
-        self.root.minsize(900, 600)
+        self.root.geometry("900x700")
+        self.root.minsize(800, 600)
 
         set_window_icon(self.root)
 

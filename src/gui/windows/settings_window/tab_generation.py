@@ -3,17 +3,18 @@
 Generation tab mixin for Settings Window (renamed from "Streaming").
 
 Sections:
+    📦 Model Presets — open preset manager
     🌊 Streaming — enable/disable streaming responses
     💭 Thinking / Reasoning — thinking mode, output format, budget/level
     ⌨️ Typing — typing delay and speed (moved from Tools tab)
-    🔧 AI Parameters — temperature, max_tokens, top_p (moved from Provider tab)
+    🧪 AI Parameters — temperature, max_tokens, top_p (moved from Provider tab)
 """
 
 import tkinter as tk
 
 from ...platform import HAVE_CTK, ctk
 from ...themes import get_ctk_font, get_ctk_label_colors
-from ...custom_widgets import create_section_header
+from ...custom_widgets import create_section_header, create_emoji_button
 
 
 class GenerationTabMixin:
@@ -22,6 +23,10 @@ class GenerationTabMixin:
     def _create_generation_tab(self, frame):
         """Create the Generation settings tab (streaming + thinking + typing + AI params)."""
         content = self._create_tab_scroll_frame(frame)
+
+        # --- Model Presets ---
+        create_section_header(content, "📦 Model Presets", self.colors, top_padding=20)
+        self._create_preset_manager_button(content)
 
         # --- Streaming ---
         create_section_header(content, "🌊 Streaming", self.colors)
@@ -117,3 +122,35 @@ class GenerationTabMixin:
                              str(top_p_val) if top_p_val != "" and top_p_val is not None else "",
                              size="sm", hint="0.0–1.0. Nucleus sampling threshold")
         self._ai_param_keys.add("ai_param_top_p")
+
+    def _create_preset_manager_button(self, parent):
+        """Create a button to open the Model Preset Manager dialog."""
+        row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        row.pack(fill="x", pady=4)
+
+        if self.use_ctk:
+            ctk.CTkLabel(row,
+                        text="Configure model presets for per-action overrides (provider, model, temperature, etc.)",
+                        font=get_ctk_font(11), justify="left",
+                        **get_ctk_label_colors(self.colors, muted=True)
+                        ).pack(side="left", padx=(0, 12))
+
+        btn = create_emoji_button(
+            row, "Manage Presets", "📦", self.colors, "primary", 160, 36,
+            command=self._open_preset_manager
+        )
+        btn.pack(side="left" if not self.use_ctk else "left")
+
+        if not self.use_ctk:
+            tk.Label(row,
+                    text="Configure model presets for per-action overrides",
+                    font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote
+                    ).pack(side="left", padx=(12, 0))
+
+    def _open_preset_manager(self):
+        """Open the PresetManagerDialog from the prompt_editor package."""
+        try:
+            from ..prompt_editor import PresetManagerDialog
+            PresetManagerDialog(self.root, colors=self.colors)
+        except Exception as e:
+            print(f"[Settings] Error opening preset manager: {e}")

@@ -2,11 +2,11 @@
 """
 Theme tab mixin for Settings Window.
 
-Sections:
+Sections (in display order):
+    👁️ Preview — live theme preview (shown first for immediate feedback)
     🎨 UI Theme — theme + mode dropdowns
-    🔧 Framework — force standard Tk toggle
     🎨 Chat Colors — user/assistant message background overrides (moved from General)
-    👁️ Preview — live theme preview
+    🔧 Framework — force standard Tk toggle
 """
 
 import tkinter as tk
@@ -28,8 +28,24 @@ class ThemeTabMixin:
         """Create the Theme settings tab."""
         content = self._create_tab_scroll_frame(frame)
 
+        # --- Preview (shown first for immediate visual feedback) ---
+        create_section_header(content, "👁️ Preview", self.colors)
+
+        if self.use_ctk:
+            self.preview_frame = ctk.CTkFrame(
+                content, fg_color=self.colors.surface0,
+                corner_radius=10, border_width=1, border_color=self.colors.border
+            )
+        else:
+            self.preview_frame = tk.Frame(content, bg=self.colors.surface0,
+                                         highlightbackground=self.colors.border, highlightthickness=1)
+        self.preview_frame.pack(fill="x", pady=5)
+
+        # We'll populate the preview after the theme vars are created below
+        self._preview_needs_init = True
+
         # --- UI Theme ---
-        create_section_header(content, "🎨 UI Theme", self.colors)
+        create_section_header(content, "🎨 UI Theme", self.colors, top_padding=20)
 
         self._add_dropdown_field(content, "ui_theme", "Theme:",
                                  self.config_data.config.get("ui_theme", "catppuccin"),
@@ -40,14 +56,6 @@ class ThemeTabMixin:
                                  self.config_data.config.get("ui_theme_mode", "auto"),
                                  options=["auto", "dark", "light"], size="sm",
                                  command=lambda x: self._update_theme_preview())
-
-        # --- Framework ---
-        create_section_header(content, "🔧 Framework", self.colors, top_padding=20)
-
-        self._add_toggle_field(content, "ui_force_standard_tk",
-                               "Force Standard Tkinter (Disable Modern UI)",
-                               self.config_data.config.get("ui_force_standard_tk", False),
-                               hint="⚠️ Restart required. Use if CustomTkinter causes performance issues.")
 
         # --- Chat Colors (moved from General tab) ---
         create_section_header(content, "🎨 Chat Colors", self.colors, top_padding=20)
@@ -62,21 +70,18 @@ class ThemeTabMixin:
                              size="sm",
                              hint="Hex color override (e.g. #1e3e2e). Empty = theme default")
 
-        # --- Preview ---
-        create_section_header(content, "👁️ Preview", self.colors, top_padding=20)
+        # --- Framework (moved to bottom — rarely changed) ---
+        create_section_header(content, "🔧 Framework", self.colors, top_padding=20)
 
-        # Preview frame
-        if self.use_ctk:
-            self.preview_frame = ctk.CTkFrame(
-                content, fg_color=self.colors.surface0,
-                corner_radius=10, border_width=1, border_color=self.colors.border
-            )
-        else:
-            self.preview_frame = tk.Frame(content, bg=self.colors.surface0,
-                                         highlightbackground=self.colors.border, highlightthickness=1)
-        self.preview_frame.pack(fill="x", pady=5)
+        self._add_toggle_field(content, "ui_force_standard_tk",
+                               "Force Standard Tkinter (Disable Modern UI)",
+                               self.config_data.config.get("ui_force_standard_tk", False),
+                               hint="⚠️ Restart required. Use if CustomTkinter causes performance issues.")
 
-        self._update_theme_preview()
+        # Now that vars are created, populate the preview
+        if self._preview_needs_init:
+            self._update_theme_preview()
+            self._preview_needs_init = False
 
     def _update_theme_preview(self, event=None):
         """Update the theme preview."""
