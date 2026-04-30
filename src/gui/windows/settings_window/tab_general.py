@@ -50,6 +50,11 @@ class GeneralTabMixin:
                                self.config_data.config.get("chat_message_bg_enabled", True),
                                hint="Enable colored backgrounds for user/assistant messages (disable for transparent)")
 
+        self._add_toggle_field(content, "preset_selector_enabled",
+                               "Use model presets in dropdowns",
+                               self.config_data.config.get("preset_selector_enabled", True),
+                               hint="When enabled and presets are defined, model dropdowns show preset names instead of the full model list")
+
         # Session auto-save
         self._add_dropdown_field(content, "auto_save_session", "New session auto-creation:",
                                  self.config_data.config.get("auto_save_session", "on_attachment"),
