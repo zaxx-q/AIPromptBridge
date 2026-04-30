@@ -50,7 +50,7 @@ class ChatWindowBase(ABC):
         self.wrapped = True
         self.markdown = True
         self.auto_scroll = True
-        self.last_response = initial_response or ""
+        self.last_response = initial_response or self._get_last_assistant_response() or ""
         self.is_loading = False
         self._destroyed = False
         
@@ -113,6 +113,18 @@ class ChatWindowBase(ABC):
     def _get_window_tag(self) -> str:
         """Return unique window tag for registration."""
         pass
+    
+    def _get_last_assistant_response(self) -> str:
+        """Get the last assistant response from session history.
+        
+        Used to initialize last_response when reopening an existing session,
+        so that Copy Last works immediately without requiring a new API call.
+        """
+        if self.session and self.session.messages:
+            for msg in reversed(self.session.messages):
+                if msg.get("role") == "assistant" and msg.get("content"):
+                    return msg["content"]
+        return ""
     
     def _compute_preset_mode(self) -> bool:
         """Check if preset selector mode should be active.
