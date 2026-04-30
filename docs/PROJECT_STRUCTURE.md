@@ -62,10 +62,8 @@ AIPromptBridge/
     │   ├── hotkey.py           # Global hotkey listener (pynput)
     │   ├── platform.py         # UI toolkit authority (HAVE_CTK and fallback logic)
     │   ├── popups.py           # Modern themed popups with scrollable ModifierBar
-    │   ├── prompt_editor.py    # GUI editor for prompts.json
     │   ├── prompts.py          # Unified PromptsConfig loader/manager
     │   ├── screen_snip.py      # Screenshot capture and overlay
-    │   ├── settings_window.py  # GUI editor for config.ini
     │   ├── snip_popup.py       # Popup UI for screen snipping results
     │   ├── snip_tool.py        # Screen Snip controller application
     │   ├── text_edit_tool.py   # TextEditTool application controller
@@ -78,7 +76,19 @@ AIPromptBridge/
     │       ├── audio_analyzer_tk.py # Tkinter fallback for Audio Analyzer
     │       ├── chat_base.py        # Base classes for chat windows
     │       ├── chat_window.py      # Interactive chat window
+    │       ├── prompt_editor/      # Prompt editor package (modularized)
+    │       │   ├── __init__.py         # Public API re-exports
+    │       │   ├── data.py             # JSON I/O, constants
+    │       │   ├── dialogs.py          # EmojiPicker, ThemedInputDialog, PresetManagerDialog
+    │       │   ├── editor.py           # Core PromptEditorWindow (mixin composition)
+    │       │   ├── tab_actions.py      # Actions tab mixin
+    │       │   ├── tab_settings.py     # Settings tab mixin
+    │       │   ├── tab_modifiers.py    # Modifiers tab mixin
+    │       │   ├── tab_groups.py       # Groups tab mixin
+    │       │   ├── tab_playground.py   # Playground tab mixin
+    │       │   └── tab_tts_playground.py # TTS playground mixin
     │       ├── session_browser.py  # Session history browser
+    │       ├── settings_window.py  # GUI editor for config.ini
     │       ├── tts_window.py       # TTS UI (voice selection, AI Director, playback)
     │       └── utils.py            # Window management utilities
     │
@@ -131,7 +141,7 @@ AIPromptBridge/
 | `hotkey.py` | pynput-based global hotkey listener |
 | `themes.py` | ThemeRegistry with 7 themes, dark/light variants, system detection |
 | `settings_window.py` | GUI editor for config.ini with tabbed interface |
-| `prompt_editor.py` | GUI editor for prompts.json with hot-reload |
+| `windows/prompt_editor/` | Modular prompt editor package (mixin-based, 10 files) |
 
 ### Providers (`src/providers/`)
 

@@ -478,10 +478,22 @@ GUI editor for `config.ini` (`src/gui/settings_window.py`):
 
 ### PromptEditorWindow
 
-GUI editor for `prompts.json` (`src/gui/prompt_editor.py`):
+GUI editor for `prompts.json` — modularized as a package (`src/gui/windows/prompt_editor/`):
+
+| Module | Contents |
+|--------|----------|
+| `editor.py` | Core `PromptEditorWindow` composing all tab mixins, window lifecycle |
+| `data.py` | JSON I/O (`load_options`, `save_options`), constants |
+| `dialogs.py` | `EmojiPicker`, `ThemedInputDialog`, `TestResultDialog`, `PresetManagerDialog` |
+| `tab_actions.py` | `ActionsTabMixin` — action list, editor, CRUD operations |
+| `tab_settings.py` | `SettingsTabMixin` — settings form, `_get_current_setting()` |
+| `tab_modifiers.py` | `ModifiersTabMixin` — modifier CRUD, default tools |
+| `tab_groups.py` | `GroupsTabMixin` — group CRUD, default tracking |
+| `tab_playground.py` | `PlaygroundTabMixin` — preview, image/audio/snip, API testing |
+| `tab_tts_playground.py` | `TTSPlaygroundMixin` — TTS director, generation, playback |
 
 - **Actions Tab**: Edit actions for TextEditTool, SnipTool, and AudioTool
-- **Model Presets**: Per-action dropdown to assign presets; "Manage..." button opens the preset manager dialog
+- **Model Presets**: Per-action dropdown to assign presets; "Manage..." button opens the `PresetManagerDialog` (also usable standalone)
 - **Settings Tab**: Edit text output rules and system instructions
 - **Modifiers Tab**: Manage global modifier buttons
 - **Groups Tab**: Organize actions into popup groups for both tools
@@ -494,10 +506,14 @@ GUI editor for `prompts.json` (`src/gui/prompt_editor.py`):
 ```python
 # From any thread
 from src.gui.settings_window import show_settings_window
-from src.gui.prompt_editor import show_prompt_editor
+from src.gui.windows.prompt_editor import show_prompt_editor
 
 show_settings_window()  # Opens Settings window
 show_prompt_editor()    # Opens Prompt Editor
+
+# PresetManagerDialog can be opened independently
+from src.gui.windows.prompt_editor import PresetManagerDialog
+PresetManagerDialog(parent_window, colors)
 ```
 
 Both windows are accessible from the system tray menu.
