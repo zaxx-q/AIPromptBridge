@@ -164,6 +164,30 @@ def resolve_preset(
     )
 
 
+def resolve_preset_by_name(
+    preset_name: str,
+    config: Dict[str, Any],
+    ai_params: Dict[str, Any],
+    key_managers: Dict[str, Any],
+) -> ResolvedPreset:
+    """
+    Resolve a preset by name (convenience wrapper for chat/audio window preset selector).
+
+    Creates a synthetic action dict and delegates to resolve_preset().
+
+    Args:
+        preset_name: Name of the model preset to resolve.
+        config: Global config dictionary.
+        ai_params: Global AI parameters dictionary.
+        key_managers: Dictionary of KeyManager instances.
+
+    Returns:
+        ResolvedPreset with effective settings from the named preset.
+    """
+    action = {"model_preset": preset_name}
+    return resolve_preset(action, config, ai_params, key_managers)
+
+
 def _get_preset(name: str) -> Optional[Dict[str, Any]]:
     """Look up a preset by name from PromptsConfig."""
     try:

@@ -202,11 +202,11 @@ def _create_top_action_bar_tk(window, parent):
     left_frame = tk.Frame(bar, bg=colors.base)
     left_frame.pack(side="left", fill="x")
     
-    # Provider
-    tk.Label(
+    # Provider (hidden in preset mode)
+    window.provider_label_widget = tk.Label(
         left_frame, text="Provider:", font=("Segoe UI", 10),
         bg=colors.base, fg=colors.text
-    ).pack(side="left", padx=(0, 5))
+    )
     
     providers = ["google", "openrouter", "custom"]
     window.provider_dropdown = TkOptionMenuWrapper(
@@ -216,24 +216,36 @@ def _create_top_action_bar_tk(window, parent):
         width=12
     )
     window.provider_dropdown.set(window.provider)
-    window.provider_dropdown.pack(side="left", padx=(0, 15))
     
-    # Model
-    tk.Label(
-        left_frame, text="Model:", font=("Segoe UI", 10),
+    if not window._use_preset_mode:
+        window.provider_label_widget.pack(side="left", padx=(0, 5))
+        window.provider_dropdown.pack(side="left", padx=(0, 15))
+    
+    # Model/Preset
+    dropdown_label = "Preset:" if window._use_preset_mode else "Model:"
+    window.model_label_widget = tk.Label(
+        left_frame, text=dropdown_label, font=("Segoe UI", 10),
         bg=colors.base, fg=colors.text
-    ).pack(side="left", padx=(0, 5))
+    )
+    window.model_label_widget.pack(side="left", padx=(0, 5))
+    
+    if window._use_preset_mode:
+        initial_values = ["(Default)"] + window._get_preset_names()
+        initial_display = "(Default)"
+    else:
+        initial_values = ["(loading...)"]
+        initial_display = window.model or "(loading...)"
     
     window.model_dropdown = ScrollableComboBox(
         left_frame,
         colors=colors,
-        values=["(loading...)"],
+        values=initial_values,
         width=250,
         height=28,
         command=window._on_model_changed
     )
     window.model_dropdown.pack(side="left")
-    window.model_dropdown.set(window.model or "(loading...)")
+    window.model_dropdown.set(initial_display)
     
     # Right: Buttons
     right_frame = tk.Frame(bar, bg=colors.base)

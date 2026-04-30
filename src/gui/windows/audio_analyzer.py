@@ -121,6 +121,10 @@ class AudioAnalyzerWindow:
         self.model = config.get(f"{self.provider}_model", "")
         self.available_models: List[str] = []
         
+        # Preset selector mode
+        self._use_preset_mode = self._compute_preset_mode()
+        self.selected_preset = None  # Active preset name (None = use global)
+        
         # Prompts
         self.prompts = get_prompts_config()
         self.active_modifiers: List[str] = []
@@ -142,6 +146,8 @@ class AudioAnalyzerWindow:
         self.action_indicator_label = None
         self.provider_dropdown = None
         self.model_dropdown = None
+        self.model_label_widget = None  # Label widget ("Model:" or "Preset:")
+        self.provider_label_widget = None  # Provider label (hidden in preset mode)
         self.device_dropdown = None
         self.device_type_var = None
         self.record_btn = None
@@ -170,6 +176,26 @@ class AudioAnalyzerWindow:
     def _get_window_tag(self) -> str:
         """Return unique window tag."""
         return f"audio_analyzer_{self.window_id}"
+    
+    def _compute_preset_mode(self) -> bool:
+        """Check if preset selector mode should be active."""
+        if not self.config.get("preset_selector_enabled", True):
+            return False
+        try:
+            from ..prompts import PromptsConfig
+            pc = PromptsConfig.get_instance()
+            return bool(pc.get_preset_names())
+        except Exception:
+            return False
+    
+    def _get_preset_names(self) -> list:
+        """Get sorted preset names from PromptsConfig."""
+        try:
+            from ..prompts import PromptsConfig
+            pc = PromptsConfig.get_instance()
+            return pc.get_preset_names()
+        except Exception:
+            return []
     
     def _create_window(self):
         """Create the main window."""
@@ -202,8 +228,9 @@ class AudioAnalyzerWindow:
         register_window(self._get_window_tag())
         self.root.protocol("WM_DELETE_WINDOW", self._close)
         
-        # Load models in background
-        threading.Thread(target=self._load_models, daemon=True).start()
+        # Load models in background (skip in preset mode)
+        if not self._use_preset_mode:
+            threading.Thread(target=self._load_models, daemon=True).start()
         
         # Initialize audio system - deferred slightly to allow UI build
         self.root.after(100, self._init_audio)
@@ -301,13 +328,13 @@ class AudioAnalyzerWindow:
         left_frame = ctk.CTkFrame(bar, fg_color="transparent")
         left_frame.pack(side="left", fill="x", expand=True)
         
-        # Provider dropdown
-        ctk.CTkLabel(
+        # Provider dropdown (hidden in preset mode)
+        self.provider_label_widget = ctk.CTkLabel(
             left_frame,
             text="Provider:",
             font=get_ctk_font(size=11),
             text_color=self.colors.text
-        ).pack(side="left", padx=(0, 5))
+        )
         
         providers = ["google", "openrouter", "custom"]
         self.provider_dropdown = ctk.CTkOptionMenu(
@@ -326,26 +353,38 @@ class AudioAnalyzerWindow:
             font=get_ctk_font(size=11)
         )
         self.provider_dropdown.set(self.provider)
-        self.provider_dropdown.pack(side="left", padx=(0, 15))
         
-        # Model dropdown
-        ctk.CTkLabel(
+        if not self._use_preset_mode:
+            self.provider_label_widget.pack(side="left", padx=(0, 5))
+            self.provider_dropdown.pack(side="left", padx=(0, 15))
+        
+        # Model/Preset dropdown
+        dropdown_label = "Preset:" if self._use_preset_mode else "Model:"
+        self.model_label_widget = ctk.CTkLabel(
             left_frame,
-            text="Model:",
+            text=dropdown_label,
             font=get_ctk_font(size=11),
             text_color=self.colors.text
-        ).pack(side="left", padx=(0, 5))
+        )
+        self.model_label_widget.pack(side="left", padx=(0, 5))
+        
+        if self._use_preset_mode:
+            initial_values = ["(Default)"] + self._get_preset_names()
+            initial_display = "(Default)"
+        else:
+            initial_values = ["(loading...)"]
+            initial_display = self.model or "(loading...)"
         
         self.model_dropdown = ScrollableComboBox(
             left_frame,
             colors=self.colors,
-            values=["(loading...)"],
+            values=initial_values,
             width=200,
             height=32,
             command=self._on_model_changed
         )
         self.model_dropdown.pack(side="left")
-        self.model_dropdown.set(self.model or "(loading...)")
+        self.model_dropdown.set(initial_display)
         
         # === Right side: Send/Clear buttons ===
         right_frame = ctk.CTkFrame(bar, fg_color="transparent")
@@ -1851,6 +1890,8 @@ class AudioAnalyzerWindow:
     
     def _on_provider_changed(self, provider: str):
         """Handle provider dropdown change."""
+        if self._use_preset_mode:
+            return  # Provider is determined by the preset
         self.provider = provider
         self.model = self.config.get(f"{provider}_model", "")
         self.model_dropdown.set(self.model or "(loading...)")
@@ -1859,7 +1900,15 @@ class AudioAnalyzerWindow:
         threading.Thread(target=self._load_models, daemon=True).start()
     
     def _on_model_changed(self, model: str):
-        """Handle model selection change."""
+        """Handle model/preset selection change."""
+        if self._use_preset_mode:
+            # Preset mode
+            if model == "(Default)":
+                self.selected_preset = None
+            elif model:
+                self.selected_preset = model
+            return
+        
         if model and model not in ("(loading...)", "(no models)", "(no audio models found)"):
             self.model = model
             # Ensure calling code knows about manually typed models
@@ -2112,6 +2161,18 @@ class AudioAnalyzerWindow:
             show_chat = action.get("show_chat_window", True)
 
         if self.on_action_callback and show_chat:
+            # Resolve effective provider/model (preset overrides if active)
+            effective_provider = self.provider
+            effective_model = self.model
+            if self._use_preset_mode and self.selected_preset:
+                from ...preset_resolver import resolve_preset_by_name
+                resolved = resolve_preset_by_name(
+                    self.selected_preset, self.config,
+                    self.ai_params, self.key_managers
+                )
+                effective_provider = resolved.provider
+                effective_model = resolved.model
+            
             # Delegate to callback (GUI Controller mode) - ONLY if show_chat_window is True
             try:
                 self.on_action_callback(
@@ -2121,8 +2182,8 @@ class AudioAnalyzerWindow:
                     custom_input=custom_text,
                     duration=self.audio_duration,
                     compressed=self.compression_enabled,
-                    provider=self.provider,
-                    model=self.model
+                    provider=effective_provider,
+                    model=effective_model
                 )
                 
                 # Reset processing state
@@ -2196,14 +2257,26 @@ class AudioAnalyzerWindow:
                 
             GUICoordinator.get_instance().run_on_gui_thread(update)
 
+        # Resolve effective provider/model (preset overrides if active)
+        effective_provider = self.provider
+        effective_model = self.model
+        if self._use_preset_mode and self.selected_preset:
+            from ...preset_resolver import resolve_preset_by_name
+            resolved = resolve_preset_by_name(
+                self.selected_preset, self.config,
+                self.ai_params, self.key_managers
+            )
+            effective_provider = resolved.provider
+            effective_model = resolved.model
+        
         tool.analyze_audio(
             audio_data=audio_data,
             mime_type=mime_type,
             action_key=action_key,
             custom_text=custom_text,
             active_modifiers=self.active_modifiers,
-            provider=self.provider,
-            model=self.model,
+            provider=effective_provider,
+            model=effective_model,
             callback_progress=on_progress,
             callback_success=on_success,
             callback_error=on_error
