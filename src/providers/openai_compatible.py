@@ -516,7 +516,15 @@ class OpenAICompatibleProvider(BaseProvider):
             response.encoding = 'utf-8'
             
             chunk_count = 0
+            last_content_time = time.time()  # Track last meaningful content for idle timeout
             for line in response.iter_lines(decode_unicode=True):
+                # Content-idle timeout: detect hangs masked by SSE heartbeats
+                if time.time() - last_content_time > timeout:
+                    response.close()
+                    raise requests.exceptions.Timeout(
+                        f"No content received for {timeout}s (content-idle timeout)"
+                    )
+
                 if not line:
                     continue
                 
@@ -573,24 +581,28 @@ class OpenAICompatibleProvider(BaseProvider):
                         if content:
                             accumulated_content += content
                             callback(CallbackType.TEXT, content)
+                            last_content_time = time.time()
                         
                         # Handle reasoning_content (DeepSeek/thinking style)
                         reasoning = delta.get("reasoning_content", "")
                         if reasoning:
                             accumulated_thinking += reasoning
                             callback(CallbackType.THINKING, reasoning)
+                            last_content_time = time.time()
                         
                         # Also check for "reasoning" field (some servers use this)
                         reasoning_alt = delta.get("reasoning", "")
                         if reasoning_alt:
                             accumulated_thinking += reasoning_alt
                             callback(CallbackType.THINKING, reasoning_alt)
+                            last_content_time = time.time()
                         
                         # Handle tool calls
                         tool_calls = delta.get("tool_calls")
                         if tool_calls:
                             accumulated_tool_calls.extend(tool_calls)
                             callback(CallbackType.TOOL_CALLS, tool_calls)
+                            last_content_time = time.time()
                     
                     # Handle usage data (comes with stream_options.include_usage)
                     # This may come in a chunk with empty choices array

@@ -1119,7 +1119,15 @@ class GeminiNativeProvider(BaseProvider):
             response.encoding = 'utf-8'
             buffer = ""
             
+            last_content_time = time.time()  # Track last meaningful content for idle timeout
             for line in response.iter_lines(decode_unicode=True):
+                # Content-idle timeout: detect hangs masked by SSE heartbeats
+                if time.time() - last_content_time > timeout:
+                    response.close()
+                    raise requests.exceptions.Timeout(
+                        f"No content received for {timeout}s (content-idle timeout)"
+                    )
+
                 if not line:
                     continue
                 
@@ -1137,12 +1145,14 @@ class GeminiNativeProvider(BaseProvider):
                             thinking_text = part["text"]
                             accumulated_thinking += thinking_text
                             callback(CallbackType.THINKING, thinking_text)
+                            last_content_time = time.time()
                         
                         # Handle regular text
                         elif "text" in part and not part.get("thought"):
                             text = part["text"]
                             accumulated_content += text
                             callback(CallbackType.TEXT, text)
+                            last_content_time = time.time()
                         
                         # Handle function calls
                         elif "functionCall" in part:
@@ -1157,6 +1167,7 @@ class GeminiNativeProvider(BaseProvider):
                             }
                             accumulated_tool_calls.append(tool_call)
                             callback(CallbackType.TOOL_CALLS, [tool_call])
+                            last_content_time = time.time()
                     
                     # Capture usage metadata
                     if "usageMetadata" in data:
