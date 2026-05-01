@@ -346,6 +346,32 @@ class OpenAICompatibleProvider(BaseProvider):
                             # If decoding fails, pass through or warn
                             new_content.append(item)
                     
+                    elif mime_type == "application/pdf":
+                        # PDF document handling
+                        b64_data = inline.get("data", "")
+                        filename = item.get("filename", "document.pdf")
+                        
+                        if self._is_openrouter_endpoint():
+                            # OpenRouter format: {"type": "file", "file": {"filename": "...", "file_data": "data:...;base64,..."}}
+                            data_url = f"data:application/pdf;base64,{b64_data}"
+                            new_content.append({
+                                "type": "file",
+                                "file": {
+                                    "filename": filename,
+                                    "file_data": data_url
+                                }
+                            })
+                        else:
+                            # Other OpenAI-compatible endpoints: use data URI in image_url
+                            # (Google OpenAI-compat and some others accept this)
+                            data_url = f"data:application/pdf;base64,{b64_data}"
+                            new_content.append({
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": data_url
+                                }
+                            })
+                    
                     else:
                         # Non-supported inline data - pass through (may be handled by server or fail)
                         new_content.append(item)

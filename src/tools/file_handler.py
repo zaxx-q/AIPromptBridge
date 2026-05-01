@@ -315,9 +315,15 @@ class FileHandler:
         
         elif content_type == "document":
             # Document (PDF) message - use inline_data (preferred for Gemini)
+            # Inject filename so providers (e.g., OpenRouter) can include it
             msgs = build_inline_message(content, mime_type, full_prompt, None)
             for m in msgs:
                 if m["role"] == "user":
+                    # Attach filename to inline_data item for provider conversion
+                    if isinstance(m["content"], list):
+                        for part in m["content"]:
+                            if part.get("type") == "inline_data":
+                                part["filename"] = display_name or filepath.name
                     return m
             return msgs[-1]  # Fallback to last message
         

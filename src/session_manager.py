@@ -116,10 +116,22 @@ class ChatSession:
                                             "data": b64
                                         }
                                     })
-                                else:
+                                elif mime.startswith("image/"):
                                     # Images use image_url (standard abstraction)
                                     data_url = f"data:{mime};base64,{b64}"
                                     content_parts.append({"type": "image_url", "image_url": {"url": data_url}})
+                                else:
+                                    # Documents (PDFs, etc.) use inline_data
+                                    # Providers convert this to their native format
+                                    # (e.g., OpenRouter file type, Gemini inline_data)
+                                    content_parts.append({
+                                        "type": "inline_data",
+                                        "inline_data": {
+                                            "mime_type": mime,
+                                            "data": b64
+                                        },
+                                        "filename": attach.get("filename", "")
+                                    })
                     
                     # Add text content last (context -> question ordering)
                     content_parts.append({"type": "text", "text": content})
