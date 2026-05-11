@@ -10,7 +10,6 @@ AIPromptBridge/
 ├── requirements.txt            # Python dependencies
 ├── config.ini                  # Configuration (auto-generated on first run)
 ├── chat_sessions.json          # Saved chat sessions (auto-created)
-├── keys.json                   # API keys organized by pool (XOR-obfuscated)
 ├── prompts.json                # Unified prompt configuration (TextEdit, Snip, Endpoints)
 ├── tools_config.json           # Tools configuration (auto-generated on demand)
 ├── session_attachments/        # Directory for message attachment files
@@ -33,8 +32,7 @@ AIPromptBridge/
     ├── attachment_manager.py   # Persistent storage for session attachments
     ├── config.py               # Custom INI parser, configuration management, change notification pub/sub
     ├── console.py              # Centralized Rich console configuration
-    ├── key_manager.py          # Runtime key rotation with exhaustion tracking
-    ├── key_store.py            # Persistent pool-based key storage (XOR obfuscation)
+    ├── key_manager.py          # API key rotation with exhaustion tracking and named key lookup
     ├── messages.py             # Multimodal message construction factory
     ├── preset_resolver.py      # Model preset resolution (per-action AI config overrides)
     ├── request_pipeline.py     # Unified request processing with logging
@@ -132,9 +130,8 @@ AIPromptBridge/
 | `web_server.py` | Flask REST API endpoints for image processing |
 | `terminal.py` | Interactive terminal commands when console is visible |
 | `console.py` | Centralized Rich console configuration with custom theme |
-| `config.py` | Custom INI parser with multiline support, change notification pub/sub |
-| `key_manager.py` | Runtime multi-key rotation and exhaustion tracking |
-| `key_store.py` | Singleton for persistent, pool-based API key storage and obfuscation |
+| `config.py` | Custom INI parser with multiline support, key name parsing, change notification pub/sub |
+| `key_manager.py` | Multi-key management with automatic rotation and named key lookup |
 | `preset_resolver.py` | Per-action model preset resolution (merges preset overrides with global config) |
 | `request_pipeline.py` | Unified logging and token tracking for all requests |
 | `session_manager.py` | Chat session persistence to JSON with per-session model override |

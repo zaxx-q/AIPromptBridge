@@ -51,9 +51,8 @@ flowchart TB
         Custom["Custom<br/>Endpoint"]
     end
     
-    subgraph KeyMgr["Key Management"]
-        KS["key_store.py<br/>• keys.json (XOR-obfuscated)<br/>• Pool CRUD & mapping<br/>• Builds KeyManagers"]
-        KM["key_manager.py<br/>• Runtime exhaustion tracking<br/>• Auto-rotation on error<br/>• Retry with backoff"]
+    subgraph KeyMgr["Key Manager"]
+        KM["key_manager.py<br/>• Multiple keys per provider<br/>• Auto-rotation on error<br/>• Exhaustion detection<br/>• Retry with backoff"]
     end
     
     Tray --> Pipeline
@@ -74,7 +73,6 @@ flowchart TB
     OAI --> KM
     Gemini --> KM
     Custom --> KM
-    KS -->|"builds"| KM
 ```
 
 ## Provider System
@@ -316,7 +314,6 @@ If no preset is assigned or a preset field is empty, the global `config.ini` def
 | `custom_url` | `custom_url` | string |
 | `gemini_endpoint` | `gemini_endpoint` | string |
 | `api_key_name` | Selects key by display name | string |
-| `api_key_pool` | Selects key pool (bypasses provider mapping) | string |
 
 ## System Tray (Windows)
 
