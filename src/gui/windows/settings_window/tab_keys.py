@@ -10,10 +10,9 @@ Layout:
     │  [+ Add Pool]  │  key entry + add/remove/reorder │
     │  [- Remove]    │                                 │
     │  [✎ Rename]    │                                 │
-    ├────────────────┴─────────────────────────────────┤
-    │  Provider → Pool Assignment                      │
-    │  Google: [pool ▼]  OpenRouter: [pool ▼]  Custom: │
-    └──────────────────────────────────────────────────┘
+    └────────────────┴─────────────────────────────────┘
+
+Provider → Pool assignment is in the Provider tab (tab_provider.py).
 """
 
 import tkinter as tk
@@ -163,58 +162,6 @@ class KeysTabMixin:
         create_emoji_button(key_btn_frame, "⬆", "", self.colors, "secondary", 35, 32, self._move_key_up).pack(side="left", padx=2)
         create_emoji_button(key_btn_frame, "⬇", "", self.colors, "secondary", 35, 32, self._move_key_down).pack(side="left", padx=2)
 
-        # --- Bottom area: Provider → Pool assignment ---
-        create_section_header(container, "📡 Provider → Pool Assignment", self.colors, top_padding=16)
-
-        assign_frame = ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
-        assign_frame.pack(fill="x", pady=(6, 0))
-
-        pool_ids = self._key_store.get_all_pool_ids()
-        pool_display = [self._pool_label(pid) for pid in pool_ids]
-        current_map = self._key_store.get_provider_pool_map()
-
-        self.widgets["keys_provider_pool_vars"] = {}
-        for provider in ["google", "openrouter", "custom"]:
-            lbl_text = {"google": "Google", "openrouter": "OpenRouter", "custom": "Custom"}[provider]
-
-            if self.use_ctk:
-                ctk.CTkLabel(
-                    assign_frame, text=f"{lbl_text}:",
-                    font=get_ctk_font(12),
-                    **get_ctk_label_colors(self.colors)
-                ).pack(side="left", padx=(0, 4))
-            else:
-                tk.Label(
-                    assign_frame, text=f"{lbl_text}:",
-                    font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg
-                ).pack(side="left", padx=(0, 4))
-
-            current_pool = current_map.get(provider, provider)
-            var = tk.StringVar(master=self.root, value=self._pool_label(current_pool))
-            self.widgets["keys_provider_pool_vars"][provider] = (var, pool_ids)
-
-            if self.use_ctk:
-                dd = ctk.CTkComboBox(
-                    assign_frame, variable=var, values=pool_display,
-                    width=140, height=32, state="readonly",
-                    font=get_ctk_font(11),
-                    fg_color=self.colors.input_bg,
-                    border_color=self.colors.surface1,
-                    button_color=self.colors.surface1,
-                    button_hover_color=self.colors.accent,
-                    dropdown_fg_color=self.colors.surface0,
-                    text_color=self.colors.fg
-                )
-            else:
-                from tkinter import ttk
-                dd = ttk.Combobox(
-                    assign_frame, textvariable=var, values=pool_display,
-                    width=18, state="readonly"
-                )
-            dd.pack(side="left", padx=(0, 18))
-            self.widgets[f"keys_provider_{provider}_dropdown"] = dd
-
         # Track selected pool
         self._selected_pool_id = None
 
@@ -226,8 +173,14 @@ class KeysTabMixin:
     # ------------------------------------------------------------------ #
 
     def _pool_label(self, pool_id: str) -> str:
-        """Format a pool ID for display in dropdowns."""
+        """Format a pool ID for display in list widgets."""
         name = self._key_store.get_pool_display_name(pool_id)
+        return f"{name} ({pool_id})" if name != pool_id else pool_id
+
+    @staticmethod
+    def _pool_label_for_id(key_store, pool_id: str) -> str:
+        """Static helper matching ProviderTabMixin._pool_label_for."""
+        name = key_store.get_pool_display_name(pool_id)
         return f"{name} ({pool_id})" if name != pool_id else pool_id
 
     def _refresh_pool_list(self):
@@ -246,9 +199,6 @@ class KeysTabMixin:
             self._selected_pool_id = pools[0]["id"]
             pool_list.select(self._selected_pool_id)
             self._refresh_key_list()
-
-        # Update provider assignment dropdowns
-        self._refresh_provider_dropdowns()
 
     def _on_pool_selected(self, pool_id: str):
         """Handle pool selection."""
@@ -272,25 +222,6 @@ class KeysTabMixin:
             masked = self._mask_key(kd)
             key_list.add_item(str(i), masked, "🔑")
 
-    def _refresh_provider_dropdowns(self):
-        """Update provider → pool assignment dropdowns with current pools."""
-        pool_ids = self._key_store.get_all_pool_ids()
-        pool_display = [self._pool_label(pid) for pid in pool_ids]
-        current_map = self._key_store.get_provider_pool_map()
-
-        for provider in ["google", "openrouter", "custom"]:
-            var, _ = self.widgets["keys_provider_pool_vars"][provider]
-            self.widgets["keys_provider_pool_vars"][provider] = (var, pool_ids)
-
-            current_pool = current_map.get(provider, provider)
-            var.set(self._pool_label(current_pool))
-
-            dd = self.widgets.get(f"keys_provider_{provider}_dropdown")
-            if dd:
-                if self.use_ctk:
-                    dd.configure(values=pool_display)
-                else:
-                    dd.configure(values=pool_display)
 
     # ------------------------------------------------------------------ #
     # Pool CRUD
@@ -402,13 +333,16 @@ class KeysTabMixin:
 
         Called by the settings window's save handler.
         """
-        # Apply provider → pool assignments from dropdowns
+        # Apply provider → pool assignments (dropdowns live in Provider tab)
+        provider_vars = self.widgets.get("keys_provider_pool_vars", {})
         for provider in ["google", "openrouter", "custom"]:
-            var, pool_ids = self.widgets["keys_provider_pool_vars"][provider]
+            entry = provider_vars.get(provider)
+            if not entry:
+                continue
+            var, pool_ids = entry
             selected_label = var.get()
-            # Resolve label back to pool ID
             for pid in pool_ids:
-                if self._pool_label(pid) == selected_label:
+                if self._pool_label_for_id(self._key_store, pid) == selected_label:
                     self._key_store.set_provider_pool(provider, pid)
                     break
 

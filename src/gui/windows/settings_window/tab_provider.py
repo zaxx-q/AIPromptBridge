@@ -16,6 +16,9 @@ from ...platform import HAVE_CTK, ctk
 from ...themes import get_ctk_font, get_ctk_label_colors
 from ...custom_widgets import create_section_header
 
+# Provider display labels
+_PROVIDER_LABELS = {"google": "Google", "openrouter": "OpenRouter", "custom": "Custom"}
+
 
 class ProviderTabMixin:
     """Mixin providing the Provider tab for SettingsWindow."""
@@ -43,12 +46,16 @@ class ProviderTabMixin:
                                        self.config_data.config.get("custom_model", "") or "",
                                        provider="custom")
 
+        self._create_pool_assignment_dropdown(content, "custom")
+
         # --- OpenRouter ---
         create_section_header(content, "🚀 OpenRouter", self.colors, top_padding=20)
 
         self._add_model_dropdown_field(content, "openrouter_model", "Model:",
                                        self.config_data.config.get("openrouter_model", ""),
                                        provider="openrouter")
+
+        self._create_pool_assignment_dropdown(content, "openrouter")
 
         # --- Google Gemini ---
         create_section_header(content, "💎 Google Gemini", self.colors, top_padding=20)
@@ -61,6 +68,8 @@ class ProviderTabMixin:
                              self.config_data.config.get("gemini_endpoint", "") or "",
                              size="lg",
                              hint="Custom Gemini API base URL (empty = official Google endpoint)")
+
+        self._create_pool_assignment_dropdown(content, "google")
 
         # --- Request Settings (moved from General > Limits) ---
         create_section_header(content, "🔄 Request Settings", self.colors, top_padding=20)
@@ -76,6 +85,69 @@ class ProviderTabMixin:
         self._add_spinbox_field(content, "request_timeout", "Request timeout (s):",
                                self.config_data.config.get("request_timeout", 120),
                                10, 600, hint="Timeout for API requests")
+
+    # -------------------------------------------------------------------------
+    # Pool assignment dropdown (per-provider)
+    # -------------------------------------------------------------------------
+
+    def _create_pool_assignment_dropdown(self, parent, provider: str):
+        """Add a Key Pool dropdown to a provider section."""
+        from src.key_store import KeyStore
+        key_store = KeyStore.get_instance()
+
+        pool_ids = key_store.get_all_pool_ids()
+        pool_display = [self._pool_label_for(key_store, pid) for pid in pool_ids]
+        current_pool = key_store.get_provider_pool_id(provider)
+
+        row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        row.pack(fill="x", padx=(0, 0), pady=(6, 2))
+
+        if self.use_ctk:
+            ctk.CTkLabel(
+                row, text="Key Pool:",
+                font=get_ctk_font(12), width=120, anchor="w",
+                **get_ctk_label_colors(self.colors)
+            ).pack(side="left")
+
+            var = tk.StringVar(master=self.root, value=self._pool_label_for(key_store, current_pool))
+            dd = ctk.CTkComboBox(
+                row, variable=var, values=pool_display,
+                width=200, height=32, state="readonly",
+                font=get_ctk_font(11),
+                fg_color=self.colors.input_bg,
+                border_color=self.colors.surface1,
+                button_color=self.colors.surface1,
+                button_hover_color=self.colors.accent,
+                dropdown_fg_color=self.colors.surface0,
+                text_color=self.colors.fg
+            )
+            dd.pack(side="left", padx=(8, 0))
+        else:
+            tk.Label(
+                row, text="Key Pool:",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg, fg=self.colors.fg
+            ).pack(side="left")
+
+            var = tk.StringVar(master=self.root, value=self._pool_label_for(key_store, current_pool))
+            from tkinter import ttk
+            dd = ttk.Combobox(
+                row, textvariable=var, values=pool_display,
+                width=24, state="readonly"
+            )
+            dd.pack(side="left", padx=(8, 0))
+
+        # Store for save flow to read
+        if "keys_provider_pool_vars" not in self.widgets:
+            self.widgets["keys_provider_pool_vars"] = {}
+        self.widgets["keys_provider_pool_vars"][provider] = (var, pool_ids)
+        self.widgets[f"keys_provider_{provider}_dropdown"] = dd
+
+    @staticmethod
+    def _pool_label_for(key_store, pool_id: str) -> str:
+        """Format a pool ID for display."""
+        name = key_store.get_pool_display_name(pool_id)
+        return f"{name} ({pool_id})" if name != pool_id else pool_id
 
     # -------------------------------------------------------------------------
     # Model fetching helpers (used by _add_model_dropdown_field)
