@@ -63,9 +63,9 @@ class KeysTabMixin:
         pool_btn_frame = ctk.CTkFrame(left_frame, fg_color="transparent") if self.use_ctk else tk.Frame(left_frame, bg=self.colors.bg)
         pool_btn_frame.pack(fill="x", pady=(8, 0))
 
-        create_emoji_button(pool_btn_frame, "+ Pool", "", self.colors, "success", 75, 32, self._add_pool).pack(side="left", padx=2)
-        create_emoji_button(pool_btn_frame, "✎", "", self.colors, "secondary", 35, 32, self._rename_pool).pack(side="left", padx=2)
-        create_emoji_button(pool_btn_frame, "✕", "", self.colors, "danger", 35, 32, self._remove_pool).pack(side="left", padx=2)
+        create_emoji_button(pool_btn_frame, "Pool", "➕", self.colors, "success", 75, 32, self._add_pool).pack(side="left", padx=2)
+        create_emoji_button(pool_btn_frame, "", "✏️", self.colors, "secondary", 35, 32, self._rename_pool).pack(side="left", padx=2)
+        create_emoji_button(pool_btn_frame, "", "✕", self.colors, "danger", 35, 32, self._remove_pool).pack(side="left", padx=2)
 
         # === Right panel: Keys for selected pool ===
         right_frame = ctk.CTkFrame(top_frame, fg_color="transparent") if self.use_ctk else tk.Frame(top_frame, bg=self.colors.bg)
@@ -157,10 +157,10 @@ class KeysTabMixin:
         key_btn_frame = ctk.CTkFrame(right_frame, fg_color="transparent") if self.use_ctk else tk.Frame(right_frame, bg=self.colors.bg)
         key_btn_frame.pack(fill="x", pady=(8, 0))
 
-        create_emoji_button(key_btn_frame, "Add", "", self.colors, "success", 65, 32, self._add_key).pack(side="left", padx=2)
-        create_emoji_button(key_btn_frame, "Remove", "", self.colors, "danger", 78, 32, self._remove_key).pack(side="left", padx=2)
-        create_emoji_button(key_btn_frame, "⬆", "", self.colors, "secondary", 35, 32, self._move_key_up).pack(side="left", padx=2)
-        create_emoji_button(key_btn_frame, "⬇", "", self.colors, "secondary", 35, 32, self._move_key_down).pack(side="left", padx=2)
+        create_emoji_button(key_btn_frame, "Add", "➕", self.colors, "success", 65, 32, self._add_key).pack(side="left", padx=2)
+        create_emoji_button(key_btn_frame, "Remove", "✕", self.colors, "danger", 85, 32, self._remove_key).pack(side="left", padx=2)
+        create_emoji_button(key_btn_frame, "", "⬆️", self.colors, "secondary", 35, 32, self._move_key_up).pack(side="left", padx=2)
+        create_emoji_button(key_btn_frame, "", "⬇️", self.colors, "secondary", 35, 32, self._move_key_down).pack(side="left", padx=2)
 
         # Track selected pool
         self._selected_pool_id = None
@@ -229,10 +229,10 @@ class KeysTabMixin:
 
     def _add_pool(self):
         """Add a new custom pool."""
-        name = simpledialog.askstring(
-            "New Key Pool", "Enter pool display name:",
-            parent=self.root
-        )
+        from ..prompt_editor.dialogs import ThemedInputDialog
+        dialog = ThemedInputDialog(self.root, "New Key Pool", "Enter pool display name:", self.colors)
+        self.root.wait_window(dialog)
+        name = dialog.result
         if name and name.strip():
             new_id = self._key_store.add_pool(name.strip())
             self._selected_pool_id = new_id
@@ -244,11 +244,11 @@ class KeysTabMixin:
         if not self._selected_pool_id:
             return
         current_name = self._key_store.get_pool_display_name(self._selected_pool_id)
-        new_name = simpledialog.askstring(
-            "Rename Pool", "Enter new display name:",
-            initialvalue=current_name,
-            parent=self.root
-        )
+        from ..prompt_editor.dialogs import ThemedInputDialog
+        dialog = ThemedInputDialog(self.root, "Rename Pool", "Enter new display name:", self.colors)
+        dialog.entry.insert(0, current_name)
+        self.root.wait_window(dialog)
+        new_name = dialog.result
         if new_name and new_name.strip():
             self._key_store.rename_pool(self._selected_pool_id, new_name.strip())
             self._refresh_pool_list()
