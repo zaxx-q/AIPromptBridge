@@ -14,8 +14,7 @@ from ...themes import (
     get_ctk_label_colors, get_ctk_font
 )
 from ...custom_widgets import ScrollableButtonList, create_section_header, create_emoji_button
-
-from .dialogs import ask_themed_string
+from ...custom_widgets import ask_themed_string
 
 
 class GroupsTabMixin:

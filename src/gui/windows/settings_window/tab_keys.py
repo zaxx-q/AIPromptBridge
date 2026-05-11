@@ -229,7 +229,7 @@ class KeysTabMixin:
 
     def _add_pool(self):
         """Add a new custom pool."""
-        from ..prompt_editor.dialogs import ThemedInputDialog
+        from ...custom_widgets import ThemedInputDialog
         dialog = ThemedInputDialog(self.root, "New Key Pool", "Enter pool display name:", self.colors)
         self.root.wait_window(dialog)
         name = dialog.result
@@ -244,7 +244,7 @@ class KeysTabMixin:
         if not self._selected_pool_id:
             return
         current_name = self._key_store.get_pool_display_name(self._selected_pool_id)
-        from ..prompt_editor.dialogs import ThemedInputDialog
+        from ...custom_widgets import ThemedInputDialog
         dialog = ThemedInputDialog(self.root, "Rename Pool", "Enter new display name:", self.colors)
         dialog.entry.insert(0, current_name)
         self.root.wait_window(dialog)

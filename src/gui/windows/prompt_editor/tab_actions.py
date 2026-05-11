@@ -16,8 +16,8 @@ from ...themes import (
     get_ctk_font
 )
 from ...custom_widgets import ScrollableButtonList, create_section_header, create_emoji_button, TkScrollableFrame
-
-from .dialogs import ask_themed_string, PresetManagerDialog
+from ...custom_widgets import ask_themed_string
+from .dialogs import PresetManagerDialog
 
 
 class ActionsTabMixin:

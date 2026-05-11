@@ -15,8 +15,7 @@ from ...themes import (
     get_ctk_font
 )
 from ...custom_widgets import ScrollableButtonList, create_section_header, create_emoji_button
-
-from .dialogs import ask_themed_string
+from ...custom_widgets import ask_themed_string
 
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
 try:

@@ -1038,3 +1038,122 @@ class TkScrollableFrame(tk.Frame):
                 self.canvas.yview_scroll(1, "units")
             elif event.num == 4:
                 self.canvas.yview_scroll(-1, "units")
+
+# =============================================================================
+# Themed Input Dialog (CTk version)
+# =============================================================================
+
+class ThemedInputDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
+    """Themed dialog for getting text input from user."""
+    
+    def __init__(self, parent, title: str, prompt: str, colors: ThemeColors):
+        super().__init__(parent)
+        self.colors = colors
+        self.result = None
+        self.use_ctk = HAVE_CTK
+        
+        self.title(title)
+        self.geometry("400x180")
+        self.transient(parent)
+        self.grab_set()
+        
+        if self.use_ctk:
+            self.configure(fg_color=colors.bg)
+        else:
+            self.configure(bg=colors.bg)
+        
+        self.withdraw()
+        try:
+            from .windows.utils import set_dark_titlebar, set_window_icon
+            set_dark_titlebar(self)
+            set_window_icon(self)
+        except ImportError:
+            pass
+        
+        # Center on parent
+        self.update_idletasks()
+        x = parent.winfo_x() + (parent.winfo_width() // 2) - 200
+        y = parent.winfo_y() + (parent.winfo_height() // 2) - 90
+        self.geometry(f"+{x}+{y}")
+        
+        # Main frame
+        main_frame = ctk.CTkFrame(self, fg_color=colors.bg) if self.use_ctk else tk.Frame(self, bg=colors.bg)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Prompt label
+        if self.use_ctk:
+            from .themes import get_ctk_label_colors, get_ctk_entry_colors
+            ctk.CTkLabel(
+                main_frame,
+                text=prompt,
+                font=get_ctk_font(12),
+                **get_ctk_label_colors(colors)
+            ).pack(anchor="w", pady=(0, 10))
+            
+            self.entry = ctk.CTkEntry(
+                main_frame,
+                width=360,
+                height=36,
+                font=get_ctk_font(12),
+                **get_ctk_entry_colors(colors)
+            )
+            self.entry.pack(fill="x", pady=(0, 15))
+        else:
+            tk.Label(main_frame, text=prompt, font=("Segoe UI", 11),
+                    bg=colors.bg, fg=colors.fg).pack(anchor="w", pady=(0, 10))
+            self.entry = tk.Entry(main_frame, font=("Segoe UI", 11),
+                                 bg=colors.input_bg, fg=colors.fg, width=40)
+            self.entry.pack(fill="x", pady=(0, 15), ipady=6)
+        
+        self.entry.focus_set()
+        
+        # Buttons
+        btn_frame = ctk.CTkFrame(main_frame, fg_color="transparent") if self.use_ctk else tk.Frame(main_frame, bg=colors.bg)
+        btn_frame.pack()
+        
+        if self.use_ctk:
+            ctk.CTkButton(
+                btn_frame,
+                text="OK",
+                font=get_ctk_font(11),
+                width=80,
+                **get_ctk_button_colors(colors, "primary"),
+                command=self._ok
+            ).pack(side="left", padx=5)
+            
+            ctk.CTkButton(
+                btn_frame,
+                text="Cancel",
+                font=get_ctk_font(11),
+                width=80,
+                **get_ctk_button_colors(colors, "secondary"),
+                command=self._cancel
+            ).pack(side="left", padx=5)
+        else:
+            tk.Button(btn_frame, text="OK", command=self._ok,
+                     bg=colors.accent, fg="#ffffff").pack(side="left", padx=5)
+            tk.Button(btn_frame, text="Cancel", command=self._cancel,
+                     bg=colors.surface1, fg=colors.fg).pack(side="left", padx=5)
+        
+        # Bindings
+        self.entry.bind('<Return>', lambda e: self._ok())
+        self.bind('<Escape>', lambda e: self._cancel())
+        self.protocol("WM_DELETE_WINDOW", self._cancel)
+        
+        self.deiconify()
+    
+    def _ok(self):
+        """Accept the input."""
+        self.result = self.entry.get().strip()
+        self.destroy()
+    
+    def _cancel(self):
+        """Cancel the dialog."""
+        self.result = None
+        self.destroy()
+
+def ask_themed_string(parent, title: str, prompt: str, colors: ThemeColors) -> Optional[str]:
+    """Show a themed input dialog and return the result."""
+    dialog = ThemedInputDialog(parent, title, prompt, colors)
+    parent.wait_window(dialog)
+    return dialog.result
