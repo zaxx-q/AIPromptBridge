@@ -25,9 +25,9 @@ import ctypes
 from pathlib import Path
 
 from src.console import console, Panel, Table, print_panel, print_success, print_error, print_warning, HAVE_RICH
-from src.config import load_config, load_key_names, generate_example_config, CONFIG_FILE, OPENROUTER_URL
+from src.config import load_config, generate_example_config, CONFIG_FILE, OPENROUTER_URL
 from src.version import __version__
-from src.key_manager import KeyManager
+from src.key_store import KeyStore
 from src.session_manager import load_sessions, list_sessions
 from src.attachment_manager import AttachmentManager
 from src.terminal import terminal_session_manager, print_commands_box
@@ -116,19 +116,17 @@ def initialize():
         print()
     
     # Load configuration
-    config, ai_params, endpoints, keys = load_config()
+    config, ai_params, endpoints = load_config()
     
     # Set global configuration
     web_server.CONFIG = config
     web_server.AI_PARAMS = ai_params
     web_server.ENDPOINTS = endpoints
     
-    # Initialize key managers
-    key_names = load_key_names()
-    for provider in ["custom", "openrouter", "google"]:
-        web_server.KEY_MANAGERS[provider] = KeyManager(
-            keys[provider], provider, key_names=key_names.get(provider, [])
-        )
+    # Initialize key managers via KeyStore (pool-based)
+    key_store = KeyStore.get_instance()
+    key_store.load()
+    web_server.KEY_MANAGERS = key_store.build_key_managers()
     
     # ─── Configuration Summary ────────────────────────────────────────────
     provider = config.get('default_provider', 'google')
@@ -487,7 +485,7 @@ def _migrate_stale_files(bin_dir: Path, root_dir: Path):
     This handles the edge case where files end up next to the internal .exe
     instead of the launcher directory.
     """
-    managed_files = ["chat_sessions.json", "tools_config.json"]
+    managed_files = ["chat_sessions.json", "tools_config.json", "keys.json"]
     managed_globs = ["config.ini*", "prompts.json*", "*file_processor.json", ".file_processor_*.json"]
     managed_folders = ["session_attachments"]
 

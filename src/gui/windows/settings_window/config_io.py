@@ -29,13 +29,7 @@ class ConfigData:
         self.config: Dict[str, Any] = {}       # [config] section values
         self.ai_params: Dict[str, Any] = {}    # [ai_params] section values
         self.endpoints: Dict[str, str] = {}    # [endpoints] section
-        # API key sections - stores dicts with "key" and "name" fields
-        # Format: [{"key": "sk-xxx", "name": "My Key"}, ...]
-        self.keys: Dict[str, List[Dict[str, str]]] = {
-            "custom": [],
-            "openrouter": [],
-            "google": []
-        }
+        # API keys are now managed by KeyStore (keys.json), not here.
         self.raw_lines: List[str] = []         # Original lines for preservation
         self.comments: Dict[str, str] = {}     # Comments associated with keys
 
@@ -132,23 +126,10 @@ def parse_config_full(filepath: str = "config.ini") -> ConfigData:
                         multiline_key = None
                         multiline_value = []
 
-            elif current_section in data.keys:
-                if stripped and not stripped.startswith('#'):
-                    # Parse key with optional inline comment for name
-                    # Format: sk-xxxxx   # My Key Name (uses any whitespace before #)
-                    match = re.search(r'\s+#\s*', stripped)
-                    if match:
-                        key_part = stripped[:match.start()].strip()
-                        comment = stripped[match.end():].strip()
-                        data.keys[current_section].append({
-                            "key": key_part,
-                            "name": comment
-                        })
-                    else:
-                        data.keys[current_section].append({
-                            "key": stripped.strip(),
-                            "name": ""
-                        })
+            elif current_section in ('custom', 'openrouter', 'google'):
+                # API key sections — now managed by KeyStore (keys.json).
+                # Silently skip so old config.ini files don't cause errors.
+                pass
 
         # Flush any remaining multiline
         if multiline_key and current_section == 'endpoints':
@@ -259,10 +240,9 @@ def save_config_full(data: ConfigData, filepath: str = "config.ini") -> bool:
                         lines.append(raw_line + '\n')
                 # Skip continuation lines (they were merged)
 
-            elif current_section in data.keys:
-                # Rewrite API keys section
+            elif current_section in ('custom', 'openrouter', 'google'):
+                # API key sections — skip old key lines, they're in keys.json now.
                 if stripped and not stripped.startswith('#'):
-                    # Skip old keys, we'll write new ones at the end
                     continue
                 lines.append(raw_line + '\n')
 
@@ -308,20 +288,7 @@ def save_config_full(data: ConfigData, filepath: str = "config.ini") -> bool:
             if new_ai_params_lines:
                 lines = lines[:ai_params_section_end] + new_ai_params_lines + lines[ai_params_section_end:]
 
-        # Add API keys at end of their sections
-        for section in ['custom', 'openrouter', 'google']:
-            section_end = _find_section_end(lines, section)
-            if section_end > 0:
-                key_lines = []
-                for key_data in data.keys[section]:
-                    key_str = key_data.get("key", "")
-                    name = key_data.get("name", "")
-                    if key_str:  # Only write non-empty keys
-                        if name:
-                            key_lines.append(f'{key_str}   # {name}\n')
-                        else:
-                            key_lines.append(f'{key_str}\n')
-                lines = lines[:section_end] + key_lines + lines[section_end:]
+        # API keys are no longer written to config.ini — managed by KeyStore (keys.json)
 
         # Write file
         with open(filepath, 'w', encoding='utf-8') as f:

@@ -284,10 +284,10 @@ class TTSPlaygroundMixin:
                 from ....config import load_config
                 from ....key_manager import KeyManager
                 
-                config, ai_params_loaded, _, loaded_keys = load_config()
-                key_managers = {}
-                for prov in ["custom", "openrouter", "google"]:
-                    key_managers[prov] = KeyManager(loaded_keys.get(prov, []), prov)
+                config, ai_params_loaded, _ = load_config()
+                from ....key_store import KeyStore
+                key_store = KeyStore.get_instance()
+                key_managers = key_store.build_key_managers()
                 
                 task = task_template.replace("{text}", input_text)
                 
@@ -389,8 +389,12 @@ class TTSPlaygroundMixin:
                 from ....config import load_config
                 from ....key_manager import KeyManager
                 
-                config, _, _, loaded_keys = load_config()
-                key_manager = KeyManager(loaded_keys.get("google", []), "google")
+                config, _, _ = load_config()
+                from ....key_store import KeyStore
+                key_store = KeyStore.get_instance()
+                keys_data = key_store.get_pool_for_provider("google")
+                key_strings = [kd["key"] for kd in keys_data if kd.get("key")]
+                key_manager = KeyManager(key_strings, "google")
                 
                 provider = get_provider_for_type("google", key_manager, config)
                 pcm_data, error = provider.generate_tts(

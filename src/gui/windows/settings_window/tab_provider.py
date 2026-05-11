@@ -100,10 +100,13 @@ class ProviderTabMixin:
                 result["error"] = "Custom URL not configured"
                 return result
 
-        # Get keys from UI if tab has been loaded, otherwise fall back to parsed config
-        keys_data = self.widgets.get(f"keys_{provider}_data")
-        if keys_data is None:
-            keys_data = self.config_data.keys.get(provider, [])
+        # Get keys from KeyStore (pool-based)
+        try:
+            from src.key_store import KeyStore
+            key_store = KeyStore.get_instance()
+            keys_data = key_store.get_pool_for_provider(provider)
+        except Exception:
+            keys_data = []
         if not keys_data:
             result["error"] = f"No API keys configured for {provider}"
             return result

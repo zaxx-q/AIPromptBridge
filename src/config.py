@@ -164,15 +164,19 @@ def parse_config_value(value_str):
 
 
 def load_config(filepath=CONFIG_FILE):
-    """Load configuration from .ini file"""
+    """Load configuration from .ini file.
+    
+    Returns:
+        Tuple of (config, ai_params, endpoints).
+        API keys are now managed separately by KeyStore (keys.json).
+    """
     config = dict(DEFAULT_CONFIG)
     ai_params = {}
     endpoints = _get_default_endpoints()
-    keys = {"custom": [], "openrouter": [], "google": []}
     
     if not Path(filepath).exists():
         print(f"[Warning] Config file '{filepath}' not found. Using defaults.")
-        return config, ai_params, endpoints, keys
+        return config, ai_params, endpoints
     
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -191,7 +195,6 @@ def load_config(filepath=CONFIG_FILE):
                 continue
             
             if stripped.startswith('[') and stripped.endswith(']'):
-                # Legacy endpoint section handling removed
                 current_section = stripped[1:-1].lower()
                 continue
             
@@ -217,35 +220,14 @@ def load_config(filepath=CONFIG_FILE):
                     if value is not None:
                         ai_params[key] = value
             
-            # Legacy [endpoints] section parsing removed - prompts now in prompts.json
-            
-            elif current_section in keys:
-                if stripped and not stripped.startswith('#'):
-                    # Strip inline comments (format: key   # name or key # name)
-                    # Use regex to handle variable whitespace before #
-                    # The comment is for display purposes only; we only store the key
-                    match = re.search(r'\s+#', stripped)
-                    if match:
-                        key_part = stripped[:match.start()].strip()
-                    else:
-                        key_part = stripped.strip()
-                    if key_part:
-                        keys[current_section].append(key_part)
-        
-        # Legacy multiline handling removed
-        
-        # Load from environment variables if not in config
-        if not keys["google"] and os.getenv("GEMINI_API_KEY"):
-            keys["google"].append(os.getenv("GEMINI_API_KEY"))
-        if not keys["openrouter"] and os.getenv("OPENROUTER_API_KEY"):
-            keys["openrouter"].append(os.getenv("OPENROUTER_API_KEY"))
-        if not keys["custom"] and os.getenv("CUSTOM_API_KEY"):
-            keys["custom"].append(os.getenv("CUSTOM_API_KEY"))
+            # API key sections ([custom], [openrouter], [google]) are now
+            # managed by KeyStore (keys.json).  Old sections are silently
+            # ignored here for backward compatibility.
         
     except Exception as e:
         print(f"[Error] Failed to load config: {e}")
     
-    return config, ai_params, endpoints, keys
+    return config, ai_params, endpoints
 
 
 def load_key_names(filepath=CONFIG_FILE):
@@ -674,21 +656,10 @@ update_check_enabled = true
 # top_p = 0.95
 
 # ============================================================
-# API KEYS - Add your keys below (one per line)
-# You can add multiple keys for automatic rotation on rate limits
+# API KEYS — Now in keys.json (managed by KeyStore)
 # ============================================================
-
-[custom]
-# Your custom/OpenAI API keys here (one per line)
-# sk-xxxxxxxxxxxxxxxxxxxxx
-# sk-yyyyyyyyyyyyyyyyyyyyy
-
-[openrouter]
-# Your OpenRouter API keys here (one per line)
-# sk-or-v1-xxxxxxxxxxxxxxxxxxxxx
-
-[google]
-# Your Google Gemini API keys here (one per line)
-# Get keys at: https://aistudio.google.com/app/apikey
-# AIzaSyXXXXXXXXXXXXXXXXXXXXXXX
+# API keys have moved to keys.json for better security.
+# Run the app once to auto-migrate existing keys from config.ini.
+# Use Settings > API Keys to manage key pools.
 '''
+

@@ -1,110 +1,124 @@
 #!/usr/bin/env python3
 """
-API Keys tab mixin for Settings Window.
+API Keys tab mixin for Settings Window — Pool-based key management.
 
-Provides a nested tabview (Google / OpenRouter / Custom) with key list,
-add/remove/reorder buttons, and masked key display.
+Layout:
+    ┌────────────────┬─────────────────────────────────┐
+    │  Pool List     │  Keys for selected pool         │
+    │  (left)        │  (right)                        │
+    │                │                                 │
+    │  [+ Add Pool]  │  key entry + add/remove/reorder │
+    │  [- Remove]    │                                 │
+    │  [✎ Rename]    │                                 │
+    ├────────────────┴─────────────────────────────────┤
+    │  Provider → Pool Assignment                      │
+    │  Google: [pool ▼]  OpenRouter: [pool ▼]  Custom: │
+    └──────────────────────────────────────────────────┘
 """
 
 import tkinter as tk
+from tkinter import simpledialog
 
 from ...platform import HAVE_CTK, ctk
 from ...themes import get_ctk_font, get_ctk_label_colors, get_ctk_entry_colors
-from ...custom_widgets import ScrollableButtonList, create_emoji_button
+from ...custom_widgets import ScrollableButtonList, create_emoji_button, create_section_header
 
 
 class KeysTabMixin:
     """Mixin providing the API Keys tab for SettingsWindow."""
 
     def _create_keys_tab(self, frame):
-        """Create the API Keys settings tab."""
+        """Create the API Keys settings tab with pool-based layout."""
+        from src.key_store import KeyStore
+        self._key_store = KeyStore.get_instance()
+
         container = ctk.CTkFrame(frame, fg_color="transparent") if self.use_ctk else tk.Frame(frame, bg=self.colors.bg)
         container.pack(fill="both", expand=True, padx=15, pady=15)
 
-        # Create inner tabview for provider keys
+        # --- Top area: Pool list (left) + Key list (right) ---
+        top_frame = ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
+        top_frame.pack(fill="both", expand=True)
+        top_frame.columnconfigure(1, weight=1)
+        top_frame.rowconfigure(0, weight=1)
+
+        # === Left panel: Pool list ===
+        left_frame = ctk.CTkFrame(top_frame, fg_color="transparent") if self.use_ctk else tk.Frame(top_frame, bg=self.colors.bg)
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+
+        create_section_header(left_frame, "🗂️ Key Pools", self.colors)
+
         if self.use_ctk:
-            keys_tabview = ctk.CTkTabview(
-                container,
-                fg_color=self.colors.bg,
-                segmented_button_fg_color=self.colors.surface0,
-                segmented_button_selected_color=self.colors.accent,
-                segmented_button_unselected_color=self.colors.surface0,
-                text_color=self.colors.fg
+            pool_list = ScrollableButtonList(
+                left_frame, self.colors, command=self._on_pool_selected,
+                corner_radius=8, fg_color=self.colors.input_bg, width=180
             )
-            keys_tabview.pack(fill="both", expand=True)
-
-            for provider in ["google", "openrouter", "custom"]:
-                keys_tabview.add(provider.capitalize())
-                self._create_keys_section(keys_tabview.tab(provider.capitalize()), provider)
         else:
-            from tkinter import ttk
-            keys_tabview = ttk.Notebook(container)
-            keys_tabview.pack(fill="both", expand=True)
+            pool_list = ScrollableButtonList(
+                left_frame, self.colors, command=self._on_pool_selected,
+                bg=self.colors.input_bg, width=180
+            )
+        pool_list.pack(fill="both", expand=True, pady=(6, 0))
+        self.widgets["keys_pool_list"] = pool_list
 
-            for provider in ["google", "openrouter", "custom"]:
-                frame_tab = tk.Frame(keys_tabview, bg=self.colors.bg)
-                keys_tabview.add(frame_tab, text=provider.capitalize())
-                self._create_keys_section(frame_tab, provider)
+        # Pool action buttons
+        pool_btn_frame = ctk.CTkFrame(left_frame, fg_color="transparent") if self.use_ctk else tk.Frame(left_frame, bg=self.colors.bg)
+        pool_btn_frame.pack(fill="x", pady=(8, 0))
 
-    def _create_keys_section(self, parent, provider: str):
-        """Create a key management section for a provider."""
-        container = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
-        container.pack(fill="both", expand=True, padx=10, pady=10)
+        create_emoji_button(pool_btn_frame, "+ Pool", "", self.colors, "success", 75, 32, self._add_pool).pack(side="left", padx=2)
+        create_emoji_button(pool_btn_frame, "✎", "", self.colors, "secondary", 35, 32, self._rename_pool).pack(side="left", padx=2)
+        create_emoji_button(pool_btn_frame, "✕", "", self.colors, "danger", 35, 32, self._remove_pool).pack(side="left", padx=2)
 
-        # Instructions
+        # === Right panel: Keys for selected pool ===
+        right_frame = ctk.CTkFrame(top_frame, fg_color="transparent") if self.use_ctk else tk.Frame(top_frame, bg=self.colors.bg)
+        right_frame.grid(row=0, column=1, sticky="nsew")
+
+        self._keys_header_var = tk.StringVar(master=self.root, value="🔑 Keys")
         if self.use_ctk:
-            ctk.CTkLabel(
-                container,
-                text=f"Manage {provider} API keys (keys are masked for security).",
-                font=get_ctk_font(12),
-                **get_ctk_label_colors(self.colors, muted=True)
-            ).pack(anchor="w", pady=(0, 12))
+            self._keys_header_label = ctk.CTkLabel(
+                right_frame, textvariable=self._keys_header_var,
+                font=get_ctk_font(14, "bold"),
+                **get_ctk_label_colors(self.colors)
+            )
         else:
-            tk.Label(container, text=f"Manage {provider} API keys (keys are masked for security)",
-                    font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote).pack(anchor="w", pady=(0, 10))
+            self._keys_header_label = tk.Label(
+                right_frame, textvariable=self._keys_header_var,
+                font=("Segoe UI", 11, "bold"),
+                bg=self.colors.bg, fg=self.colors.fg
+            )
+        self._keys_header_label.pack(anchor="w")
 
-        # Key list
         if self.use_ctk:
-            listbox = ScrollableButtonList(
-                container, self.colors, command=None,
+            key_list = ScrollableButtonList(
+                right_frame, self.colors, command=None,
                 corner_radius=8, fg_color=self.colors.input_bg
             )
         else:
-            listbox = ScrollableButtonList(container, self.colors, command=None, bg=self.colors.input_bg)
-        listbox.pack(fill="both", expand=True)
+            key_list = ScrollableButtonList(
+                right_frame, self.colors, command=None,
+                bg=self.colors.input_bg
+            )
+        key_list.pack(fill="both", expand=True, pady=(6, 0))
+        self.widgets["keys_key_list"] = key_list
 
-        def refresh_keys_list():
-            listbox.clear()
-            for i, key_data in enumerate(self.widgets[f"keys_{provider}_data"]):
-                masked = self._mask_key(key_data)
-                listbox.add_item(str(i), masked, "🔑")
-
-        # Initialize with config data
-        self.widgets[f"keys_{provider}_data"] = list(self.config_data.keys.get(provider, []))
-        refresh_keys_list()
-
-        self.widgets[f"keys_{provider}_listbox"] = listbox
-        self.widgets[f"keys_{provider}_refresh"] = refresh_keys_list
-
-        # Input frame for key + name
-        input_frame = ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
+        # Key input row
+        input_frame = ctk.CTkFrame(right_frame, fg_color="transparent") if self.use_ctk else tk.Frame(right_frame, bg=self.colors.bg)
         input_frame.pack(fill="x", pady=(10, 0))
 
         if self.use_ctk:
             ctk.CTkLabel(
-                input_frame, text="API Key:",
+                input_frame, text="Key:",
                 font=get_ctk_font(12),
                 **get_ctk_label_colors(self.colors)
             ).pack(side="left", padx=(0, 4))
 
-            entry_var = tk.StringVar(master=self.root)
+            key_var = tk.StringVar(master=self.root)
             key_entry = ctk.CTkEntry(
-                input_frame, textvariable=entry_var,
-                font=get_ctk_font(12), width=280, height=36,
-                placeholder_text="Paste key here...",
+                input_frame, textvariable=key_var,
+                font=get_ctk_font(12), width=260, height=36,
+                placeholder_text="Paste API key…",
                 **get_ctk_entry_colors(self.colors)
             )
-            key_entry.pack(side="left", padx=(0, 12))
+            key_entry.pack(side="left", padx=(0, 10))
 
             ctk.CTkLabel(
                 input_frame, text="Name:",
@@ -115,114 +129,294 @@ class KeysTabMixin:
             name_var = tk.StringVar(master=self.root)
             name_entry = ctk.CTkEntry(
                 input_frame, textvariable=name_var,
-                font=get_ctk_font(12), width=140, height=36,
-                placeholder_text="Optional...",
+                font=get_ctk_font(12), width=130, height=36,
+                placeholder_text="Optional…",
                 **get_ctk_entry_colors(self.colors)
             )
             name_entry.pack(side="left", padx=(0, 8))
         else:
-            entry_var = tk.StringVar(master=self.root)
-            key_entry = tk.Entry(input_frame, textvariable=entry_var,
-                                font=("Consolas", 10), width=35,
-                                bg=self.colors.input_bg, fg=self.colors.fg)
-            key_entry.insert(0, "API key...")
-            key_entry.configure(fg=self.colors.blockquote)
+            key_var = tk.StringVar(master=self.root)
+            key_entry = tk.Entry(
+                input_frame, textvariable=key_var,
+                font=("Consolas", 10), width=32,
+                bg=self.colors.input_bg, fg=self.colors.fg
+            )
             key_entry.pack(side="left", padx=(0, 6))
 
             name_var = tk.StringVar(master=self.root)
-            name_entry = tk.Entry(input_frame, textvariable=name_var,
-                                 font=("Segoe UI", 10), width=15,
-                                 bg=self.colors.input_bg, fg=self.colors.fg)
-            name_entry.insert(0, "Name...")
-            name_entry.configure(fg=self.colors.blockquote)
+            name_entry = tk.Entry(
+                input_frame, textvariable=name_var,
+                font=("Segoe UI", 10), width=14,
+                bg=self.colors.input_bg, fg=self.colors.fg
+            )
             name_entry.pack(side="left", padx=(0, 6))
 
-            def on_key_focus_in(e):
-                if key_entry.get() == "API key...":
-                    key_entry.delete(0, "end")
-                    key_entry.configure(fg=self.colors.fg)
+        self.widgets["keys_key_var"] = key_var
+        self.widgets["keys_name_var"] = name_var
 
-            def on_key_focus_out(e):
-                if not key_entry.get():
-                    key_entry.insert(0, "API key...")
-                    key_entry.configure(fg=self.colors.blockquote)
+        # Key action buttons
+        key_btn_frame = ctk.CTkFrame(right_frame, fg_color="transparent") if self.use_ctk else tk.Frame(right_frame, bg=self.colors.bg)
+        key_btn_frame.pack(fill="x", pady=(8, 0))
 
-            def on_name_focus_in(e):
-                if name_entry.get() == "Name...":
-                    name_entry.delete(0, "end")
-                    name_entry.configure(fg=self.colors.fg)
+        create_emoji_button(key_btn_frame, "Add", "", self.colors, "success", 65, 32, self._add_key).pack(side="left", padx=2)
+        create_emoji_button(key_btn_frame, "Remove", "", self.colors, "danger", 78, 32, self._remove_key).pack(side="left", padx=2)
+        create_emoji_button(key_btn_frame, "⬆", "", self.colors, "secondary", 35, 32, self._move_key_up).pack(side="left", padx=2)
+        create_emoji_button(key_btn_frame, "⬇", "", self.colors, "secondary", 35, 32, self._move_key_down).pack(side="left", padx=2)
 
-            def on_name_focus_out(e):
-                if not name_entry.get():
-                    name_entry.insert(0, "Name...")
-                    name_entry.configure(fg=self.colors.blockquote)
+        # --- Bottom area: Provider → Pool assignment ---
+        create_section_header(container, "📡 Provider → Pool Assignment", self.colors, top_padding=16)
 
-            key_entry.bind('<FocusIn>', on_key_focus_in)
-            key_entry.bind('<FocusOut>', on_key_focus_out)
-            name_entry.bind('<FocusIn>', on_name_focus_in)
-            name_entry.bind('<FocusOut>', on_name_focus_out)
+        assign_frame = ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
+        assign_frame.pack(fill="x", pady=(6, 0))
 
-        # Button frame
-        btn_frame = ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
-        btn_frame.pack(fill="x", pady=(8, 0))
+        pool_ids = self._key_store.get_all_pool_ids()
+        pool_display = [self._pool_label(pid) for pid in pool_ids]
+        current_map = self._key_store.get_provider_pool_map()
 
-        def add_key():
-            key = entry_var.get().strip()
-            name = name_var.get().strip()
-            if key == "API key...":
-                key = ""
-            if name == "Name...":
-                name = ""
-            if key:
-                self.widgets[f"keys_{provider}_data"].append({
-                    "key": key,
-                    "name": name
-                })
-                refresh_keys_list()
-                entry_var.set("")
-                name_var.set("")
+        self.widgets["keys_provider_pool_vars"] = {}
+        for provider in ["google", "openrouter", "custom"]:
+            lbl_text = {"google": "Google", "openrouter": "OpenRouter", "custom": "Custom"}[provider]
+
+            if self.use_ctk:
+                ctk.CTkLabel(
+                    assign_frame, text=f"{lbl_text}:",
+                    font=get_ctk_font(12),
+                    **get_ctk_label_colors(self.colors)
+                ).pack(side="left", padx=(0, 4))
+            else:
+                tk.Label(
+                    assign_frame, text=f"{lbl_text}:",
+                    font=("Segoe UI", 10),
+                    bg=self.colors.bg, fg=self.colors.fg
+                ).pack(side="left", padx=(0, 4))
+
+            current_pool = current_map.get(provider, provider)
+            var = tk.StringVar(master=self.root, value=self._pool_label(current_pool))
+            self.widgets["keys_provider_pool_vars"][provider] = (var, pool_ids)
+
+            if self.use_ctk:
+                dd = ctk.CTkComboBox(
+                    assign_frame, variable=var, values=pool_display,
+                    width=140, height=32, state="readonly",
+                    font=get_ctk_font(11),
+                    fg_color=self.colors.input_bg,
+                    border_color=self.colors.surface1,
+                    button_color=self.colors.surface1,
+                    button_hover_color=self.colors.accent,
+                    dropdown_fg_color=self.colors.surface0,
+                    text_color=self.colors.fg
+                )
+            else:
+                from tkinter import ttk
+                dd = ttk.Combobox(
+                    assign_frame, textvariable=var, values=pool_display,
+                    width=18, state="readonly"
+                )
+            dd.pack(side="left", padx=(0, 18))
+            self.widgets[f"keys_provider_{provider}_dropdown"] = dd
+
+        # Track selected pool
+        self._selected_pool_id = None
+
+        # Populate pool list
+        self._refresh_pool_list()
+
+    # ------------------------------------------------------------------ #
+    # Pool list helpers
+    # ------------------------------------------------------------------ #
+
+    def _pool_label(self, pool_id: str) -> str:
+        """Format a pool ID for display in dropdowns."""
+        name = self._key_store.get_pool_display_name(pool_id)
+        return f"{name} ({pool_id})" if name != pool_id else pool_id
+
+    def _refresh_pool_list(self):
+        """Rebuild the pool list widget."""
+        pool_list: ScrollableButtonList = self.widgets["keys_pool_list"]
+        pool_list.clear()
+        pools = self._key_store.list_pools()
+        for p in pools:
+            label = f"{p['display_name']}  ({p['key_count']})"
+            pool_list.add_item(p["id"], label, "🗂️")
+
+        # Re-select previous pool if still exists, otherwise select first
+        if self._selected_pool_id and self._key_store.pool_exists(self._selected_pool_id):
+            pool_list.select(self._selected_pool_id)
+        elif pools:
+            self._selected_pool_id = pools[0]["id"]
+            pool_list.select(self._selected_pool_id)
+            self._refresh_key_list()
+
+        # Update provider assignment dropdowns
+        self._refresh_provider_dropdowns()
+
+    def _on_pool_selected(self, pool_id: str):
+        """Handle pool selection."""
+        self._selected_pool_id = pool_id
+        self._refresh_key_list()
+
+    def _refresh_key_list(self):
+        """Rebuild the key list for the currently selected pool."""
+        key_list: ScrollableButtonList = self.widgets["keys_key_list"]
+        key_list.clear()
+
+        if not self._selected_pool_id:
+            self._keys_header_var.set("🔑 Keys")
+            return
+
+        display_name = self._key_store.get_pool_display_name(self._selected_pool_id)
+        self._keys_header_var.set(f"🔑 Keys — {display_name}")
+
+        keys_data = self._key_store.get_pool(self._selected_pool_id)
+        for i, kd in enumerate(keys_data):
+            masked = self._mask_key(kd)
+            key_list.add_item(str(i), masked, "🔑")
+
+    def _refresh_provider_dropdowns(self):
+        """Update provider → pool assignment dropdowns with current pools."""
+        pool_ids = self._key_store.get_all_pool_ids()
+        pool_display = [self._pool_label(pid) for pid in pool_ids]
+        current_map = self._key_store.get_provider_pool_map()
+
+        for provider in ["google", "openrouter", "custom"]:
+            var, _ = self.widgets["keys_provider_pool_vars"][provider]
+            self.widgets["keys_provider_pool_vars"][provider] = (var, pool_ids)
+
+            current_pool = current_map.get(provider, provider)
+            var.set(self._pool_label(current_pool))
+
+            dd = self.widgets.get(f"keys_provider_{provider}_dropdown")
+            if dd:
                 if self.use_ctk:
-                    key_entry.configure(placeholder_text="API key...")
-                    name_entry.configure(placeholder_text="Name (optional)...")
+                    dd.configure(values=pool_display)
                 else:
-                    key_entry.delete(0, "end")
-                    key_entry.insert(0, "API key...")
-                    key_entry.configure(fg=self.colors.blockquote)
-                    name_entry.delete(0, "end")
-                    name_entry.insert(0, "Name...")
-                    name_entry.configure(fg=self.colors.blockquote)
+                    dd.configure(values=pool_display)
 
-        def remove_key():
-            selected_id = listbox.get_selected()
-            if selected_id:
-                idx = int(selected_id)
-                del self.widgets[f"keys_{provider}_data"][idx]
-                refresh_keys_list()
+    # ------------------------------------------------------------------ #
+    # Pool CRUD
+    # ------------------------------------------------------------------ #
 
-        def move_key_up():
-            selected_id = listbox.get_selected()
-            if selected_id:
-                idx = int(selected_id)
-                keys = self.widgets[f"keys_{provider}_data"]
-                if idx > 0:
-                    keys[idx], keys[idx-1] = keys[idx-1], keys[idx]
-                    refresh_keys_list()
-                    listbox.select(str(idx-1))
+    def _add_pool(self):
+        """Add a new custom pool."""
+        name = simpledialog.askstring(
+            "New Key Pool", "Enter pool display name:",
+            parent=self.root
+        )
+        if name and name.strip():
+            new_id = self._key_store.add_pool(name.strip())
+            self._selected_pool_id = new_id
+            self._refresh_pool_list()
+            self._refresh_key_list()
 
-        def move_key_down():
-            selected_id = listbox.get_selected()
-            if selected_id:
-                idx = int(selected_id)
-                keys = self.widgets[f"keys_{provider}_data"]
-                if idx < len(keys) - 1:
-                    keys[idx], keys[idx+1] = keys[idx+1], keys[idx]
-                    refresh_keys_list()
-                    listbox.select(str(idx+1))
+    def _rename_pool(self):
+        """Rename the selected pool."""
+        if not self._selected_pool_id:
+            return
+        current_name = self._key_store.get_pool_display_name(self._selected_pool_id)
+        new_name = simpledialog.askstring(
+            "Rename Pool", "Enter new display name:",
+            initialvalue=current_name,
+            parent=self.root
+        )
+        if new_name and new_name.strip():
+            self._key_store.rename_pool(self._selected_pool_id, new_name.strip())
+            self._refresh_pool_list()
+            self._refresh_key_list()
 
-        create_emoji_button(btn_frame, "Add", "", self.colors, "success", 70, 36, add_key).pack(side="left", padx=3)
-        create_emoji_button(btn_frame, "Remove", "", self.colors, "danger", 80, 36, remove_key).pack(side="left", padx=3)
-        create_emoji_button(btn_frame, "⬆", "", self.colors, "secondary", 40, 36, move_key_up).pack(side="left", padx=3)
-        create_emoji_button(btn_frame, "⬇", "", self.colors, "secondary", 40, 36, move_key_down).pack(side="left", padx=3)
+    def _remove_pool(self):
+        """Remove the selected pool (built-in pools cannot be removed)."""
+        if not self._selected_pool_id:
+            return
+        if self._selected_pool_id in ("google", "openrouter", "custom"):
+            return  # Built-in pools cannot be removed
+        success = self._key_store.remove_pool(self._selected_pool_id)
+        if success:
+            self._selected_pool_id = None
+            self._refresh_pool_list()
+            self._refresh_key_list()
+
+    # ------------------------------------------------------------------ #
+    # Key CRUD within selected pool
+    # ------------------------------------------------------------------ #
+
+    def _add_key(self):
+        """Add a key to the selected pool."""
+        if not self._selected_pool_id:
+            return
+        key_var: tk.StringVar = self.widgets["keys_key_var"]
+        name_var: tk.StringVar = self.widgets["keys_name_var"]
+        key = key_var.get().strip()
+        name = name_var.get().strip()
+        if key:
+            self._key_store.add_key(self._selected_pool_id, key, name)
+            key_var.set("")
+            name_var.set("")
+            self._refresh_key_list()
+            self._refresh_pool_list()  # Update key count in pool list
+
+    def _remove_key(self):
+        """Remove the selected key from the pool."""
+        if not self._selected_pool_id:
+            return
+        key_list: ScrollableButtonList = self.widgets["keys_key_list"]
+        selected = key_list.get_selected()
+        if selected is not None:
+            idx = int(selected)
+            self._key_store.remove_key(self._selected_pool_id, idx)
+            self._refresh_key_list()
+            self._refresh_pool_list()
+
+    def _move_key_up(self):
+        """Move selected key up."""
+        if not self._selected_pool_id:
+            return
+        key_list: ScrollableButtonList = self.widgets["keys_key_list"]
+        selected = key_list.get_selected()
+        if selected is not None:
+            idx = int(selected)
+            if idx > 0:
+                self._key_store.reorder_key(self._selected_pool_id, idx, idx - 1)
+                self._refresh_key_list()
+                key_list.select(str(idx - 1))
+
+    def _move_key_down(self):
+        """Move selected key down."""
+        if not self._selected_pool_id:
+            return
+        key_list: ScrollableButtonList = self.widgets["keys_key_list"]
+        selected = key_list.get_selected()
+        if selected is not None:
+            idx = int(selected)
+            keys_data = self._key_store.get_pool(self._selected_pool_id)
+            if idx < len(keys_data) - 1:
+                self._key_store.reorder_key(self._selected_pool_id, idx, idx + 1)
+                self._refresh_key_list()
+                key_list.select(str(idx + 1))
+
+    # ------------------------------------------------------------------ #
+    # Save — called by SettingsWindow save flow
+    # ------------------------------------------------------------------ #
+
+    def _save_keys_to_store(self):
+        """Persist key changes and provider assignments to KeyStore.
+
+        Called by the settings window's save handler.
+        """
+        # Apply provider → pool assignments from dropdowns
+        for provider in ["google", "openrouter", "custom"]:
+            var, pool_ids = self.widgets["keys_provider_pool_vars"][provider]
+            selected_label = var.get()
+            # Resolve label back to pool ID
+            for pid in pool_ids:
+                if self._pool_label(pid) == selected_label:
+                    self._key_store.set_provider_pool(provider, pid)
+                    break
+
+        self._key_store.save()
+
+    # ------------------------------------------------------------------ #
+    # Utilities
+    # ------------------------------------------------------------------ #
 
     def _mask_key(self, key_data: dict) -> str:
         """Mask an API key for display, including name if present."""
@@ -232,8 +426,8 @@ class KeysTabMixin:
         if len(key) <= 8:
             masked = "*" * len(key)
         else:
-            masked = key[:4] + "..." + key[-4:]
+            masked = key[:4] + "…" + key[-4:]
 
         if name:
-            return f"{masked} ({name})"
+            return f"{masked}  ({name})"
         return masked

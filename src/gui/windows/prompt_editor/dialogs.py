@@ -318,6 +318,7 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         ("custom_url", "Custom URL", "entry", None),
         ("gemini_endpoint", "Gemini Endpoint", "entry", None),
         ("api_key_name", "API Key Name", "entry", None),
+        ("api_key_pool", "API Key Pool", "entry", None),
     ]
 
     # Fields only visible for specific providers (others always visible)
@@ -699,11 +700,14 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         def _fetch():
             try:
                 from ....config import load_config
+                from ....key_store import KeyStore
                 from ....key_manager import KeyManager
                 from ....api_client import get_provider_for_type
 
-                config, _, _, loaded_keys = load_config()
-                key_strings = loaded_keys.get(provider, [])
+                config, _, _ = load_config()
+                key_store = KeyStore.get_instance()
+                keys_data = key_store.get_pool_for_provider(provider)
+                key_strings = [kd["key"] for kd in keys_data if kd.get("key")]
                 if not key_strings:
                     self._schedule_ui(lambda: self._set_model_status("❌ No API keys", "error"))
                     return
@@ -858,12 +862,12 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 from ....key_manager import KeyManager
                 from ....api_client import call_api_stream_unified
 
-                config, ai_params_loaded, _, loaded_keys = load_config()
+                config, ai_params_loaded, _ = load_config()
                 ai_params = {k: v for k, v in ai_params_loaded.items() if v is not None}
 
-                key_managers = {}
-                for prov in ["custom", "openrouter", "google"]:
-                    key_managers[prov] = KeyManager(loaded_keys.get(prov, []), prov)
+                from ....key_store import KeyStore
+                key_store = KeyStore.get_instance()
+                key_managers = key_store.build_key_managers()
 
                 # Apply preset overrides to config
                 provider = preset.get("provider") or config.get("default_provider", "google")
@@ -919,7 +923,7 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         except (ImportError, AttributeError):
             try:
                 from ....config import load_config
-                config, ai_params, _, _ = load_config()
+                config, ai_params, _ = load_config()
             except Exception:
                 messagebox.showwarning("Error", "Could not load current config.", parent=self)
                 return

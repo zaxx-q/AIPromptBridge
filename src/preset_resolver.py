@@ -34,6 +34,7 @@ CONFIG_OVERRIDE_FIELDS = {
     "custom_url",     # -> custom_url
     "gemini_endpoint", # -> gemini_endpoint
     "api_key_name",   # -> selects key by name
+    "api_key_pool",   # -> selects key pool (overrides provider_pool_map)
 }
 
 
@@ -135,9 +136,12 @@ def resolve_preset(
             if "gemini_endpoint" in preset:
                 merged_config["gemini_endpoint"] = preset["gemini_endpoint"]
 
-            if "api_key_name" in preset:
-                resolved_km = _resolve_key_manager_by_name(
-                    preset["api_key_name"], provider, key_managers
+            if "api_key_pool" in preset or "api_key_name" in preset:
+                resolved_km = _resolve_key_override(
+                    preset.get("api_key_pool", ""),
+                    preset.get("api_key_name", ""),
+                    provider,
+                    key_managers,
                 )
                 if resolved_km is not None:
                     effective_key_managers = dict(key_managers)
@@ -199,32 +203,79 @@ def _get_preset(name: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _resolve_key_manager_by_name(
+def _resolve_key_override(
+    pool_id: str,
     key_name: str,
     provider: str,
     key_managers: Dict[str, Any],
 ):
     """
-    Create a KeyManager that uses a specific key identified by its name.
+    Resolve a key override from preset fields.
 
-    Args:
-        key_name: The display name of the key (from config.ini inline comment).
-        provider: Provider type to look up keys for.
-        key_managers: Current key managers.
+    Resolution order:
+        1. If *pool_id* is set, build a KeyManager from that pool.
+           If *key_name* is also set, filter to only the named key
+           within that pool.
+        2. If only *key_name* is set, look up the named key within
+           the provider's default pool.
 
     Returns:
-        A new KeyManager with only the named key, or None if not found.
+        A new KeyManager, or None if nothing matched.
     """
+    try:
+        from .key_store import KeyStore
+        key_store = KeyStore.get_instance()
+    except Exception:
+        # Fallback: try legacy KeyManager.get_key_by_name()
+        if key_name:
+            return _legacy_resolve_by_name(key_name, provider, key_managers)
+        return None
+
+    # Case 1: pool override
+    if pool_id and key_store.pool_exists(pool_id):
+        if key_name:
+            # Find specific key within the overridden pool
+            keys_data = key_store.get_pool(pool_id)
+            name_lower = key_name.lower().strip()
+            for kd in keys_data:
+                if kd.get("name", "").lower().strip() == name_lower:
+                    from .key_manager import KeyManager
+                    return KeyManager([kd["key"]], provider)
+            logging.warning(
+                f"[PresetResolver] Key '{key_name}' not found in pool '{pool_id}'"
+            )
+        # Return all keys from the overridden pool
+        return key_store.build_key_manager_for_pool(pool_id, provider)
+
+    # Case 2: key name only — resolve within provider's default pool
+    if key_name:
+        pool_for_provider = key_store.get_provider_pool_id(provider)
+        keys_data = key_store.get_pool(pool_for_provider)
+        name_lower = key_name.lower().strip()
+        for kd in keys_data:
+            if kd.get("name", "").lower().strip() == name_lower:
+                from .key_manager import KeyManager
+                return KeyManager([kd["key"]], provider)
+        logging.warning(
+            f"[PresetResolver] Key '{key_name}' not found in pool '{pool_for_provider}' for provider '{provider}'"
+        )
+
+    return None
+
+
+def _legacy_resolve_by_name(
+    key_name: str,
+    provider: str,
+    key_managers: Dict[str, Any],
+):
+    """Fallback: resolve key by name using KeyManager (pre-pool compat)."""
     km = key_managers.get(provider)
     if not km:
         return None
-
-    # KeyManager stores key_names alongside keys (if available)
     named_key = km.get_key_by_name(key_name)
     if named_key:
         from .key_manager import KeyManager
         return KeyManager([named_key], provider)
-
     logging.warning(
         f"[PresetResolver] API key named '{key_name}' not found for provider '{provider}'"
     )

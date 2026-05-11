@@ -445,7 +445,7 @@ class PlaygroundTabMixin:
         # Load defaults
         try:
             from ....config import load_config
-            config, _, _, _ = load_config()
+            config, _, _ = load_config()
             default_provider = config.get("default_provider", "google")
             self.playground_provider_var.set(default_provider)
             self.playground_model_var.set(config.get(f"{default_provider}_model", ""))
@@ -1430,11 +1430,11 @@ class PlaygroundTabMixin:
         from ....config import load_config
         from ....key_manager import KeyManager
 
-        config, ai_params_loaded, endpoints, loaded_keys = load_config()
+        config, ai_params_loaded, endpoints = load_config()
         
-        key_managers = {}
-        for provider in ["custom", "openrouter", "google"]:
-            key_managers[provider] = KeyManager(loaded_keys.get(provider, []), provider)
+        from ....key_store import KeyStore
+        key_store = KeyStore.get_instance()
+        key_managers = key_store.build_key_managers()
             
         ai_params = {k: v for k, v in ai_params_loaded.items() if v is not None}
         provider = self.playground_provider_var.get()

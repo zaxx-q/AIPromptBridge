@@ -10,6 +10,7 @@ dist/
 *.cmd
 
 config.ini
+keys.json
 chat_sessions.json
 *.bak
 *file_processor*.json

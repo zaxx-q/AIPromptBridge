@@ -486,15 +486,9 @@ class SettingsWindow(
             else:
                 self.config_data.config[key] = value
 
-        # Collect API keys
-        for provider in ["custom", "openrouter", "google"]:
-            data_key = f"keys_{provider}_data"
-            if data_key in self.widgets:
-                cleaned_keys = []
-                for kd in self.widgets[data_key]:
-                    if kd.get("key"):
-                        cleaned_keys.append(kd)
-                self.config_data.keys[provider] = cleaned_keys
+        # Save API keys via KeyStore (pool-based)
+        if hasattr(self, '_save_keys_to_store'):
+            self._save_keys_to_store()
 
         # Cleanup transient keys
         self.config_data.config.pop("run_at_startup", None)
@@ -507,15 +501,15 @@ class SettingsWindow(
                 for key, value in self.config_data.config.items():
                     web_server.CONFIG[key] = value
 
-                # Hot-reload API keys
-                for provider in ["custom", "openrouter", "google"]:
-                    if provider in web_server.KEY_MANAGERS:
-                        new_keys = self.config_data.keys.get(provider, [])
-                        key_strings = [kd.get("key", "") for kd in new_keys if kd.get("key")]
-                        web_server.KEY_MANAGERS[provider].keys = key_strings
-                        web_server.KEY_MANAGERS[provider].current_index = 0
-                        web_server.KEY_MANAGERS[provider].exhausted_keys.clear()
-                        print(f"[Settings] Reloaded {len(key_strings)} {provider} API key(s)")
+                # Hot-reload API keys from KeyStore
+                try:
+                    from ....key_store import KeyStore
+                    key_store = KeyStore.get_instance()
+                    web_server.KEY_MANAGERS = key_store.build_key_managers()
+                    total_keys = sum(km.get_key_count() for km in web_server.KEY_MANAGERS.values())
+                    print(f"[Settings] Reloaded API keys ({total_keys} total)")
+                except Exception as e:
+                    print(f"[Settings] Note: Could not hot-reload API keys: {e}")
 
                 # Hot-reload endpoints
                 for endpoint_name, prompt in self.config_data.endpoints.items():
