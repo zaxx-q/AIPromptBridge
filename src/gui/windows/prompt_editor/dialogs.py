@@ -204,7 +204,7 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         ("custom_url", "Custom URL", "entry", None),
         ("gemini_endpoint", "Gemini Endpoint", "entry", None),
         ("api_key_name", "API Key Name", "entry", None),
-        ("api_key_pool", "API Key Pool", "entry", None),
+        ("api_key_pool", "API Key Pool", "combobox", None),
     ]
 
     # Fields only visible for specific providers (others always visible)
@@ -246,6 +246,16 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         set_dark_titlebar(self)
 
         set_window_icon(self)
+        
+        from ....key_store import KeyStore
+        pools = KeyStore.get_instance().get_all_pool_ids()
+        self.preset_fields = []
+        for field in self.PRESET_FIELDS:
+            if field[0] == "api_key_pool":
+                self.preset_fields.append(("api_key_pool", "API Key Pool", "combobox", [""] + pools))
+            else:
+                self.preset_fields.append(field)
+                
         self._build_ui()
         self._refresh_list()
 
@@ -353,7 +363,7 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         self._fields_container.pack(fill="x")
 
         # Build fields
-        for key, label, field_type, options in self.PRESET_FIELDS:
+        for key, label, field_type, options in self.preset_fields:
             row = ctk.CTkFrame(self._fields_container, fg_color="transparent") if self.use_ctk else tk.Frame(self._fields_container, bg=c.bg)
             row.pack(fill="x", pady=3)
             self.field_rows[key] = row
@@ -548,12 +558,12 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             provider = provider_info["var"].get() if provider_info else ""
 
         # Unpack all field rows, then re-pack visible ones in defined order
-        for key, _, _, _ in self.PRESET_FIELDS:
+        for key, _, _, _ in self.preset_fields:
             row = self.field_rows.get(key)
             if row:
                 row.pack_forget()
 
-        for key, _, _, _ in self.PRESET_FIELDS:
+        for key, _, _, _ in self.preset_fields:
             row = self.field_rows.get(key)
             if not row:
                 continue
@@ -694,7 +704,7 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         provider_info = self.field_widgets.get("provider")
         provider = provider_info["var"].get() if provider_info else ""
 
-        for key, label, field_type, _ in self.PRESET_FIELDS:
+        for key, label, field_type, _ in self.preset_fields:
             widget_info = self.field_widgets.get(key)
             if not widget_info:
                 continue
