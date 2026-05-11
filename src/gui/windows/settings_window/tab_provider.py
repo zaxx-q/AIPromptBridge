@@ -93,6 +93,7 @@ class ProviderTabMixin:
     def _create_pool_assignment_dropdown(self, parent, provider: str):
         """Add a Key Pool dropdown to a provider section."""
         from src.key_store import KeyStore
+        from .widgets import LABEL_WIDTH, DROPDOWN_WIDTH_MD
         key_store = KeyStore.get_instance()
 
         pool_ids = key_store.get_all_pool_ids()
@@ -100,20 +101,20 @@ class ProviderTabMixin:
         current_pool = key_store.get_provider_pool_id(provider)
 
         row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
-        row.pack(fill="x", padx=(0, 0), pady=(6, 2))
+        row.pack(fill="x", pady=4)
 
         if self.use_ctk:
             ctk.CTkLabel(
                 row, text="Key Pool:",
-                font=get_ctk_font(12), width=120, anchor="w",
+                font=get_ctk_font(13), width=LABEL_WIDTH, anchor="w",
                 **get_ctk_label_colors(self.colors)
             ).pack(side="left")
 
             var = tk.StringVar(master=self.root, value=self._pool_label_for(key_store, current_pool))
             dd = ctk.CTkComboBox(
                 row, variable=var, values=pool_display,
-                width=200, height=32, state="readonly",
-                font=get_ctk_font(11),
+                width=DROPDOWN_WIDTH_MD, height=34, state="readonly",
+                font=get_ctk_font(13),
                 fg_color=self.colors.input_bg,
                 border_color=self.colors.surface1,
                 button_color=self.colors.surface1,
@@ -125,7 +126,7 @@ class ProviderTabMixin:
         else:
             tk.Label(
                 row, text="Key Pool:",
-                font=("Segoe UI", 10),
+                font=("Segoe UI", 10), width=LABEL_WIDTH // 8, anchor="w",
                 bg=self.colors.bg, fg=self.colors.fg
             ).pack(side="left")
 
@@ -133,7 +134,7 @@ class ProviderTabMixin:
             from tkinter import ttk
             dd = ttk.Combobox(
                 row, textvariable=var, values=pool_display,
-                width=24, state="readonly"
+                width=DROPDOWN_WIDTH_MD // 10, state="readonly"
             )
             dd.pack(side="left", padx=(8, 0))
 
