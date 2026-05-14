@@ -156,11 +156,12 @@ class AudioToolApp:
         duration: float = 0.0,
         compressed: bool = False,
         provider: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        preset_name: Optional[str] = None
     ):
         """
         Handle action selection from window.
-        
+
         Args:
             action_key: The action name (e.g., "Transcribe", "Summarize")
             audio_data: Raw audio bytes (WAV or compressed)
@@ -170,19 +171,20 @@ class AudioToolApp:
             compressed: Whether audio is compressed
             provider: Selected provider override
             model: Selected model override
+            preset_name: Selected preset name override (from analyzer dropdown)
         """
         logging.debug(f'Action selected: key={action_key}, custom={bool(custom_input)}, duration={duration:.1f}s, compressed={compressed}')
-        
+
         if not audio_data:
             logging.error('No audio data available for action')
             return
-        
+
         self._begin_task()
-        
+
         # Process in background thread
         threading.Thread(
             target=self._process_action,
-            args=(action_key, audio_data, mime_type, custom_input, duration, provider, model),
+            args=(action_key, audio_data, mime_type, custom_input, duration, provider, model, preset_name),
             daemon=True
         ).start()
     
@@ -195,6 +197,7 @@ class AudioToolApp:
         active_modifiers: List[str] = None,
         provider: str = None,
         model: str = None,
+        preset_name: Optional[str] = None,
         callback_progress: Optional[Callable[[str], None]] = None,
         callback_success: Optional[Callable[[str, int], None]] = None,
         callback_error: Optional[Callable[[str], None]] = None
@@ -220,6 +223,11 @@ class AudioToolApp:
                 # Get action config
                 actions = self.prompts.get_audio_actions()
                 action = actions.get(action_key, {})
+
+                # If a preset was selected in the analyzer UI, override the action's model_preset
+                if preset_name:
+                    action = dict(action)
+                    action["model_preset"] = preset_name
                 
                 system_prompt = action.get("system_prompt", "You are an audio analysis assistant.")
                 task = action.get("task", "Analyze this audio.")
@@ -335,15 +343,21 @@ class AudioToolApp:
         custom_input: Optional[str],
         duration: float,
         provider: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        preset_name: Optional[str] = None
     ):
         """Process the selected action with audio context."""
         try:
             # Get action config
             actions = self.prompts.get_audio_actions()
             settings = self.prompts.get_audio_tool().get("_settings", {})
-            
+
             action = actions.get(action_key, {})
+
+            # If a preset was selected in the analyzer UI, override the action's model_preset
+            if preset_name:
+                action = dict(action)
+                action["model_preset"] = preset_name
             
             # Build prompt
             system_prompt = action.get("system_prompt", "You are an AI assistant analyzing audio.")

@@ -2164,6 +2164,7 @@ class AudioAnalyzerWindow:
             # Resolve effective provider/model (preset overrides if active)
             effective_provider = self.provider
             effective_model = self.model
+            effective_preset = None
             if self._use_preset_mode and self.selected_preset:
                 from ...preset_resolver import resolve_preset_by_name
                 resolved = resolve_preset_by_name(
@@ -2172,7 +2173,8 @@ class AudioAnalyzerWindow:
                 )
                 effective_provider = resolved.provider
                 effective_model = resolved.model
-            
+                effective_preset = self.selected_preset
+
             # Delegate to callback (GUI Controller mode) - ONLY if show_chat_window is True
             try:
                 self.on_action_callback(
@@ -2183,7 +2185,8 @@ class AudioAnalyzerWindow:
                     duration=self.audio_duration,
                     compressed=self.compression_enabled,
                     provider=effective_provider,
-                    model=effective_model
+                    model=effective_model,
+                    preset_name=effective_preset
                 )
                 
                 # Reset processing state
@@ -2260,6 +2263,7 @@ class AudioAnalyzerWindow:
         # Resolve effective provider/model (preset overrides if active)
         effective_provider = self.provider
         effective_model = self.model
+        effective_preset = None
         if self._use_preset_mode and self.selected_preset:
             from ...preset_resolver import resolve_preset_by_name
             resolved = resolve_preset_by_name(
@@ -2268,7 +2272,8 @@ class AudioAnalyzerWindow:
             )
             effective_provider = resolved.provider
             effective_model = resolved.model
-        
+            effective_preset = self.selected_preset
+
         tool.analyze_audio(
             audio_data=audio_data,
             mime_type=mime_type,
@@ -2277,6 +2282,7 @@ class AudioAnalyzerWindow:
             active_modifiers=self.active_modifiers,
             provider=effective_provider,
             model=effective_model,
+            preset_name=effective_preset,
             callback_progress=on_progress,
             callback_success=on_success,
             callback_error=on_error
