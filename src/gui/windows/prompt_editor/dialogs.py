@@ -60,7 +60,7 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self.configure(fg_color=colors.bg)
         else:
             self.configure(bg=colors.bg)
-            
+
         set_window_icon(self)
             
         # Main content area
@@ -791,6 +791,37 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 if "max_tokens" in preset:
                     ai_params["max_tokens"] = preset["max_tokens"]
 
+                # Handle api_key_pool / api_key_name overrides
+                pool_override = preset.get("api_key_pool")
+                key_name_override = preset.get("api_key_name")
+
+                if pool_override:
+                    # Build a KeyManager from the specified pool
+                    custom_km = key_store.build_key_manager_for_pool(pool_override, provider)
+                    if custom_km and custom_km.has_keys():
+                        key_managers = dict(key_managers)
+                        key_managers[provider] = custom_km
+                    else:
+                        dialog.append_error(f"Pool '{pool_override}' has no usable keys")
+                        return
+
+                if key_name_override:
+                    # Filter the provider's key manager to only the named key
+                    source_pool = pool_override or key_store.get_provider_pool_id(provider)
+                    pool_keys = key_store.get_pool(source_pool)
+                    matched = [kd for kd in pool_keys if kd.get("name") == key_name_override and kd.get("key")]
+                    if matched:
+                        custom_km = KeyManager([kd["key"] for kd in matched], provider,
+                                               key_names=[kd["name"] for kd in matched])
+                        key_managers = dict(key_managers)
+                        key_managers[provider] = custom_km
+                    else:
+                        dialog.append_error(f"Key named '{key_name_override}' not found in pool '{source_pool}'")
+                        return
+
+                thinking_enabled = config.get("thinking_enabled", False)
+                thinking_output = config.get("thinking_output", "reasoning_content")
+
                 messages = [{"role": "user", "content": "Say 'Hello! Preset test successful.' in exactly those words."}]
 
                 def stream_callback(type_, content):
@@ -804,11 +835,13 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 call_api_stream_unified(
                     provider_type=provider,
                     messages=messages,
-                    model_override=model,
+                    model=model,
                     config=config,
                     ai_params=ai_params,
                     key_managers=key_managers,
                     callback=stream_callback,
+                    thinking_enabled=thinking_enabled,
+                    thinking_output=thinking_output,
                 )
             except Exception as e:
                 dialog.append_error(str(e))
