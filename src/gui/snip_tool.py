@@ -546,7 +546,8 @@ class SnipToolApp:
                 response, error = text_edit._call_api(
                     messages,
                     on_chunk=type_chunk,
-                    origin_override=origin
+                    origin_override=origin,
+                    action_config=action_config
                 )
                 
                 # Type any remaining buffered text (unless aborted)
@@ -573,7 +574,8 @@ class SnipToolApp:
             # Non-streaming: get full response then paste instantly
             response, error = text_edit._call_api(
                 messages,
-                origin_override=origin
+                origin_override=origin,
+                action_config=action_config
             )
             
             if error:
