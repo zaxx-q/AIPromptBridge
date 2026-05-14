@@ -518,10 +518,22 @@ class ScrollableComboBox:
             self.entry.bind("<Button-1>", self._on_entry_click)
             self.entry.bind("<FocusOut>", self._on_focus_out)
     
+    def _compute_filtered_values(self):
+        """Recompute _filtered_values from current entry text.
+        
+        Ensures the filter is applied immediately when values are refreshed
+        or the dropdown is opened while the entry already contains text.
+        """
+        search_text = self.entry.get().strip().lower()
+        if search_text and search_text != self._selected_value.lower():
+            self._filtered_values = [v for v in self.values if search_text in v.lower()]
+        else:
+            self._filtered_values = list(self.values)
+    
     def _on_entry_click(self, event):
         """Handle click on entry - open dropdown."""
         if not self._dropdown_open and self.state != "disabled":
-            self._filtered_values = list(self.values)
+            self._compute_filtered_values()
             self._open_dropdown()
     
     def _on_arrow_click(self):
@@ -532,7 +544,7 @@ class ScrollableComboBox:
         if self._dropdown_open:
             self._close_dropdown()
         else:
-            self._filtered_values = list(self.values)
+            self._compute_filtered_values()
             self._open_dropdown()
             self.entry.focus_set()
     
@@ -625,7 +637,7 @@ class ScrollableComboBox:
     def _on_arrow_down(self, event):
         """Handle Down arrow - open dropdown."""
         if not self._dropdown_open:
-            self._filtered_values = list(self.values)
+            self._compute_filtered_values()
             self._open_dropdown()
         return "break"
     
@@ -968,7 +980,10 @@ class ScrollableComboBox:
         """Configure widget options."""
         if "values" in kwargs:
             self.values = kwargs["values"]
-            self._filtered_values = list(self.values)
+            self._compute_filtered_values()
+            # Refresh dropdown if it's currently open
+            if self._dropdown_open:
+                self._refresh_dropdown_items()
         if "state" in kwargs:
             self.state = kwargs["state"]
             if HAVE_CTK:
