@@ -405,7 +405,9 @@ class ScrollableComboBox:
         self._text_widget = None  # Text widget for dropdown
         self._debounce_id = None  # For debounced search
         self._focus_check_id = None  # For periodic focus checking
+        self._focus_out_id = None  # For delayed focus-out value application
         self._hover_line = -1  # Currently hovered line
+        self._selection_gen = 0  # Generation counter to invalidate stale focus-out callbacks
         
         # Main frame to hold entry and arrow button
         if HAVE_CTK:
@@ -536,15 +538,39 @@ class ScrollableComboBox:
     
     def _on_focus_out(self, event):
         """Handle focus leaving entry - update value from typed text."""
+        # Cancel any previous pending focus-out callback
+        if self._focus_out_id:
+            try:
+                self.frame.after_cancel(self._focus_out_id)
+            except Exception:
+                pass
+            self._focus_out_id = None
+        
         # When focus leaves, use the typed text as the value if it's different
         typed_text = self.entry.get().strip()
         if typed_text and typed_text != self._selected_value:
-            # Only update if not clicking within dropdown
-            # Delay slightly to allow dropdown click to register
-            self.frame.after(100, lambda: self._check_and_update_value(typed_text))
+            # Capture the current generation so stale callbacks are ignored
+            gen = self._selection_gen
+            # Delay slightly to allow dropdown click to register first
+            self._focus_out_id = self.frame.after(
+                200, lambda: self._check_and_update_value(typed_text, gen)
+            )
     
-    def _check_and_update_value(self, typed_text: str):
+    def _cancel_focus_out(self):
+        """Cancel any pending focus-out value application."""
+        if self._focus_out_id:
+            try:
+                self.frame.after_cancel(self._focus_out_id)
+            except Exception:
+                pass
+            self._focus_out_id = None
+    
+    def _check_and_update_value(self, typed_text: str, gen: int):
         """Check if we should update value from typed text."""
+        self._focus_out_id = None
+        # Bail if a selection happened after this callback was scheduled
+        if gen != self._selection_gen:
+            return
         # Only update if dropdown is closed (meaning user didn't click an item)
         if not self._dropdown_open and typed_text:
             self._selected_value = typed_text
@@ -849,20 +875,25 @@ class ScrollableComboBox:
             _value_already_set: Internal flag - True when called from _select_value
                                to skip redundant value application.
         """
-        # Cancel timers
+        # Cancel all pending timers
         if self._focus_check_id:
             try:
                 self.frame.after_cancel(self._focus_check_id)
-            except:
+            except Exception:
                 pass
             self._focus_check_id = None
         
         if self._debounce_id:
             try:
                 self.frame.after_cancel(self._debounce_id)
-            except:
+            except Exception:
                 pass
             self._debounce_id = None
+        
+        # Cancel pending focus-out callback to prevent it from overwriting
+        # a valid selection after the dropdown closes
+        if _value_already_set:
+            self._cancel_focus_out()
         
         if self._dropdown_window:
             try:
@@ -897,6 +928,10 @@ class ScrollableComboBox:
     
     def _select_value(self, value: str):
         """Select a value."""
+        # Bump generation counter so any pending focus-out callback becomes a no-op
+        self._selection_gen += 1
+        self._cancel_focus_out()
+        
         self._selected_value = value
         self._update_entry_text()
         self._close_dropdown(_value_already_set=True)
