@@ -591,6 +591,9 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         custom_url_info = self.field_widgets.get("custom_url")
         custom_url_value = custom_url_info["var"].get() if custom_url_info else ""
 
+        gemini_endpoint_info = self.field_widgets.get("gemini_endpoint")
+        gemini_endpoint_value = gemini_endpoint_info["var"].get() if gemini_endpoint_info else ""
+
         self._set_model_status("🔄 Loading...", "info")
 
         def _fetch():
@@ -618,6 +621,10 @@ class PresetManagerDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                     else:
                         self._schedule_ui(lambda: self._set_model_status("❌ No custom URL", "error"))
                         return
+                elif provider == "google":
+                    endpoint = gemini_endpoint_value or config.get("gemini_endpoint", "")
+                    if endpoint:
+                        temp_config["gemini_endpoint"] = endpoint
 
                 provider_instance = get_provider_for_type(provider, temp_km, temp_config)
                 models, error = provider_instance.fetch_models()
