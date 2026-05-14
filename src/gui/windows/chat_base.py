@@ -1337,7 +1337,10 @@ class ChatWindowBase(ABC):
             current_provider = web_server.CONFIG.get("default_provider", "google")
             current_model = self.session.model_override or web_server.CONFIG.get(f"{current_provider}_model", "")
             thinking_enabled = web_server.CONFIG.get("thinking_enabled", False)
-            
+            effective_config = web_server.CONFIG
+            effective_ai_params = web_server.AI_PARAMS
+            effective_key_managers = web_server.KEY_MANAGERS
+
             # Apply preset override if active
             if self.session.preset_override:
                 from ...preset_resolver import resolve_preset_by_name
@@ -1347,11 +1350,14 @@ class ChatWindowBase(ABC):
                 )
                 current_provider = resolved.provider
                 current_model = resolved.model
+                effective_config = resolved.config
+                effective_ai_params = resolved.ai_params
+                effective_key_managers = resolved.key_managers
                 if resolved.streaming is not None:
                     streaming_enabled = resolved.streaming
                 if resolved.thinking_enabled is not None:
                     thinking_enabled = resolved.thinking_enabled
-            
+
             ctx = RequestContext(
                 origin=RequestOrigin.CHAT_WINDOW,
                 provider=current_provider,
@@ -1360,50 +1366,50 @@ class ChatWindowBase(ABC):
                 thinking_enabled=thinking_enabled,
                 session_id=str(self.session.session_id)
             )
-            
+
             def on_text(content):
                 if self._destroyed:
                     return
                 self.streaming_text += content
                 self._safe_after(0, self._update_streaming_display)
-            
+
             def on_thinking(content):
                 if self._destroyed:
                     return
                 self.streaming_thinking += content
                 self._safe_after(0, self._update_streaming_display)
-            
+
             def on_usage(content):
                 self.last_usage = content
-            
+
             def on_error(content):
                 if self._destroyed:
                     return
                 self._safe_after(0, lambda: self._update_status(f"Error: {content}", self.theme.accent_red))
-            
+
             callbacks = StreamCallback(
                 on_text=on_text,
                 on_thinking=on_thinking,
                 on_usage=on_usage,
                 on_error=on_error
             )
-            
+
             self.is_streaming = True
             self._safe_after(0, lambda: self._update_status("Streaming..." if streaming_enabled else "Processing..."))
-            
+
             if streaming_enabled and current_provider in ("custom", "google", "openrouter"):
                 ctx = RequestPipeline.execute_streaming(
-                    ctx, self.session, web_server.CONFIG, web_server.AI_PARAMS,
-                    web_server.KEY_MANAGERS, callbacks
+                    ctx, self.session, effective_config, effective_ai_params,
+                    effective_key_managers, callbacks
                 )
             else:
                 self.is_streaming = False
                 messages = self.session.get_conversation_for_api(include_image=True)
                 ctx = RequestPipeline.execute_simple(
-                    ctx, messages, web_server.CONFIG, web_server.AI_PARAMS,
-                    web_server.KEY_MANAGERS
+                    ctx, messages, effective_config, effective_ai_params,
+                    effective_key_managers
                 )
-            
+
             self.is_streaming = False
             self.last_usage = {
                 "prompt_tokens": ctx.input_tokens,
@@ -1411,14 +1417,14 @@ class ChatWindowBase(ABC):
                 "total_tokens": ctx.total_tokens,
                 "estimated": ctx.estimated
             }
-            
+
             if self._destroyed:
                 return
-            
+
             def handle_response():
                 if self._destroyed:
                     return
-                
+
                 if ctx.error:
                     self._update_status(f"Error: {ctx.error}", self.theme.accent_red)
                 else:
@@ -1426,34 +1432,34 @@ class ChatWindowBase(ABC):
                     thinking_content = self.streaming_thinking or ctx.reasoning_text
                     if thinking_content and len(self.session.messages) > 0:
                         self.session.messages[-1]["thinking"] = thinking_content
-                    
+
                     # Auto-collapse thinking after streaming finishes
                     msg_idx = len(self.session.messages) - 1
                     if msg_idx in self.thinking_collapsed_states:
                         self.thinking_collapsed_states[msg_idx] = True
-                    
+
                     self.last_response = ctx.response_text
-                
+
                 # Always restore saved messages (rerun turn) — even on error
                 # so subsequent messages are never permanently lost.
                 # Pass success flag so closure can also restore the original
                 # assistant message on failure.
                 if on_complete:
                     on_complete(success=not ctx.error)
-                
+
                 # Always refresh display — on success to show new response,
                 # on error to restore the original conversation state
                 self._update_chat_display(scroll_to_bottom=True)
-                
+
                 if not ctx.error:
                     usage_str = ""
                     if self.last_usage:
                         usage_str = f" | {self.last_usage.get('total_tokens', 0)} tokens"
-                    
+
                     self._update_status(f"✅ Regenerated{usage_str}", self.theme.accent_green)
-                
+
                 add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
-                
+
                 self.is_loading = False
                 if HAVE_CTK:
                     self.send_btn.configure(state="normal")
@@ -2265,7 +2271,10 @@ class ChatWindowBase(ABC):
             current_provider = web_server.CONFIG.get("default_provider", "google")
             current_model = self.session.model_override or web_server.CONFIG.get(f"{current_provider}_model", "")
             thinking_enabled = web_server.CONFIG.get("thinking_enabled", False)
-            
+            effective_config = web_server.CONFIG
+            effective_ai_params = web_server.AI_PARAMS
+            effective_key_managers = web_server.KEY_MANAGERS
+
             # Apply preset override if active
             if self.session.preset_override:
                 from ...preset_resolver import resolve_preset_by_name
@@ -2275,11 +2284,14 @@ class ChatWindowBase(ABC):
                 )
                 current_provider = resolved.provider
                 current_model = resolved.model
+                effective_config = resolved.config
+                effective_ai_params = resolved.ai_params
+                effective_key_managers = resolved.key_managers
                 if resolved.streaming is not None:
                     streaming_enabled = resolved.streaming
                 if resolved.thinking_enabled is not None:
                     thinking_enabled = resolved.thinking_enabled
-            
+
             ctx = RequestContext(
                 origin=RequestOrigin.CHAT_WINDOW,
                 provider=current_provider,
@@ -2288,48 +2300,48 @@ class ChatWindowBase(ABC):
                 thinking_enabled=thinking_enabled,
                 session_id=str(self.session.session_id)
             )
-            
+
             def on_text(content):
                 if self._destroyed:
                     return
                 self.streaming_text += content
                 self._safe_after(0, self._update_streaming_display)
-            
+
             def on_thinking(content):
                 if self._destroyed:
                     return
                 self.streaming_thinking += content
                 self._safe_after(0, self._update_streaming_display)
-            
+
             def on_usage(content):
                 self.last_usage = content
-            
+
             def on_error(content):
                 if self._destroyed:
                     return
                 self._safe_after(0, lambda: self._update_status(f"Error: {content}", self.theme.accent_red))
-            
+
             callbacks = StreamCallback(
                 on_text=on_text,
                 on_thinking=on_thinking,
                 on_usage=on_usage,
                 on_error=on_error
             )
-            
+
             self.is_streaming = True
             self._safe_after(0, lambda: self._update_status("Streaming..." if streaming_enabled else "Processing..."))
-            
+
             if streaming_enabled and current_provider in ("custom", "google", "openrouter"):
                 ctx = RequestPipeline.execute_streaming(
-                    ctx, self.session, web_server.CONFIG, web_server.AI_PARAMS,
-                    web_server.KEY_MANAGERS, callbacks
+                    ctx, self.session, effective_config, effective_ai_params,
+                    effective_key_managers, callbacks
                 )
             else:
                 self.is_streaming = False
                 messages = self.session.get_conversation_for_api(include_image=True)
                 ctx = RequestPipeline.execute_simple(
-                    ctx, messages, web_server.CONFIG, web_server.AI_PARAMS,
-                    web_server.KEY_MANAGERS
+                    ctx, messages, effective_config, effective_ai_params,
+                    effective_key_managers
                 )
             
             self.is_streaming = False
