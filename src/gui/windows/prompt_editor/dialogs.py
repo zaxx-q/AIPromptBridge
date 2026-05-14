@@ -61,6 +61,8 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         else:
             self.configure(bg=colors.bg)
             
+        set_window_icon(self)
+            
         # Main content area
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent") if self.use_ctk else tk.Frame(self, bg=colors.bg)
         self.main_frame.pack(fill="both", expand=True, padx=15, pady=15)
