@@ -289,7 +289,7 @@ Dedicated file managed by `ProfileStore` singleton (`src/connection_profiles.py`
 
 ### Resolution Chain
 
-At request time, `src/preset_resolver.py` resolves settings:
+At request time, `src/profile_resolver.py` resolves settings:
 
 ```
 Per-session profile override (chat window dropdown)
@@ -399,7 +399,7 @@ ocr_translate = Extract and translate to {lang}. Return only translated text.
 
 ## Theme System
 
-The theme system (`src/gui/themes.py`) provides centralized color management with multiple presets.
+The theme system (`src/gui/themes.py`) provides centralized color management with multiple profiles.
 
 ### Available Themes
 

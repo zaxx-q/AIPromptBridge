@@ -256,39 +256,39 @@ class ActionsTabMixin:
         self.compare_prompts_frame.pack(fill="x", pady=10)
         
         # Connection Profile dropdown (all tools)
-        self.preset_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
-        self.preset_frame.pack(fill="x", pady=8)
+        self.profile_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        self.profile_frame.pack(fill="x", pady=8)
         
         if self.use_ctk:
-            ctk.CTkLabel(self.preset_frame, text="Connection Profile:", font=get_ctk_font(13), width=120, anchor="w",
+            ctk.CTkLabel(self.profile_frame, text="Connection Profile:", font=get_ctk_font(13), width=120, anchor="w",
                         **get_ctk_label_colors(self.colors)).pack(side="left")
             self.editor_widgets["profile_var"] = tk.StringVar(master=self.root, value="(None)")
-            self.editor_widgets["preset_combo"] = ctk.CTkComboBox(
-                self.preset_frame, variable=self.editor_widgets["profile_var"],
+            self.editor_widgets["profile_combo"] = ctk.CTkComboBox(
+                self.profile_frame, variable=self.editor_widgets["profile_var"],
                 values=["(None)"], width=220, height=34, state="readonly",
                 font=get_ctk_font(13), **get_ctk_combobox_colors(self.colors)
             )
-            self.editor_widgets["preset_combo"].pack(side="left", padx=(12, 8))
+            self.editor_widgets["profile_combo"].pack(side="left", padx=(12, 8))
             ctk.CTkButton(
-                self.preset_frame, text="Manage...", font=get_ctk_font(12),
+                self.profile_frame, text="Manage...", font=get_ctk_font(12),
                 width=90, height=34, **get_ctk_button_colors(self.colors, "secondary"),
                 command=self._open_profile_manager
             ).pack(side="left")
         else:
             from tkinter import ttk
-            tk.Label(self.preset_frame, text="Connection Profile:", font=("Segoe UI", 10), width=12, anchor="w",
+            tk.Label(self.profile_frame, text="Connection Profile:", font=("Segoe UI", 10), width=12, anchor="w",
                     bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
             self.editor_widgets["profile_var"] = tk.StringVar(master=self.root, value="(None)")
-            self.editor_widgets["preset_combo"] = ttk.Combobox(
-                self.preset_frame, textvariable=self.editor_widgets["profile_var"],
+            self.editor_widgets["profile_combo"] = ttk.Combobox(
+                self.profile_frame, textvariable=self.editor_widgets["profile_var"],
                 values=["(None)"], state="readonly", width=20
             )
-            self.editor_widgets["preset_combo"].pack(side="left", padx=(10, 5))
-            tk.Button(self.preset_frame, text="Manage...", font=("Segoe UI", 9),
+            self.editor_widgets["profile_combo"].pack(side="left", padx=(10, 5))
+            tk.Button(self.profile_frame, text="Manage...", font=("Segoe UI", 9),
                      bg=self.colors.surface1, fg=self.colors.fg,
                      command=self._open_profile_manager).pack(side="left")
         
-        # Refresh preset dropdown values
+        # Refresh profile dropdown values
         self._refresh_profile_dropdown()
         self._refresh_action_list()
         
@@ -449,8 +449,8 @@ class ActionsTabMixin:
         
         # Load connection profile (all tools)
         if "profile_var" in self.editor_widgets:
-            preset_name = action_data.get("connection_profile", "") or ""
-            self.editor_widgets["profile_var"].set(preset_name if preset_name else "(None)")
+            profile_name = action_data.get("connection_profile", "") or ""
+            self.editor_widgets["profile_var"].set(profile_name if profile_name else "(None)")
         
         # Update field visibility
         self._update_editor_visibility()
@@ -458,11 +458,11 @@ class ActionsTabMixin:
     def _refresh_profile_dropdown(self):
         """Refresh the connection profile dropdown values from profile store."""
         from ....connection_profiles import ProfileStore
-        preset_names = ProfileStore.get_instance().get_profile_names()
-        values = ["(None)"] + preset_names
+        profile_names = ProfileStore.get_instance().get_profile_names()
+        values = ["(None)"] + profile_names
         
-        if "preset_combo" in self.editor_widgets:
-            combo = self.editor_widgets["preset_combo"]
+        if "profile_combo" in self.editor_widgets:
+            combo = self.editor_widgets["profile_combo"]
             if self.use_ctk:
                 combo.configure(values=values)
             else:
@@ -629,9 +629,9 @@ class ActionsTabMixin:
         
         # Save connection profile (all tools)
         if "profile_var" in self.editor_widgets:
-            preset_val = self.editor_widgets["profile_var"].get()
-            if preset_val and preset_val != "(None)":
-                action_dict["connection_profile"] = preset_val
+            profile_val = self.editor_widgets["profile_var"].get()
+            if profile_val and profile_val != "(None)":
+                action_dict["connection_profile"] = profile_val
         
         tool_data = self.options_data.setdefault(self.current_tool, {})
         tool_data[self.current_action] = action_dict

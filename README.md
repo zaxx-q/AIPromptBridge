@@ -247,7 +247,7 @@ Access via **System Tray > Profiles**, terminal `C` key, or **Settings > Provide
 For advanced users, configuration files are stored in the application root:
 - `config.ini`: Core settings and API keys.
 - `prompts.json`: AI system prompts and tool configurations.
-- `profiles.json`: Connection profiles (provider, model, and parameter presets).
+- `profiles.json`: Connection profiles (provider, model, and parameter profiles).
 
 ## 💡 Tips
 

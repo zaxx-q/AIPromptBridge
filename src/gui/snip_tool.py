@@ -217,7 +217,7 @@ class SnipToolApp:
         if active_modifiers is None:
             active_modifiers = []
         
-        logging.debug(f'Action selected: source={source}, key={action_key}, custom={bool(custom_input)}, modifiers={active_modifiers}, compare={compare_mode}, mode={response_mode}, preset={profile_override}')
+        logging.debug(f'Action selected: source={source}, key={action_key}, custom={bool(custom_input)}, modifiers={active_modifiers}, compare={compare_mode}, mode={response_mode}, profile={profile_override}')
         
         if not capture:
             logging.error('No capture available for action')
@@ -285,7 +285,7 @@ class SnipToolApp:
                 
                 action = actions.get(action_key, {})
                 
-                # Apply popup-level preset override (takes priority over action's connection_profile)
+                # Apply popup-level profile override (takes priority over action's connection_profile)
                 if profile_override:
                     action = dict(action)  # Don't mutate the original
                     action["connection_profile"] = profile_override
@@ -430,10 +430,10 @@ class SnipToolApp:
     def _copy_to_clipboard_with_notification(self, messages, action_key, action_config=None):
         """Execute non-streaming request, copy to clipboard, show notification."""
         from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
-        from ..preset_resolver import resolve_preset
+        from ..profile_resolver import resolve_profile
         import pyperclip
         
-        resolved = resolve_preset(action_config, self.config, self.ai_params, self.key_managers)
+        resolved = resolve_profile(action_config, self.config, self.ai_params, self.key_managers)
         
         ctx = RequestContext(
             origin=RequestOrigin.SNIP_TOOL,
@@ -494,7 +494,7 @@ class SnipToolApp:
             action_config: Optional action config dict (may contain connection_profile)
         """
         from .text_edit_tool import get_instance as get_text_edit_instance
-        from ..preset_resolver import resolve_preset
+        from ..profile_resolver import resolve_profile
         
         text_edit = get_text_edit_instance()
         if not text_edit:
@@ -508,7 +508,7 @@ class SnipToolApp:
             )
             return
         
-        resolved = resolve_preset(action_config, self.config, self.ai_params, self.key_managers)
+        resolved = resolve_profile(action_config, self.config, self.ai_params, self.key_managers)
         streaming_enabled = resolved.config.get("streaming_enabled", True)
         
         if streaming_enabled:
@@ -626,7 +626,7 @@ class SnipToolApp:
         )
         session.title = window_title
         
-        # Carry over preset override to the chat session
+        # Carry over profile override to the chat session
         if action_config and action_config.get("connection_profile"):
             if self.config.get("profile_selector_enabled", True):
                 session.profile_override = action_config["connection_profile"]
@@ -696,8 +696,8 @@ class SnipToolApp:
             session.system_instruction = self.prompts.get_chat_window_system_instruction()
         
         # Check if streaming is enabled
-        from ..preset_resolver import resolve_preset
-        resolved = resolve_preset(action_config, self.config, self.ai_params, self.key_managers)
+        from ..profile_resolver import resolve_profile
+        resolved = resolve_profile(action_config, self.config, self.ai_params, self.key_managers)
         streaming_enabled = resolved.config.get("streaming_enabled", True)
         
         if streaming_enabled:

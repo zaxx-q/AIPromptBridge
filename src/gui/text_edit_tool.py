@@ -213,7 +213,7 @@ class TextEditToolApp:
             response_mode: Response mode ("default", "copy", "replace", or "show")
             profile_override: Optional model profile name to override for this request
         """
-        logging.debug(f'Direct chat input: {user_input[:50]}..., mode: {response_mode}, preset: {profile_override}')
+        logging.debug(f'Direct chat input: {user_input[:50]}..., mode: {response_mode}, profile: {profile_override}')
         
         self._begin_task()
         
@@ -345,7 +345,7 @@ class TextEditToolApp:
         if active_modifiers is None:
             active_modifiers = []
         
-        logging.debug(f'Option selected: {option_key}, mode: {response_mode}, modifiers: {active_modifiers}, compare={bool(compare_text)}, preset: {profile_override}')
+        logging.debug(f'Option selected: {option_key}, mode: {response_mode}, modifiers: {active_modifiers}, compare={bool(compare_text)}, profile: {profile_override}')
         
         self._begin_task()
         
@@ -369,10 +369,10 @@ class TextEditToolApp:
         """
         from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin, StreamCallback
         from ..session_manager import ChatSession
-        from ..preset_resolver import resolve_preset
+        from ..profile_resolver import resolve_profile
         
-        # Resolve preset overrides from action config
-        resolved = resolve_preset(action_config, self.config, self.ai_params, self.key_managers)
+        # Resolve profile overrides from action config
+        resolved = resolve_profile(action_config, self.config, self.ai_params, self.key_managers)
         
         if not provider:
             provider = resolved.provider
@@ -672,10 +672,10 @@ class TextEditToolApp:
             action_config: Optional action config dict (may contain connection_profile)
         """
         from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
-        from ..preset_resolver import resolve_preset
+        from ..profile_resolver import resolve_profile
         import pyperclip
         
-        resolved = resolve_preset(action_config, self.config, self.ai_params, self.key_managers)
+        resolved = resolve_profile(action_config, self.config, self.ai_params, self.key_managers)
         
         ctx = RequestContext(
             origin=RequestOrigin.POPUP_INPUT,
@@ -746,10 +746,10 @@ class TextEditToolApp:
             
             messages = build_text_message(user_input, chat_system_instruction)
             
-            # Build action config for preset override (direct chat has no action config)
+            # Build action config for profile override (direct chat has no action config)
             action_config = {"connection_profile": profile_override} if profile_override else None
-            
-            # Store action config for preset resolution in streaming paths
+        
+            # Store action config for profile resolution in streaming paths
             self._current_action_config = action_config
             
             # Session origin for direct chat (no text selected)
@@ -951,17 +951,17 @@ class TextEditToolApp:
             action_options = self._get_action_options()
             option = action_options.get(option_key, {})
             
-            # Apply popup-level preset override (takes priority over action's connection_profile)
+            # Apply popup-level profile override (takes priority over action's connection_profile)
             if profile_override:
                 option = dict(option)  # Don't mutate the original
                 option["connection_profile"] = profile_override
             
-            # Store action config for preset resolution in streaming paths
+            # Store action config for profile resolution in streaming paths
             self._current_action_config = option
             
-            # Resolve preset early for streaming_enabled checks
-            from ..preset_resolver import resolve_preset
-            resolved = resolve_preset(option, self.config, self.ai_params, self.key_managers)
+            # Resolve profile early for streaming_enabled checks
+            from ..profile_resolver import resolve_profile
+            resolved = resolve_profile(option, self.config, self.ai_params, self.key_managers)
             # Get modifier definitions from global settings
             modifier_defs = self.prompts.get_modifiers()
             
@@ -1291,7 +1291,7 @@ class TextEditToolApp:
         session = ChatSession(origin=session_origin)
         session.title = window_title
         
-        # Carry over preset override to the chat session
+        # Carry over profile override to the chat session
         action_config = getattr(self, '_current_action_config', None)
         if action_config and action_config.get("connection_profile"):
             if self.config.get("profile_selector_enabled", True):
@@ -1324,9 +1324,9 @@ class TextEditToolApp:
         full_response = []
         full_thinking = []
         
-        # Resolve preset from action_config if available
-        from ..preset_resolver import resolve_preset
-        resolved = resolve_preset(
+        # Resolve profile from action_config if available
+        from ..profile_resolver import resolve_profile
+        resolved = resolve_profile(
             getattr(self, '_current_action_config', None),
             self.config, self.ai_params, self.key_managers
         )
@@ -1428,7 +1428,7 @@ class TextEditToolApp:
         session = ChatSession(origin=session_origin)
         session.title = window_title
         
-        # Carry over preset override to the chat session
+        # Carry over profile override to the chat session
         action_config = getattr(self, '_current_action_config', None)
         if action_config and action_config.get("connection_profile"):
             if self.config.get("profile_selector_enabled", True):

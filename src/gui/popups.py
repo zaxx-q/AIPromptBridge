@@ -1143,19 +1143,19 @@ class CarouselButtonList:
 
 
 # =============================================================================
-# Preset Dropdown Helpers
+# Profile Dropdown Helpers
 # =============================================================================
 
 def create_profile_dropdown_ctk(parent, colors):
     """
-    Create a model preset override dropdown (CTk version).
+    Create a connection profile override dropdown (CTk version).
     
-    Returns (profile_var, dropdown_widget, frame) or (None, None, None) if no presets.
+    Returns (profile_var, dropdown_widget, frame) or (None, None, None) if no profiles.
     Caller must pack the frame.
     """
     from .prompts import get_prompts_config
-    preset_names = get_prompts_config().get_profile_names()
-    if not preset_names:
+    profile_names = get_prompts_config().get_profile_names()
+    if not profile_names:
         return None, None, None
     
     frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -1163,7 +1163,7 @@ def create_profile_dropdown_ctk(parent, colors):
     profile_var = tk.StringVar(value="(Default)")
     dropdown = ctk.CTkOptionMenu(
         frame,
-        values=["(Default)"] + preset_names,
+        values=["(Default)"] + profile_names,
         variable=profile_var,
         width=140,
         height=28,
@@ -1177,21 +1177,21 @@ def create_profile_dropdown_ctk(parent, colors):
         font=get_ctk_font(size=11)
     )
     dropdown.pack(side="left", fill="x", expand=True)
-    Tooltip(dropdown, "Override model preset for this request")
+    Tooltip(dropdown, "Override connection profile for this request")
     
     return profile_var, dropdown, frame
 
 
 def create_profile_dropdown_tk(parent, root, colors):
     """
-    Create a model preset override dropdown (Tk fallback).
+    Create a connection profile override dropdown (Tk fallback).
     
-    Returns (profile_var, dropdown_widget, frame) or (None, None, None) if no presets.
+    Returns (profile_var, dropdown_widget, frame) or (None, None, None) if no profiles.
     Caller must pack the frame.
     """
     from .prompts import get_prompts_config
-    preset_names = get_prompts_config().get_profile_names()
-    if not preset_names:
+    profile_names = get_prompts_config().get_profile_names()
+    if not profile_names:
         return None, None, None
     
     frame = tk.Frame(parent, bg=colors.base)
@@ -1201,7 +1201,7 @@ def create_profile_dropdown_tk(parent, root, colors):
         frame,
         profile_var,
         "(Default)",
-        *preset_names
+        *profile_names
     )
     dropdown.config(
         bg=colors.surface0,
@@ -1218,7 +1218,7 @@ def create_profile_dropdown_tk(parent, root, colors):
 
 
 def get_profile_override_value(profile_var):
-    """Get the selected preset override, or None for '(Default)'."""
+    """Get the selected profile override, or None for '(Default)'."""
     if profile_var:
         try:
             val = profile_var.get()
@@ -1990,7 +1990,7 @@ class AttachedInputPopup:
             )
             close_btn.pack(side="right")
             
-            # TTS button in top bar (only if callback provided) - pack before preset so order is: TTS | Preset | Close
+            # TTS button in top bar (only if callback provided) - pack before profile so order is: TTS | Profile | Close
             if self.on_tts_callback:
                 tts_btn = create_emoji_button(
                     top_bar,
@@ -2012,10 +2012,10 @@ class AttachedInputPopup:
                 self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window")
                 self.tts_btn = tts_btn
             
-            # Model preset dropdown in top bar (only if presets exist)
-            self.profile_var, self.profile_dropdown, preset_frame = create_profile_dropdown_ctk(top_bar, self.colors)
-            if preset_frame:
-                preset_frame.pack(side="left", expand=True)
+            # Connection profile dropdown in top bar (only if profiles exist)
+            self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_ctk(top_bar, self.colors)
+            if profile_frame:
+                profile_frame.pack(side="left", expand=True)
             
             # Response toggle
             toggle_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
@@ -2098,7 +2098,7 @@ class AttachedInputPopup:
             close_btn.bind('<Enter>', lambda e: close_btn.config(fg=self.colors.red))
             close_btn.bind('<Leave>', lambda e: close_btn.config(fg=self.colors.overlay0))
             
-            # TTS button in top bar (only if callback provided) - pack before preset so order is: TTS | Preset | Close
+            # TTS button in top bar (only if callback provided) - pack before profile so order is: TTS | Profile | Close
             if self.on_tts_callback:
                 tts_btn = tk.Label(
                     top_bar,
@@ -2115,10 +2115,10 @@ class AttachedInputPopup:
                 self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window")
                 self.tts_btn = tts_btn
             
-            # Model preset dropdown in top bar (only if presets exist)
-            self.profile_var, self.profile_dropdown, preset_frame = create_profile_dropdown_tk(top_bar, self.root, self.colors)
-            if preset_frame:
-                preset_frame.pack(side=tk.LEFT, expand=True)
+            # Connection profile dropdown in top bar (only if profiles exist)
+            self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_tk(top_bar, self.root, self.colors)
+            if profile_frame:
+                profile_frame.pack(side=tk.LEFT, expand=True)
             
             # Response mode toggle
             toggle_frame = tk.Frame(content_frame, bg=self.colors.base)
@@ -2463,10 +2463,10 @@ class AttachedPromptPopup:
             )
             self.response_toggle.pack(anchor="center")
             
-            # Model preset dropdown (only if presets exist)
-            self.profile_var, self.profile_dropdown, preset_frame = create_profile_dropdown_ctk(content_frame, self.colors)
-            if preset_frame:
-                preset_frame.pack(anchor="center", pady=(0, 8))
+            # Connection profile dropdown (only if profiles exist)
+            self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_ctk(content_frame, self.colors)
+            if profile_frame:
+                profile_frame.pack(anchor="center", pady=(0, 8))
             
             # Modifier bar - get from global settings
             from .prompts import get_prompts_config
@@ -2691,10 +2691,10 @@ class AttachedPromptPopup:
             )
             self.response_toggle.pack(anchor=tk.CENTER)
             
-            # Model preset dropdown (only if presets exist)
-            self.profile_var, self.profile_dropdown, preset_frame = create_profile_dropdown_tk(content_frame, self.root, self.colors)
-            if preset_frame:
-                preset_frame.pack(anchor=tk.CENTER, pady=(0, 8))
+            # Connection profile dropdown (only if profiles exist)
+            self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_tk(content_frame, self.root, self.colors)
+            if profile_frame:
+                profile_frame.pack(anchor=tk.CENTER, pady=(0, 8))
             
             # Modifier bar - get from global settings
             from .prompts import get_prompts_config

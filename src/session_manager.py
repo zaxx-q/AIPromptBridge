@@ -46,7 +46,7 @@ class ChatSession:
         self.system_instruction = None
         # Per-session model override (None = use global config model)
         self.model_override = None
-        # Per-session preset override (None = no preset selected)
+        # Per-session profile override (None = no profile selected)
         self.profile_override = None
     
     def add_message(self, role, content, attachments=None):

@@ -157,7 +157,7 @@ class AudioToolApp:
         compressed: bool = False,
         provider: Optional[str] = None,
         model: Optional[str] = None,
-        preset_name: Optional[str] = None
+        profile_name: Optional[str] = None
     ):
         """
         Handle action selection from window.
@@ -171,7 +171,7 @@ class AudioToolApp:
             compressed: Whether audio is compressed
             provider: Selected provider override
             model: Selected model override
-            preset_name: Selected profile name override (from analyzer dropdown)
+            profile_name: Selected profile name override (from analyzer dropdown)
         """
         logging.debug(f'Action selected: key={action_key}, custom={bool(custom_input)}, duration={duration:.1f}s, compressed={compressed}')
 
@@ -184,7 +184,7 @@ class AudioToolApp:
         # Process in background thread
         threading.Thread(
             target=self._process_action,
-            args=(action_key, audio_data, mime_type, custom_input, duration, provider, model, preset_name),
+            args=(action_key, audio_data, mime_type, custom_input, duration, provider, model, profile_name),
             daemon=True
         ).start()
     
@@ -197,7 +197,7 @@ class AudioToolApp:
         active_modifiers: List[str] = None,
         provider: str = None,
         model: str = None,
-        preset_name: Optional[str] = None,
+        profile_name: Optional[str] = None,
         callback_progress: Optional[Callable[[str], None]] = None,
         callback_success: Optional[Callable[[str, int], None]] = None,
         callback_error: Optional[Callable[[str], None]] = None
@@ -224,10 +224,10 @@ class AudioToolApp:
                 actions = self.prompts.get_audio_actions()
                 action = actions.get(action_key, {})
 
-                # If a preset was selected in the analyzer UI, override the action's connection_profile
-                if preset_name:
+                # If a profile was selected in the analyzer UI, override the action's connection_profile
+                if profile_name:
                     action = dict(action)
-                    action["connection_profile"] = preset_name
+                    action["connection_profile"] = profile_name
                 
                 system_prompt = action.get("system_prompt", "You are an audio analysis assistant.")
                 task = action.get("task", "Analyze this audio.")
@@ -255,9 +255,9 @@ class AudioToolApp:
                 
                 messages = []
                 
-                # Determine provider/model using preset resolution
-                from ..preset_resolver import resolve_preset
-                resolved = resolve_preset(action, self.config, self.ai_params, self.key_managers)
+                # Determine provider/model using profile resolution
+                from ..profile_resolver import resolve_profile
+                resolved = resolve_profile(action, self.config, self.ai_params, self.key_managers)
                 req_provider = provider or resolved.provider
                 req_model = model or resolved.model
                 
@@ -344,7 +344,7 @@ class AudioToolApp:
         duration: float,
         provider: Optional[str] = None,
         model: Optional[str] = None,
-        preset_name: Optional[str] = None
+        profile_name: Optional[str] = None
     ):
         """Process the selected action with audio context."""
         try:
@@ -354,10 +354,10 @@ class AudioToolApp:
 
             action = actions.get(action_key, {})
 
-            # If a preset was selected in the analyzer UI, override the action's connection_profile
-            if preset_name:
+            # If a profile was selected in the analyzer UI, override the action's connection_profile
+            if profile_name:
                 action = dict(action)
-                action["connection_profile"] = preset_name
+                action["connection_profile"] = profile_name
             
             # Build prompt
             system_prompt = action.get("system_prompt", "You are an AI assistant analyzing audio.")
@@ -460,7 +460,7 @@ class AudioToolApp:
         session = ChatSession(origin=session_origin)
         session.title = window_title
         
-        # Carry over preset override to the chat session
+        # Carry over profile override to the chat session
         if action_config and action_config.get("connection_profile"):
             if self.config.get("profile_selector_enabled", True):
                 session.profile_override = action_config["connection_profile"]
@@ -506,8 +506,8 @@ class AudioToolApp:
             session.system_instruction = self.prompts.get_chat_window_system_instruction()
         
         # Check if streaming is enabled
-        from ..preset_resolver import resolve_preset
-        resolved = resolve_preset(action_config, self.config, self.ai_params, self.key_managers)
+        from ..profile_resolver import resolve_profile
+        resolved = resolve_profile(action_config, self.config, self.ai_params, self.key_managers)
         streaming_enabled = resolved.config.get("streaming_enabled", True)
         
         if streaming_enabled:
@@ -523,7 +523,7 @@ class AudioToolApp:
             full_response = []
             full_thinking = []
             
-            # Use provided settings or fallback to resolved preset defaults
+            # Use provided settings or fallback to resolved profile defaults
             req_provider = provider or resolved.provider
             req_model = model or resolved.model
             

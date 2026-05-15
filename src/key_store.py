@@ -458,7 +458,7 @@ class KeyStore:
     ) -> Optional[KeyManager]:
         """Build a single ``KeyManager`` for a specific pool.
 
-        Used by preset resolver when ``api_key_pool`` overrides the
+        Used by profile resolver when ``api_key_pool`` overrides the
         default provider mapping.
         """
         keys_data = self.get_pool(pool_id)

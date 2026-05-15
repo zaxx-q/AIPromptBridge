@@ -8,9 +8,9 @@ Resolves effective settings for API requests by merging:
   3. Hard-coded defaults (last resort)
 
 Usage:
-    from src.preset_resolver import resolve_preset
+    from src.profile_resolver import resolve_profile
 
-    resolved = resolve_preset(action, config, ai_params, key_managers)
+    resolved = resolve_profile(action, config, ai_params, key_managers)
     # resolved.provider, resolved.model, resolved.config, resolved.ai_params
 """
 
@@ -20,7 +20,7 @@ from typing import Dict, Any, Optional
 
 
 @dataclass
-class ResolvedPreset:
+class ResolvedProfile:
     """Result of profile resolution with all effective settings."""
     provider: str
     model: str
@@ -29,15 +29,15 @@ class ResolvedPreset:
     config: Dict[str, Any]
     ai_params: Dict[str, Any]
     key_managers: Dict[str, Any]
-    preset_name: Optional[str] = None
+    profile_name: Optional[str] = None
 
 
-def resolve_preset(
+def resolve_profile(
     action: Optional[Dict[str, Any]],
     config: Dict[str, Any],
     ai_params: Dict[str, Any],
     key_managers: Dict[str, Any],
-) -> ResolvedPreset:
+) -> ResolvedProfile:
     """
     Resolve effective settings for an action, applying connection profile overrides.
 
@@ -51,7 +51,7 @@ def resolve_preset(
         key_managers: Dictionary of KeyManager instances.
 
     Returns:
-        ResolvedPreset with effective provider, model, streaming, thinking,
+        ResolvedProfile with effective provider, model, streaming, thinking,
         and merged config/ai_params dicts ready for the request pipeline.
     """
     provider = config.get("default_provider", "google")
@@ -118,7 +118,7 @@ def resolve_preset(
     if not model and provider:
         model = config.get(f"{provider}_model", "")
 
-    return ResolvedPreset(
+    return ResolvedProfile(
         provider=provider,
         model=model,
         streaming=streaming,
@@ -126,21 +126,21 @@ def resolve_preset(
         config=merged_config,
         ai_params=merged_ai_params,
         key_managers=effective_key_managers,
-        preset_name=profile_name,
+        profile_name=profile_name,
     )
 
 
-def resolve_preset_by_name(
+def resolve_profile_by_name(
     profile_name: str,
     config: Dict[str, Any],
     ai_params: Dict[str, Any],
     key_managers: Dict[str, Any],
-) -> ResolvedPreset:
+) -> ResolvedProfile:
     """
     Resolve a profile by name (convenience wrapper for chat/audio window profile selector).
     """
     action = {"connection_profile": profile_name}
-    return resolve_preset(action, config, ai_params, key_managers)
+    return resolve_profile(action, config, ai_params, key_managers)
 
 
 def _get_profile(name: str):

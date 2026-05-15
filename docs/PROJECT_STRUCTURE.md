@@ -37,7 +37,7 @@ AIPromptBridge/
     ├── key_manager.py          # API key rotation with exhaustion tracking and named key lookup
     ├── messages.py             # Multimodal message construction factory
     ├── connection_profiles.py  # Connection profile store (profiles.json CRUD, ProfileStore singleton)
-    ├── preset_resolver.py      # Connection profile resolution (per-action AI config overrides)
+    ├── profile_resolver.py      # Connection profile resolution (per-action AI config overrides)
     ├── request_pipeline.py     # Unified request processing with logging
     ├── session_manager.py      # Session persistence with sequential IDs and per-session model override
     ├── terminal.py             # Interactive terminal commands (includes Tools menu)
@@ -137,7 +137,7 @@ AIPromptBridge/
 | `config.py` | Custom INI parser with multiline support, key name parsing, change notification pub/sub |
 | `key_manager.py` | Multi-key management with automatic rotation and named key lookup |
 | `connection_profiles.py` | Connection profile store — `ProfileStore` singleton, `profiles.json` CRUD |
-| `preset_resolver.py` | Connection profile resolution (merges per-action profile overrides with active profile) |
+| `profile_resolver.py` | Connection profile resolution (merges per-action profile overrides with active profile) |
 | `request_pipeline.py` | Unified logging and token tracking for all requests |
 | `session_manager.py` | Chat session persistence to JSON with per-session model override |
 | `attachment_manager.py`| Manages external file storage for session attachments |

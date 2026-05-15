@@ -69,7 +69,7 @@ class ChatWindowBase(ABC):
         self.selected_model = self.session.model_override  # None = use global
         self._last_global_model = web_server.CONFIG.get(f"{provider}_model", "")
         
-        # Preset selector mode: show presets instead of model list
+        # Profile selector mode: show profiles instead of model list
         self._use_profile_mode = self._compute_profile_mode()
         
         # Theme
@@ -93,7 +93,7 @@ class ChatWindowBase(ABC):
         self.input_text = None
         self.chat_text = None
         self.model_dropdown = None
-        self.model_label_widget = None  # Label widget ("Model:" or "Preset:")
+        self.model_label_widget = None  # Label widget ("Model:" or "Profile:")
         self.h_scrollbar = None
         self.v_scrollbar = None
         # Placeholder state
@@ -127,9 +127,9 @@ class ChatWindowBase(ABC):
         return ""
     
     def _compute_profile_mode(self) -> bool:
-        """Check if preset selector mode should be active.
-        
-        Returns True when profile_selector_enabled=True AND at least one preset exists.
+        """Check if profile selector mode should be active.
+    
+        Returns True when profile_selector_enabled=True AND at least one profile exists.
         """
         from ... import web_server
         if not web_server.CONFIG.get("profile_selector_enabled", True):
@@ -290,8 +290,8 @@ class ChatWindowBase(ABC):
             )
             self.scroll_btn.pack(side="left", padx=2)
             
-            # Model/Preset dropdown (right-aligned)
-            dropdown_label = "Preset:" if self._use_profile_mode else "Model:"
+            # Model/Profile dropdown (right-aligned)
+            dropdown_label = "Profile:" if self._use_profile_mode else "Model:"
             if self._use_profile_mode:
                 initial_values = ["(Use Global)"] + self._get_profile_names()
                 initial_display = self.session.profile_override or "(Use Global)"
@@ -366,8 +366,8 @@ class ChatWindowBase(ABC):
             )
             self.scroll_btn.pack(side=tk.LEFT, padx=2)
             
-            # Model/Preset dropdown (right-aligned)
-            dropdown_label = "Preset:" if self._use_profile_mode else "Model:"
+            # Model/Profile dropdown (right-aligned)
+            dropdown_label = "Profile:" if self._use_profile_mode else "Model:"
             if self._use_profile_mode:
                 initial_values = ["(Use Global)"] + self._get_profile_names()
                 initial_display = self.session.profile_override or "(Use Global)"
@@ -392,9 +392,9 @@ class ChatWindowBase(ABC):
         self._schedule_model_loading()
     
     def _schedule_model_loading(self):
-        """Schedule model loading - skip in profile mode (presets are local)."""
+        """Schedule model loading - skip in profile mode (profiles are local)."""
         if self._use_profile_mode:
-            return  # Preset names already populated in _create_toolbar
+            return # Profile names already populated in _create_toolbar
         threading.Thread(target=self._load_models, daemon=True).start()
     
     def _create_chat_area(self):
@@ -1138,7 +1138,7 @@ class ChatWindowBase(ABC):
     def _refresh_global_sentinel(self):
         """Update the global sentinel label in the dropdown when the global model changes."""
         if self._destroyed or self._use_profile_mode:
-            return  # Preset mode doesn't use the global model sentinel
+            return  # Profile mode doesn't use the global model sentinel
         try:
             from ... import web_server
             provider = web_server.CONFIG.get("default_provider", "google")
@@ -1176,7 +1176,7 @@ class ChatWindowBase(ABC):
         
         # Update label
         if self.model_label_widget:
-            label_text = "Preset:" if self._use_profile_mode else "Model:"
+            label_text = "Profile:" if self._use_profile_mode else "Model:"
             if HAVE_CTK:
                 self.model_label_widget.configure(text=label_text)
             else:
@@ -1184,8 +1184,8 @@ class ChatWindowBase(ABC):
         
         if self._use_profile_mode:
             # Switch to profile mode
-            preset_names = self._get_profile_names()
-            values = ["(Use Global)"] + preset_names
+            profile_names = self._get_profile_names()
+            values = ["(Use Global)"] + profile_names
             self.model_dropdown.configure(values=values)
             self.model_dropdown.set(self.session.profile_override or "(Use Global)")
         else:
@@ -1195,14 +1195,14 @@ class ChatWindowBase(ABC):
             threading.Thread(target=self._load_models, daemon=True).start()
     
     def _on_model_select(self, selected: str):
-        """Handle model/preset selection — per-session, not global."""
+        """Handle model/profile selection — per-session, not global."""
         from ... import web_server
         
         if not selected or selected in ("(loading...)", "(no models)"):
             return
         
         if self._use_profile_mode:
-            # Preset mode
+            # Profile mode
             if selected == "(Use Global)":
                 self.session.profile_override = None
                 self.session.model_override = None
@@ -1210,9 +1210,9 @@ class ChatWindowBase(ABC):
                 self._update_status("✅ Using global settings", self.theme.accent_green)
             else:
                 self.session.profile_override = selected
-                self.session.model_override = None  # Preset handles model
+                self.session.model_override = None # Profile handles model
                 self.selected_model = None
-                self._update_status(f"✅ Using preset: {selected}", self.theme.accent_green)
+                self._update_status(f"✅ Using profile: {selected}", self.theme.accent_green)
         else:
             # Model mode (original behavior)
             if selected.startswith("(Use Global"):
@@ -1341,10 +1341,10 @@ class ChatWindowBase(ABC):
             effective_ai_params = web_server.AI_PARAMS
             effective_key_managers = web_server.KEY_MANAGERS
 
-            # Apply preset override if active
+            # Apply profile override if active
             if self.session.profile_override:
-                from ...preset_resolver import resolve_preset_by_name
-                resolved = resolve_preset_by_name(
+                from ...profile_resolver import resolve_profile_by_name
+                resolved = resolve_profile_by_name(
                     self.session.profile_override, web_server.CONFIG,
                     web_server.AI_PARAMS, web_server.KEY_MANAGERS
                 )
@@ -2275,10 +2275,10 @@ class ChatWindowBase(ABC):
             effective_ai_params = web_server.AI_PARAMS
             effective_key_managers = web_server.KEY_MANAGERS
 
-            # Apply preset override if active
+            # Apply profile override if active
             if self.session.profile_override:
-                from ...preset_resolver import resolve_preset_by_name
-                resolved = resolve_preset_by_name(
+                from ...profile_resolver import resolve_profile_by_name
+                resolved = resolve_profile_by_name(
                     self.session.profile_override, web_server.CONFIG,
                     web_server.AI_PARAMS, web_server.KEY_MANAGERS
                 )

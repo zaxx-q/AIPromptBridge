@@ -136,7 +136,7 @@ class AttachedSnipPopup:
         # Active modifiers
         self.active_modifiers: List[str] = []
         
-        # Model preset override
+        # Connection profile override
         self.profile_var = None
         self.profile_dropdown = None
         
@@ -299,10 +299,10 @@ class AttachedSnipPopup:
         self.source_dropdown.pack(side="left", fill="x", expand=True)
         Tooltip(self.source_dropdown, "Select action source category")
         
-        # Model preset dropdown (only if presets exist)
-        self.profile_var, self.profile_dropdown, preset_frame = create_profile_dropdown_ctk(right_side, self.colors)
-        if preset_frame:
-            preset_frame.pack(fill="x", pady=(0, 8))
+        # Connection profile dropdown (only if profiles exist)
+        self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_ctk(right_side, self.colors)
+        if profile_frame:
+            profile_frame.pack(fill="x", pady=(0, 8))
 
         # Response mode toggle
         toggle_frame = ctk.CTkFrame(right_side, fg_color="transparent")
@@ -511,10 +511,10 @@ class AttachedSnipPopup:
         self.source_label.bind('<Button-1>', self._toggle_source_tk)
         Tooltip(self.source_label, "Select action source category")
         
-        # Model preset dropdown (only if presets exist)
-        self.profile_var, self.profile_dropdown, preset_frame = create_profile_dropdown_tk(right_side, self.root, self.colors)
-        if preset_frame:
-            preset_frame.pack(fill=tk.X, pady=(0, 8))
+        # Connection profile dropdown (only if profiles exist)
+        self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_tk(right_side, self.root, self.colors)
+        if profile_frame:
+            profile_frame.pack(fill=tk.X, pady=(0, 8))
         
         # Response mode toggle
         toggle_frame = tk.Frame(right_side, bg=self.colors.base)

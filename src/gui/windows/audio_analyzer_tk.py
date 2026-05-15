@@ -221,8 +221,8 @@ def _create_top_action_bar_tk(window, parent):
         window.provider_label_widget.pack(side="left", padx=(0, 5))
         window.provider_dropdown.pack(side="left", padx=(0, 15))
     
-    # Model/Preset
-    dropdown_label = "Preset:" if window._use_profile_mode else "Model:"
+    # Model/Profile
+    dropdown_label = "Profile:" if window._use_profile_mode else "Model:"
     window.model_label_widget = tk.Label(
         left_frame, text=dropdown_label, font=("Segoe UI", 10),
         bg=colors.base, fg=colors.text
@@ -407,13 +407,13 @@ def _create_compression_section_tk(window, parent):
     )
     window.compression_cb.pack(side="left", padx=(0, 10))
     
-    # Preset Dropdown
+    # Compression Preset Dropdown
     tk.Label(row, text="Preset:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0).pack(side="left", padx=(0, 5))
     
     from ...audio.recorder import COMPRESSION_PRESETS
     preset_names = [p["name"] for p in COMPRESSION_PRESETS.values()]
     
-    window.profile_dropdown = TkOptionMenuWrapper(
+    window.compression_preset_dropdown = TkOptionMenuWrapper(
         row,
         values=preset_names,
         command=window._on_preset_changed,
@@ -422,8 +422,8 @@ def _create_compression_section_tk(window, parent):
     
     # Set current preset
     current_preset = COMPRESSION_PRESETS.get(window.compression_preset, {})
-    window.profile_dropdown.set(current_preset.get("name", "Recommended"))
-    window.profile_dropdown.pack(side="left")
+    window.compression_preset_dropdown.set(current_preset.get("name", "Recommended"))
+    window.compression_preset_dropdown.pack(side="left")
     
     # Info Row
     info_row = tk.Frame(content, bg=colors.surface0)

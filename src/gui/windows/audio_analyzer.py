@@ -121,9 +121,9 @@ class AudioAnalyzerWindow:
         self.model = config.get(f"{self.provider}_model", "")
         self.available_models: List[str] = []
         
-        # Preset selector mode
+        # Profile selector mode
         self._use_profile_mode = self._compute_profile_mode()
-        self.selected_preset = None  # Active profile name (None = use global)
+        self.selected_profile = None  # Active profile name (None = use global)
         
         # Prompts
         self.prompts = get_prompts_config()
@@ -146,7 +146,7 @@ class AudioAnalyzerWindow:
         self.action_indicator_label = None
         self.provider_dropdown = None
         self.model_dropdown = None
-        self.model_label_widget = None  # Label widget ("Model:" or "Preset:")
+        self.model_label_widget = None  # Label widget ("Model:" or "Profile:")
         self.provider_label_widget = None  # Provider label (hidden in profile mode)
         self.device_dropdown = None
         self.device_type_var = None
@@ -157,7 +157,7 @@ class AudioAnalyzerWindow:
         self.level_bar = None  # CTkProgressBar-based meter (new)
         self.meter_style = self.config.get("audio_level_meter_style", "progressbar")
         self.compression_var = None
-        self.profile_dropdown = None
+        self.compression_preset_dropdown = None
         self.size_label = None
         self.preset_desc_label = None  # New: description label
         self.play_pause_btn = None
@@ -178,7 +178,7 @@ class AudioAnalyzerWindow:
         return f"audio_analyzer_{self.window_id}"
     
     def _compute_profile_mode(self) -> bool:
-        """Check if preset selector mode should be active."""
+        """Check if profile selector mode should be active."""
         if not self.config.get("profile_selector_enabled", True):
             return False
         try:
@@ -358,8 +358,8 @@ class AudioAnalyzerWindow:
             self.provider_label_widget.pack(side="left", padx=(0, 5))
             self.provider_dropdown.pack(side="left", padx=(0, 15))
         
-        # Model/Preset dropdown
-        dropdown_label = "Preset:" if self._use_profile_mode else "Model:"
+        # Model/Profile dropdown
+        dropdown_label = "Profile:" if self._use_profile_mode else "Model:"
         self.model_label_widget = ctk.CTkLabel(
             left_frame,
             text=dropdown_label,
@@ -608,7 +608,7 @@ class AudioAnalyzerWindow:
         from ...audio.recorder import COMPRESSION_PRESETS
         preset_names = [p["name"] for p in COMPRESSION_PRESETS.values()]
         
-        self.profile_dropdown = ctk.CTkOptionMenu(
+        self.compression_preset_dropdown = ctk.CTkOptionMenu(
             row_frame,
             values=preset_names,
             command=self._on_preset_changed,
@@ -625,8 +625,8 @@ class AudioAnalyzerWindow:
         )
         # Set current preset
         current_preset = COMPRESSION_PRESETS.get(self.compression_preset, {})
-        self.profile_dropdown.set(current_preset.get("name", "Recommended"))
-        self.profile_dropdown.pack(side="left")
+        self.compression_preset_dropdown.set(current_preset.get("name", "Recommended"))
+        self.compression_preset_dropdown.pack(side="left")
         
         # Second row: Size estimation and description
         info_row = ctk.CTkFrame(content, fg_color="transparent")
@@ -1891,7 +1891,7 @@ class AudioAnalyzerWindow:
     def _on_provider_changed(self, provider: str):
         """Handle provider dropdown change."""
         if self._use_profile_mode:
-            return  # Provider is determined by the preset
+            return  # Provider is determined by the profile
         self.provider = provider
         self.model = self.config.get(f"{provider}_model", "")
         self.model_dropdown.set(self.model or "(loading...)")
@@ -1900,13 +1900,13 @@ class AudioAnalyzerWindow:
         threading.Thread(target=self._load_models, daemon=True).start()
     
     def _on_model_changed(self, model: str):
-        """Handle model/preset selection change."""
+        """Handle model/profile selection change."""
         if self._use_profile_mode:
-            # Preset mode
+            # Profile mode
             if model == "(Default)":
-                self.selected_preset = None
+                self.selected_profile = None
             elif model:
-                self.selected_preset = model
+                self.selected_profile = model
             return
         
         if model and model not in ("(loading...)", "(no models)", "(no audio models found)"):
@@ -2161,19 +2161,19 @@ class AudioAnalyzerWindow:
             show_chat = action.get("show_chat_window", True)
 
         if self.on_action_callback and show_chat:
-            # Resolve effective provider/model (preset overrides if active)
+            # Resolve effective provider/model (profile overrides if active)
             effective_provider = self.provider
             effective_model = self.model
-            effective_preset = None
-            if self._use_profile_mode and self.selected_preset:
-                from ...preset_resolver import resolve_preset_by_name
-                resolved = resolve_preset_by_name(
-                    self.selected_preset, self.config,
+            effective_profile = None
+            if self._use_profile_mode and self.selected_profile:
+                from ...profile_resolver import resolve_profile_by_name
+                resolved = resolve_profile_by_name(
+                    self.selected_profile, self.config,
                     self.ai_params, self.key_managers
                 )
                 effective_provider = resolved.provider
                 effective_model = resolved.model
-                effective_preset = self.selected_preset
+                effective_profile = self.selected_profile
 
             # Delegate to callback (GUI Controller mode) - ONLY if show_chat_window is True
             try:
@@ -2186,7 +2186,7 @@ class AudioAnalyzerWindow:
                     compressed=self.compression_enabled,
                     provider=effective_provider,
                     model=effective_model,
-                    preset_name=effective_preset
+                    profile_name=effective_profile
                 )
                 
                 # Reset processing state
@@ -2260,19 +2260,19 @@ class AudioAnalyzerWindow:
                 
             GUICoordinator.get_instance().run_on_gui_thread(update)
 
-        # Resolve effective provider/model (preset overrides if active)
+        # Resolve effective provider/model (profile overrides if active)
         effective_provider = self.provider
         effective_model = self.model
-        effective_preset = None
-        if self._use_profile_mode and self.selected_preset:
-            from ...preset_resolver import resolve_preset_by_name
-            resolved = resolve_preset_by_name(
-                self.selected_preset, self.config,
+        effective_profile = None
+        if self._use_profile_mode and self.selected_profile:
+            from ...profile_resolver import resolve_profile_by_name
+            resolved = resolve_profile_by_name(
+                self.selected_profile, self.config,
                 self.ai_params, self.key_managers
             )
             effective_provider = resolved.provider
             effective_model = resolved.model
-            effective_preset = self.selected_preset
+            effective_profile = self.selected_profile
 
         tool.analyze_audio(
             audio_data=audio_data,
@@ -2282,7 +2282,7 @@ class AudioAnalyzerWindow:
             active_modifiers=self.active_modifiers,
             provider=effective_provider,
             model=effective_model,
-            preset_name=effective_preset,
+            profile_name=effective_profile,
             callback_progress=on_progress,
             callback_success=on_success,
             callback_error=on_error

@@ -16,7 +16,7 @@ class KeyManager:
         self.provider_name = provider_name
         self.lock = threading.Lock()
         # Optional display names for keys (parallel list, same length as self.keys)
-        # Used by preset resolver to select keys by name
+        # Used by profile resolver to select keys by name
         self.key_names = key_names or [""] * len(self.keys)
     
     def get_current_key(self):

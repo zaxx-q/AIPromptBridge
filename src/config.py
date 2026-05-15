@@ -129,8 +129,8 @@ DEFAULT_CONFIG = {
     # Custom background colors (hex, empty = use theme default)
     "chat_user_bg_color": "",
     "chat_assistant_bg_color": "",
-    # Preset selector mode
-    # true = Show model presets in dropdowns (if presets exist) instead of model list
+    # Profile selector mode
+    # true = Show connection profiles in dropdowns (if profiles exist) instead of model list
     # false = Always show model list in dropdowns
     "profile_selector_enabled": True,
     # Update settings
@@ -628,11 +628,11 @@ chat_message_bg_enabled = true
 chat_user_bg_color =
 chat_assistant_bg_color =
 
-# Preset selector mode
-# When enabled and model presets are defined in prompts.json,
+# Profile selector mode
+# When enabled and connection profiles are defined in prompts.json,
 # model dropdowns (Chat Window, Audio Analyzer) show profile names
 # instead of the full model list.
-# true = use presets dropdown (if presets exist)
+# true = use profile dropdown (if profiles exist)
 # false = always show model list
 profile_selector_enabled = true
 
