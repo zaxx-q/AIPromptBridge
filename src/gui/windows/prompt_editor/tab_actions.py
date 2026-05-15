@@ -17,7 +17,7 @@ from ...themes import (
 )
 from ...custom_widgets import ScrollableButtonList, create_section_header, create_emoji_button, TkScrollableFrame
 from ...custom_widgets import ask_themed_string
-from .dialogs import ProfileManagerDialog
+from ...core import show_connection_manager
 
 
 class ActionsTabMixin:
@@ -255,12 +255,12 @@ class ActionsTabMixin:
         # Show compare_prompts frame initially (text_edit_tool is default)
         self.compare_prompts_frame.pack(fill="x", pady=10)
         
-        # Model Preset dropdown (all tools)
+        # Connection Profile dropdown (all tools)
         self.preset_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
         self.preset_frame.pack(fill="x", pady=8)
         
         if self.use_ctk:
-            ctk.CTkLabel(self.preset_frame, text="Model Preset:", font=get_ctk_font(13), width=120, anchor="w",
+            ctk.CTkLabel(self.preset_frame, text="Connection Profile:", font=get_ctk_font(13), width=120, anchor="w",
                         **get_ctk_label_colors(self.colors)).pack(side="left")
             self.editor_widgets["profile_var"] = tk.StringVar(master=self.root, value="(None)")
             self.editor_widgets["preset_combo"] = ctk.CTkComboBox(
@@ -272,11 +272,11 @@ class ActionsTabMixin:
             ctk.CTkButton(
                 self.preset_frame, text="Manage...", font=get_ctk_font(12),
                 width=90, height=34, **get_ctk_button_colors(self.colors, "secondary"),
-                command=self._open_preset_manager
+                command=self._open_profile_manager
             ).pack(side="left")
         else:
             from tkinter import ttk
-            tk.Label(self.preset_frame, text="Model Preset:", font=("Segoe UI", 10), width=12, anchor="w",
+            tk.Label(self.preset_frame, text="Connection Profile:", font=("Segoe UI", 10), width=12, anchor="w",
                     bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
             self.editor_widgets["profile_var"] = tk.StringVar(master=self.root, value="(None)")
             self.editor_widgets["preset_combo"] = ttk.Combobox(
@@ -286,7 +286,7 @@ class ActionsTabMixin:
             self.editor_widgets["preset_combo"].pack(side="left", padx=(10, 5))
             tk.Button(self.preset_frame, text="Manage...", font=("Segoe UI", 9),
                      bg=self.colors.surface1, fg=self.colors.fg,
-                     command=self._open_preset_manager).pack(side="left")
+                     command=self._open_profile_manager).pack(side="left")
         
         # Refresh preset dropdown values
         self._refresh_profile_dropdown()
@@ -447,7 +447,7 @@ class ActionsTabMixin:
                     action_data.get("compare_prompts", False)
                 )
         
-        # Load model preset (all tools)
+        # Load connection profile (all tools)
         if "profile_var" in self.editor_widgets:
             preset_name = action_data.get("connection_profile", "") or ""
             self.editor_widgets["profile_var"].set(preset_name if preset_name else "(None)")
@@ -456,10 +456,9 @@ class ActionsTabMixin:
         self._update_editor_visibility()
 
     def _refresh_profile_dropdown(self):
-        """Refresh the model preset dropdown values from prompts config."""
-        from ...prompts import get_prompts_config
-        pc = get_prompts_config()
-        preset_names = pc.get_profile_names()
+        """Refresh the connection profile dropdown values from profile store."""
+        from ....connection_profiles import ProfileStore
+        preset_names = ProfileStore.get_instance().get_profile_names()
         values = ["(None)"] + preset_names
         
         if "preset_combo" in self.editor_widgets:
@@ -469,9 +468,9 @@ class ActionsTabMixin:
             else:
                 combo["values"] = values
 
-    def _open_preset_manager(self):
+    def _open_profile_manager(self):
         """Open the Manage Profiles dialog."""
-        ProfileManagerDialog(self.root, self.colors, on_close=self._refresh_profile_dropdown)
+        show_connection_manager()
 
     def _add_action(self):
         """Add a new action."""
@@ -628,7 +627,7 @@ class ActionsTabMixin:
         else:  # audio_tool
             action_dict["show_chat_window"] = self.editor_widgets["show_chat_var"].get()
         
-        # Save model preset (all tools)
+        # Save connection profile (all tools)
         if "profile_var" in self.editor_widgets:
             preset_val = self.editor_widgets["profile_var"].get()
             if preset_val and preset_val != "(None)":

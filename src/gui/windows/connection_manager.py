@@ -17,21 +17,21 @@ import tkinter as tk
 from tkinter import messagebox
 from typing import Optional
 
-from ...platform import HAVE_CTK, ctk
-from ...themes import (
+from ..platform import HAVE_CTK, ctk
+from ..themes import (
     ThemeColors, get_colors,
     get_ctk_button_colors, get_ctk_frame_colors, get_ctk_entry_colors,
     get_ctk_textbox_colors, get_ctk_combobox_colors, get_ctk_label_colors,
     get_ctk_font
 )
-from ...custom_widgets import (
+from ..custom_widgets import (
     ScrollableButtonList, ScrollableComboBox, create_emoji_button,
     TkScrollableFrame, ask_themed_string
 )
-from ..utils import set_window_icon
+from .utils import set_window_icon
 
 try:
-    from ...emoji_renderer import get_emoji_renderer, HAVE_PIL
+    from ..emoji_renderer import get_emoji_renderer, HAVE_PIL
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
@@ -97,14 +97,14 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self.configure(bg=self.colors.bg)
 
         self.withdraw()
-        from ..utils import set_dark_titlebar
+        from .utils import set_dark_titlebar
         set_dark_titlebar(self)
         set_window_icon(self)
 
         # Resolve api_key_pool options from KeyStore
         self.profile_fields = []
         try:
-            from ....key_store import KeyStore
+            from ...key_store import KeyStore
             pools = KeyStore.get_instance().get_all_pool_ids()
         except Exception:
             pools = []
@@ -424,10 +424,10 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         def _fetch():
             try:
-                from ....config import load_config
-                from ....key_store import KeyStore
-                from ....key_manager import KeyManager
-                from ....api_client import get_provider_for_type
+                from ...config import load_config
+                from ...key_store import KeyStore
+                from ...key_manager import KeyManager
+                from ...api_client import get_provider_for_type
 
                 config, _, _ = load_config()
                 key_store = KeyStore.get_instance()
@@ -507,7 +507,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 except Exception:
                     pass
         try:
-            from ...core import GUICoordinator
+            from ..core import GUICoordinator
             GUICoordinator.get_instance().run_on_gui_thread(safe_wrapper)
         except Exception:
             try:
@@ -546,7 +546,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         text = ", ".join(parts) if parts else "No profile selected"
 
         # Show active profile indicator
-        from ....connection_profiles import ProfileStore
+        from ...connection_profiles import ProfileStore
         store = ProfileStore.get_instance()
         active_name = store.get_active_profile_name()
         if self.current_profile and self.current_profile == active_name:
@@ -562,19 +562,19 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             messagebox.showinfo("Test Profile", "Set at least a provider or model to test.", parent=self)
             return
 
-        from ...windows.prompt_editor.dialogs import TestResultDialog
+        from .prompt_editor.dialogs import TestResultDialog
         dialog = TestResultDialog(self, self.colors)
 
         def _test_thread():
             try:
-                from ....config import load_config
-                from ....key_manager import KeyManager
-                from ....api_client import call_api_stream_unified
+                from ...config import load_config
+                from ...key_manager import KeyManager
+                from ...api_client import call_api_stream_unified
 
                 config, ai_params_loaded, _ = load_config()
                 ai_params = {k: v for k, v in ai_params_loaded.items() if v is not None}
 
-                from ....key_store import KeyStore
+                from ...key_store import KeyStore
                 key_store = KeyStore.get_instance()
                 key_managers = key_store.build_key_managers()
 
@@ -655,7 +655,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             messagebox.showinfo("Set Active", "Select a profile first.", parent=self)
             return
 
-        from ....web_server import switch_active_profile
+        from ...web_server import switch_active_profile
         if switch_active_profile(self.current_profile):
             self._refresh_list()
             self._update_summary()
@@ -692,7 +692,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
     # ─── CRUD ─────────────────────────────────────────────────────────────
 
     def _refresh_list(self):
-        from ....connection_profiles import ProfileStore
+        from ...connection_profiles import ProfileStore
         store = ProfileStore.get_instance()
         active = store.get_active_profile_name()
 
@@ -702,7 +702,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self.profile_listbox.add_item(name, name, icon)
 
     def _on_profile_select(self, name):
-        from ....connection_profiles import ProfileStore
+        from ...connection_profiles import ProfileStore
         self.current_profile = name
         store = ProfileStore.get_instance()
         profile_data = store.get_profile_dict(name) or {}
@@ -731,7 +731,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         self._update_summary()
 
     def _save_profile(self):
-        from ....connection_profiles import ProfileStore
+        from ...connection_profiles import ProfileStore
         name = self.name_var.get().strip()
         if not name:
             messagebox.showwarning("Missing Name", "Please enter a profile name.", parent=self)
@@ -757,7 +757,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         # If this is the active profile, apply changes live
         active = store.get_active_profile_name()
         if name == active:
-            from ....web_server import switch_active_profile
+            from ...web_server import switch_active_profile
             switch_active_profile(name)
 
         self.save_status.configure(text=f"✅ Saved '{name}'")
@@ -765,7 +765,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
     def _new_profile(self):
         name = ask_themed_string(self, "New Profile", "Enter profile name:", self.colors)
         if name:
-            from ....connection_profiles import ProfileStore, ConnectionProfile
+            from ...connection_profiles import ProfileStore, ConnectionProfile
             store = ProfileStore.get_instance()
             store.set_profile(name, ConnectionProfile())
             self.current_profile = name
@@ -778,7 +778,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             return
         name = ask_themed_string(self, "Duplicate Profile", "Enter new profile name:", self.colors)
         if name:
-            from ....connection_profiles import ProfileStore
+            from ...connection_profiles import ProfileStore
             store = ProfileStore.get_instance()
             source = store.get_profile_dict(self.current_profile) or {}
             store.set_profile_from_dict(name, dict(source))
@@ -792,7 +792,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         if not self.current_profile:
             return
         if messagebox.askyesno("Delete Profile", f"Delete profile '{self.current_profile}'?", parent=self):
-            from ....connection_profiles import ProfileStore
+            from ...connection_profiles import ProfileStore
             store = ProfileStore.get_instance()
             store.delete_profile(self.current_profile)
             self.current_profile = None
