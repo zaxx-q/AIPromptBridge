@@ -28,9 +28,9 @@ DEFAULT_CONFIG = {
     # Custom URL: If it contains "google" or "googleapis.com",
     # Google-specific behavior is automatically applied
     "custom_url": "https://api.openai.com/v1/chat/completions",
-    "custom_model": "gpt-5.2",
-    "openrouter_model": "openai/gpt-oss-120b:free",
-    "google_model": "gemma-3-27b-it",
+    "custom_model": "gpt-5.5",
+    "openrouter_model": "openrouter/free",
+    "google_model": "gemma-4-31b-it",
     "gemini_endpoint": None,
     "max_retries": 3,
     "retry_delay": 5,

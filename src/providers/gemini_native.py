@@ -791,10 +791,18 @@ class GeminiNativeProvider(BaseProvider):
         lower = model.lower()
         return "gemini" in lower and "2.5" in lower
     
-    def _is_gemma(self, model: str) -> bool:
-        """Check if model is Gemma (doesn't support systemInstruction)"""
+    def _is_legacy_gemma(self, model: str) -> bool:
+        """Check if model is a legacy Gemma (1/2/3) that lacks systemInstruction support.
+
+        Gemma 1, 2, and 3 require the system prompt to be prepended to the first
+        user message. Gemma 4+ added native system role support, so any version
+        not explicitly identified as legacy is treated as modern (future-proof).
+        """
         lower = model.lower()
-        return "gemma" in lower
+        if "gemma" not in lower:
+            return False
+        # Match legacy versions: gemma-1, gemma-2, gemma-3 (and variants like gemma2, gemma-2b)
+        return bool(re.search(r"gemma[-_]?[123](?:[^0-9]|$)", lower))
     
     def _get_url(self, model: str, streaming: bool) -> str:
         """Build the API URL"""
@@ -1008,28 +1016,28 @@ class GeminiNativeProvider(BaseProvider):
         thinking_enabled: bool
     ) -> Dict:
         """Build the full request body"""
-        # Gemma models don't support systemInstruction - prepend to first user message instead
-        is_gemma = self._is_gemma(model)
-        
+        # Pre-Gemma-4 models don't support systemInstruction - prepend to first user message.
+        # Gemma 4+ supports the native system role, so treat it like Gemini models.
+        is_old_gemma = self._is_legacy_gemma(model)
+
         contents, system_instruction = self._convert_messages_to_contents(
             messages,
-            prepend_system_to_user=is_gemma
+            prepend_system_to_user=is_old_gemma
         )
-        
+
         body = {
             "contents": contents,
             "generationConfig": self._build_generation_config(params, thinking_enabled, model),
             "safetySettings": SAFETY_SETTINGS
         }
-        
-        if system_instruction and not is_gemma:
-            # systemInstruction is a top-level field - omit "role" (best practice)
-            # Never use "role": "user" here as it conflicts with system instruction purpose
-            # Gemma models don't support this field, so we skip it for them
+
+        if system_instruction and not is_old_gemma:
+            # systemInstruction is a top-level field - omit "role" (best practice).
+            # Supported by all Gemini models and Gemma 4+.
             body["systemInstruction"] = {
                 "parts": [{"text": system_instruction}]
             }
-        
+
         return body
     
     def generate_stream(
