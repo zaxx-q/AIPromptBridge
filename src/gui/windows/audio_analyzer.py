@@ -122,8 +122,8 @@ class AudioAnalyzerWindow:
         self.available_models: List[str] = []
         
         # Preset selector mode
-        self._use_preset_mode = self._compute_preset_mode()
-        self.selected_preset = None  # Active preset name (None = use global)
+        self._use_profile_mode = self._compute_profile_mode()
+        self.selected_preset = None  # Active profile name (None = use global)
         
         # Prompts
         self.prompts = get_prompts_config()
@@ -147,7 +147,7 @@ class AudioAnalyzerWindow:
         self.provider_dropdown = None
         self.model_dropdown = None
         self.model_label_widget = None  # Label widget ("Model:" or "Preset:")
-        self.provider_label_widget = None  # Provider label (hidden in preset mode)
+        self.provider_label_widget = None  # Provider label (hidden in profile mode)
         self.device_dropdown = None
         self.device_type_var = None
         self.record_btn = None
@@ -157,7 +157,7 @@ class AudioAnalyzerWindow:
         self.level_bar = None  # CTkProgressBar-based meter (new)
         self.meter_style = self.config.get("audio_level_meter_style", "progressbar")
         self.compression_var = None
-        self.preset_dropdown = None
+        self.profile_dropdown = None
         self.size_label = None
         self.preset_desc_label = None  # New: description label
         self.play_pause_btn = None
@@ -177,23 +177,23 @@ class AudioAnalyzerWindow:
         """Return unique window tag."""
         return f"audio_analyzer_{self.window_id}"
     
-    def _compute_preset_mode(self) -> bool:
+    def _compute_profile_mode(self) -> bool:
         """Check if preset selector mode should be active."""
-        if not self.config.get("preset_selector_enabled", True):
+        if not self.config.get("profile_selector_enabled", True):
             return False
         try:
             from ..prompts import PromptsConfig
             pc = PromptsConfig.get_instance()
-            return bool(pc.get_preset_names())
+            return bool(pc.get_profile_names())
         except Exception:
             return False
     
-    def _get_preset_names(self) -> list:
-        """Get sorted preset names from PromptsConfig."""
+    def _get_profile_names(self) -> list:
+        """Get sorted profile names from PromptsConfig."""
         try:
             from ..prompts import PromptsConfig
             pc = PromptsConfig.get_instance()
-            return pc.get_preset_names()
+            return pc.get_profile_names()
         except Exception:
             return []
     
@@ -228,8 +228,8 @@ class AudioAnalyzerWindow:
         register_window(self._get_window_tag())
         self.root.protocol("WM_DELETE_WINDOW", self._close)
         
-        # Load models in background (skip in preset mode)
-        if not self._use_preset_mode:
+        # Load models in background (skip in profile mode)
+        if not self._use_profile_mode:
             threading.Thread(target=self._load_models, daemon=True).start()
         
         # Initialize audio system - deferred slightly to allow UI build
@@ -328,7 +328,7 @@ class AudioAnalyzerWindow:
         left_frame = ctk.CTkFrame(bar, fg_color="transparent")
         left_frame.pack(side="left", fill="x", expand=True)
         
-        # Provider dropdown (hidden in preset mode)
+        # Provider dropdown (hidden in profile mode)
         self.provider_label_widget = ctk.CTkLabel(
             left_frame,
             text="Provider:",
@@ -354,12 +354,12 @@ class AudioAnalyzerWindow:
         )
         self.provider_dropdown.set(self.provider)
         
-        if not self._use_preset_mode:
+        if not self._use_profile_mode:
             self.provider_label_widget.pack(side="left", padx=(0, 5))
             self.provider_dropdown.pack(side="left", padx=(0, 15))
         
         # Model/Preset dropdown
-        dropdown_label = "Preset:" if self._use_preset_mode else "Model:"
+        dropdown_label = "Preset:" if self._use_profile_mode else "Model:"
         self.model_label_widget = ctk.CTkLabel(
             left_frame,
             text=dropdown_label,
@@ -368,8 +368,8 @@ class AudioAnalyzerWindow:
         )
         self.model_label_widget.pack(side="left", padx=(0, 5))
         
-        if self._use_preset_mode:
-            initial_values = ["(Default)"] + self._get_preset_names()
+        if self._use_profile_mode:
+            initial_values = ["(Default)"] + self._get_profile_names()
             initial_display = "(Default)"
         else:
             initial_values = ["(loading...)"]
@@ -608,7 +608,7 @@ class AudioAnalyzerWindow:
         from ...audio.recorder import COMPRESSION_PRESETS
         preset_names = [p["name"] for p in COMPRESSION_PRESETS.values()]
         
-        self.preset_dropdown = ctk.CTkOptionMenu(
+        self.profile_dropdown = ctk.CTkOptionMenu(
             row_frame,
             values=preset_names,
             command=self._on_preset_changed,
@@ -625,8 +625,8 @@ class AudioAnalyzerWindow:
         )
         # Set current preset
         current_preset = COMPRESSION_PRESETS.get(self.compression_preset, {})
-        self.preset_dropdown.set(current_preset.get("name", "Recommended"))
-        self.preset_dropdown.pack(side="left")
+        self.profile_dropdown.set(current_preset.get("name", "Recommended"))
+        self.profile_dropdown.pack(side="left")
         
         # Second row: Size estimation and description
         info_row = ctk.CTkFrame(content, fg_color="transparent")
@@ -1890,7 +1890,7 @@ class AudioAnalyzerWindow:
     
     def _on_provider_changed(self, provider: str):
         """Handle provider dropdown change."""
-        if self._use_preset_mode:
+        if self._use_profile_mode:
             return  # Provider is determined by the preset
         self.provider = provider
         self.model = self.config.get(f"{provider}_model", "")
@@ -1901,7 +1901,7 @@ class AudioAnalyzerWindow:
     
     def _on_model_changed(self, model: str):
         """Handle model/preset selection change."""
-        if self._use_preset_mode:
+        if self._use_profile_mode:
             # Preset mode
             if model == "(Default)":
                 self.selected_preset = None
@@ -2165,7 +2165,7 @@ class AudioAnalyzerWindow:
             effective_provider = self.provider
             effective_model = self.model
             effective_preset = None
-            if self._use_preset_mode and self.selected_preset:
+            if self._use_profile_mode and self.selected_preset:
                 from ...preset_resolver import resolve_preset_by_name
                 resolved = resolve_preset_by_name(
                     self.selected_preset, self.config,
@@ -2264,7 +2264,7 @@ class AudioAnalyzerWindow:
         effective_provider = self.provider
         effective_model = self.model
         effective_preset = None
-        if self._use_preset_mode and self.selected_preset:
+        if self._use_profile_mode and self.selected_preset:
             from ...preset_resolver import resolve_preset_by_name
             resolved = resolve_preset_by_name(
                 self.selected_preset, self.config,

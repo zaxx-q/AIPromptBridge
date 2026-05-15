@@ -4,7 +4,7 @@ Prompt Editor Package for AIPromptBridge.
 
 Modular prompt editor window split into:
 - data.py: JSON I/O utilities and constants
-- dialogs.py: TestResultDialog, PresetManagerDialog
+- dialogs.py: TestResultDialog
 - editor.py: Core PromptEditorWindow composing all tab mixins
 - tab_actions.py: Actions tab (ActionsTabMixin)
 - tab_settings.py: Settings tab (SettingsTabMixin)
@@ -18,7 +18,6 @@ Public API:
 - AttachedPromptEditorWindow: Editor as child of GUICoordinator root
 - create_attached_prompt_editor_window: Factory for attached editor
 - show_prompt_editor: Thread-safe shortcut to show editor
-- PresetManagerDialog: Standalone model preset manager (usable outside editor)
 """
 
 from .editor import (
@@ -28,12 +27,9 @@ from .editor import (
     show_prompt_editor,
 )
 
-from .dialogs import PresetManagerDialog
-
 __all__ = [
     'PromptEditorWindow',
     'AttachedPromptEditorWindow',
     'create_attached_prompt_editor_window',
     'show_prompt_editor',
-    'PresetManagerDialog',
 ]

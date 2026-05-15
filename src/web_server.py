@@ -287,5 +287,36 @@ def init_web_server(config, ai_params, endpoints, key_managers):
     else:
         # No endpoints registered - API available but no custom routes
         ENDPOINTS = {}
-    
+
     return app
+
+
+def switch_active_profile(profile_name: str) -> bool:
+    """
+    Switch the active connection profile at runtime.
+
+    Updates ProfileStore, repopulates CONFIG/AI_PARAMS, and fires
+    config change notifications so all listeners (chat windows, etc.) update.
+
+    Returns True on success, False if profile not found.
+    """
+    global CONFIG, AI_PARAMS
+
+    from .connection_profiles import ProfileStore
+    from .config import notify_config_change
+
+    store = ProfileStore.get_instance()
+    if not store.set_active_profile(profile_name):
+        return False
+
+    profile = store.get_active_profile()
+    profile.populate_config(CONFIG)
+    profile.populate_ai_params(AI_PARAMS)
+
+    # Rebuild key managers if profile specifies a key pool/name override
+    if profile.api_key_pool or profile.api_key_name:
+        from .key_store import KeyStore
+        KEY_MANAGERS.update(KeyStore.get_instance().build_key_managers())
+
+    notify_config_change("_bulk_update", None)
+    return True

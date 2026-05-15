@@ -117,17 +117,24 @@ def initialize():
     
     # Load configuration
     config, ai_params, endpoints = load_config()
-    
+
     # Set global configuration
     web_server.CONFIG = config
     web_server.AI_PARAMS = ai_params
     web_server.ENDPOINTS = endpoints
-    
+
     # Initialize key managers via KeyStore (pool-based)
     key_store = KeyStore.get_instance()
     key_store.load()
     web_server.KEY_MANAGERS = key_store.build_key_managers()
-    
+
+    # ─── Populate from active connection profile ──────────────────────────
+    from src.connection_profiles import ProfileStore
+    profile_store = ProfileStore.get_instance()
+    active_profile = profile_store.get_active_profile()
+    active_profile.populate_config(config)
+    active_profile.populate_ai_params(ai_params)
+
     # ─── Configuration Summary ────────────────────────────────────────────
     provider = config.get('default_provider', 'google')
     model = config.get(f'{provider}_model', 'not set')

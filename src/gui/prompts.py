@@ -62,7 +62,6 @@ SETTINGS_KEY = "_settings"
 DEFAULT_GLOBAL_SETTINGS = {
     "version": 1,
     "description": "Unified prompt configuration for AIPromptBridge",
-    "model_presets": {},
     "chat_window_system_instruction": "You are a helpful AI assistant continuing a conversation. The conversation started with a specific task or query shown in the first message. If the user asks what you did, refer to that context. Maintain consistency with your previous responses. Use Markdown formatting when appropriate.",
     "modifiers": [
         {
@@ -901,10 +900,6 @@ class PromptsConfig:
                     if isinstance(mod, dict) and "default_tools" not in mod:
                         mod["default_tools"] = []
                         changed = True
-            # Ensure model_presets exists (migration for existing installs)
-            if "model_presets" not in self._config["_global_settings"]:
-                self._config["_global_settings"]["model_presets"] = {}
-                changed = True
 
         if "text_edit_tool" not in self._config:
             self._config["text_edit_tool"] = self._get_text_edit_defaults()
@@ -1131,52 +1126,7 @@ class PromptsConfig:
             for mod in self.get_modifiers()
             if isinstance(mod, dict) and tool_name in mod.get("default_tools", [])
         ]
-    
-    # =========================================================================
-    # Model Preset Accessors
-    # =========================================================================
-    
-    def get_model_presets(self) -> Dict[str, Any]:
-        """Get all model presets."""
-        return self.get_global_setting("model_presets", {})
-    
-    def get_model_preset(self, name: str) -> Optional[Dict[str, Any]]:
-        """Get a single model preset by name."""
-        presets = self.get_model_presets()
-        return presets.get(name)
-    
-    def set_model_preset(self, name: str, preset: Dict[str, Any]):
-        """Add or update a model preset and save."""
-        global_settings = self._config.setdefault("_global_settings", {})
-        presets = global_settings.setdefault("model_presets", {})
-        presets[name] = preset
-        self._save()
-        logging.info(f"Model preset '{name}' saved")
-    
-    def delete_model_preset(self, name: str) -> bool:
-        """Delete a model preset. Returns True if it existed."""
-        presets = self._config.get("_global_settings", {}).get("model_presets", {})
-        if name in presets:
-            del presets[name]
-            self._save()
-            logging.info(f"Model preset '{name}' deleted")
-            return True
-        return False
-    
-    def rename_model_preset(self, old_name: str, new_name: str) -> bool:
-        """Rename a model preset. Returns True if successful."""
-        presets = self._config.get("_global_settings", {}).get("model_presets", {})
-        if old_name in presets and new_name not in presets:
-            presets[new_name] = presets.pop(old_name)
-            self._save()
-            logging.info(f"Model preset renamed: '{old_name}' -> '{new_name}'")
-            return True
-        return False
-    
-    def get_preset_names(self) -> List[str]:
-        """Get sorted list of all preset names."""
-        return sorted(self.get_model_presets().keys())
-    
+
     def get_chat_window_system_instruction(self) -> str:
         """Get the unified chat window system instruction for follow-ups."""
         return self.get_global_setting(

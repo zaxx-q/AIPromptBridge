@@ -171,7 +171,7 @@ class AudioToolApp:
             compressed: Whether audio is compressed
             provider: Selected provider override
             model: Selected model override
-            preset_name: Selected preset name override (from analyzer dropdown)
+            preset_name: Selected profile name override (from analyzer dropdown)
         """
         logging.debug(f'Action selected: key={action_key}, custom={bool(custom_input)}, duration={duration:.1f}s, compressed={compressed}')
 
@@ -224,10 +224,10 @@ class AudioToolApp:
                 actions = self.prompts.get_audio_actions()
                 action = actions.get(action_key, {})
 
-                # If a preset was selected in the analyzer UI, override the action's model_preset
+                # If a preset was selected in the analyzer UI, override the action's connection_profile
                 if preset_name:
                     action = dict(action)
-                    action["model_preset"] = preset_name
+                    action["connection_profile"] = preset_name
                 
                 system_prompt = action.get("system_prompt", "You are an audio analysis assistant.")
                 task = action.get("task", "Analyze this audio.")
@@ -354,10 +354,10 @@ class AudioToolApp:
 
             action = actions.get(action_key, {})
 
-            # If a preset was selected in the analyzer UI, override the action's model_preset
+            # If a preset was selected in the analyzer UI, override the action's connection_profile
             if preset_name:
                 action = dict(action)
-                action["model_preset"] = preset_name
+                action["connection_profile"] = preset_name
             
             # Build prompt
             system_prompt = action.get("system_prompt", "You are an AI assistant analyzing audio.")
@@ -461,9 +461,9 @@ class AudioToolApp:
         session.title = window_title
         
         # Carry over preset override to the chat session
-        if action_config and action_config.get("model_preset"):
-            if self.config.get("preset_selector_enabled", True):
-                session.preset_override = action_config["model_preset"]
+        if action_config and action_config.get("connection_profile"):
+            if self.config.get("profile_selector_enabled", True):
+                session.profile_override = action_config["connection_profile"]
         
         # Save audio to external file for persistence
         attachment_path = AttachmentManager.save_audio(

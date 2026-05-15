@@ -204,22 +204,22 @@ class TextEditToolApp:
             initial_text=text
         )
     
-    def _on_direct_chat(self, user_input: str, response_mode: str = "default", preset_override: Optional[str] = None):
+    def _on_direct_chat(self, user_input: str, response_mode: str = "default", profile_override: Optional[str] = None):
         """
         Handle direct chat input (no selected text).
         
         Args:
             user_input: The user's chat input
             response_mode: Response mode ("default", "copy", "replace", or "show")
-            preset_override: Optional model preset name to override for this request
+            profile_override: Optional model profile name to override for this request
         """
-        logging.debug(f'Direct chat input: {user_input[:50]}..., mode: {response_mode}, preset: {preset_override}')
+        logging.debug(f'Direct chat input: {user_input[:50]}..., mode: {response_mode}, preset: {profile_override}')
         
         self._begin_task()
         
         threading.Thread(
             target=self._process_direct_chat,
-            args=(user_input, response_mode, preset_override),
+            args=(user_input, response_mode, profile_override),
             daemon=True
         ).start()
     
@@ -329,7 +329,7 @@ class TextEditToolApp:
         
         threading.Thread(target=_timeout, daemon=True).start()
     
-    def _on_option_selected(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None, preset_override: Optional[str] = None):
+    def _on_option_selected(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None, profile_override: Optional[str] = None):
         """
         Handle option selection from popup.
         
@@ -340,18 +340,18 @@ class TextEditToolApp:
             response_mode: Response mode ("default", "replace", or "show")
             active_modifiers: List of active modifier keys
             compare_text: Optional second text for compare mode
-            preset_override: Optional model preset name to override for this request
+            profile_override: Optional model profile name to override for this request
         """
         if active_modifiers is None:
             active_modifiers = []
         
-        logging.debug(f'Option selected: {option_key}, mode: {response_mode}, modifiers: {active_modifiers}, compare={bool(compare_text)}, preset: {preset_override}')
+        logging.debug(f'Option selected: {option_key}, mode: {response_mode}, modifiers: {active_modifiers}, compare={bool(compare_text)}, preset: {profile_override}')
         
         self._begin_task()
         
         threading.Thread(
             target=self._process_option,
-            args=(option_key, selected_text, custom_input, response_mode, active_modifiers, compare_text, preset_override),
+            args=(option_key, selected_text, custom_input, response_mode, active_modifiers, compare_text, profile_override),
             daemon=True
         ).start()
     
@@ -365,7 +365,7 @@ class TextEditToolApp:
             model: Optional model override
             on_chunk: Optional callback for each text chunk (for real-time typing)
             origin_override: Optional RequestOrigin override
-            action_config: Optional action config dict (may contain model_preset)
+            action_config: Optional action config dict (may contain connection_profile)
         """
         from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin, StreamCallback
         from ..session_manager import ChatSession
@@ -669,7 +669,7 @@ class TextEditToolApp:
         Args:
             messages: API messages to send
             action_key: Label for logging and notification
-            action_config: Optional action config dict (may contain model_preset)
+            action_config: Optional action config dict (may contain connection_profile)
         """
         from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
         from ..preset_resolver import resolve_preset
@@ -721,7 +721,7 @@ class TextEditToolApp:
                 logging.error(f"Failed to copy to clipboard: {e}")
                 print(f"  [Error] Failed to copy: {e}")
 
-    def _process_direct_chat(self, user_input: str, response_mode: str = "default", preset_override: Optional[str] = None):
+    def _process_direct_chat(self, user_input: str, response_mode: str = "default", profile_override: Optional[str] = None):
         """
         Process direct chat input.
         
@@ -732,7 +732,7 @@ class TextEditToolApp:
                 - "copy": Copy response to clipboard
                 - "replace": Force type to active field
                 - "default": Use show_ai_response_in_chat_window config setting
-            preset_override: Optional model preset name to override for this request
+            profile_override: Optional model profile name to override for this request
         """
         self.cancel_requested = False
         try:
@@ -747,7 +747,7 @@ class TextEditToolApp:
             messages = build_text_message(user_input, chat_system_instruction)
             
             # Build action config for preset override (direct chat has no action config)
-            action_config = {"model_preset": preset_override} if preset_override else None
+            action_config = {"connection_profile": profile_override} if profile_override else None
             
             # Store action config for preset resolution in streaming paths
             self._current_action_config = action_config
@@ -908,7 +908,7 @@ class TextEditToolApp:
         finally:
             self._end_task()
     
-    def _process_option(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None, preset_override: Optional[str] = None):
+    def _process_option(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None, profile_override: Optional[str] = None):
         """
         Process the selected option.
         
@@ -951,10 +951,10 @@ class TextEditToolApp:
             action_options = self._get_action_options()
             option = action_options.get(option_key, {})
             
-            # Apply popup-level preset override (takes priority over action's model_preset)
-            if preset_override:
+            # Apply popup-level preset override (takes priority over action's connection_profile)
+            if profile_override:
                 option = dict(option)  # Don't mutate the original
-                option["model_preset"] = preset_override
+                option["connection_profile"] = profile_override
             
             # Store action config for preset resolution in streaming paths
             self._current_action_config = option
@@ -1293,9 +1293,9 @@ class TextEditToolApp:
         
         # Carry over preset override to the chat session
         action_config = getattr(self, '_current_action_config', None)
-        if action_config and action_config.get("model_preset"):
-            if self.config.get("preset_selector_enabled", True):
-                session.preset_override = action_config["model_preset"]
+        if action_config and action_config.get("connection_profile"):
+            if self.config.get("profile_selector_enabled", True):
+                session.profile_override = action_config["connection_profile"]
         
         # Extract user content from the already-built messages
         user_text = self._extract_user_content_from_messages(messages)
@@ -1430,9 +1430,9 @@ class TextEditToolApp:
         
         # Carry over preset override to the chat session
         action_config = getattr(self, '_current_action_config', None)
-        if action_config and action_config.get("model_preset"):
-            if self.config.get("preset_selector_enabled", True):
-                session.preset_override = action_config["model_preset"]
+        if action_config and action_config.get("connection_profile"):
+            if self.config.get("profile_selector_enabled", True):
+                session.profile_override = action_config["connection_profile"]
         
         # Extract user content from the already-built messages
         user_text = self._extract_user_content_from_messages(messages)

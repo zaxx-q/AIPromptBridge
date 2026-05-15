@@ -132,7 +132,7 @@ DEFAULT_CONFIG = {
     # Preset selector mode
     # true = Show model presets in dropdowns (if presets exist) instead of model list
     # false = Always show model list in dropdowns
-    "preset_selector_enabled": True,
+    "profile_selector_enabled": True,
     # Update settings
     "update_check_enabled": True,       # Auto-check on startup
 }
@@ -630,11 +630,11 @@ chat_assistant_bg_color =
 
 # Preset selector mode
 # When enabled and model presets are defined in prompts.json,
-# model dropdowns (Chat Window, Audio Analyzer) show preset names
+# model dropdowns (Chat Window, Audio Analyzer) show profile names
 # instead of the full model list.
 # true = use presets dropdown (if presets exist)
 # false = always show model list
-preset_selector_enabled = true
+profile_selector_enabled = true
 
 # ============================================================
 # UPDATE SETTINGS

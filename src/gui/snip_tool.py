@@ -144,10 +144,10 @@ class SnipToolApp:
         
         def on_action_with_capture(source, action_key, custom_input, active_modifiers=None,
                                     compare_mode=False, compare_capture=None, response_mode="default",
-                                    preset_override=None):
+                                    profile_override=None):
             self._on_action_selected(source, action_key, custom_input, active_modifiers,
                                       compare_mode, compare_capture, response_mode, capture=captured,
-                                      preset_override=preset_override)
+                                      profile_override=profile_override)
         
         # Get combined prompts for popup
         prompts_config = self._get_combined_prompts()
@@ -198,7 +198,7 @@ class SnipToolApp:
         compare_capture: Optional[CaptureResult] = None,
         response_mode: str = "default",
         capture: Optional[CaptureResult] = None,
-        preset_override: Optional[str] = None
+        profile_override: Optional[str] = None
     ):
         """
         Handle action selection from popup.
@@ -212,12 +212,12 @@ class SnipToolApp:
             compare_capture: Second capture result (if compare mode)
             response_mode: "default", "copy", or "show"
             capture: The captured image (passed via closure for parallel safety)
-            preset_override: Optional model preset name to override for this request
+            profile_override: Optional model profile name to override for this request
         """
         if active_modifiers is None:
             active_modifiers = []
         
-        logging.debug(f'Action selected: source={source}, key={action_key}, custom={bool(custom_input)}, modifiers={active_modifiers}, compare={compare_mode}, mode={response_mode}, preset={preset_override}')
+        logging.debug(f'Action selected: source={source}, key={action_key}, custom={bool(custom_input)}, modifiers={active_modifiers}, compare={compare_mode}, mode={response_mode}, preset={profile_override}')
         
         if not capture:
             logging.error('No capture available for action')
@@ -228,7 +228,7 @@ class SnipToolApp:
         # Process in background thread
         threading.Thread(
             target=self._process_action,
-            args=(source, action_key, custom_input, active_modifiers, compare_mode, compare_capture, response_mode, capture, preset_override),
+            args=(source, action_key, custom_input, active_modifiers, compare_mode, compare_capture, response_mode, capture, profile_override),
             daemon=True
         ).start()
     
@@ -261,7 +261,7 @@ class SnipToolApp:
         compare_capture: Optional[CaptureResult] = None,
         response_mode: str = "default",
         capture: Optional[CaptureResult] = None,
-        preset_override: Optional[str] = None
+        profile_override: Optional[str] = None
     ):
         """Process the selected action with image context."""
         if active_modifiers is None:
@@ -285,10 +285,10 @@ class SnipToolApp:
                 
                 action = actions.get(action_key, {})
                 
-                # Apply popup-level preset override (takes priority over action's model_preset)
-                if preset_override:
+                # Apply popup-level preset override (takes priority over action's connection_profile)
+                if profile_override:
                     action = dict(action)  # Don't mutate the original
-                    action["model_preset"] = preset_override
+                    action["connection_profile"] = profile_override
                 
                 # Build prompt
                 system_prompt = action.get("system_prompt", "You are an AI assistant analyzing images.")
@@ -491,7 +491,7 @@ class SnipToolApp:
             messages: API messages to send
             action_key: The action name for logging
             origin: RequestOrigin for logging
-            action_config: Optional action config dict (may contain model_preset)
+            action_config: Optional action config dict (may contain connection_profile)
         """
         from .text_edit_tool import get_instance as get_text_edit_instance
         from ..preset_resolver import resolve_preset
@@ -627,9 +627,9 @@ class SnipToolApp:
         session.title = window_title
         
         # Carry over preset override to the chat session
-        if action_config and action_config.get("model_preset"):
-            if self.config.get("preset_selector_enabled", True):
-                session.preset_override = action_config["model_preset"]
+        if action_config and action_config.get("connection_profile"):
+            if self.config.get("profile_selector_enabled", True):
+                session.profile_override = action_config["connection_profile"]
         
         attachments = []
         

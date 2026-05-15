@@ -1146,25 +1146,25 @@ class CarouselButtonList:
 # Preset Dropdown Helpers
 # =============================================================================
 
-def create_preset_dropdown_ctk(parent, colors):
+def create_profile_dropdown_ctk(parent, colors):
     """
     Create a model preset override dropdown (CTk version).
     
-    Returns (preset_var, dropdown_widget, frame) or (None, None, None) if no presets.
+    Returns (profile_var, dropdown_widget, frame) or (None, None, None) if no presets.
     Caller must pack the frame.
     """
     from .prompts import get_prompts_config
-    preset_names = get_prompts_config().get_preset_names()
+    preset_names = get_prompts_config().get_profile_names()
     if not preset_names:
         return None, None, None
     
     frame = ctk.CTkFrame(parent, fg_color="transparent")
     
-    preset_var = tk.StringVar(value="(Default)")
+    profile_var = tk.StringVar(value="(Default)")
     dropdown = ctk.CTkOptionMenu(
         frame,
         values=["(Default)"] + preset_names,
-        variable=preset_var,
+        variable=profile_var,
         width=140,
         height=28,
         corner_radius=6,
@@ -1179,27 +1179,27 @@ def create_preset_dropdown_ctk(parent, colors):
     dropdown.pack(side="left", fill="x", expand=True)
     Tooltip(dropdown, "Override model preset for this request")
     
-    return preset_var, dropdown, frame
+    return profile_var, dropdown, frame
 
 
-def create_preset_dropdown_tk(parent, root, colors):
+def create_profile_dropdown_tk(parent, root, colors):
     """
     Create a model preset override dropdown (Tk fallback).
     
-    Returns (preset_var, dropdown_widget, frame) or (None, None, None) if no presets.
+    Returns (profile_var, dropdown_widget, frame) or (None, None, None) if no presets.
     Caller must pack the frame.
     """
     from .prompts import get_prompts_config
-    preset_names = get_prompts_config().get_preset_names()
+    preset_names = get_prompts_config().get_profile_names()
     if not preset_names:
         return None, None, None
     
     frame = tk.Frame(parent, bg=colors.base)
     
-    preset_var = tk.StringVar(master=root, value="(Default)")
+    profile_var = tk.StringVar(master=root, value="(Default)")
     dropdown = tk.OptionMenu(
         frame,
-        preset_var,
+        profile_var,
         "(Default)",
         *preset_names
     )
@@ -1214,14 +1214,14 @@ def create_preset_dropdown_tk(parent, root, colors):
     )
     dropdown.pack(side=tk.LEFT, fill=tk.X, expand=True)
     
-    return preset_var, dropdown, frame
+    return profile_var, dropdown, frame
 
 
-def get_preset_override_value(preset_var):
+def get_profile_override_value(profile_var):
     """Get the selected preset override, or None for '(Default)'."""
-    if preset_var:
+    if profile_var:
         try:
-            val = preset_var.get()
+            val = profile_var.get()
             if val and val != "(Default)":
                 return val
         except Exception:
@@ -1934,8 +1934,8 @@ class AttachedInputPopup:
         self.colors = get_colors()
         self.root = None
         self.response_toggle = None
-        self.preset_var = None
-        self.preset_dropdown = None
+        self.profile_var = None
+        self.profile_dropdown = None
         
         self._create_window()
     
@@ -2013,7 +2013,7 @@ class AttachedInputPopup:
                 self.tts_btn = tts_btn
             
             # Model preset dropdown in top bar (only if presets exist)
-            self.preset_var, self.preset_dropdown, preset_frame = create_preset_dropdown_ctk(top_bar, self.colors)
+            self.profile_var, self.profile_dropdown, preset_frame = create_profile_dropdown_ctk(top_bar, self.colors)
             if preset_frame:
                 preset_frame.pack(side="left", expand=True)
             
@@ -2116,7 +2116,7 @@ class AttachedInputPopup:
                 self.tts_btn = tts_btn
             
             # Model preset dropdown in top bar (only if presets exist)
-            self.preset_var, self.preset_dropdown, preset_frame = create_preset_dropdown_tk(top_bar, self.root, self.colors)
+            self.profile_var, self.profile_dropdown, preset_frame = create_profile_dropdown_tk(top_bar, self.root, self.colors)
             if preset_frame:
                 preset_frame.pack(side=tk.LEFT, expand=True)
             
@@ -2249,9 +2249,9 @@ class AttachedInputPopup:
         
         if not is_empty:
             response_mode = self.response_toggle.get() if self.response_toggle else "default"
-            preset_override = get_preset_override_value(self.preset_var)
+            profile_override = get_profile_override_value(self.profile_var)
             self._close()
-            self.on_submit(text, response_mode, preset_override)
+            self.on_submit(text, response_mode, profile_override)
         else:
             self._flash_input_error()
     
@@ -2306,7 +2306,7 @@ class AttachedInputPopup:
         # is GC'd on a background thread (the Toplevel shares the parent's
         # live Tcl interpreter, so Variable.__del__ would still attempt
         # a real Tcl call).
-        for attr_name in ('input_var', 'preset_var'):
+        for attr_name in ('input_var', 'profile_var'):
             var = getattr(self, attr_name, None)
             if isinstance(var, tk.Variable):
                 try:
@@ -2319,8 +2319,8 @@ class AttachedInputPopup:
         self.input_entry = None
         self.response_toggle = None
         self.input_var = None
-        self.preset_var = None
-        self.preset_dropdown = None
+        self.profile_var = None
+        self.profile_dropdown = None
         if hasattr(self, 'tts_btn'):
             self.tts_btn = None
         gc.collect()
@@ -2365,8 +2365,8 @@ class AttachedPromptPopup:
         self.response_toggle = None
         self.modifier_bar = None
         self.active_modifiers: List[str] = []
-        self.preset_var = None
-        self.preset_dropdown = None
+        self.profile_var = None
+        self.profile_dropdown = None
         
         # Compare mode state
         self._compare_text: Optional[str] = None
@@ -2464,7 +2464,7 @@ class AttachedPromptPopup:
             self.response_toggle.pack(anchor="center")
             
             # Model preset dropdown (only if presets exist)
-            self.preset_var, self.preset_dropdown, preset_frame = create_preset_dropdown_ctk(content_frame, self.colors)
+            self.profile_var, self.profile_dropdown, preset_frame = create_profile_dropdown_ctk(content_frame, self.colors)
             if preset_frame:
                 preset_frame.pack(anchor="center", pady=(0, 8))
             
@@ -2692,7 +2692,7 @@ class AttachedPromptPopup:
             self.response_toggle.pack(anchor=tk.CENTER)
             
             # Model preset dropdown (only if presets exist)
-            self.preset_var, self.preset_dropdown, preset_frame = create_preset_dropdown_tk(content_frame, self.root, self.colors)
+            self.profile_var, self.profile_dropdown, preset_frame = create_profile_dropdown_tk(content_frame, self.root, self.colors)
             if preset_frame:
                 preset_frame.pack(anchor=tk.CENTER, pady=(0, 8))
             
@@ -3044,9 +3044,9 @@ class AttachedPromptPopup:
             return
         
         response_mode = self._get_effective_response_mode(option_key)
-        preset_override = get_preset_override_value(self.preset_var)
+        profile_override = get_profile_override_value(self.profile_var)
         self._close()
-        self.on_option_selected(option_key, self.selected_text, None, response_mode, self.active_modifiers, None, preset_override)
+        self.on_option_selected(option_key, self.selected_text, None, response_mode, self.active_modifiers, None, profile_override)
     
     def _initiate_compare_text(self):
         """Hide popup and request a second text selection from the user."""
@@ -3071,9 +3071,9 @@ class AttachedPromptPopup:
             option_key, custom_input = self._pending_compare_action
             self._pending_compare_action = None
             response_mode = self._get_effective_response_mode(option_key)
-            preset_override = get_preset_override_value(self.preset_var)
+            profile_override = get_profile_override_value(self.profile_var)
             self._close()
-            self.on_option_selected(option_key, self.selected_text, custom_input, response_mode, self.active_modifiers, text, preset_override)
+            self.on_option_selected(option_key, self.selected_text, custom_input, response_mode, self.active_modifiers, text, profile_override)
         else:
             # No pending action (shouldn't happen), just close
             self._close()
@@ -3102,9 +3102,9 @@ class AttachedPromptPopup:
             return
         
         response_mode = self._get_effective_response_mode("_Custom")
-        preset_override = get_preset_override_value(self.preset_var)
+        profile_override = get_profile_override_value(self.profile_var)
         self._close()
-        self.on_option_selected("_Custom", self.selected_text, custom_text, response_mode, self.active_modifiers, None, preset_override)
+        self.on_option_selected("_Custom", self.selected_text, custom_text, response_mode, self.active_modifiers, None, profile_override)
     
     def _on_ask_submit(self):
         """Handle ask submission."""
@@ -3117,9 +3117,9 @@ class AttachedPromptPopup:
             return
         
         response_mode = self._get_effective_response_mode("_Ask")
-        preset_override = get_preset_override_value(self.preset_var)
+        profile_override = get_profile_override_value(self.profile_var)
         self._close()
-        self.on_option_selected("_Ask", self.selected_text, ask_text, response_mode, self.active_modifiers, None, preset_override)
+        self.on_option_selected("_Ask", self.selected_text, ask_text, response_mode, self.active_modifiers, None, profile_override)
     
     def _on_ask_compare_submit(self):
         """Handle ask with compare mode - triggers second text selection."""
@@ -3171,7 +3171,7 @@ class AttachedPromptPopup:
         # is GC'd on a background thread (the Toplevel shares the parent's
         # live Tcl interpreter, so Variable.__del__ would still attempt
         # a real Tcl call).
-        for attr_name in ('edit_input_var', 'ask_input_var', 'preset_var'):
+        for attr_name in ('edit_input_var', 'ask_input_var', 'profile_var'):
             var = getattr(self, attr_name, None)
             if isinstance(var, tk.Variable):
                 try:
@@ -3188,8 +3188,8 @@ class AttachedPromptPopup:
         self.carousel = None
         self.edit_input_var = None
         self.ask_input_var = None
-        self.preset_var = None
-        self.preset_dropdown = None
+        self.profile_var = None
+        self.profile_dropdown = None
         if hasattr(self, 'tts_btn'):
             self.tts_btn = None
         gc.collect()

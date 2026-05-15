@@ -3,10 +3,10 @@
 Provider tab mixin for Settings Window.
 
 Sections:
-    🥇 Default Provider — provider selector dropdown
-    🛠️ Custom Provider — URL + model
-    🚀 OpenRouter — model
-    💎 Google Gemini — model + gemini_endpoint
+    🔌 Connection Profile — active profile selector + manage button
+    🛠️ Custom Provider — URL (for reference / fallback)
+    💎 Google Gemini — gemini_endpoint (for reference / fallback)
+    🔑 Key Pool Assignments — per-provider pool assignment
     🔄 Request Settings — retries, delay, timeout
 """
 
@@ -14,10 +14,7 @@ import tkinter as tk
 
 from ...platform import HAVE_CTK, ctk
 from ...themes import get_ctk_font, get_ctk_label_colors
-from ...custom_widgets import create_section_header
-
-# Provider display labels
-_PROVIDER_LABELS = {"google": "Google", "openrouter": "OpenRouter", "custom": "Custom"}
+from ...custom_widgets import create_section_header, create_emoji_button
 
 
 class ProviderTabMixin:
@@ -27,51 +24,30 @@ class ProviderTabMixin:
         """Create the Provider settings tab."""
         content = self._create_tab_scroll_frame(frame)
 
-        # --- Default Provider ---
-        create_section_header(content, "🥇 Default Provider", self.colors)
+        # --- Connection Profile ---
+        create_section_header(content, "🔌 Connection Profile", self.colors)
+        self._create_profile_selector(content)
 
-        self._add_dropdown_field(content, "default_provider", "Provider:",
-                                 self.config_data.config.get("default_provider", "google"),
-                                 options=["custom", "openrouter", "google"], size="md",
-                                 hint="Selected provider for API calls")
+        # --- Key Pool Assignments ---
+        create_section_header(content, "🔑 Key Pool Assignments", self.colors, top_padding=20)
 
-        # --- Custom Provider ---
-        create_section_header(content, "🛠️ Custom Provider", self.colors, top_padding=20)
-
-        self._add_entry_field(content, "custom_url", "URL:",
-                             self.config_data.config.get("custom_url", "") or "",
-                             size="lg", hint="OpenAI-compatible endpoint URL")
-
-        self._add_model_dropdown_field(content, "custom_model", "Model:",
-                                       self.config_data.config.get("custom_model", "") or "",
-                                       provider="custom")
+        if self.use_ctk:
+            ctk.CTkLabel(content,
+                        text="Assign which key pool each provider draws API keys from.",
+                        font=get_ctk_font(11), justify="left",
+                        **get_ctk_label_colors(self.colors, muted=True)
+                        ).pack(anchor="w", pady=(0, 8))
+        else:
+            tk.Label(content,
+                    text="Assign which key pool each provider draws API keys from.",
+                    font=("Segoe UI", 9), justify="left",
+                    bg=self.colors.bg, fg=self.colors.blockquote).pack(anchor="w", pady=(0, 8))
 
         self._create_pool_assignment_dropdown(content, "custom")
-
-        # --- OpenRouter ---
-        create_section_header(content, "🚀 OpenRouter", self.colors, top_padding=20)
-
-        self._add_model_dropdown_field(content, "openrouter_model", "Model:",
-                                       self.config_data.config.get("openrouter_model", ""),
-                                       provider="openrouter")
-
         self._create_pool_assignment_dropdown(content, "openrouter")
-
-        # --- Google Gemini ---
-        create_section_header(content, "💎 Google Gemini", self.colors, top_padding=20)
-
-        self._add_model_dropdown_field(content, "google_model", "Model:",
-                                       self.config_data.config.get("google_model", ""),
-                                       provider="google")
-
-        self._add_entry_field(content, "gemini_endpoint", "Custom endpoint:",
-                             self.config_data.config.get("gemini_endpoint", "") or "",
-                             size="lg",
-                             hint="Custom Gemini API base URL (empty = official Google endpoint)")
-
         self._create_pool_assignment_dropdown(content, "google")
 
-        # --- Request Settings (moved from General > Limits) ---
+        # --- Request Settings ---
         create_section_header(content, "🔄 Request Settings", self.colors, top_padding=20)
 
         self._add_spinbox_field(content, "max_retries", "Max retries:",
@@ -85,6 +61,143 @@ class ProviderTabMixin:
         self._add_spinbox_field(content, "request_timeout", "Request timeout (s):",
                                self.config_data.config.get("request_timeout", 120),
                                10, 600, hint="Timeout for API requests")
+
+    # -------------------------------------------------------------------------
+    # Connection Profile selector
+    # -------------------------------------------------------------------------
+
+    def _create_profile_selector(self, parent):
+        """Active profile dropdown + Manage Profiles button."""
+        from src.connection_profiles import ProfileStore
+        from .widgets import LABEL_WIDTH, DROPDOWN_WIDTH_MD
+
+        store = ProfileStore.get_instance()
+        profile_names = store.get_profile_names()
+        active_name = store.get_active_profile_name()
+
+        row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        row.pack(fill="x", pady=4)
+
+        if self.use_ctk:
+            ctk.CTkLabel(
+                row, text="Active Profile:",
+                font=get_ctk_font(13), width=LABEL_WIDTH, anchor="w",
+                **get_ctk_label_colors(self.colors)
+            ).pack(side="left")
+
+            self._profile_var = tk.StringVar(master=self.root, value=active_name)
+            dd = ctk.CTkComboBox(
+                row, variable=self._profile_var, values=profile_names,
+                width=DROPDOWN_WIDTH_MD, height=34, state="readonly",
+                font=get_ctk_font(13),
+                fg_color=self.colors.input_bg,
+                border_color=self.colors.surface1,
+                button_color=self.colors.surface1,
+                button_hover_color=self.colors.accent,
+                dropdown_fg_color=self.colors.surface0,
+                text_color=self.colors.fg,
+                command=self._on_profile_selected
+            )
+            dd.pack(side="left", padx=(8, 0))
+            self._profile_dropdown = dd
+        else:
+            tk.Label(
+                row, text="Active Profile:",
+                font=("Segoe UI", 10), width=LABEL_WIDTH // 8, anchor="w",
+                bg=self.colors.bg, fg=self.colors.fg
+            ).pack(side="left")
+
+            self._profile_var = tk.StringVar(master=self.root, value=active_name)
+            from tkinter import ttk
+            dd = ttk.Combobox(
+                row, textvariable=self._profile_var, values=profile_names,
+                width=DROPDOWN_WIDTH_MD // 10, state="readonly"
+            )
+            dd.pack(side="left", padx=(8, 0))
+            dd.bind('<<ComboboxSelected>>', lambda e: self._on_profile_selected(self._profile_var.get()))
+            self._profile_dropdown = dd
+
+        # Status label
+        if self.use_ctk:
+            self._profile_status = ctk.CTkLabel(
+                row, text="", font=get_ctk_font(11),
+                text_color=self.colors.accent_green
+            )
+        else:
+            self._profile_status = tk.Label(
+                row, text="", font=("Segoe UI", 9),
+                bg=self.colors.bg, fg=self.colors.accent_green
+            )
+        self._profile_status.pack(side="left", padx=(12, 0))
+
+        # Manage Profiles button
+        btn_row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        btn_row.pack(fill="x", pady=(4, 8))
+
+        create_emoji_button(
+            btn_row, "Manage Profiles", "🔌", self.colors, "primary", 170, 36,
+            command=self._open_connection_manager
+        ).pack(side="left")
+
+        hint_text = "Create, edit, and test connection profiles"
+        if self.use_ctk:
+            ctk.CTkLabel(btn_row, text=hint_text,
+                        font=get_ctk_font(11), justify="left",
+                        **get_ctk_label_colors(self.colors, muted=True)
+                        ).pack(side="left", padx=(12, 0))
+        else:
+            tk.Label(btn_row, text=hint_text,
+                    font=("Segoe UI", 9),
+                    bg=self.colors.bg, fg=self.colors.blockquote
+                    ).pack(side="left", padx=(12, 0))
+
+    def _on_profile_selected(self, name: str = None):
+        """Handle profile selection from dropdown."""
+        if not name:
+            name = self._profile_var.get()
+        if not name:
+            return
+
+        try:
+            from ....web_server import switch_active_profile
+            if switch_active_profile(name):
+                status_text = f"⭐ Switched to '{name}'"
+                color = self.colors.accent_green
+            else:
+                status_text = f"Profile '{name}' not found"
+                color = self.colors.accent_red
+        except Exception as e:
+            status_text = f"Error: {str(e)[:30]}"
+            color = self.colors.accent_red
+
+        if self.use_ctk:
+            self._profile_status.configure(text=status_text, text_color=color)
+        else:
+            self._profile_status.configure(text=status_text, fg=color)
+
+    def _open_connection_manager(self):
+        """Open the Connection Profile Manager window."""
+        try:
+            from ..connection_manager import ConnectionProfileManager
+            ConnectionProfileManager(self.root, colors=self.colors,
+                                     on_close=self._refresh_profile_dropdown)
+        except Exception as e:
+            print(f"[Settings] Error opening connection manager: {e}")
+
+    def _refresh_profile_dropdown(self):
+        """Refresh profile dropdown after connection manager closes."""
+        try:
+            from src.connection_profiles import ProfileStore
+            store = ProfileStore.get_instance()
+            names = store.get_profile_names()
+            active = store.get_active_profile_name()
+            self._profile_var.set(active)
+            if self.use_ctk:
+                self._profile_dropdown.configure(values=names)
+            else:
+                self._profile_dropdown.configure(values=names)
+        except Exception:
+            pass
 
     # -------------------------------------------------------------------------
     # Pool assignment dropdown (per-provider)
@@ -103,9 +216,11 @@ class ProviderTabMixin:
         row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
         row.pack(fill="x", pady=4)
 
+        label_text = f"{provider.title()} Key Pool:"
+
         if self.use_ctk:
             ctk.CTkLabel(
-                row, text="Key Pool:",
+                row, text=label_text,
                 font=get_ctk_font(13), width=LABEL_WIDTH, anchor="w",
                 **get_ctk_label_colors(self.colors)
             ).pack(side="left")
@@ -125,7 +240,7 @@ class ProviderTabMixin:
             dd.pack(side="left", padx=(8, 0))
         else:
             tk.Label(
-                row, text="Key Pool:",
+                row, text=label_text,
                 font=("Segoe UI", 10), width=LABEL_WIDTH // 8, anchor="w",
                 bg=self.colors.bg, fg=self.colors.fg
             ).pack(side="left")
@@ -149,133 +264,3 @@ class ProviderTabMixin:
         """Format a pool ID for display."""
         name = key_store.get_pool_display_name(pool_id)
         return f"{name} ({pool_id})" if name != pool_id else pool_id
-
-    # -------------------------------------------------------------------------
-    # Model fetching helpers (used by _add_model_dropdown_field)
-    # -------------------------------------------------------------------------
-
-    def _collect_ui_values_for_provider(self, provider: str) -> dict:
-        """
-        Collect current UI values needed for model fetching.
-        Must be called from the main thread before starting background work.
-        """
-        result = {"custom_url": None, "keys": [], "error": None}
-
-        if provider == "custom":
-            custom_url_var = self.vars.get("custom_url")
-            if custom_url_var:
-                try:
-                    result["custom_url"] = custom_url_var.get()
-                except tk.TclError:
-                    result["error"] = "Could not read custom URL"
-                    return result
-            else:
-                result["error"] = "Custom URL not configured"
-                return result
-
-        # Get keys from KeyStore (pool-based)
-        try:
-            from src.key_store import KeyStore
-            key_store = KeyStore.get_instance()
-            keys_data = key_store.get_pool_for_provider(provider)
-        except Exception:
-            keys_data = []
-        if not keys_data:
-            result["error"] = f"No API keys configured for {provider}"
-            return result
-
-        for kd in keys_data:
-            key_str = kd.get("key", "")
-            if key_str:
-                result["keys"].append(key_str)
-
-        if not result["keys"]:
-            result["error"] = f"No valid API keys for {provider}"
-
-        return result
-
-    def _fetch_models_with_values(self, provider: str, ui_values: dict) -> tuple:
-        """
-        Fetch models using pre-collected UI values.
-        Safe to call from a background thread.
-        """
-        if ui_values.get("error"):
-            return [], ui_values["error"]
-
-        key_strings = ui_values.get("keys", [])
-        if not key_strings:
-            return [], f"No valid API keys for {provider}"
-
-        temp_config = {"request_timeout": 30}
-        if provider == "custom" and ui_values.get("custom_url"):
-            temp_config["custom_url"] = ui_values["custom_url"]
-
-        try:
-            from ....key_manager import KeyManager
-            temp_key_manager = KeyManager(key_strings, provider)
-
-            from ....api_client import get_provider_for_type
-            provider_instance = get_provider_for_type(provider, temp_key_manager, temp_config)
-            models, error = provider_instance.fetch_models()
-
-            if error:
-                return [], error
-            if not models:
-                return [], "No models returned"
-
-            return [m.get("id", str(m)) for m in models], None
-        except Exception as e:
-            return [], f"Error fetching models: {e}"
-
-    def _refresh_models(self, provider: str, dropdown_widget, status_label):
-        """Refresh models in background thread, update dropdown when done."""
-        import threading
-
-        ui_values = self._collect_ui_values_for_provider(provider)
-
-        if ui_values.get("error"):
-            if self.use_ctk:
-                status_label.configure(text=f"❌ {ui_values['error'][:35]}", text_color=self.colors.accent_red)
-            else:
-                status_label.configure(text=f"Error: {ui_values['error'][:35]}", fg=self.colors.accent_red)
-            return
-
-        if self.use_ctk:
-            status_label.configure(text="🔄 Loading...", text_color=self.colors.accent)
-        else:
-            status_label.configure(text="Loading...", fg=self.colors.accent)
-
-        def fetch_thread():
-            models, error = self._fetch_models_with_values(provider, ui_values)
-            if self.root and not self._destroyed:
-                self._schedule_callback(lambda: self._update_model_dropdown(
-                    provider, dropdown_widget, status_label, models, error
-                ))
-
-        threading.Thread(target=fetch_thread, daemon=True).start()
-
-    def _update_model_dropdown(self, provider, dropdown_widget, status_label, models, error):
-        """Update model dropdown after fetch completes."""
-        if self._destroyed:
-            return
-
-        if error:
-            if self.use_ctk:
-                status_label.configure(text=f"❌ {error[:40]}", text_color=self.colors.accent_red)
-            else:
-                status_label.configure(text=f"Error: {error[:40]}", fg=self.colors.accent_red)
-            return
-
-        if not models:
-            if self.use_ctk:
-                status_label.configure(text="⚠️ No models found", text_color=self.colors.accent_yellow)
-            else:
-                status_label.configure(text="No models found", fg=self.colors.accent_yellow)
-            return
-
-        if self.use_ctk:
-            dropdown_widget.configure(values=models)
-            status_label.configure(text=f"✅ {len(models)} models", text_color=self.colors.accent_green)
-        else:
-            dropdown_widget.configure(values=models)
-            status_label.configure(text=f"{len(models)} models", fg=self.colors.accent_green)

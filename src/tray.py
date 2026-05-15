@@ -536,6 +536,18 @@ class TrayApp:
         except Exception as e:
             print(f"[Error] Could not open prompt editor: {e}")
 
+    def _on_connection_profiles(self, systray):
+        """Open connection profile manager window"""
+        try:
+            from .gui.core import show_connection_manager, HAVE_GUI
+            if HAVE_GUI:
+                print("\n🔌  Opening connection profiles...\n")
+                show_connection_manager()
+            else:
+                print("[Warning] GUI not available")
+        except Exception as e:
+            print(f"[Error] Could not open connection profiles: {e}")
+
     def _on_direct_chat(self, systray):
         """Show direct chat popup (equivalent to Ctrl+Space with no selection)"""
         try:
@@ -740,6 +752,7 @@ class TrayApp:
             SEP,
             ("⚙️ Settings", self._on_settings),
             ("✏️ Prompt Editor", self._on_prompt_editor),
+            ("🔌 Profiles", self._on_connection_profiles),
         ])
         
         # File editing options (debug mode)

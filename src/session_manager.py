@@ -47,7 +47,7 @@ class ChatSession:
         # Per-session model override (None = use global config model)
         self.model_override = None
         # Per-session preset override (None = no preset selected)
-        self.preset_override = None
+        self.profile_override = None
     
     def add_message(self, role, content, attachments=None):
         """
@@ -158,8 +158,8 @@ class ChatSession:
         # Only include model_override when set (keep JSON clean)
         if self.model_override is not None:
             d["model_override"] = self.model_override
-        if self.preset_override is not None:
-            d["preset_override"] = self.preset_override
+        if self.profile_override is not None:
+            d["profile_override"] = self.profile_override
         return d
     
     @classmethod
@@ -182,7 +182,7 @@ class ChatSession:
         session.title = data.get("title")
         session.messages = data.get("messages", [])
         session.model_override = data.get("model_override", None)
-        session.preset_override = data.get("preset_override", None)
+        session.profile_override = data.get("profile_override", None)
         
         return session
 

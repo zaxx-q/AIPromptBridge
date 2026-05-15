@@ -38,8 +38,8 @@ from .popups import (
     Tooltip, GroupedButtonList, CarouselButtonList,
     setup_transparent_popup, TRANSPARENCY_COLOR,
     ModifierBar, SegmentedToggle,
-    create_preset_dropdown_ctk, create_preset_dropdown_tk,
-    get_preset_override_value
+    create_profile_dropdown_ctk, create_profile_dropdown_tk,
+    get_profile_override_value
 )
 from .screen_snip import CaptureResult
 from .prompts import get_prompts_config
@@ -137,8 +137,8 @@ class AttachedSnipPopup:
         self.active_modifiers: List[str] = []
         
         # Model preset override
-        self.preset_var = None
-        self.preset_dropdown = None
+        self.profile_var = None
+        self.profile_dropdown = None
         
         # Thumbnail
         self.thumbnail_photo = None
@@ -300,7 +300,7 @@ class AttachedSnipPopup:
         Tooltip(self.source_dropdown, "Select action source category")
         
         # Model preset dropdown (only if presets exist)
-        self.preset_var, self.preset_dropdown, preset_frame = create_preset_dropdown_ctk(right_side, self.colors)
+        self.profile_var, self.profile_dropdown, preset_frame = create_profile_dropdown_ctk(right_side, self.colors)
         if preset_frame:
             preset_frame.pack(fill="x", pady=(0, 8))
 
@@ -512,7 +512,7 @@ class AttachedSnipPopup:
         Tooltip(self.source_label, "Select action source category")
         
         # Model preset dropdown (only if presets exist)
-        self.preset_var, self.preset_dropdown, preset_frame = create_preset_dropdown_tk(right_side, self.root, self.colors)
+        self.profile_var, self.profile_dropdown, preset_frame = create_profile_dropdown_tk(right_side, self.root, self.colors)
         if preset_frame:
             preset_frame.pack(fill=tk.X, pady=(0, 8))
         
@@ -1042,9 +1042,9 @@ class AttachedSnipPopup:
         """Execute the action with current state."""
         response_mode = self.response_toggle.get() if hasattr(self, 'response_toggle') and self.response_toggle else "default"
         
-        preset_override = get_preset_override_value(self.preset_var)
+        profile_override = get_profile_override_value(self.profile_var)
         self._close()
-        # on_action signature: (source, action_key, custom_input, active_modifiers, compare_mode, compare_capture, response_mode, preset_override)
+        # on_action signature: (source, action_key, custom_input, active_modifiers, compare_mode, compare_capture, response_mode, profile_override)
         self.on_action(
             source,
             action_key,
@@ -1053,7 +1053,7 @@ class AttachedSnipPopup:
             self.compare_mode_enabled,
             self.compare_capture,
             response_mode,
-            preset_override
+            profile_override
         )
     
     def _on_custom_submit(self):
@@ -1167,7 +1167,7 @@ class AttachedSnipPopup:
         # Setting _tk = None makes Variable.__del__ a no-op, preventing
         # "RuntimeError: main thread is not in main loop" when the popup
         # object is later GC'd on a background thread.
-        for attr_name in ('source_var', 'compare_var', 'input_var', 'preset_var'):
+        for attr_name in ('source_var', 'compare_var', 'input_var', 'profile_var'):
             var = getattr(self, attr_name, None)
             if isinstance(var, tk.Variable):
                 _neutralize_tk_var(var)
@@ -1182,8 +1182,8 @@ class AttachedSnipPopup:
         self.carousel = None
         self.modifier_bar = None
         self.response_toggle = None
-        self.preset_var = None
-        self.preset_dropdown = None
+        self.profile_var = None
+        self.profile_dropdown = None
         self.thumbnail_photo = None
         self.source_var = None
         self.compare_var = None

@@ -70,7 +70,7 @@ class ChatWindowBase(ABC):
         self._last_global_model = web_server.CONFIG.get(f"{provider}_model", "")
         
         # Preset selector mode: show presets instead of model list
-        self._use_preset_mode = self._compute_preset_mode()
+        self._use_profile_mode = self._compute_profile_mode()
         
         # Theme
         self.theme = get_colors()
@@ -126,27 +126,27 @@ class ChatWindowBase(ABC):
                     return msg["content"]
         return ""
     
-    def _compute_preset_mode(self) -> bool:
+    def _compute_profile_mode(self) -> bool:
         """Check if preset selector mode should be active.
         
-        Returns True when preset_selector_enabled=True AND at least one preset exists.
+        Returns True when profile_selector_enabled=True AND at least one preset exists.
         """
         from ... import web_server
-        if not web_server.CONFIG.get("preset_selector_enabled", True):
+        if not web_server.CONFIG.get("profile_selector_enabled", True):
             return False
         try:
             from ...gui.prompts import PromptsConfig
             pc = PromptsConfig.get_instance()
-            return bool(pc.get_preset_names())
+            return bool(pc.get_profile_names())
         except Exception:
             return False
     
-    def _get_preset_names(self) -> list:
-        """Get sorted preset names from PromptsConfig."""
+    def _get_profile_names(self) -> list:
+        """Get sorted profile names from PromptsConfig."""
         try:
             from ...gui.prompts import PromptsConfig
             pc = PromptsConfig.get_instance()
-            return pc.get_preset_names()
+            return pc.get_profile_names()
         except Exception:
             return []
     
@@ -291,10 +291,10 @@ class ChatWindowBase(ABC):
             self.scroll_btn.pack(side="left", padx=2)
             
             # Model/Preset dropdown (right-aligned)
-            dropdown_label = "Preset:" if self._use_preset_mode else "Model:"
-            if self._use_preset_mode:
-                initial_values = ["(Use Global)"] + self._get_preset_names()
-                initial_display = self.session.preset_override or "(Use Global)"
+            dropdown_label = "Preset:" if self._use_profile_mode else "Model:"
+            if self._use_profile_mode:
+                initial_values = ["(Use Global)"] + self._get_profile_names()
+                initial_display = self.session.profile_override or "(Use Global)"
             else:
                 initial_values = ["(loading...)"]
                 initial_display = self.selected_model or self._get_global_sentinel()
@@ -367,10 +367,10 @@ class ChatWindowBase(ABC):
             self.scroll_btn.pack(side=tk.LEFT, padx=2)
             
             # Model/Preset dropdown (right-aligned)
-            dropdown_label = "Preset:" if self._use_preset_mode else "Model:"
-            if self._use_preset_mode:
-                initial_values = ["(Use Global)"] + self._get_preset_names()
-                initial_display = self.session.preset_override or "(Use Global)"
+            dropdown_label = "Preset:" if self._use_profile_mode else "Model:"
+            if self._use_profile_mode:
+                initial_values = ["(Use Global)"] + self._get_profile_names()
+                initial_display = self.session.profile_override or "(Use Global)"
             else:
                 initial_values = ["(loading...)"]
                 initial_display = self.selected_model or self._get_global_sentinel()
@@ -392,8 +392,8 @@ class ChatWindowBase(ABC):
         self._schedule_model_loading()
     
     def _schedule_model_loading(self):
-        """Schedule model loading - skip in preset mode (presets are local)."""
-        if self._use_preset_mode:
+        """Schedule model loading - skip in profile mode (presets are local)."""
+        if self._use_profile_mode:
             return  # Preset names already populated in _create_toolbar
         threading.Thread(target=self._load_models, daemon=True).start()
     
@@ -1127,17 +1127,17 @@ class ChatWindowBase(ABC):
         """
         if self._destroyed:
             return
-        # React to preset_selector_enabled toggle
-        if key == "preset_selector_enabled" or key == "_bulk_update":
-            self._safe_after(0, self._refresh_preset_mode)
+        # React to profile_selector_enabled toggle
+        if key == "profile_selector_enabled" or key == "_bulk_update":
+            self._safe_after(0, self._refresh_profile_mode)
         # Only react to model/provider changes in model mode
-        if not self._use_preset_mode:
+        if not self._use_profile_mode:
             if key.endswith("_model") or key == "default_provider" or key == "_bulk_update":
                 self._safe_after(0, self._refresh_global_sentinel)
     
     def _refresh_global_sentinel(self):
         """Update the global sentinel label in the dropdown when the global model changes."""
-        if self._destroyed or self._use_preset_mode:
+        if self._destroyed or self._use_profile_mode:
             return  # Preset mode doesn't use the global model sentinel
         try:
             from ... import web_server
@@ -1164,30 +1164,30 @@ class ChatWindowBase(ABC):
         except Exception:
             pass
     
-    def _refresh_preset_mode(self):
-        """Re-evaluate preset mode and update dropdown if mode changed."""
+    def _refresh_profile_mode(self):
+        """Re-evaluate profile mode and update dropdown if mode changed."""
         if self._destroyed:
             return
-        new_mode = self._compute_preset_mode()
-        if new_mode == self._use_preset_mode:
+        new_mode = self._compute_profile_mode()
+        if new_mode == self._use_profile_mode:
             return  # No change
         
-        self._use_preset_mode = new_mode
+        self._use_profile_mode = new_mode
         
         # Update label
         if self.model_label_widget:
-            label_text = "Preset:" if self._use_preset_mode else "Model:"
+            label_text = "Preset:" if self._use_profile_mode else "Model:"
             if HAVE_CTK:
                 self.model_label_widget.configure(text=label_text)
             else:
                 self.model_label_widget.configure(text=label_text)
         
-        if self._use_preset_mode:
-            # Switch to preset mode
-            preset_names = self._get_preset_names()
+        if self._use_profile_mode:
+            # Switch to profile mode
+            preset_names = self._get_profile_names()
             values = ["(Use Global)"] + preset_names
             self.model_dropdown.configure(values=values)
-            self.model_dropdown.set(self.session.preset_override or "(Use Global)")
+            self.model_dropdown.set(self.session.profile_override or "(Use Global)")
         else:
             # Switch to model mode — trigger model loading
             self.model_dropdown.configure(values=["(loading...)"])
@@ -1201,15 +1201,15 @@ class ChatWindowBase(ABC):
         if not selected or selected in ("(loading...)", "(no models)"):
             return
         
-        if self._use_preset_mode:
+        if self._use_profile_mode:
             # Preset mode
             if selected == "(Use Global)":
-                self.session.preset_override = None
+                self.session.profile_override = None
                 self.session.model_override = None
                 self.selected_model = None
                 self._update_status("✅ Using global settings", self.theme.accent_green)
             else:
-                self.session.preset_override = selected
+                self.session.profile_override = selected
                 self.session.model_override = None  # Preset handles model
                 self.selected_model = None
                 self._update_status(f"✅ Using preset: {selected}", self.theme.accent_green)
@@ -1218,13 +1218,13 @@ class ChatWindowBase(ABC):
             if selected.startswith("(Use Global"):
                 # User selected the global sentinel — clear override
                 self.session.model_override = None
-                self.session.preset_override = None
+                self.session.profile_override = None
                 self.selected_model = None
                 self._update_status(f"✅ Using global model", self.theme.accent_green)
             else:
                 # User selected a specific model — set per-session override
                 self.session.model_override = selected
-                self.session.preset_override = None
+                self.session.profile_override = None
                 self.selected_model = selected
                 self._update_status(f"✅ Session model: {selected}", self.theme.accent_green)
         
@@ -1342,10 +1342,10 @@ class ChatWindowBase(ABC):
             effective_key_managers = web_server.KEY_MANAGERS
 
             # Apply preset override if active
-            if self.session.preset_override:
+            if self.session.profile_override:
                 from ...preset_resolver import resolve_preset_by_name
                 resolved = resolve_preset_by_name(
-                    self.session.preset_override, web_server.CONFIG,
+                    self.session.profile_override, web_server.CONFIG,
                     web_server.AI_PARAMS, web_server.KEY_MANAGERS
                 )
                 current_provider = resolved.provider
@@ -2276,10 +2276,10 @@ class ChatWindowBase(ABC):
             effective_key_managers = web_server.KEY_MANAGERS
 
             # Apply preset override if active
-            if self.session.preset_override:
+            if self.session.profile_override:
                 from ...preset_resolver import resolve_preset_by_name
                 resolved = resolve_preset_by_name(
-                    self.session.preset_override, web_server.CONFIG,
+                    self.session.profile_override, web_server.CONFIG,
                     web_server.AI_PARAMS, web_server.KEY_MANAGERS
                 )
                 current_provider = resolved.provider
@@ -2611,7 +2611,7 @@ class ChatWindowBase(ABC):
         new_session.system_instruction = self.session.system_instruction
         # Carry over model override so branched sessions use the same model
         new_session.model_override = self.session.model_override
-        new_session.preset_override = self.session.preset_override
+        new_session.profile_override = self.session.profile_override
         
         # Save the branched session
         add_session(new_session, web_server.CONFIG.get("max_sessions", 200))

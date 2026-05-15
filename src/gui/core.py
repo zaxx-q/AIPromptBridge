@@ -251,6 +251,8 @@ class GUICoordinator:
                     self._create_settings_window(request)
                 elif request_type == 'prompt_editor':
                     self._create_prompt_editor_window(request)
+                elif request_type == 'connection_manager':
+                    self._create_connection_manager(request)
                 elif request_type == 'error_popup':
                     self._create_error_popup(request)
                 elif request_type == 'streaming_chat':
@@ -349,6 +351,12 @@ class GUICoordinator:
         """Create a prompt editor window on the GUI thread"""
         from .windows import create_attached_prompt_editor_window
         create_attached_prompt_editor_window(self._root)
+
+    def _create_connection_manager(self, request):
+        """Create a connection profile manager window on the GUI thread"""
+        from .windows.connection_manager import create_attached_connection_manager
+        on_close = request.get('on_close')
+        create_attached_connection_manager(self._root, on_close)
     
     def _create_error_popup(self, request):
         """Create an error popup on the GUI thread"""
@@ -598,6 +606,14 @@ class GUICoordinator:
         self._request_queue.put({
             'type': 'prompt_editor'
         })
+
+    def request_connection_manager(self, on_close=None):
+        """Request creation of a connection profile manager window (thread-safe)"""
+        self.ensure_running()
+        self._request_queue.put({
+            'type': 'connection_manager',
+            'on_close': on_close
+        })
     
     def request_snip_overlay(
         self,
@@ -784,4 +800,11 @@ def show_prompt_editor():
     """Show prompt editor window (thread-safe)"""
     coordinator = GUICoordinator.get_instance()
     coordinator.request_prompt_editor_window()
+    return True
+
+
+def show_connection_manager():
+    """Show connection profile manager window (thread-safe)"""
+    coordinator = GUICoordinator.get_instance()
+    coordinator.request_connection_manager()
     return True

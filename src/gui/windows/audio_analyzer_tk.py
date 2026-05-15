@@ -202,7 +202,7 @@ def _create_top_action_bar_tk(window, parent):
     left_frame = tk.Frame(bar, bg=colors.base)
     left_frame.pack(side="left", fill="x")
     
-    # Provider (hidden in preset mode)
+    # Provider (hidden in profile mode)
     window.provider_label_widget = tk.Label(
         left_frame, text="Provider:", font=("Segoe UI", 10),
         bg=colors.base, fg=colors.text
@@ -217,20 +217,20 @@ def _create_top_action_bar_tk(window, parent):
     )
     window.provider_dropdown.set(window.provider)
     
-    if not window._use_preset_mode:
+    if not window._use_profile_mode:
         window.provider_label_widget.pack(side="left", padx=(0, 5))
         window.provider_dropdown.pack(side="left", padx=(0, 15))
     
     # Model/Preset
-    dropdown_label = "Preset:" if window._use_preset_mode else "Model:"
+    dropdown_label = "Preset:" if window._use_profile_mode else "Model:"
     window.model_label_widget = tk.Label(
         left_frame, text=dropdown_label, font=("Segoe UI", 10),
         bg=colors.base, fg=colors.text
     )
     window.model_label_widget.pack(side="left", padx=(0, 5))
     
-    if window._use_preset_mode:
-        initial_values = ["(Default)"] + window._get_preset_names()
+    if window._use_profile_mode:
+        initial_values = ["(Default)"] + window._get_profile_names()
         initial_display = "(Default)"
     else:
         initial_values = ["(loading...)"]
@@ -413,7 +413,7 @@ def _create_compression_section_tk(window, parent):
     from ...audio.recorder import COMPRESSION_PRESETS
     preset_names = [p["name"] for p in COMPRESSION_PRESETS.values()]
     
-    window.preset_dropdown = TkOptionMenuWrapper(
+    window.profile_dropdown = TkOptionMenuWrapper(
         row,
         values=preset_names,
         command=window._on_preset_changed,
@@ -422,8 +422,8 @@ def _create_compression_section_tk(window, parent):
     
     # Set current preset
     current_preset = COMPRESSION_PRESETS.get(window.compression_preset, {})
-    window.preset_dropdown.set(current_preset.get("name", "Recommended"))
-    window.preset_dropdown.pack(side="left")
+    window.profile_dropdown.set(current_preset.get("name", "Recommended"))
+    window.profile_dropdown.pack(side="left")
     
     # Info Row
     info_row = tk.Frame(content, bg=colors.surface0)

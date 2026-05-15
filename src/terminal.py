@@ -83,13 +83,13 @@ def print_commands_box():
             ("G", "🔨", "Settings"),
             ("W", "📝", "Prompts"),
         ])
-        
+
         # Column 3: Info & Toggles
         col3 = create_column_table([
             ("I", "📊", "Info"),
+            ("C", "🔌", "Profile"),
             ("K", "💭", "Thinking"),
             ("R", "🌊", "Streaming"),
-            ("U", "⬆️", "Update"),
         ])
         
         grid.add_row(col1, col2, col3)
@@ -108,9 +108,9 @@ def print_commands_box():
         print("  COMMANDS                                       Press H to show all commands")
         print("─" * 64)
         print("  [S] 🌐 Sessions      [P] 🔄 Provider     [I] 📊 Info")
-        print("  [A] 🎤 Audio         [M] 🤖 Models       [K] 💭 Thinking")
-        print("  [T] 🔊 TTS           [G] 🔨 Settings     [R] 🌊 Streaming")
-        print("  [X] 🧰 Tools         [W] 📝 Prompts      [U] ⬆️ Update")
+        print("  [A] 🎤 Audio         [M] 🤖 Models       [C] 🔌 Profile")
+        print("  [T] 🔊 TTS           [G] 🔨 Settings     [K] 💭 Thinking")
+        print("  [X] 🧰 Tools         [W] 📝 Prompts      [R] 🌊 Streaming")
         print("─" * 64)
         print()
 
@@ -452,40 +452,47 @@ def terminal_session_manager(endpoints=None):
                 print(f"{'─'*64}\n")
             
             elif key == 'i':
-                # Info command - enhanced with base_url
+                # Info command - enhanced with active profile
                 from . import web_server
-                
+                from .connection_profiles import ProfileStore
+
+                store = ProfileStore.get_instance()
+                active_profile = store.get_active_profile_name()
+
                 provider = web_server.CONFIG.get("default_provider", "google")
                 model = web_server.CONFIG.get(f"{provider}_model", "not set")
                 base_url = get_base_url_for_status(web_server.CONFIG, provider)
                 streaming = web_server.CONFIG.get("streaming_enabled", True)
                 thinking = web_server.CONFIG.get("thinking_enabled", False)
-                
+
                 if HAVE_RICH:
                     grid = Table.grid(expand=True, padding=(0, 2))
                     grid.add_column(justify="left")
                     grid.add_column(justify="left")
-                    
+
+                    # Active Profile
+                    grid.add_row("[bold]🔌 Profile[/bold]", f"[yellow]{active_profile}[/yellow]")
+
                     # Provider Info
                     grid.add_row("[bold]📡 Provider[/bold]", f"[cyan]{provider}[/cyan]")
                     grid.add_row("[dim]   Base URL[/dim]", f"[dim]{base_url}[/dim]")
                     grid.add_row("[bold]🤖 Model[/bold]", f"[green]{model}[/green]")
-                    
+
                     # Settings
                     stream_icon = "[green]ON[/green]" if streaming else "[red]OFF[/red]"
                     think_icon = "[green]ON[/green]" if thinking else "[red]OFF[/red]"
                     grid.add_row("[bold]🌊 Streaming[/bold]", stream_icon)
                     grid.add_row("[bold]💭 Thinking[/bold]", think_icon)
-                    
+
                     if thinking:
                         thinking_output = web_server.CONFIG.get("thinking_output", "reasoning_content")
                         grid.add_row("[dim]   Output[/dim]", thinking_output)
-                    
+
                     # Server
                     host = web_server.CONFIG.get("host", "127.0.0.1")
                     port = web_server.CONFIG.get("port", 5000)
                     grid.add_row("[bold]🚀 Server[/bold]", f"[link=http://{host}:{port}]http://{host}:{port}[/link]")
-                    
+
                     # Keys
                     key_status = []
                     for p, km in web_server.KEY_MANAGERS.items():
@@ -493,15 +500,16 @@ def terminal_session_manager(endpoints=None):
                         color = "green" if count > 0 else "red"
                         active = " [bold]◄[/bold]" if p == provider else ""
                         key_status.append(f"[{color}]{p}: {count}[/{color}]{active}")
-                    
+
                     grid.add_row("[bold]🔑 API Keys[/bold]", ", ".join(key_status))
-                    
+
                     console.print(Panel(grid, title="[bold]System Info[/bold]", border_style="blue"))
                     console.print()
                 else:
                     print(f"\n{'─'*64}")
                     print("📊 INFO")
                     print(f"{'─'*64}")
+                    print(f"   🔌 Profile:   {active_profile}")
                     print(f"   📡 Provider:  {provider}")
                     print(f"      Base URL:  {base_url}")
                     print(f"   🤖 Model:     {model}")
@@ -519,51 +527,84 @@ def terminal_session_manager(endpoints=None):
                     print(f"{'─'*64}\n")
             
             elif key == 'k':
-                # Toggle thinking mode
+                # Toggle thinking mode (session-scoped, in-memory only)
                 from . import web_server
-                from .config import save_config_value
-                
+
                 current = web_server.CONFIG.get("thinking_enabled", False)
                 new_value = not current
-                
-                if save_config_value("thinking_enabled", new_value):
-                    web_server.CONFIG["thinking_enabled"] = new_value
-                    if HAVE_RICH:
-                        status = "[green]ON[/green]" if new_value else "[red]OFF[/red]"
-                        console.print(f"\n💭 Thinking: {status}")
-                    else:
-                        status = "✅ ON" if new_value else "✗ OFF"
-                        print(f"\n💭 Thinking: {status}")
+                web_server.CONFIG["thinking_enabled"] = new_value
+
+                if HAVE_RICH:
+                    status = "[green]ON[/green]" if new_value else "[red]OFF[/red]"
+                    console.print(f"\n💭 Thinking: {status} [dim](session)[/dim]\n")
                 else:
-                    if HAVE_RICH:
-                        print_error("Failed to toggle thinking")
-                    else:
-                        print("\n✗ Failed to toggle thinking")
-                if HAVE_RICH: console.print()
-                else: print()
-            
+                    status = "✅ ON" if new_value else "✗ OFF"
+                    print(f"\n💭 Thinking: {status} (session)\n")
+
             elif key == 'r':
-                # Toggle streaming mode
+                # Toggle streaming mode (session-scoped, in-memory only)
                 from . import web_server
-                from .config import save_config_value
-                
+
                 current = web_server.CONFIG.get("streaming_enabled", True)
                 new_value = not current
-                
-                if save_config_value("streaming_enabled", new_value):
-                    web_server.CONFIG["streaming_enabled"] = new_value
-                    if HAVE_RICH:
-                        status = "[green]ON[/green]" if new_value else "[red]OFF[/red]"
-                        console.print(f"\n🌊 Streaming: {status}\n")
-                    else:
-                        status = "✅ ON" if new_value else "✗ OFF"
-                        print(f"\n🌊 Streaming: {status}\n")
+                web_server.CONFIG["streaming_enabled"] = new_value
+
+                if HAVE_RICH:
+                    status = "[green]ON[/green]" if new_value else "[red]OFF[/red]"
+                    console.print(f"\n🌊 Streaming: {status} [dim](session)[/dim]\n")
                 else:
-                    if HAVE_RICH:
-                        print_error("Failed to toggle streaming")
-                    else:
-                        print("\n✗ Failed to toggle streaming\n")
-            
+                    status = "✅ ON" if new_value else "✗ OFF"
+                    print(f"\n🌊 Streaming: {status} (session)\n")
+
+            elif key == 'c':
+                # Switch connection profile
+                from . import web_server
+                from .connection_profiles import ProfileStore
+                from .web_server import switch_active_profile
+
+                store = ProfileStore.get_instance()
+                names = store.get_profile_names()
+                active = store.get_active_profile_name()
+
+                if HAVE_RICH:
+                    console.print(f"\n[bold]🔌 Connection Profiles[/bold]")
+                    console.print(f"   Active: [green]{active}[/green]\n")
+                else:
+                    print(f"\n🔌 Connection Profiles")
+                    print(f"   Active: {active}\n")
+
+                for i, name in enumerate(names):
+                    marker = " ◄" if name == active else ""
+                    print(f"      [{i+1}] {name}{marker}")
+
+                print("\n   Enter number or name (q = cancel): ", end='', flush=True)
+                try:
+                    choice = input().strip()
+                    if choice.lower() != 'q' and choice:
+                        try:
+                            idx = int(choice) - 1
+                            if 0 <= idx < len(names):
+                                new_profile = names[idx]
+                            else:
+                                new_profile = choice
+                        except ValueError:
+                            new_profile = choice
+
+                        if switch_active_profile(new_profile):
+                            provider = web_server.CONFIG.get("default_provider", "google")
+                            model = web_server.CONFIG.get(f"{provider}_model", "")
+                            if HAVE_RICH:
+                                console.print(f"   ✅ Switched to [green]{new_profile}[/green]")
+                                console.print(f"      Provider: [cyan]{provider}[/cyan]  Model: [green]{model}[/green]")
+                            else:
+                                print(f"   ✅ Switched to {new_profile}")
+                                print(f"      Provider: {provider}  Model: {model}")
+                        else:
+                            print(f"   ✗ Profile '{new_profile}' not found")
+                except Exception:
+                    pass
+                print()
+
             elif key == 'v':
                 if HAVE_RICH:
                     console.print("\n[bold]Enter session ID: [/bold]", end="")
@@ -624,17 +665,7 @@ def terminal_session_manager(endpoints=None):
                         print(f"✗ Session '{session_id}' not found.\n")
                 except:
                     pass
-            
-            elif key == 'c':
-                try:
-                    confirm = input("\n⚠️  Clear ALL sessions? [y/N]: ").strip().lower()
-                    if confirm == 'y':
-                        clear_all_sessions()
-                        save_sessions()
-                        print("✅ All sessions cleared.\n")
-                except:
-                    pass
-            
+
             elif key == 'g':
                 # Open Settings window
                 if HAVE_GUI:
@@ -714,16 +745,16 @@ def terminal_session_manager(endpoints=None):
                 print("   [L] 📋 List          List recent saved sessions")
                 print("   [V] 👁️ View          View a session by ID")
                 print("   [D] 🗑️ Delete        Delete a session by ID")
-                print("   [C] 🧹 Clear         Clear all sessions")
                 print("\n   Configuration:")
+                print("   [C] 🔌 Profile       Switch connection profile")
                 print("   [P] 🔄 Provider      Switch API provider")
                 print("   [M] 🤖 Models        List/set models from API")
                 print("   [G] 🔨 Settings      Open settings window")
                 print("   [W] 📝 Prompts       Open prompt editor")
                 print("\n   Info & Toggles:")
                 print("   [I] 📊 Info          Show current configuration")
-                print("   [K] 💭 Thinking      Toggle thinking mode")
-                print("   [R] 🌊 Streaming     Toggle streaming")
+                print("   [K] 💭 Thinking      Toggle thinking (session)")
+                print("   [R] 🌊 Streaming     Toggle streaming (session)")
                 print("   [E] 📡 Endpoints     List registered endpoints")
                 print("   [U] ⬆️ Update        Check for updates")
                 print("   [H] ❓ Help          Show this help")

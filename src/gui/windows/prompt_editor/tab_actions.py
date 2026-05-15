@@ -17,7 +17,7 @@ from ...themes import (
 )
 from ...custom_widgets import ScrollableButtonList, create_section_header, create_emoji_button, TkScrollableFrame
 from ...custom_widgets import ask_themed_string
-from .dialogs import PresetManagerDialog
+from .dialogs import ProfileManagerDialog
 
 
 class ActionsTabMixin:
@@ -262,9 +262,9 @@ class ActionsTabMixin:
         if self.use_ctk:
             ctk.CTkLabel(self.preset_frame, text="Model Preset:", font=get_ctk_font(13), width=120, anchor="w",
                         **get_ctk_label_colors(self.colors)).pack(side="left")
-            self.editor_widgets["preset_var"] = tk.StringVar(master=self.root, value="(None)")
+            self.editor_widgets["profile_var"] = tk.StringVar(master=self.root, value="(None)")
             self.editor_widgets["preset_combo"] = ctk.CTkComboBox(
-                self.preset_frame, variable=self.editor_widgets["preset_var"],
+                self.preset_frame, variable=self.editor_widgets["profile_var"],
                 values=["(None)"], width=220, height=34, state="readonly",
                 font=get_ctk_font(13), **get_ctk_combobox_colors(self.colors)
             )
@@ -278,9 +278,9 @@ class ActionsTabMixin:
             from tkinter import ttk
             tk.Label(self.preset_frame, text="Model Preset:", font=("Segoe UI", 10), width=12, anchor="w",
                     bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
-            self.editor_widgets["preset_var"] = tk.StringVar(master=self.root, value="(None)")
+            self.editor_widgets["profile_var"] = tk.StringVar(master=self.root, value="(None)")
             self.editor_widgets["preset_combo"] = ttk.Combobox(
-                self.preset_frame, textvariable=self.editor_widgets["preset_var"],
+                self.preset_frame, textvariable=self.editor_widgets["profile_var"],
                 values=["(None)"], state="readonly", width=20
             )
             self.editor_widgets["preset_combo"].pack(side="left", padx=(10, 5))
@@ -289,7 +289,7 @@ class ActionsTabMixin:
                      command=self._open_preset_manager).pack(side="left")
         
         # Refresh preset dropdown values
-        self._refresh_preset_dropdown()
+        self._refresh_profile_dropdown()
         self._refresh_action_list()
         
         # Save action button - OUTSIDE scrollable frame so it's always visible
@@ -448,18 +448,18 @@ class ActionsTabMixin:
                 )
         
         # Load model preset (all tools)
-        if "preset_var" in self.editor_widgets:
-            preset_name = action_data.get("model_preset", "") or ""
-            self.editor_widgets["preset_var"].set(preset_name if preset_name else "(None)")
+        if "profile_var" in self.editor_widgets:
+            preset_name = action_data.get("connection_profile", "") or ""
+            self.editor_widgets["profile_var"].set(preset_name if preset_name else "(None)")
         
         # Update field visibility
         self._update_editor_visibility()
 
-    def _refresh_preset_dropdown(self):
+    def _refresh_profile_dropdown(self):
         """Refresh the model preset dropdown values from prompts config."""
         from ...prompts import get_prompts_config
         pc = get_prompts_config()
-        preset_names = pc.get_preset_names()
+        preset_names = pc.get_profile_names()
         values = ["(None)"] + preset_names
         
         if "preset_combo" in self.editor_widgets:
@@ -470,8 +470,8 @@ class ActionsTabMixin:
                 combo["values"] = values
 
     def _open_preset_manager(self):
-        """Open the Manage Presets dialog."""
-        PresetManagerDialog(self.root, self.colors, on_close=self._refresh_preset_dropdown)
+        """Open the Manage Profiles dialog."""
+        ProfileManagerDialog(self.root, self.colors, on_close=self._refresh_profile_dropdown)
 
     def _add_action(self):
         """Add a new action."""
@@ -629,10 +629,10 @@ class ActionsTabMixin:
             action_dict["show_chat_window"] = self.editor_widgets["show_chat_var"].get()
         
         # Save model preset (all tools)
-        if "preset_var" in self.editor_widgets:
-            preset_val = self.editor_widgets["preset_var"].get()
+        if "profile_var" in self.editor_widgets:
+            preset_val = self.editor_widgets["profile_var"].get()
             if preset_val and preset_val != "(None)":
-                action_dict["model_preset"] = preset_val
+                action_dict["connection_profile"] = preset_val
         
         tool_data = self.options_data.setdefault(self.current_tool, {})
         tool_data[self.current_action] = action_dict
