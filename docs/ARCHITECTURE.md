@@ -279,41 +279,54 @@ Sessions do NOT store provider info (read dynamically at call time for hot-switc
 - The chat window dropdown shows a `"(Use Global: <model>)"` sentinel entry that follows the current global model
 - Sentinel updates are **event-driven** via `subscribe_config_change()` in `src/config.py`
 
-## Model Presets
+## Connection Profiles
 
-Model presets allow per-action AI configuration overrides, enabling seamless switching between different AI profiles without manual settings changes.
+Connection profiles provide complete, self-contained AI configuration sets stored in `profiles.json`. Each profile contains every connection parameter (no sparse fallbacks). Actions reference profiles by name via the `connection_profile` field.
 
-### Storage
+### Storage: `profiles.json`
 
-Presets are stored in `prompts.json` under `_global_settings.model_presets`. Each action can reference a preset by name via its `model_preset` field.
+Dedicated file managed by `ProfileStore` singleton (`src/connection_profiles.py`). Auto-created with a "Default" profile on first load.
 
 ### Resolution Chain
 
-At request time, `src/preset_resolver.py` merges settings:
+At request time, `src/preset_resolver.py` resolves settings:
 
 ```
-Action's model_preset → Preset fields → config.ini globals (fallback)
+Per-session profile override (chat window dropdown)
+  → Action's connection_profile field
+    → Active global profile (from profiles.json)
+      → Hard-coded defaults (last resort)
 ```
 
-If no preset is assigned or a preset field is empty, the global `config.ini` default is used.
+### Profile Fields
 
-### Preset Fields
+| Field | Type | Description |
+|-------|------|-------------|
+| `provider` | `google`, `openrouter`, `custom` | API provider |
+| `model` | string | Model identifier |
+| `streaming` | bool | Enable streaming responses |
+| `thinking` | bool | Enable thinking/reasoning |
+| `thinking_budget` | int | Gemini 2.5 thinking token budget (-1 = auto) |
+| `thinking_level` | `low`, `high` | Gemini 3.x thinking level |
+| `reasoning_effort` | `low`, `medium`, `high` | OpenAI-compatible reasoning |
+| `temperature` | float or null | Sampling temperature |
+| `max_tokens` | int or null | Max output tokens |
+| `request_timeout` | int | Request timeout in seconds |
+| `custom_url` | string | Custom endpoint URL |
+| `gemini_endpoint` | string | Gemini API endpoint override |
+| `api_key_name` | string | Select key by display name |
+| `api_key_pool` | string | Key pool override |
 
-| Field | Overrides | Type |
-|-------|-----------|------|
-| `provider` | `default_provider` | `google`, `openrouter`, `custom` |
-| `model` | `{provider}_model` | string |
-| `streaming` | `streaming_enabled` | bool |
-| `thinking` | `thinking_enabled` | bool |
-| `thinking_budget` | `thinking_budget` | int |
-| `thinking_level` | `thinking_level` | `low`, `high` |
-| `reasoning_effort` | `reasoning_effort` | `low`, `medium`, `high` |
-| `temperature` | `temperature` (ai_params) | float |
-| `max_tokens` | `max_tokens` (ai_params) | int |
-| `request_timeout` | `request_timeout` | int |
-| `custom_url` | `custom_url` | string |
-| `gemini_endpoint` | `gemini_endpoint` | string |
-| `api_key_name` | Selects key by display name | string |
+### Runtime Switching
+
+`switch_active_profile()` in `web_server.py` updates CONFIG, AI_PARAMS, rebuilds key managers, and fires a `_bulk_update` config notification to all subscribers.
+
+### Management
+
+- **GUI**: `ConnectionProfileManager` window (`src/gui/windows/connection_manager.py`)
+- **Settings Window**: Active profile dropdown + "Manage Profiles" button in Provider tab
+- **Tray Menu**: "Profiles" menu item
+- **Terminal**: `C` command for profile switching, `I` shows active profile
 
 ## System Tray (Windows)
 
@@ -476,15 +489,15 @@ Modularized as a package (`src/gui/windows/settings_window/`):
 | `widgets.py` | `ToggleSwitch`, `FormFieldsMixin` — uniform layout constants and field helpers |
 | `core.py` | Core `SettingsWindow` composing all tab mixins, window lifecycle, save/reset |
 | `tab_general.py` | `GeneralTabMixin` — startup, behavior, updates, server settings |
-| `tab_provider.py` | `ProviderTabMixin` — providers, models, request settings, model fetching |
-| `tab_generation.py` | `GenerationTabMixin` — streaming, thinking, typing speed, AI parameters |
+| `tab_provider.py` | `ProviderTabMixin` — active profile selector, key pool assignments, request settings |
+| `tab_generation.py` | `GenerationTabMixin` — typing speed settings |
 | `tab_tools.py` | `ToolsTabMixin` — TextEditTool, ScreenSnip, Audio Tool |
 | `tab_tts.py` | `TTSTabMixin` — TTS voice, AI Director, export & playback |
 | `tab_keys.py` | `KeysTabMixin` — API key management per provider |
 | `tab_endpoints.py` | `EndpointsTabMixin` — Flask endpoints, prompt editor |
 | `tab_theme.py` | `ThemeTabMixin` — theme/mode, chat colors, live preview |
 
-- **Tabbed Interface**: General, Provider, Generation, Tools, TTS, API Keys, Endpoints, Theme
+- **Tabbed Interface**: General, Provider (profile selector + key pools), Generation (typing settings), Tools, TTS, API Keys, Endpoints, Theme
 - **Uniform Layout**: Standardized field widths and hint positioning via `FormFieldsMixin`
 - **API Key Naming**: Supports associative names for API keys via inline comments
 - **Model Dropdowns**: Interactive dropdowns for model selection with background refreshing
@@ -501,7 +514,7 @@ GUI editor for `prompts.json` — modularized as a package (`src/gui/windows/pro
 |--------|----------|
 | `editor.py` | Core `PromptEditorWindow` composing all tab mixins, window lifecycle |
 | `data.py` | JSON I/O (`load_options`, `save_options`), constants |
-| `dialogs.py` | `ThemedInputDialog`, `TestResultDialog`, `PresetManagerDialog` |
+| `dialogs.py` | `TestResultDialog` (streaming API test viewer) |
 | `tab_actions.py` | `ActionsTabMixin` — action list, editor, CRUD operations |
 | `tab_settings.py` | `SettingsTabMixin` — settings form, `_get_current_setting()` |
 | `tab_modifiers.py` | `ModifiersTabMixin` — modifier CRUD, default tools |
@@ -510,7 +523,7 @@ GUI editor for `prompts.json` — modularized as a package (`src/gui/windows/pro
 | `tab_tts_playground.py` | `TTSPlaygroundMixin` — TTS director, generation, playback |
 
 - **Actions Tab**: Edit actions for TextEditTool, SnipTool, and AudioTool
-- **Model Presets**: Per-action dropdown to assign presets; "Manage..." button opens the `PresetManagerDialog` (also usable standalone)
+- **Connection Profiles**: Per-action dropdown to assign connection profiles for AI configuration overrides
 - **Settings Tab**: Edit text output rules and system instructions
 - **Modifiers Tab**: Manage global modifier buttons
 - **Groups Tab**: Organize actions into popup groups for both tools
@@ -528,9 +541,9 @@ from src.gui.windows.prompt_editor import show_prompt_editor
 show_settings_window()  # Opens Settings window
 show_prompt_editor()    # Opens Prompt Editor
 
-# PresetManagerDialog can be opened independently
-from src.gui.windows.prompt_editor import PresetManagerDialog
-PresetManagerDialog(parent_window, colors)
+# ConnectionProfileManager can be opened independently
+from src.gui.core import show_connection_manager
+show_connection_manager()
 ```
 
 Both windows are accessible from the system tray menu.

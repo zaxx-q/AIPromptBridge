@@ -85,7 +85,7 @@ Customizable appearance with:
 
 ### 🔄 Robust Backend
 - **Multi-provider support** - Google Gemini, OpenRouter, custom endpoints
-- **Model Presets** - Per-action AI configuration presets (provider, model, thinking, streaming, and advanced params)
+- **Connection Profiles** - Dedicated connection profiles (`profiles.json`) for provider, model, thinking, streaming, and advanced params — assignable per-action or globally
 - **Automatic key rotation** - Switch API keys on rate limits (429, 401, 403)
 - **Smart retry logic** - Handles errors gracefully with configurable delays
 - **Empty response detection** - Automatically retries with next key
@@ -147,6 +147,7 @@ Right-click the tray icon for:
 - **TTS** - Open Text-to-Speech window (Ctrl+Alt+T)
 - **Settings** - Open GUI settings editor
 - **Prompt Editor** - Edit TextEditTool prompts
+- **Profiles** - Open Connection Profile Manager
 - **Edit config.ini** - Open configuration file (only visible with `--show-console` arg)
 - **Edit prompts.json** - Open prompts file (only visible with `--show-console` arg)
 - **Check for Updates** - Check GitHub for new releases and install
@@ -197,10 +198,11 @@ When console is visible, press these keys:
 | `X` | Open Tools menu |
 | `L` | List recent saved sessions |
 | `I` | Show system info (Status) |
-| `K` | Toggle thinking mode |
+| `C` | Switch connection profile |
+| `K` | Toggle thinking mode (session-scoped) |
 | `P` | Switch AI provider |
 | `M` | List available models (Use `?N` for details, e.g., `?1`) |
-| `R` | Toggle streaming mode |
+| `R` | Toggle streaming mode (session-scoped) |
 | `G` | Open Settings window |
 | `W` | Open prompt editor |
 | `U` | Check for updates |
@@ -215,7 +217,7 @@ AIPromptBridge features a comprehensive GUI for all configuration needs, making 
 
 Access via **System Tray > Settings**. This window manages the core application configuration (`config.ini`):
 - **API Keys**: Manage keys for Google Gemini, OpenRouter, and Custom providers.
-- **Providers**: Select default models and configure endpoint URLs.
+- **Providers**: Select active connection profile
 - **Tools**: Configure hotkeys and behavior for TextEditTool, SnipTool, and AudioTool.
 - **Theme**: Switch between 7 themes and toggle Dark/Light modes.
 - **System**: Configure server host/port, startup options, and auto-update checks.
@@ -225,15 +227,27 @@ Access via **System Tray > Settings**. This window manages the core application 
 
 Access via **System Tray > Prompt Editor**. This window lets you customize how the AI responds (`prompts.json`):
 - **Actions**: Create, edit, and organize actions for Text, Snip, and Audio tools.
-- **Model Presets**: Assign per-action AI presets (provider, model, thinking, streaming, temperature, etc.).
+- **Connection Profiles**: Assign per-action connection profiles (provider, model, thinking, streaming, temperature, etc.).
 - **Modifiers**: Customize the modifier bar buttons (e.g., "Shorter", "Professional").
 - **Playground**: Test your prompts in real-time with text, images, or audio before saving.
 - **Hot-Reload**: Changes apply immediately without restarting the app.
+
+### 🔌 Connection Profile Manager
+![Connection Profile Manager](docs/images/window_connection_profiles.png)
+
+Access via **System Tray > Profiles**, terminal `C` key, or **Settings > Provider > Manage Profiles**. Manages connection profiles (`profiles.json`):
+- **Profiles**: Create, edit, duplicate, and delete connection profiles.
+- **Per-Profile Settings**: Provider, model, streaming, thinking, temperature, max tokens, timeout, and endpoint configuration.
+- **Active Profile**: Set any profile as the global default — all tools and actions use it unless overridden.
+- **Per-Action Override**: Assign a specific profile to individual actions in the Prompt Editor.
+- **Model Refresh**: Fetch available models from the provider directly in the editor.
+- **Test**: Verify a profile's connection with a quick API test.
 
 ### 📂 Manual Configuration
 For advanced users, configuration files are stored in the application root:
 - `config.ini`: Core settings and API keys.
 - `prompts.json`: AI system prompts and tool configurations.
+- `profiles.json`: Connection profiles (provider, model, and parameter presets).
 
 ## 💡 Tips
 

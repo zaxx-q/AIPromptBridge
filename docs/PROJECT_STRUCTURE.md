@@ -11,6 +11,8 @@ AIPromptBridge/
 ├── config.ini                  # Configuration (auto-generated on first run)
 ├── chat_sessions.json          # Saved chat sessions (auto-created)
 ├── prompts.json                # Unified prompt configuration (TextEdit, Snip, Endpoints)
+├── profiles.json               # Connection profiles (auto-generated on first run)
+├── keys.json                   # API key pools, XOR-obfuscated (auto-created on first run)
 ├── tools_config.json           # Tools configuration (auto-generated on demand)
 ├── session_attachments/        # Directory for message attachment files
 ├── icon.ico                    # System tray icon
@@ -34,7 +36,8 @@ AIPromptBridge/
     ├── console.py              # Centralized Rich console configuration
     ├── key_manager.py          # API key rotation with exhaustion tracking and named key lookup
     ├── messages.py             # Multimodal message construction factory
-    ├── preset_resolver.py      # Model preset resolution (per-action AI config overrides)
+    ├── connection_profiles.py  # Connection profile store (profiles.json CRUD, ProfileStore singleton)
+    ├── preset_resolver.py      # Connection profile resolution (per-action AI config overrides)
     ├── request_pipeline.py     # Unified request processing with logging
     ├── session_manager.py      # Session persistence with sequential IDs and per-session model override
     ├── terminal.py             # Interactive terminal commands (includes Tools menu)
@@ -79,7 +82,7 @@ AIPromptBridge/
     │       ├── prompt_editor/      # Prompt editor package (modularized)
     │       │   ├── __init__.py         # Public API re-exports
     │       │   ├── data.py             # JSON I/O, constants
-    │       │   ├── dialogs.py          # ThemedInputDialog, PresetManagerDialog
+    │       │   ├── dialogs.py          # TestResultDialog
     │       │   ├── editor.py           # Core PromptEditorWindow (mixin composition)
     │       │   ├── tab_actions.py      # Actions tab mixin
     │       │   ├── tab_settings.py     # Settings tab mixin
@@ -94,13 +97,14 @@ AIPromptBridge/
     │       │   ├── widgets.py          # ToggleSwitch, FormFieldsMixin (uniform layout)
     │       │   ├── core.py             # Core SettingsWindow (mixin composition)
     │       │   ├── tab_general.py      # General tab mixin (startup, behavior, updates)
-    │       │   ├── tab_provider.py     # Provider tab mixin (providers, models, requests)
-    │       │   ├── tab_generation.py   # Generation tab mixin (streaming, thinking, typing, AI params)
+    │       │   ├── tab_provider.py     # Provider tab mixin (profile selector, key pools, requests)
+    │       │   ├── tab_generation.py   # Generation tab mixin (typing speed settings)
     │       │   ├── tab_tools.py        # Tools tab mixin (TextEdit, ScreenSnip, Audio)
     │       │   ├── tab_tts.py          # TTS tab mixin (voice, director, export)
     │       │   ├── tab_keys.py         # API Keys tab mixin
     │       │   ├── tab_endpoints.py    # Endpoints tab mixin
     │       │   └── tab_theme.py        # Theme tab mixin (theme, chat colors, preview)
+    │       ├── connection_manager.py   # Connection Profile Manager window
     │       ├── tts_window.py       # TTS UI (voice selection, AI Director, playback)
     │       └── utils.py            # Window management utilities
     │
@@ -132,7 +136,8 @@ AIPromptBridge/
 | `console.py` | Centralized Rich console configuration with custom theme |
 | `config.py` | Custom INI parser with multiline support, key name parsing, change notification pub/sub |
 | `key_manager.py` | Multi-key management with automatic rotation and named key lookup |
-| `preset_resolver.py` | Per-action model preset resolution (merges preset overrides with global config) |
+| `connection_profiles.py` | Connection profile store — `ProfileStore` singleton, `profiles.json` CRUD |
+| `preset_resolver.py` | Connection profile resolution (merges per-action profile overrides with active profile) |
 | `request_pipeline.py` | Unified logging and token tracking for all requests |
 | `session_manager.py` | Chat session persistence to JSON with per-session model override |
 | `attachment_manager.py`| Manages external file storage for session attachments |
