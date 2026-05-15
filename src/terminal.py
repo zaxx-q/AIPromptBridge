@@ -577,10 +577,23 @@ def terminal_session_manager(endpoints=None):
                     marker = " ◄" if name == active else ""
                     print(f"      [{i+1}] {name}{marker}")
 
-                print("\n   Enter number or name (q = cancel): ", end='', flush=True)
+                print(f"\n   Enter number/name to switch, [E] edit profiles (q = cancel): ", end='', flush=True)
                 try:
                     choice = input().strip()
-                    if choice.lower() != 'q' and choice:
+                    if choice.lower() == 'e':
+                        if HAVE_GUI:
+                            if HAVE_RICH:
+                                console.print("\n[bold]🔌  Opening Connection Profile Manager...[/bold]\n")
+                            else:
+                                print("\n🔌  Opening Connection Profile Manager...\n")
+                            from .gui.core import show_connection_manager
+                            show_connection_manager()
+                        else:
+                            if HAVE_RICH:
+                                console.print("\n[red]✗ GUI not available[/red]\n")
+                            else:
+                                print("\n✗ GUI not available\n")
+                    elif choice.lower() != 'q' and choice:
                         try:
                             idx = int(choice) - 1
                             if 0 <= idx < len(names):
