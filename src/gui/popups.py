@@ -1153,8 +1153,8 @@ def create_profile_dropdown_ctk(parent, colors):
     Returns (profile_var, dropdown_widget, frame) or (None, None, None) if no profiles.
     Caller must pack the frame.
     """
-    from .prompts import get_prompts_config
-    profile_names = get_prompts_config().get_profile_names()
+    from ..connection_profiles import ProfileStore
+    profile_names = ProfileStore.get_instance().get_profile_names()
     if not profile_names:
         return None, None, None
     
@@ -1189,8 +1189,8 @@ def create_profile_dropdown_tk(parent, root, colors):
     Returns (profile_var, dropdown_widget, frame) or (None, None, None) if no profiles.
     Caller must pack the frame.
     """
-    from .prompts import get_prompts_config
-    profile_names = get_prompts_config().get_profile_names()
+    from ..connection_profiles import ProfileStore
+    profile_names = ProfileStore.get_instance().get_profile_names()
     if not profile_names:
         return None, None, None
     

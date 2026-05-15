@@ -135,20 +135,18 @@ class ChatWindowBase(ABC):
         if not web_server.CONFIG.get("profile_selector_enabled", True):
             return False
         try:
-            from ...gui.prompts import PromptsConfig
-            pc = PromptsConfig.get_instance()
-            return bool(pc.get_profile_names())
+            from ...connection_profiles import ProfileStore
+            return bool(ProfileStore.get_instance().get_profile_names())
         except Exception:
             return False
     
-    def _get_profile_names(self) -> list:
-        """Get sorted profile names from PromptsConfig."""
-        try:
-            from ...gui.prompts import PromptsConfig
-            pc = PromptsConfig.get_instance()
-            return pc.get_profile_names()
-        except Exception:
-            return []
+        def _get_profile_names(self) -> list:
+            """Get sorted profile names from ProfileStore."""
+            try:
+                from ...connection_profiles import ProfileStore
+                return ProfileStore.get_instance().get_profile_names()
+            except Exception:
+                return []
     
     def _safe_after(self, delay: int, func):
         """Schedule callback safely. Override for attached windows."""
