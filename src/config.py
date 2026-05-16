@@ -24,14 +24,6 @@ def _get_default_endpoints():
 DEFAULT_CONFIG = {
     "host": "127.0.0.1",
     "port": 5000,
-    "default_provider": "google",
-    # Custom URL: If it contains "google" or "googleapis.com",
-    # Google-specific behavior is automatically applied
-    "custom_url": "https://api.openai.com/v1/chat/completions",
-    "custom_model": "gpt-5.5",
-    "openrouter_model": "openrouter/free",
-    "google_model": "gemma-4-31b-it",
-    "gemini_endpoint": None,
     "max_retries": 3,
     "retry_delay": 5,
     "request_timeout": 120,
@@ -40,7 +32,7 @@ DEFAULT_CONFIG = {
     # This controls whether responses appear in a GUI window or are typed directly.
     # For API endpoints: overridden by ?show=yes/no URL parameter
     # For TextEditTool: overridden by show_chat_window_instead_of_replace per-action setting,
-    #                   which is further overridden by popup radio button selection
+    # which is further overridden by popup radio button selection
     "show_ai_response_in_chat_window": False,
     # Session Auto-Save Setting:
     # controls when new sessions are automatically created and persisted to disk.
@@ -49,17 +41,12 @@ DEFAULT_CONFIG = {
     # - "on_attachment": Create session when chat window has attachments.
     # - "always_window": Create session whenever a new chat window is opened from Tools.
     "auto_save_session": "on_attachment",
-    # Streaming and thinking settings
-    "streaming_enabled": True,
-    "thinking_enabled": False,
-    "thinking_output": "reasoning_content",  # filter, raw, or reasoning_content
-    # Thinking configuration
-    # - reasoning_effort: For OpenAI-compatible APIs ("low", "medium", "high")
-    # - thinking_budget: For Gemini 2.5 models (integer tokens, -1 = auto/unlimited)
-    # - thinking_level: For Gemini 3.x models ("low", "high")
-    "reasoning_effort": "high",
-    "thinking_budget": -1,
-    "thinking_level": "high",
+    # How to handle thinking output: filter, raw, or reasoning_content
+    # This is a display preference, NOT a connection setting.
+    # - filter: Hide thinking content
+    # - raw: Include thinking in main response
+    # - reasoning_content: Separate field (for collapsible display)
+    "thinking_output": "reasoning_content",
     # TextEditTool settings
     "text_edit_tool_enabled": True,
     "text_edit_tool_hotkey": "ctrl+space",
@@ -398,19 +385,16 @@ def generate_example_config():
 host = 127.0.0.1
 port = 5000
 
-# Default API provider: custom, openrouter, or google
-default_provider = google
-
 # ============================================================
 # RESPONSE DISPLAY SETTINGS
 # ============================================================
 # Show AI response in a chat window (yes) or type directly (no)
 #
 # Override hierarchy (highest to lowest priority):
-#   1. ?show=yes/no URL parameter (API endpoints only)
-#   2. Popup radio button selection (TextEditTool, if not "Default")
-#   3. show_chat_window_instead_of_replace per-action setting (TextEditTool)
-#   4. This global setting (show_ai_response_in_chat_window)
+# 1. ?show=yes/no URL parameter (API endpoints only)
+# 2. Popup radio button selection (TextEditTool, if not "Default")
+# 3. show_chat_window_instead_of_replace per-action setting (TextEditTool)
+# 4. This global setting (show_ai_response_in_chat_window)
 show_ai_response_in_chat_window = false
 
 # Session Auto-Save Setting:
@@ -421,56 +405,24 @@ show_ai_response_in_chat_window = false
 # - "always_window": Create session whenever a new chat window is opened.
 auto_save_session = on_attachment
 
-# Custom API configuration
-custom_url = https://api.openai.com/v1/chat/completions
-custom_model = gpt-5.2
-#
-# NOTE: If custom_url contains "google" or "googleapis.com", the system will
-# automatically apply Google-specific settings (safety_settings, thinking_config).
-# Example for Google's OpenAI-compatible endpoint:
-# custom_url = https://generativelanguage.googleapis.com/v1beta/openai
-# custom_model = gemini-2.5-flash
-
-# OpenRouter model (see https://openrouter.ai/models for options)
-openrouter_model = openai/gpt-oss-120b:free
-
-# Google Gemini model
-google_model = gemma-3-27b-it
-
-# Custom Gemini Endpoint (optional)
-# Override the default Google AI Studio endpoint
-# gemini_endpoint = https://generativelanguage.googleapis.com/v1beta
-
 # Retry settings
 max_retries = 3
 retry_delay = 5
+# request_timeout is also set here as a fallback; active profile overrides it.
 request_timeout = 120
 
 # Session management
 max_sessions = 200
 
 # ============================================================
-# STREAMING AND THINKING SETTINGS
+# THINKING OUTPUT DISPLAY
 # ============================================================
-# Enable streaming responses (default: true)
-streaming_enabled = true
-
-# Enable extended thinking/reasoning mode (default: false)
-thinking_enabled = false
-
 # How to handle thinking output: filter, raw, or reasoning_content
 # - filter: Hide thinking content
 # - raw: Include thinking in main response
 # - reasoning_content: Separate field (for collapsible display)
+# This is a display preference and does NOT change when switching profiles.
 thinking_output = reasoning_content
-
-# Thinking configuration (for different providers)
-# - reasoning_effort: OpenAI-compatible APIs (low, medium, high)
-# - thinking_budget: Gemini 2.5 models (integer tokens, -1 = auto/unlimited)
-# - thinking_level: Gemini 3.x models (low, high)
-reasoning_effort = high
-thinking_budget = -1
-thinking_level = high
 
 # ============================================================
 # TEXT EDIT TOOL - Hotkey-triggered text processing with AI
@@ -643,17 +595,10 @@ profile_selector_enabled = true
 update_check_enabled = true
 
 # ============================================================
-# AI PARAMETERS (Optional)
+# AI PARAMETERS — Now in Connection Profiles (profiles.json)
 # ============================================================
-# These parameters are passed directly to the AI model.
-# Only set values you want to override; unset = model defaults.
-# Unknown keys in [config] are ignored to prevent stale values
-# from being sent to the model.
-
-[ai_params]
-# temperature = 1
-# max_tokens = 16384
-# top_p = 0.95
+# temperature, max_tokens, and other AI parameters are now managed
+# per-profile via the Connection Profile Manager.
 
 # ============================================================
 # API KEYS — Now in keys.json (managed by KeyStore)

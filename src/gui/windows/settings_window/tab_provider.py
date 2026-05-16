@@ -3,11 +3,9 @@
 Provider tab mixin for Settings Window.
 
 Sections:
-    🔌 Connection Profile — active profile selector + manage button
-    🛠️ Custom Provider — URL (for reference / fallback)
-    💎 Google Gemini — gemini_endpoint (for reference / fallback)
-    🔑 Key Pool Assignments — per-provider pool assignment
-    🔄 Request Settings — retries, delay, timeout
+🔌 Connection Profile — active profile selector + manage button
+🔑 Key Pool Assignments — per-provider pool assignment
+🔄 Request Settings — retries, delay, timeout
 """
 
 import tkinter as tk
@@ -49,18 +47,18 @@ class ProviderTabMixin:
 
         # --- Request Settings ---
         create_section_header(content, "🔄 Request Settings", self.colors, top_padding=20)
-
+    
         self._add_spinbox_field(content, "max_retries", "Max retries:",
-                               self.config_data.config.get("max_retries", 3),
-                               0, 10, hint="Retries before giving up on API calls")
-
+            self.config_data.config.get("max_retries", 3),
+            0, 10, hint="Retries before giving up on API calls")
+    
         self._add_spinbox_field(content, "retry_delay", "Retry delay (s):",
-                               self.config_data.config.get("retry_delay", 5),
-                               1, 60, hint="Seconds between retries")
-
+            self.config_data.config.get("retry_delay", 5),
+            1, 60, hint="Seconds between retries")
+    
         self._add_spinbox_field(content, "request_timeout", "Request timeout (s):",
-                               self.config_data.config.get("request_timeout", 120),
-                               10, 600, hint="Timeout for API requests")
+            self.config_data.config.get("request_timeout", 120),
+            10, 600, hint="Timeout for API requests (overridden by active profile)")
 
     # -------------------------------------------------------------------------
     # Connection Profile selector

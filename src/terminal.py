@@ -78,7 +78,7 @@ def print_commands_box():
         
         # Column 2: Configuration
         col2 = create_column_table([
-            ("P", "🔄", "Provider"),
+            ("U", "🔄", "Update"),
             ("M", "🤖", "Models"),
             ("G", "🔨", "Settings"),
             ("W", "📝", "Prompts"),
@@ -87,7 +87,7 @@ def print_commands_box():
         # Column 3: Info & Toggles
         col3 = create_column_table([
             ("I", "📊", "Info"),
-            ("C", "🔌", "Profile"),
+            ("P", "🔌", "Profile"),
             ("K", "💭", "Thinking"),
             ("R", "🌊", "Streaming"),
         ])
@@ -105,10 +105,10 @@ def print_commands_box():
         console.print()
     else:
         print("─" * 64)
-        print("  COMMANDS                                       Press H to show all commands")
+        print(" COMMANDS Press H to show all commands")
         print("─" * 64)
-        print("  [S] 🌐 Sessions      [P] 🔄 Provider     [I] 📊 Info")
-        print("  [A] 🎤 Audio         [M] 🤖 Models       [C] 🔌 Profile")
+        print("  [S] 🌐 Sessions      [U] ⬆️ Update       [I] 📊 Info")
+        print("  [A] 🎤 Audio         [M] 🤖 Models       [P] 🔌 Profile")
         print("  [T] 🔊 TTS           [G] 🔨 Settings     [K] 💭 Thinking")
         print("  [X] 🧰 Tools         [W] 📝 Prompts      [R] 🌊 Streaming")
         print("─" * 64)
@@ -252,7 +252,6 @@ def terminal_session_manager(endpoints=None):
                 # Model management with two-tier display
                 from . import web_server
                 from .api_client import fetch_models
-                from .config import save_config_value
                 
                 if HAVE_RICH:
                     console.print("[bold]🤖 Model Management[/bold]")
@@ -389,66 +388,14 @@ def terminal_session_manager(endpoints=None):
                                 new_model = choice
                             
                             config_key = f"{provider}_model"
-                            if save_config_value(config_key, new_model):
-                                web_server.CONFIG[config_key] = new_model
-                                print(f"   ✅ Model: {new_model}")
-                            else:
-                                print(f"   ✗ Failed to save")
+                            # In-memory only — model is owned by the active profile.
+                            # Switch profile or edit on Connection Manager for persistent changes.
+                            web_server.CONFIG[config_key] = new_model
+                            print(f" ✅ Model: {new_model} (session)")
                     except:
                         pass
                 else:
                     print("   No models available")
-                print(f"{'─'*64}\n")
-            
-            elif key == 'p':
-                # Provider management
-                from . import web_server
-                from .config import save_config_value
-                
-                print(f"\n{'─'*64}")
-                print("🔄 PROVIDER")
-                print(f"{'─'*64}")
-                current_provider = web_server.CONFIG.get("default_provider", "google")
-                base_url = get_base_url_for_status(web_server.CONFIG, current_provider)
-                print(f"   Current: {current_provider} → {base_url}")
-                print()
-                
-                # List available providers
-                available = []
-                for p, km in web_server.KEY_MANAGERS.items():
-                    key_count = km.get_key_count()
-                    key_icon = "✅" if key_count > 0 else "✗"
-                    key_info = f"({key_count})" if key_count > 0 else "(no keys)"
-                    available.append((p, key_count))
-                    marker = " ◄" if p == current_provider else ""
-                    print(f"      [{len(available)}] {key_icon} {p} {key_info}{marker}")
-                
-                print("\n   Enter number or name (q = cancel): ", end='', flush=True)
-                try:
-                    choice = input().strip()
-                    if choice.lower() != 'q' and choice:
-                        try:
-                            idx = int(choice) - 1
-                            if 0 <= idx < len(available):
-                                new_provider = available[idx][0]
-                            else:
-                                new_provider = choice.lower()
-                        except ValueError:
-                            new_provider = choice.lower()
-                        
-                        if new_provider in web_server.KEY_MANAGERS:
-                            if save_config_value("default_provider", new_provider):
-                                web_server.CONFIG["default_provider"] = new_provider
-                                new_base = get_base_url_for_status(web_server.CONFIG, new_provider)
-                                model = web_server.CONFIG.get(f"{new_provider}_model", "not set")
-                                print(f"   ✅ {new_provider} → {new_base}")
-                                print(f"     Model: {model}")
-                            else:
-                                print(f"   ✗ Failed to save")
-                        else:
-                            print(f"   ✗ Unknown: {new_provider}")
-                except:
-                    pass
                 print(f"{'─'*64}\n")
             
             elif key == 'i':
@@ -556,7 +503,7 @@ def terminal_session_manager(endpoints=None):
                     status = "✅ ON" if new_value else "✗ OFF"
                     print(f"\n🌊 Streaming: {status} (session)\n")
 
-            elif key == 'c':
+            elif key == 'p':
                 # Switch connection profile
                 from . import web_server
                 from .connection_profiles import ProfileStore
@@ -759,8 +706,7 @@ def terminal_session_manager(endpoints=None):
                 print("   [V] 👁️ View          View a session by ID")
                 print("   [D] 🗑️ Delete        Delete a session by ID")
                 print("\n   Configuration:")
-                print("   [C] 🔌 Profile       Switch connection profile")
-                print("   [P] 🔄 Provider      Switch API provider")
+                print("   [P] 🔌 Profile       Switch connection profile")
                 print("   [M] 🤖 Models        List/set models from API")
                 print("   [G] 🔨 Settings      Open settings window")
                 print("   [W] 📝 Prompts       Open prompt editor")

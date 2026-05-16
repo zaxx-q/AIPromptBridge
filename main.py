@@ -128,6 +128,10 @@ def initialize():
     key_store.load()
     web_server.KEY_MANAGERS = key_store.build_key_managers()
 
+    # ─── Ensure CONFIG has all connection keys (safe defaults) ────────────
+    from src.connection_profiles import ensure_config_connection_keys
+    ensure_config_connection_keys(config)
+
     # ─── Populate from active connection profile ──────────────────────────
     from src.connection_profiles import ProfileStore
     profile_store = ProfileStore.get_instance()

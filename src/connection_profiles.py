@@ -58,6 +58,31 @@ PROFILE_TO_CONFIG_MAP = {
 # Fields that map to ai_params dict
 PROFILE_AI_PARAM_FIELDS = {"temperature", "max_tokens"}
 
+# Safe defaults for connection keys that must exist in CONFIG dict.
+CONNECTION_KEY_DEFAULTS: Dict[str, Any] = {
+    "default_provider": "google",
+    "google_model": "gemini-3-flash-preview",
+    "custom_model": "",
+    "openrouter_model": "",
+    "custom_url": "",
+    "gemini_endpoint": "",
+    "streaming_enabled": True,
+    "thinking_enabled": False,
+    "thinking_budget": -1,
+    "thinking_level": "high",
+    "reasoning_effort": "high",
+}
+
+def ensure_config_connection_keys(config: Dict[str, Any]) -> None:
+    """Ensure CONFIG dict has all connection keys with safe defaults.
+
+    Called after load_config() and before profile population to guarantee
+    that connection keys exist even if config.ini is missing or was created
+    without them (post-refactor).
+    """
+    for config_key, default in CONNECTION_KEY_DEFAULTS.items():
+        if config_key not in config:
+            config[config_key] = default
 
 @dataclass
 class ConnectionProfile:
