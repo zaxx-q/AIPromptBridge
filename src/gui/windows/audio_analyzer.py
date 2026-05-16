@@ -178,14 +178,11 @@ class AudioAnalyzerWindow:
         return f"audio_analyzer_{self.window_id}"
     
     def _compute_profile_mode(self) -> bool:
-        """Check if profile selector mode should be active."""
-        if not self.config.get("profile_selector_enabled", True):
-            return False
-        try:
-            from ...connection_profiles import ProfileStore
-            return bool(ProfileStore.get_instance().get_profile_names())
-        except Exception:
-            return False
+        """Check if profile selector mode should be active.
+
+        (A built-in Default profile always exists, so no need to check ProfileStore.)
+        """
+        return self.config.get("profile_selector_enabled", True)
     
         def _get_profile_names(self) -> list:
             """Get sorted profile names from ProfileStore."""

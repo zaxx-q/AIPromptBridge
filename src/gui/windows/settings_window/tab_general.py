@@ -53,7 +53,7 @@ class GeneralTabMixin:
         self._add_toggle_field(content, "profile_selector_enabled",
                                "Use connection profiles in dropdowns",
                                self.config_data.config.get("profile_selector_enabled", True),
-                               hint="When enabled and profiles are defined, model dropdowns show profile names instead of the full model list")
+                               hint="When enabled, model dropdowns show connection profile names instead of the full model list")
 
         # Session auto-save
         self._add_dropdown_field(content, "auto_save_session", "New session auto-creation:",

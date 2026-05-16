@@ -1150,13 +1150,10 @@ def create_profile_dropdown_ctk(parent, colors):
     """
     Create a connection profile override dropdown (CTk version).
     
-    Returns (profile_var, dropdown_widget, frame) or (None, None, None) if no profiles.
-    Caller must pack the frame.
+    Returns (profile_var, dropdown_widget, frame). Caller must pack the frame.
     """
     from ..connection_profiles import ProfileStore
     profile_names = ProfileStore.get_instance().get_profile_names()
-    if not profile_names:
-        return None, None, None
     
     frame = ctk.CTkFrame(parent, fg_color="transparent")
     
@@ -1186,13 +1183,10 @@ def create_profile_dropdown_tk(parent, root, colors):
     """
     Create a connection profile override dropdown (Tk fallback).
     
-    Returns (profile_var, dropdown_widget, frame) or (None, None, None) if no profiles.
-    Caller must pack the frame.
+    Returns (profile_var, dropdown_widget, frame). Caller must pack the frame.
     """
     from ..connection_profiles import ProfileStore
     profile_names = ProfileStore.get_instance().get_profile_names()
-    if not profile_names:
-        return None, None, None
     
     frame = tk.Frame(parent, bg=colors.base)
     
@@ -2012,10 +2006,9 @@ class AttachedInputPopup:
                 self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window")
                 self.tts_btn = tts_btn
             
-            # Connection profile dropdown in top bar (only if profiles exist)
+            # Connection profile dropdown in top bar
             self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_ctk(top_bar, self.colors)
-            if profile_frame:
-                profile_frame.pack(side="left", expand=True)
+            profile_frame.pack(side="left", expand=True)
             
             # Response toggle
             toggle_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
@@ -2115,10 +2108,9 @@ class AttachedInputPopup:
                 self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window")
                 self.tts_btn = tts_btn
             
-            # Connection profile dropdown in top bar (only if profiles exist)
+            # Connection profile dropdown in top bar
             self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_tk(top_bar, self.root, self.colors)
-            if profile_frame:
-                profile_frame.pack(side=tk.LEFT, expand=True)
+            profile_frame.pack(side=tk.LEFT, expand=True)
             
             # Response mode toggle
             toggle_frame = tk.Frame(content_frame, bg=self.colors.base)
@@ -2463,10 +2455,9 @@ class AttachedPromptPopup:
             )
             self.response_toggle.pack(anchor="center")
             
-            # Connection profile dropdown (only if profiles exist)
+            # Connection profile dropdown
             self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_ctk(content_frame, self.colors)
-            if profile_frame:
-                profile_frame.pack(anchor="center", pady=(0, 8))
+            profile_frame.pack(anchor="center", pady=(0, 8))
             
             # Modifier bar - get from global settings
             from .prompts import get_prompts_config
@@ -2691,10 +2682,9 @@ class AttachedPromptPopup:
             )
             self.response_toggle.pack(anchor=tk.CENTER)
             
-            # Connection profile dropdown (only if profiles exist)
+            # Connection profile dropdown
             self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_tk(content_frame, self.root, self.colors)
-            if profile_frame:
-                profile_frame.pack(anchor=tk.CENTER, pady=(0, 8))
+            profile_frame.pack(anchor=tk.CENTER, pady=(0, 8))
             
             # Modifier bar - get from global settings
             from .prompts import get_prompts_config

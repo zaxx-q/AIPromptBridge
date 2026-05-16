@@ -1294,8 +1294,7 @@ class TextEditToolApp:
         # Carry over profile override to the chat session
         action_config = getattr(self, '_current_action_config', None)
         if action_config and action_config.get("connection_profile"):
-            if self.config.get("profile_selector_enabled", True):
-                session.profile_override = action_config["connection_profile"]
+            session.profile_override = action_config["connection_profile"]
         
         # Extract user content from the already-built messages
         user_text = self._extract_user_content_from_messages(messages)
@@ -1431,8 +1430,7 @@ class TextEditToolApp:
         # Carry over profile override to the chat session
         action_config = getattr(self, '_current_action_config', None)
         if action_config and action_config.get("connection_profile"):
-            if self.config.get("profile_selector_enabled", True):
-                session.profile_override = action_config["connection_profile"]
+            session.profile_override = action_config["connection_profile"]
         
         # Extract user content from the already-built messages
         user_text = self._extract_user_content_from_messages(messages)

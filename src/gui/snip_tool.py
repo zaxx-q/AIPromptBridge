@@ -628,8 +628,7 @@ class SnipToolApp:
         
         # Carry over profile override to the chat session
         if action_config and action_config.get("connection_profile"):
-            if self.config.get("profile_selector_enabled", True):
-                session.profile_override = action_config["connection_profile"]
+            session.profile_override = action_config["connection_profile"]
         
         attachments = []
         

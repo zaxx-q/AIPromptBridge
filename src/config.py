@@ -104,7 +104,7 @@ DEFAULT_CONFIG = {
     "chat_user_bg_color": "",
     "chat_assistant_bg_color": "",
     # Profile selector mode
-    # true = Show connection profiles in dropdowns (if profiles exist) instead of model list
+    # true = Show connection profiles in dropdowns instead of model list
     # false = Always show model list in dropdowns
     "profile_selector_enabled": True,
     # Update settings
@@ -549,10 +549,9 @@ chat_user_bg_color =
 chat_assistant_bg_color =
 
 # Profile selector mode
-# When enabled and connection profiles are defined in prompts.json,
-# model dropdowns (Chat Window, Audio Analyzer) show profile names
-# instead of the full model list.
-# true = use profile dropdown (if profiles exist)
+# When enabled, model dropdowns (Chat Window, Audio Analyzer) show
+# connection profile names instead of the full model list.
+# true = use profile dropdown
 # false = always show model list
 profile_selector_enabled = true
 

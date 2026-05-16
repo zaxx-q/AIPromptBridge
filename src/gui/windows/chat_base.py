@@ -128,17 +128,12 @@ class ChatWindowBase(ABC):
     
     def _compute_profile_mode(self) -> bool:
         """Check if profile selector mode should be active.
-    
-        Returns True when profile_selector_enabled=True AND at least one profile exists.
+
+        Returns True when profile_selector_enabled=True.
+        (A built-in Default profile always exists, so no need to check ProfileStore.)
         """
         from ... import web_server
-        if not web_server.CONFIG.get("profile_selector_enabled", True):
-            return False
-        try:
-            from ...connection_profiles import ProfileStore
-            return bool(ProfileStore.get_instance().get_profile_names())
-        except Exception:
-            return False
+        return web_server.CONFIG.get("profile_selector_enabled", True)
     
         def _get_profile_names(self) -> list:
             """Get sorted profile names from ProfileStore."""
