@@ -135,13 +135,13 @@ class ChatWindowBase(ABC):
         from ... import web_server
         return web_server.CONFIG.get("profile_selector_enabled", True)
     
-        def _get_profile_names(self) -> list:
-            """Get sorted profile names from ProfileStore."""
-            try:
-                from ...connection_profiles import ProfileStore
-                return ProfileStore.get_instance().get_profile_names()
-            except Exception:
-                return []
+    def _get_profile_names(self) -> list:
+        """Get sorted profile names from ProfileStore."""
+        try:
+            from ...connection_profiles import ProfileStore
+            return ProfileStore.get_instance().get_profile_names()
+        except Exception:
+            return []
     
     def _safe_after(self, delay: int, func):
         """Schedule callback safely. Override for attached windows."""

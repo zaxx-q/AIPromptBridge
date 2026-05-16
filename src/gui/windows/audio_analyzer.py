@@ -184,13 +184,13 @@ class AudioAnalyzerWindow:
         """
         return self.config.get("profile_selector_enabled", True)
     
-        def _get_profile_names(self) -> list:
-            """Get sorted profile names from ProfileStore."""
-            try:
-                from ...connection_profiles import ProfileStore
-                return ProfileStore.get_instance().get_profile_names()
-            except Exception:
-                return []
+    def _get_profile_names(self) -> list:
+        """Get sorted profile names from ProfileStore."""
+        try:
+            from ...connection_profiles import ProfileStore
+            return ProfileStore.get_instance().get_profile_names()
+        except Exception:
+            return []
     
     def _create_window(self):
         """Create the main window."""
