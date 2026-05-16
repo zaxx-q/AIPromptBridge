@@ -284,7 +284,7 @@ class TTSPlaygroundMixin:
                 from ....config import load_config
                 from ....key_manager import KeyManager
                 
-                config, ai_params_loaded, _ = load_config()
+                config = load_config()
                 from ....key_store import KeyStore
                 key_store = KeyStore.get_instance()
                 key_managers = key_store.build_key_managers()
@@ -298,7 +298,7 @@ class TTSPlaygroundMixin:
                 
                 provider = config.get("default_provider", "google")
                 model = config.get(f"{provider}_model", "")
-                ai_params = {k: v for k, v in ai_params_loaded.items() if v is not None}
+                ai_params = {}
                 
                 ctx = RequestContext(
                     origin=RequestOrigin.TTS_TOOL,
@@ -389,7 +389,7 @@ class TTSPlaygroundMixin:
                 from ....config import load_config
                 from ....key_manager import KeyManager
                 
-                config, _, _ = load_config()
+                config = load_config()
                 from ....key_store import KeyStore
                 key_store = KeyStore.get_instance()
                 keys_data = key_store.get_pool_for_provider("google")

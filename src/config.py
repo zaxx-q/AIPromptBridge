@@ -13,13 +13,6 @@ from pathlib import Path
 CONFIG_FILE = "config.ini"
 SESSIONS_FILE = "chat_sessions.json"
 
-# Import endpoint prompts from unified prompts module
-# This avoids circular imports by using a late import pattern
-def _get_default_endpoints():
-    """Get default endpoints from prompts module."""
-    from src.gui.prompts import DEFAULT_ENDPOINTS
-    return dict(DEFAULT_ENDPOINTS)
-
 # Default configuration
 DEFAULT_CONFIG = {
     "host": "127.0.0.1",
@@ -154,24 +147,21 @@ def load_config(filepath=CONFIG_FILE):
     """Load configuration from .ini file.
     
     Returns:
-        Tuple of (config, ai_params, endpoints).
-        API keys are now managed separately by KeyStore (keys.json).
+        config dict. AI parameters are managed by Connection Profiles
+        (profiles.json). Endpoints are loaded from prompts.json via PromptsConfig.
+        API keys are managed separately by KeyStore (keys.json).
     """
     config = dict(DEFAULT_CONFIG)
-    ai_params = {}
-    endpoints = _get_default_endpoints()
     
     if not Path(filepath).exists():
         print(f"[Warning] Config file '{filepath}' not found. Using defaults.")
-        return config, ai_params, endpoints
+        return config
     
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             lines = f.readlines()
         
         current_section = None
-        multiline_key = None
-        multiline_value = []
         seen_config_keys = set()
         
         for line in lines:
@@ -196,25 +186,18 @@ def load_config(filepath=CONFIG_FILE):
                         seen_config_keys.add(key)
                         config[key] = value
                     else:
-                        print(f"[Warning] Unknown key '{key}' in [config] section (ignored). "
-                              f"AI parameters belong in [ai_params].")
+                        print(f"[Warning] Unknown key '{key}' in [config] section (ignored).")
             
-            elif current_section == 'ai_params':
-                if '=' in stripped:
-                    key, value = stripped.split('=', 1)
-                    key = key.strip().lower()
-                    value = parse_config_value(value)
-                    if value is not None:
-                        ai_params[key] = value
-            
-            # API key sections ([custom], [openrouter], [google]) are now
-            # managed by KeyStore (keys.json).  Old sections are silently
-            # ignored here for backward compatibility.
+            # [ai_params], [endpoints], and API key sections ([custom],
+            # [openrouter], [google]) are silently ignored here.
+            # ai_params: managed by Connection Profiles (profiles.json)
+            # endpoints: managed by PromptsConfig (prompts.json)
+            # API keys: managed by KeyStore (keys.json)
         
     except Exception as e:
         print(f"[Error] Failed to load config: {e}")
     
-    return config, ai_params, endpoints
+    return config
 
 
 def load_key_names(filepath=CONFIG_FILE):
@@ -225,7 +208,7 @@ def load_key_names(filepath=CONFIG_FILE):
         sk-abc123   # My Key Name
     and returns the name part for each key, in order.
     
-    This is separate from load_config() to avoid breaking its return type.
+    This is separate from load_config() to keep concerns distinct.
     
     Returns:
         Dict[str, List[str]]: Mapping of provider -> list of key names.

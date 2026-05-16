@@ -429,7 +429,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 from ...key_manager import KeyManager
                 from ...api_client import get_provider_for_type
 
-                config, _, _ = load_config()
+                config = load_config()
                 key_store = KeyStore.get_instance()
                 keys_data = key_store.get_pool_for_provider(provider)
                 key_strings = [kd["key"] for kd in keys_data if kd.get("key")]
@@ -571,8 +571,8 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 from ...key_manager import KeyManager
                 from ...api_client import call_api_stream_unified
 
-                config, ai_params_loaded, _ = load_config()
-                ai_params = {k: v for k, v in ai_params_loaded.items() if v is not None}
+                config = load_config()
+                ai_params = {}
 
                 from ...key_store import KeyStore
                 key_store = KeyStore.get_instance()

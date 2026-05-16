@@ -17,7 +17,13 @@ from src.tools.file_processor import show_tools_menu
 
 def main():
     # Initialize globals for the tool to function (mirroring main.py logic)
-    config, ai_params, endpoints = load_config()
+    config = load_config()
+    ai_params = {}
+
+    # Load endpoints from prompts.json defaults
+    from src.gui.prompts import DEFAULT_ENDPOINTS
+    endpoints = dict(DEFAULT_ENDPOINTS)
+
     web_server.CONFIG = config
     web_server.AI_PARAMS = ai_params
     web_server.ENDPOINTS = endpoints

@@ -116,7 +116,12 @@ def initialize():
         print()
     
     # Load configuration
-    config, ai_params, endpoints = load_config()
+    config = load_config()
+    ai_params = {}
+
+    # Load endpoints from prompts.json defaults
+    from src.gui.prompts import DEFAULT_ENDPOINTS
+    endpoints = dict(DEFAULT_ENDPOINTS)
 
     # Set global configuration
     web_server.CONFIG = config

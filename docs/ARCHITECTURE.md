@@ -217,7 +217,7 @@ Sessions are stored in `chat_sessions.json` with sequential IDs.
 }
 ```
 
-> `model_override` is only present when a per-session model has been selected; `null`/absent means the session uses the global model from `config.ini`.
+> `model_override` is only present when a per-session model has been selected; `null`/absent means the session uses the model from the active connection profile.
 
 ### Context Injection
 
@@ -381,20 +381,17 @@ The config parser (`src/config.py`) is a custom INI parser, NOT Python's `config
 ### Example
 
 ```ini
-[settings]
-streaming_enabled = true
-thinking_enabled = false
-default_provider = google
-google_model = gemini-2.5-flash
+[config]
+# Connection settings (provider, model, streaming, thinking) are
+# managed via Connection Profiles — see profiles.json.
+# config.ini only holds non-connection settings:
 
-[google]
-# API keys, one per line
-AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-AIzaSyYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY
+thinking_output = reasoning_content
+max_retries = 3
+retry_delay = 5
 
-[endpoints]
-# Use {lang} placeholder for dynamic language
-ocr_translate = Extract and translate to {lang}. Return only translated text.
+# [google] — API keys now in keys.json (KeyStore)
+# [ai_params] — Now in Connection Profiles (profiles.json)
 ```
 
 ## Theme System

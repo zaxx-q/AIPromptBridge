@@ -198,9 +198,8 @@ When console is visible, press these keys:
 | `X` | Open Tools menu |
 | `L` | List recent saved sessions |
 | `I` | Show system info (Status) |
-| `C` | Switch connection profile |
+| `P` | Switch connection profile |
 | `K` | Toggle thinking mode (session-scoped) |
-| `P` | Switch AI provider |
 | `M` | List available models (Use `?N` for details, e.g., `?1`) |
 | `R` | Toggle streaming mode (session-scoped) |
 | `G` | Open Settings window |
@@ -245,7 +244,7 @@ Access via **System Tray > Profiles**, terminal `C` key, or **Settings > Provide
 
 ### 📂 Manual Configuration
 For advanced users, configuration files are stored in the application root:
-- `config.ini`: Core settings and API keys.
+- `config.ini`: Core app settings (connection settings are in profiles, API keys in keys.json).
 - `prompts.json`: AI system prompts and tool configurations.
 - `profiles.json`: Connection profiles (provider, model, and parameter profiles).
 

@@ -115,7 +115,7 @@ class AttachmentManager:
         """
         try:
             from .config import load_config
-            config, _, _ = load_config()
+            config = load_config()
             fmt = config.get("session_image_format", cls.DEFAULT_FORMAT).lower()
             quality = config.get("session_image_quality", cls.DEFAULT_QUALITY)
             
