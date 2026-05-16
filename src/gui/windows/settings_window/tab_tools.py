@@ -6,6 +6,7 @@ Sections:
     ✏️ TextEditTool — enable, hotkeys
     📸 ScreenSnip — enable, hotkey
     🎤 Audio Tool — enable, hotkey, device, loopback, level meter style
+    ⌨️ Typing — typing delay and speed
 """
 
 import tkinter as tk
@@ -19,7 +20,7 @@ class ToolsTabMixin:
     """Mixin providing the Tools tab for SettingsWindow."""
 
     def _create_tools_tab(self, frame):
-        """Create the Tools settings tab (TextEditTool + ScreenSnip + Audio)."""
+        """Create the Tools settings tab (TextEditTool + ScreenSnip + Audio + Typing)."""
         content = self._create_tab_scroll_frame(frame)
 
         # --- TextEditTool ---
@@ -76,3 +77,27 @@ class ToolsTabMixin:
                                  self.config_data.config.get("audio_level_meter_style", "canvas"),
                                  options=["canvas", "progressbar"], size="sm",
                                  hint="Visual style of recording meter")
+
+        # --- Typing ---
+        create_section_header(content, "⌨️ Typing", self.colors, top_padding=20)
+
+        if self.use_ctk:
+            ctk.CTkLabel(content,
+                        text="Controls typing speed when streaming text into other applications via replace mode.",
+                        font=get_ctk_font(11), justify="left",
+                        **get_ctk_label_colors(self.colors, muted=True)
+                        ).pack(anchor="w", pady=(0, 8))
+        else:
+            tk.Label(content,
+                    text="Controls typing speed when streaming text into other applications via replace mode.",
+                    font=("Segoe UI", 9), justify="left",
+                    bg=self.colors.bg, fg=self.colors.blockquote).pack(anchor="w", pady=(0, 8))
+
+        self._add_spinbox_field(content, "streaming_typing_delay", "Typing delay (ms):",
+                               self.config_data.config.get("streaming_typing_delay", 5),
+                               1, 100, hint="Delay per character in replace mode")
+
+        self._add_toggle_field(content, "streaming_typing_uncapped",
+                               "Uncapped typing speed",
+                               self.config_data.config.get("streaming_typing_uncapped", False),
+                               hint="⚠️ No delay between chars. May overwhelm some apps.")

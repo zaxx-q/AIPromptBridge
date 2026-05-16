@@ -44,7 +44,6 @@ from .config_io import ConfigData, parse_config_full, save_config_full
 from .widgets import FormFieldsMixin
 from .tab_general import GeneralTabMixin
 from .tab_provider import ProviderTabMixin
-from .tab_generation import GenerationTabMixin
 from .tab_tools import ToolsTabMixin
 from .tab_tts import TTSTabMixin
 from .tab_keys import KeysTabMixin
@@ -60,7 +59,6 @@ class SettingsWindow(
     FormFieldsMixin,
     GeneralTabMixin,
     ProviderTabMixin,
-    GenerationTabMixin,
     ToolsTabMixin,
     TTSTabMixin,
     KeysTabMixin,
@@ -319,8 +317,7 @@ class SettingsWindow(
             # Tab configs: name -> (method_name, is_loaded)
             self._tab_configs = {
                 "⚙️ General": ("_create_general_tab", False),
-                "🌐 Provider": ("_create_provider_tab", False),
-                "⚡ Generation": ("_create_generation_tab", False),
+                "🔌 Connection": ("_create_provider_tab", False),
                 "🔧 Tools": ("_create_tools_tab", False),
                 "🗣️ TTS": ("_create_tts_tab", False),
                 "🔑 API Keys": ("_create_keys_tab", False),
@@ -341,7 +338,7 @@ class SettingsWindow(
             self.tabview = ttk.Notebook(parent)
             self.tabview.pack(fill="both", expand=True, pady=(0, 2))
 
-            tabs = ["General", "Provider", "Generation", "Tools", "TTS", "API Keys", "Theme"]
+            tabs = ["General", "Connection", "Tools", "TTS", "API Keys", "Theme"]
             frames = {}
             for tab_name in tabs:
                 frame = tk.Frame(self.tabview, bg=self.colors.bg)
@@ -349,8 +346,7 @@ class SettingsWindow(
                 frames[tab_name] = frame
 
             self._create_general_tab(frames["General"])
-            self._create_provider_tab(frames["Provider"])
-            self._create_generation_tab(frames["Generation"])
+            self._create_provider_tab(frames["Connection"])
             self._create_tools_tab(frames["Tools"])
             self._create_tts_tab(frames["TTS"])
             self._create_keys_tab(frames["API Keys"])

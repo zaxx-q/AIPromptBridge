@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Provider tab mixin for Settings Window.
+Connection tab mixin for Settings Window.
 
 Sections:
 🔌 Connection Profile — active profile selector + manage button
@@ -16,10 +16,10 @@ from ...custom_widgets import create_section_header, create_emoji_button
 
 
 class ProviderTabMixin:
-    """Mixin providing the Provider tab for SettingsWindow."""
+    """Mixin providing the Connection tab for SettingsWindow."""
 
     def _create_provider_tab(self, frame):
-        """Create the Provider settings tab."""
+        """Create the Connection settings tab."""
         content = self._create_tab_scroll_frame(frame)
 
         # --- Connection Profile ---

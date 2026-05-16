@@ -7,9 +7,8 @@ Modular settings window split into:
 - widgets.py: ToggleSwitch, FormFieldsMixin (uniform layout helpers)
 - core.py: SettingsWindow class composing all tab mixins
 - tab_general.py: General tab (startup, behavior, updates, server)
-- tab_provider.py: Provider tab (providers, models, request settings)
-- tab_generation.py: Generation tab (streaming, thinking, typing, AI params)
-- tab_tools.py: Tools tab (TextEditTool, ScreenSnip, Audio Tool)
+- tab_provider.py: Connection tab (connection profile, key pools, request settings)
+- tab_tools.py: Tools tab (TextEditTool, ScreenSnip, Audio Tool, Typing)
 - tab_tts.py: TTS tab (text-to-speech, director, export)
 - tab_keys.py: API Keys tab (key management per provider)
 - tab_theme.py: Theme tab (theme, mode, chat colors, preview)
