@@ -23,7 +23,6 @@ DEFAULT_CONFIG = {
     "max_sessions": 200,
     # Show AI response in chat window: yes or no
     # This controls whether responses appear in a GUI window or are typed directly.
-    # For API endpoints: overridden by ?show=yes/no URL parameter
     # For TextEditTool: overridden by show_chat_window_instead_of_replace per-action setting,
     # which is further overridden by popup radio button selection
     "show_ai_response_in_chat_window": False,
@@ -54,11 +53,6 @@ DEFAULT_CONFIG = {
     # Screen Snipping Tool settings
     "screen_snip_enabled": True,
     "screen_snip_hotkey": "ctrl+alt+x",
-    # Flask endpoints settings
-    # Enable/disable Flask API endpoints for external tools like ShareX
-    # When disabled, endpoints from prompts.json are not registered
-    # Default: False (use built-in screen snipping instead)
-    "flask_endpoints_enabled": False,
     # UI Theme settings
     # Available themes: catppuccin, dracula, nord, gruvbox, onedark, minimal, highcontrast
     "ui_theme": "dracula",
@@ -509,15 +503,6 @@ tts_autoplay = true
 # regardless of gemini_endpoint setting (useful when using a proxy that
 # doesn't support TTS models)
 tts_use_official_endpoint = false
-
-# ============================================================
-# FLASK API ENDPOINTS (Optional)
-# ============================================================
-# Enable Flask endpoints for external tools like ShareX
-# When disabled (default), use built-in screen snipping instead
-# Set to true if you need to integrate with external tools
-# Endpoint prompts are defined in prompts.json (endpoints section)
-flask_endpoints_enabled = false
 
 # ============================================================
 # UI THEME SETTINGS

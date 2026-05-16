@@ -25,7 +25,6 @@ class RequestOrigin(Enum):
     SNIP_TOOL = "snip_tool"
     AUDIO_TOOL = "audio_tool"
     TTS_TOOL = "tts_tool"
-    ENDPOINT = "endpoint"
 
 
 @dataclass

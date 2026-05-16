@@ -883,7 +883,7 @@ class PlaygroundTabMixin:
     # --- Image Handling ---
     
     def _select_playground_image(self):
-        """Select an image file for endpoint testing."""
+        """Select an image file for playground testing."""
         path = filedialog.askopenfilename(
             filetypes=[("Images", "*.png;*.jpg;*.jpeg;*.webp")]
         )
@@ -1440,10 +1440,6 @@ class PlaygroundTabMixin:
         provider = self.playground_provider_var.get()
         model = self.playground_model_var.get()
         
-        # Ensure max_tokens is set for image endpoints
-        if self.playground_mode_var.get() == "endpoint":
-             ai_params["max_tokens"] = 1024
-             
         return {
             "messages": messages,
             "provider": provider,

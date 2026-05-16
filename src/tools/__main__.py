@@ -20,21 +20,16 @@ def main():
     config = load_config()
     ai_params = {}
 
-    # Load endpoints from prompts.json defaults
-    from src.gui.prompts import DEFAULT_ENDPOINTS
-    endpoints = dict(DEFAULT_ENDPOINTS)
-
     web_server.CONFIG = config
     web_server.AI_PARAMS = ai_params
-    web_server.ENDPOINTS = endpoints
-    
+
     # Initialize key managers via KeyStore (pool-based)
     key_store = KeyStore.get_instance()
     key_store.load()
     web_server.KEY_MANAGERS = key_store.build_key_managers()
-    
+
     # Run the menu
-    show_tools_menu(endpoints=web_server.ENDPOINTS)
+    show_tools_menu()
 
 if __name__ == "__main__":
     main()

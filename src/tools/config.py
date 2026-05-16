@@ -231,57 +231,34 @@ def get_file_type_mappings(config: Dict[str, Any]) -> Dict[str, List[str]]:
     return config.get("file_processor", {}).get("file_type_mappings", {})
 
 
-def resolve_endpoint_prompt(prompt_text: str, endpoints: Dict[str, str]) -> str:
-    """
-    Resolve @endpoint:name references in prompt text.
-    
-    Args:
-        prompt_text: Prompt text that may contain @endpoint:name
-        endpoints: Dictionary of endpoint name -> prompt
-    
-    Returns:
-        Resolved prompt text
-    """
-    if prompt_text.startswith("@endpoint:"):
-        endpoint_name = prompt_text[10:].strip()  # Remove "@endpoint:"
-        if endpoint_name in endpoints:
-            return endpoints[endpoint_name]
-        else:
-            print(f"[Warning] Endpoint '{endpoint_name}' not found")
-            return prompt_text
-    return prompt_text
-
-
 def list_available_prompts(
     config: Dict[str, Any],
-    endpoints: Dict[str, str] = None,
     filter_input_type: str = None
 ) -> List[Dict[str, Any]]:
     """
     List all available prompts for file processor.
-    
+
     Args:
         config: Tools configuration dictionary
-        endpoints: Optional endpoints dict to include endpoint prompts
         filter_input_type: Optional filter by input type (image, text, code)
-    
+
     Returns:
         List of prompt info dicts with keys: key, icon, description, input_types
     """
     result = []
     prompts = get_file_processor_prompts(config)
-    
+
     # Add tool prompts
     for key, prompt_config in prompts.items():
         if key.startswith("_"):
-            continue  # Skip internal prompts
-        
+            continue # Skip internal prompts
+
         input_types = prompt_config.get("input_types", ["image", "text", "code"])
-        
+
         # Apply filter if specified
         if filter_input_type and filter_input_type not in input_types:
             continue
-        
+
         result.append({
             "key": key,
             "icon": prompt_config.get("icon", "📄"),
@@ -289,16 +266,5 @@ def list_available_prompts(
             "input_types": input_types,
             "source": "tool"
         })
-    
-    # Add endpoint prompts if provided
-    if endpoints:
-        for name, prompt in endpoints.items():
-            result.append({
-                "key": f"@endpoint:{name}",
-                "icon": "📡",
-                "description": f"Endpoint: {prompt[:50]}..." if len(prompt) > 50 else f"Endpoint: {prompt}",
-                "input_types": ["image"],  # Endpoints are typically for images
-                "source": "endpoint"
-            })
-    
+
     return result

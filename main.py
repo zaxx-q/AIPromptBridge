@@ -119,14 +119,9 @@ def initialize():
     config = load_config()
     ai_params = {}
 
-    # Load endpoints from prompts.json defaults
-    from src.gui.prompts import DEFAULT_ENDPOINTS
-    endpoints = dict(DEFAULT_ENDPOINTS)
-
     # Set global configuration
     web_server.CONFIG = config
     web_server.AI_PARAMS = ai_params
-    web_server.ENDPOINTS = endpoints
 
     # Initialize key managers via KeyStore (pool-based)
     key_store = KeyStore.get_instance()
@@ -218,9 +213,9 @@ def initialize():
         print()
     
     # Initialize web server (silent)
-    web_server.init_web_server(config, ai_params, endpoints, web_server.KEY_MANAGERS)
-    
-    return config, ai_params, endpoints
+    web_server.init_web_server(config, ai_params, web_server.KEY_MANAGERS)
+
+    return config, ai_params
 
 
 def initialize_text_edit_tool(config, ai_params):
@@ -632,7 +627,7 @@ def acquire_single_instance_mutex():
     return mutex
 
 
-def run_server(config, ai_params, endpoints):
+def run_server(config, ai_params):
     """Run the Flask server (used by both tray and terminal modes)"""
     host = web_server.CONFIG.get('host', '127.0.0.1')
     port = int(web_server.CONFIG.get('port', 5000))
@@ -807,7 +802,7 @@ def main():
             print(f"✅ Created '{PROMPTS_FILE}'")
     
     # Initialize (new compact output)
-    config, ai_params, endpoints = initialize()
+    config, ai_params = initialize()
     
     # ─── Background Update Check ───────────────────────────────────────────
     try:
@@ -881,27 +876,14 @@ def main():
     
     port = actual_port
     
-    # Show endpoint status based on flask_endpoints_enabled
-    flask_endpoints_enabled = config.get("flask_endpoints_enabled", False)
-    
     if HAVE_RICH:
-        if flask_endpoints_enabled:
-            console.print(f"[bold green]🚀 API Server Active[/bold green]: [link=http://{host}:{port}]http://{host}:{port}[/link]")
-            console.print(f"   📡  {len(endpoints)} endpoints registered")
-        else:
-            console.print(f"[dim]ℹ️  Internal Server Running locally (API endpoints disabled)[/dim]")
-            console.print("   📡  Endpoints disabled (use built-in snipping)")
+        console.print(f"[bold green]🚀 Server Running[/bold green]: [link=http://{host}:{port}]http://{host}:{port}[/link]")
         if HAVE_GUI:
-            console.print("   🖥️  GUI available (on-demand)")
+            console.print(" 🖥️ GUI available (on-demand)")
     else:
-        if flask_endpoints_enabled:
-            print(f"🚀 API Server Active: http://{host}:{port}")
-            print(f"   📡  {len(endpoints)} endpoints registered")
-        else:
-            print("ℹ️ Internal Server Running locally (API endpoints disabled)")
-            print("   📡  Endpoints disabled (use built-in snipping)")
+        print(f"🚀 Server Running: http://{host}:{port}")
         if HAVE_GUI:
-            print("   🖥️  GUI available (on-demand)")
+            print(" 🖥️ GUI available (on-demand)")
     
     # TextEditTool
     text_tool_result = initialize_text_edit_tool(config, ai_params)
@@ -948,14 +930,14 @@ def main():
         
         # Start terminal session manager
         terminal_thread = threading.Thread(
-            target=lambda: terminal_session_manager(endpoints),
+            target=lambda: terminal_session_manager(),
             daemon=True
         )
         terminal_thread.start()
         
         # Start Flask server in background thread
         server_thread = threading.Thread(
-            target=lambda: run_server(config, ai_params, endpoints),
+            target=lambda: run_server(config, ai_params),
             daemon=True
         )
         server_thread.start()
@@ -992,13 +974,13 @@ def main():
         
         # Start terminal session manager
         terminal_thread = threading.Thread(
-            target=lambda: terminal_session_manager(endpoints),
+            target=lambda: terminal_session_manager(),
             daemon=True
         )
         terminal_thread.start()
         
         # Run server in main thread
-        run_server(config, ai_params, endpoints)
+        run_server(config, ai_params)
 
 
 if __name__ == '__main__':

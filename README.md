@@ -120,7 +120,7 @@ The **TTS Processor** tool enables batch text-to-speech generation:
 1. Download `AIPromptBridge.zip` from [GitHub Releases](https://github.com/zaxx-q/AIPromptBridge/releases)
 2. Extract and run `AIPromptBridge.exe` (use `AIPromptBridge-NoConsole.exe` to hide console)
 3. On first launch, it automatically opens the Settings window in **API Keys** tab. Enter your API keys (see [Getting API Keys](#getting-api-keys)), enter key name (Optional), and click **Add**
-4. Optionally configure selected provider, endpoint URL or models in **Provider** tab and click **Save**
+4. Optionally configure selected provider, endpoint URL, or models in **Provider** tab and click **Save**
 5. The app starts minimized to system tray
 
 ### From Source (Alternative)
@@ -178,14 +178,6 @@ Right-click the tray icon for:
 4. Choose an action (Transcribe, Analyze, etc.)
 5. Results are streamed to a chat window or displayed in the result panel
 
-### API Endpoints
-
-**Note: These endpoints are largely deprecated. Reasons:**
-- ShareX 19.0.1+ now has a native "Analyze image" feature.
-- The built-in SnipTool (**Ctrl+Alt+X**) offers better integration.
-
-Endpoints allow HTTP POST access (disabled by default). See [ShareX Setup Guide](docs/SHAREX_SETUP.md) if needed.
-
 ### Console Commands
 
 When console is visible, press these keys:
@@ -236,7 +228,7 @@ Access via **System Tray > Prompt Editor**. This window lets you customize how t
 
 Access via **System Tray > Profiles**, terminal `C` key, or **Settings > Provider > Manage Profiles**. Manages connection profiles (`profiles.json`):
 - **Profiles**: Create, edit, duplicate, and delete connection profiles.
-- **Per-Profile Settings**: Provider, model, streaming, thinking, temperature, max tokens, timeout, and endpoint configuration.
+- **Per-Profile Settings**: Provider, model, streaming, thinking, temperature, max tokens, and timeout configuration.
 - **Active Profile**: Set any profile as the global default — all tools and actions use it unless overridden.
 - **Per-Action Override**: Assign a specific profile to individual actions in the Prompt Editor.
 - **Model Refresh**: Fetch available models from the provider directly in the editor.
@@ -290,7 +282,6 @@ AIPromptBridge.exe --no-wt            # Skip Windows Terminal detection and redi
 
 - [Project Structure](docs/PROJECT_STRUCTURE.md) - File organization
 - [Architecture](docs/ARCHITECTURE.md) - Technical details
-- [ShareX Setup](docs/SHAREX_SETUP.md) - Screenshot integration
 
 ## 📝 Requirements
 

@@ -4,7 +4,7 @@ File Processor Tool - Interactive terminal workflow for batch file processing
 
 Provides:
 - Interactive wizard for file/folder selection
-- Prompt selection (tool prompts + endpoint prompts)
+- Prompt selection (tool prompts)
 - Output configuration (individual/combined, naming, destination)
 - Progress display with pause/stop/resume
 - Checkpoint persistence
@@ -33,7 +33,6 @@ from .config import (
     get_prompt_by_key,
     get_setting,
     list_available_prompts,
-    resolve_endpoint_prompt,
 )
 from .audio_processor import (
     AudioProcessor,
@@ -80,16 +79,14 @@ class FileProcessor(BaseTool):
     - Large file handling (Files API or FFmpeg chunking)
     """
     
-    def __init__(self, config: Dict[str, Any] = None, endpoints: Dict[str, str] = None):
+    def __init__(self, config: Dict[str, Any] = None):
         """
         Initialize File Processor.
-        
+
         Args:
             config: Main application config (from web_server.CONFIG)
-            endpoints: Endpoint prompts from config.ini
         """
         super().__init__("file_processor", config)
-        self.endpoints = endpoints or {}
         self.tools_config = load_tools_config()
         self.file_handler = FileHandler()
         self.checkpoint_manager = CheckpointManager()
@@ -1469,57 +1466,31 @@ class FileProcessor(BaseTool):
         self._print_header("📁 FILE PROCESSOR - Step 2: Prompt Selection")
         
         # Get available prompts
-        prompts = list_available_prompts(
-            self.tools_config,
-            self.endpoints if self.endpoints else None
-        )
-        
-        # Organize by source
-        tool_prompts = [p for p in prompts if p["source"] == "tool"]
-        endpoint_prompts = [p for p in prompts if p["source"] == "endpoint"]
-        
+        prompts = list_available_prompts(self.tools_config)
+
         # Display tool prompts
         print("\n📝 Tool Prompts:")
-        for i, p in enumerate(tool_prompts, 1):
+        for i, p in enumerate(prompts, 1):
             requires_input = ""
             if get_prompt_by_key(self.tools_config, p["key"]):
                 config = get_prompt_by_key(self.tools_config, p["key"])
                 if config.get("requires_input"):
                     requires_input = " [requires input]"
-            print(f"  [{i}] {p['icon']} {p['key']}{requires_input}")
-            print(f"      {p['description'][:60]}")
-        
-        # Display endpoint prompts options
-        has_endpoints = bool(endpoint_prompts)
-        if has_endpoints:
-            print(f"\n  [E] Show Endpoint Prompts ({len(endpoint_prompts)})")
-        
-        print("  [C] Enter custom prompt")
-        print("  [F] Load prompt from file")
-        print("  [Q] Cancel")
-        
-        showing_endpoints = False
-        
+            print(f" [{i}] {p['icon']} {p['key']}{requires_input}")
+            print(f" {p['description'][:60]}")
+
+        print(" [C] Enter custom prompt")
+        print(" [F] Load prompt from file")
+        print(" [Q] Cancel")
+
         while True:
             try:
                 choice = input("\nSelect prompt: ").strip().lower()
             except (EOFError, KeyboardInterrupt):
                 return None, None
-            
+
             if choice == 'q':
                 return None, None
-                
-            if choice == 'e' and has_endpoints:
-                if not showing_endpoints:
-                    print("\n📡 Endpoint Prompts:")
-                    for i, p in enumerate(endpoint_prompts, len(tool_prompts) + 1):
-                        print(f"  [{i}] {p['icon']} {p['key'].replace('@endpoint:', '')}")
-                        print(f"      {p['description'][:60]}")
-                    showing_endpoints = True
-                    continue
-                else:
-                    print_info("Endpoint prompts are already shown above")
-                    continue
             if choice == 'c':
                 # Custom prompt
                 print("\nEnter your custom prompt (end with empty line):")
@@ -1586,33 +1557,28 @@ class FileProcessor(BaseTool):
             
             try:
                 idx = int(choice) - 1
-                all_prompts = tool_prompts + endpoint_prompts
-                
-                if 0 <= idx < len(all_prompts):
-                    selected = all_prompts[idx]
+    
+                if 0 <= idx < len(prompts):
+                    selected = prompts[idx]
                     prompt_key = selected["key"]
-                    
+    
                     # Get the actual prompt text
-                    if selected["source"] == "endpoint":
-                        endpoint_name = prompt_key.replace("@endpoint:", "")
-                        prompt_text = self.endpoints.get(endpoint_name, "")
+                    config = get_prompt_by_key(self.tools_config, prompt_key)
+                    if config:
+                        prompt_text = config.get("prompt", "")
+                        
+                        # Handle prompts that require input
+                        if config.get("requires_input") or not prompt_text:
+                            print(f"\nEnter prompt for '{prompt_key}':")
+                            try:
+                                prompt_text = input("> ").strip()
+                            except (EOFError, KeyboardInterrupt):
+                                return None, None
+                            if not prompt_text:
+                                print_warning("Empty prompt")
+                                continue
                     else:
-                        config = get_prompt_by_key(self.tools_config, prompt_key)
-                        if config:
-                            prompt_text = config.get("prompt", "")
-                            
-                            # Handle prompts that require input
-                            if config.get("requires_input") or not prompt_text:
-                                print(f"\nEnter prompt for '{prompt_key}':")
-                                try:
-                                    prompt_text = input("> ").strip()
-                                except (EOFError, KeyboardInterrupt):
-                                    return None, None
-                                if not prompt_text:
-                                    print_warning("Empty prompt")
-                                    continue
-                        else:
-                            prompt_text = ""
+                        prompt_text = ""
                     
                     if not prompt_text:
                         print_error("Prompt not found")
@@ -3162,13 +3128,10 @@ Response will not be available immediately.
         return output
 
     
-def show_tools_menu(endpoints: Dict[str, str] = None) -> bool:
+def show_tools_menu() -> bool:
     """
     Display the Tools menu and handle selection.
-    
-    Args:
-        endpoints: Endpoint prompts from config.ini
-    
+
     Returns:
         True if a tool was run, False if cancelled
     """
@@ -3202,7 +3165,6 @@ def show_tools_menu(endpoints: Dict[str, str] = None) -> bool:
         
         processor = FileProcessor(
             config=web_server.CONFIG,
-            endpoints=endpoints
         )
         result = processor.run_interactive()
         

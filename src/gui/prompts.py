@@ -6,7 +6,6 @@ Loads prompts.json which contains:
 - _global_settings: Shared settings (modifiers, chat_window_system_instruction)
 - text_edit_tool: Text manipulation prompts
 - snip_tool: Image analysis prompts
-- endpoints: Flask API endpoint prompts (optional, disabled by default)
 
 This module provides a unified interface for all prompt types.
 
@@ -671,47 +670,18 @@ DEFAULT_TTS_SETTINGS = {
     "director_task_template": "Analyze the following text and create a TTS directorial prompt for an expressive voice performance. Consider the text's tone, emotional content, intended audience, and natural rhythm when crafting your direction.\n\nText to direct:\n\n{text}",
 }
 
-# =============================================================================
-# Default Endpoints Configuration (from config.py)
-# =============================================================================
-
-DEFAULT_ENDPOINTS_SETTINGS = {
-    "description": "Flask API endpoints for external tools like ShareX. Enabled via flask_endpoints_enabled in config.ini."
-}
-
-DEFAULT_ENDPOINTS = {
-    "ocr": "Extract the text from this image. Preserve the original formatting, including line breaks, spacing, and layout, as accurately as possible. Return only the extracted text.",
-    "ocr_translate": "Extract all text from this image and translate it to {lang}. Preserve the original formatting as much as possible. Return only the translated text.",
-    "translate": "Translate all text in this image to English. Preserve the original formatting as much as possible. Return only the translated text.",
-    "translate_to_id": "Translate all text in this image to Indonesian. Preserve the original formatting as much as possible. Return only the translated text.",
-    "summarize": "Summarize the content shown in this image concisely. Focus on the main points and key information.",
-    "describe": "Describe this image in detail, including all visible elements, text, colors, and context.",
-    "code": "Extract any code from this image. Preserve exact formatting, indentation, and syntax. Return only the code without any explanation.",
-    "explain": "Analyze and explain what is shown in this image. Provide context and insights.",
-    "explain_code": "Extract and explain any code shown in this image. First show the code, then explain what it does.",
-    "latex": "Convert any mathematical equations or formulas in this image to LaTeX format. Return only the LaTeX code.",
-    "markdown": "Convert the content of this image to Markdown format. Preserve the structure, headings, lists, and formatting.",
-    "proofread": "Extract the text from this image and proofread it. Fix any spelling, grammar, or punctuation errors. Return the corrected text.",
-    "caption": "Generate a short, descriptive caption for this image suitable for social media or alt text.",
-    "analyze": "Analyze this image and provide insights about its content, context, and any notable elements.",
-    "extract_data": "Extract any structured data (tables, lists, key-value pairs) from this image and format it clearly.",
-    "handwriting": "Transcribe any handwritten text in this image as accurately as possible."
-}
-
-
 class PromptsConfig:
     """
     Unified prompts configuration manager.
-    
+
     Provides access to:
     - text_edit_tool: Text manipulation prompts
     - snip_tool: Image analysis prompts
-    - endpoints: Flask API endpoint prompts
-    
+
     Usage:
-        prompts = PromptsConfig.get_instance()
-        snip_actions = prompts.get_snip_actions()
-        text_actions = prompts.get_text_edit_actions()
+    prompts = PromptsConfig.get_instance()
+    snip_actions = prompts.get_snip_actions()
+    text_actions = prompts.get_text_edit_actions()
     """
     
     _instance = None
@@ -937,27 +907,6 @@ class PromptsConfig:
             if self._merge_section(self._config["tts_tool"], {}, DEFAULT_TTS_SETTINGS):
                 changed = True
         
-        if "endpoints" not in self._config:
-            self._config["endpoints"] = {
-                "_settings": DEFAULT_ENDPOINTS_SETTINGS.copy(),
-                **DEFAULT_ENDPOINTS
-            }
-            changed = True
-        else:
-            endpoints_section = self._config["endpoints"]
-            if "_settings" not in endpoints_section:
-                endpoints_section["_settings"] = DEFAULT_ENDPOINTS_SETTINGS.copy()
-                changed = True
-            else:
-                for k, v in DEFAULT_ENDPOINTS_SETTINGS.items():
-                    if k not in endpoints_section["_settings"]:
-                        endpoints_section["_settings"][k] = v
-                        changed = True
-            for k, v in DEFAULT_ENDPOINTS.items():
-                if k not in endpoints_section:
-                    endpoints_section[k] = v
-                    changed = True
-        
         if changed:
             self._save()
     
@@ -983,10 +932,6 @@ class PromptsConfig:
             },
             "tts_tool": {
                 "_settings": DEFAULT_TTS_SETTINGS.copy()
-            },
-            "endpoints": {
-                "_settings": DEFAULT_ENDPOINTS_SETTINGS.copy(),
-                **DEFAULT_ENDPOINTS
             }
         }
     
@@ -1143,12 +1088,11 @@ class PromptsConfig:
         
         Args:
             origin: Origin string in `tool:action` format (e.g., "textedit:Explain",
-                    "snip:Extract Text", "audio:Transcribe", "directchat", "chat",
-                    "endpoint:ocr")
+                    "snip:Extract Text", "audio:Transcribe", "directchat", "chat")
         
         Returns:
             The resolved system_prompt string, or None if the origin maps to the
-            global fallback (chat, endpoint:*, unknown/missing).
+            global fallback (chat, unknown/missing).
         """
         if not origin:
             return None
@@ -1160,8 +1104,8 @@ class PromptsConfig:
                 "You are a friendly, helpful, and knowledgeable AI conversational assistant."
             )
         
-        # chat, endpoint:* → None (caller uses global chat_window_system_instruction)
-        if origin == "chat" or origin.startswith("endpoint:"):
+        # chat → None (caller uses global chat_window_system_instruction)
+        if origin == "chat":
             return None
         
         # Parse tool:action format
@@ -1187,20 +1131,6 @@ class PromptsConfig:
         
         # Unknown tool prefix → None (fallback to global)
         return None
-    
-    # =========================================================================
-    # Endpoints Accessors
-    # =========================================================================
-    
-    def get_endpoints(self) -> dict:
-        """Get complete endpoints configuration (including _settings)."""
-        return self._config.get("endpoints", {})
-    
-    def get_endpoint_prompts(self) -> dict:
-        """Get endpoint prompts (excluding _settings)."""
-        endpoints = self.get_endpoints()
-        return {k: v for k, v in endpoints.items() if k != "_settings"}
-    
     
     # No legacy migration support needed for fresh install
 

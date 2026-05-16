@@ -48,7 +48,6 @@ from .tab_generation import GenerationTabMixin
 from .tab_tools import ToolsTabMixin
 from .tab_tts import TTSTabMixin
 from .tab_keys import KeysTabMixin
-from .tab_endpoints import EndpointsTabMixin
 from .tab_theme import ThemeTabMixin
 
 
@@ -65,7 +64,6 @@ class SettingsWindow(
     ToolsTabMixin,
     TTSTabMixin,
     KeysTabMixin,
-    EndpointsTabMixin,
     ThemeTabMixin,
 ):
     """
@@ -326,7 +324,6 @@ class SettingsWindow(
                 "🔧 Tools": ("_create_tools_tab", False),
                 "🗣️ TTS": ("_create_tts_tab", False),
                 "🔑 API Keys": ("_create_keys_tab", False),
-                "🔗 Endpoints": ("_create_endpoints_tab", False),
                 "🎨 Theme": ("_create_theme_tab", False),
             }
 
@@ -344,7 +341,7 @@ class SettingsWindow(
             self.tabview = ttk.Notebook(parent)
             self.tabview.pack(fill="both", expand=True, pady=(0, 2))
 
-            tabs = ["General", "Provider", "Generation", "Tools", "TTS", "API Keys", "Endpoints", "Theme"]
+            tabs = ["General", "Provider", "Generation", "Tools", "TTS", "API Keys", "Theme"]
             frames = {}
             for tab_name in tabs:
                 frame = tk.Frame(self.tabview, bg=self.colors.bg)
@@ -357,7 +354,6 @@ class SettingsWindow(
             self._create_tools_tab(frames["Tools"])
             self._create_tts_tab(frames["TTS"])
             self._create_keys_tab(frames["API Keys"])
-            self._create_endpoints_tab(frames["Endpoints"])
             self._create_theme_tab(frames["Theme"])
 
     def _on_tab_changed(self):
@@ -510,11 +506,6 @@ class SettingsWindow(
                     print(f"[Settings] Reloaded API keys ({total_keys} total)")
                 except Exception as e:
                     print(f"[Settings] Note: Could not hot-reload API keys: {e}")
-
-                # Hot-reload endpoints
-                for endpoint_name, prompt in self.config_data.endpoints.items():
-                    web_server.ENDPOINTS[endpoint_name] = prompt
-                print(f"[Settings] Reloaded {len(self.config_data.endpoints)} endpoint(s)")
 
                 # Sync AI parameters
                 web_server.AI_PARAMS.clear()

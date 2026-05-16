@@ -26,12 +26,11 @@ class ConfigData:
     """
 
     def __init__(self):
-        self.config: Dict[str, Any] = {}       # [config] section values
-        self.ai_params: Dict[str, Any] = {}    # [ai_params] section values
-        self.endpoints: Dict[str, str] = {}    # [endpoints] section
+        self.config: Dict[str, Any] = {} # [config] section values
+        self.ai_params: Dict[str, Any] = {} # [ai_params] section values
         # API keys are now managed by KeyStore (keys.json), not here.
-        self.raw_lines: List[str] = []         # Original lines for preservation
-        self.comments: Dict[str, str] = {}     # Comments associated with keys
+        self.raw_lines: List[str] = [] # Original lines for preservation
+        self.comments: Dict[str, str] = {} # Comments associated with keys
 
 
 def parse_config_full(filepath: str = "config.ini") -> ConfigData:
@@ -52,8 +51,6 @@ def parse_config_full(filepath: str = "config.ini") -> ConfigData:
 
         data.raw_lines = lines
         current_section = None
-        multiline_key = None
-        multiline_value = []
         last_comment = ""
 
         for line in lines:
@@ -71,10 +68,6 @@ def parse_config_full(filepath: str = "config.ini") -> ConfigData:
 
             # Section header
             if stripped.startswith('[') and stripped.endswith(']'):
-                if multiline_key and current_section == 'endpoints':
-                    data.endpoints[multiline_key] = ' '.join(multiline_value)
-                    multiline_key = None
-                    multiline_value = []
                 current_section = stripped[1:-1].lower()
                 continue
 
@@ -99,41 +92,10 @@ def parse_config_full(filepath: str = "config.ini") -> ConfigData:
                         data.comments[f"ai_params.{key}"] = last_comment
                     last_comment = ""
 
-            elif current_section == 'endpoints':
-                if '=' in stripped:
-                    if multiline_key:
-                        data.endpoints[multiline_key] = ' '.join(multiline_value)
-                    endpoint_name, prompt = stripped.split('=', 1)
-                    endpoint_name = endpoint_name.strip().lower()
-                    prompt = prompt.strip()
-                    # Remove quotes if present
-                    if (prompt.startswith('"') and prompt.endswith('"')) or \
-                       (prompt.startswith("'") and prompt.endswith("'")):
-                        prompt = prompt[1:-1]
-                    if prompt.endswith('\\'):
-                        multiline_key = endpoint_name
-                        multiline_value = [prompt[:-1].strip()]
-                    else:
-                        data.endpoints[endpoint_name] = prompt
-                        multiline_key = None
-                        multiline_value = []
-                elif multiline_key:
-                    if stripped.endswith('\\'):
-                        multiline_value.append(stripped[:-1].strip())
-                    else:
-                        multiline_value.append(stripped)
-                        data.endpoints[multiline_key] = ' '.join(multiline_value)
-                        multiline_key = None
-                        multiline_value = []
-
             elif current_section in ('custom', 'openrouter', 'google'):
                 # API key sections — now managed by KeyStore (keys.json).
                 # Silently skip so old config.ini files don't cause errors.
                 pass
-
-        # Flush any remaining multiline
-        if multiline_key and current_section == 'endpoints':
-            data.endpoints[multiline_key] = ' '.join(multiline_value)
 
     except Exception as e:
         print(f"[SettingsWindow] Error parsing config: {e}")
@@ -192,7 +154,6 @@ def save_config_full(data: ConfigData, filepath: str = "config.ini") -> bool:
         current_section = None
         written_keys = set()
         written_ai_params = set()
-        written_endpoints = set()
 
         for line in data.raw_lines:
             raw_line = line.rstrip('\n\r')
@@ -227,18 +188,6 @@ def save_config_full(data: ConfigData, filepath: str = "config.ini") -> bool:
                     written_ai_params.add(key)
                 else:
                     continue
-
-            elif current_section == 'endpoints' and '=' in stripped:
-                # Skip multiline continuations (handled with main key)
-                if not stripped.startswith(' ') and not stripped.startswith('\t'):
-                    endpoint_name = stripped.split('=', 1)[0].strip().lower()
-                    if endpoint_name in data.endpoints and endpoint_name not in written_endpoints:
-                        prompt = data.endpoints[endpoint_name]
-                        lines.append(f"{endpoint_name} = {prompt}\n")
-                        written_endpoints.add(endpoint_name)
-                    elif endpoint_name not in written_endpoints:
-                        lines.append(raw_line + '\n')
-                # Skip continuation lines (they were merged)
 
             elif current_section in ('custom', 'openrouter', 'google'):
                 # API key sections — skip old key lines, they're in keys.json now.

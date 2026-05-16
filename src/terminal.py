@@ -115,7 +115,7 @@ def print_commands_box():
         print()
 
 
-def terminal_session_manager(endpoints=None):
+def terminal_session_manager():
     """Interactive terminal session manager"""
     # Print the commands box
     print_commands_box()
@@ -146,9 +146,6 @@ def terminal_session_manager(endpoints=None):
                     except:
                         pass
             return None
-    
-    # Store endpoints reference
-    _endpoints = endpoints or {}
     
     while True:
         try:
@@ -220,34 +217,6 @@ def terminal_session_manager(endpoints=None):
                     else:
                         print("\n✗ Audio Tool not initialized\n")
             
-            elif key == 'e':
-                # List endpoints
-                if HAVE_RICH:
-                    table = Table(title=f"📡 Endpoints ({len(_endpoints)} registered)", box=None)
-                    table.add_column("Path", style="bold green")
-                    table.add_column("System Prompt Preview", style="dim")
-                    
-                    if not _endpoints:
-                        console.print(Panel("No endpoints registered", style="yellow"))
-                    else:
-                        for name, prompt in _endpoints.items():
-                            preview = prompt[:60] + "..." if len(prompt) > 60 else prompt
-                            table.add_row(f"/{name}", preview)
-                        console.print(table)
-                        console.print()
-                else:
-                    print(f"\n{'─'*64}")
-                    print(f"📡 ENDPOINTS ({len(_endpoints)} registered)")
-                    print(f"{'─'*64}")
-                    if not _endpoints:
-                        print("   (No endpoints)")
-                    else:
-                        for name, prompt in _endpoints.items():
-                            preview = prompt[:50] + "..." if len(prompt) > 50 else prompt
-                            print(f"   /{name}")
-                            print(f"      → {preview}")
-                    print(f"{'─'*64}\n")
-
             elif key == 'm':
                 # Model management with two-tier display
                 from . import web_server
@@ -687,7 +656,7 @@ def terminal_session_manager(endpoints=None):
                     console.print("\n[bold]🧰  Opening Tools menu...[/bold]\n")
                 else:
                     print("\n🧰  Opening Tools menu...\n")
-                show_tools_menu(_endpoints)
+                show_tools_menu()
                 # Reprint commands box after returning
                 print()
                 print_commands_box()
@@ -714,7 +683,6 @@ def terminal_session_manager(endpoints=None):
                 print("   [I] 📊 Info          Show current configuration")
                 print("   [K] 💭 Thinking      Toggle thinking (session)")
                 print("   [R] 🌊 Streaming     Toggle streaming (session)")
-                print("   [E] 📡 Endpoints     List registered endpoints")
                 print("   [U] ⬆️ Update        Check for updates")
                 print("   [H] ❓ Help          Show this help")
                 print(f"{'─'*64}\n")

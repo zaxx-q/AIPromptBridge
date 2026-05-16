@@ -12,7 +12,6 @@ Modular settings window split into:
 - tab_tools.py: Tools tab (TextEditTool, ScreenSnip, Audio Tool)
 - tab_tts.py: TTS tab (text-to-speech, director, export)
 - tab_keys.py: API Keys tab (key management per provider)
-- tab_endpoints.py: Endpoints tab (Flask endpoints, prompt editor)
 - tab_theme.py: Theme tab (theme, mode, chat colors, preview)
 
 Public API:

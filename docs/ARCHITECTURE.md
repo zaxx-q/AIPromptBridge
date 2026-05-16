@@ -6,7 +6,7 @@ This document describes the technical architecture of AIPromptBridge.
 
 AIPromptBridge is a Windows application consisting of:
 
-1. **Flask Web Server** - REST API endpoints for image/text processing
+1. **Flask Web Server** - Internal REST API for session/model management
 2. **System Tray Application** - Background process management with `infi.systray`
 3. **CustomTkinter GUI** - Modern chat windows, session browser, and popups with multi-theme support
 4. **Rich Console Interface** - Modernized terminal UI with structured logging and panels
@@ -179,7 +179,7 @@ All AI requests flow through `RequestPipeline` for consistent observability, uti
 
 ```python
 pipeline = RequestPipeline(
-    origin=RequestOrigin.CHAT_WINDOW,  # or POPUP_INPUT, ENDPOINT_OCR, etc.
+    origin=RequestOrigin.CHAT_WINDOW, # or POPUP_INPUT, SNIP_TOOL, etc.
     session_id=session.id
 )
 result = pipeline.execute(provider, messages, config, ai_params, key_manager)
@@ -233,7 +233,6 @@ Prompts are managed centrally via `PromptsConfig` (loading `prompts.json` or def
 - `snip_tool`: Configuration for screen snipping actions (Ctrl+Alt+X)
 - `audio_tool`: Configuration for audio analysis actions (Ctrl+Alt+A)
 - `tts_tool`: Configuration for TTS voice list, director prompts, and defaults
-- `endpoints`: Flask API endpoint prompts
 - `_global_settings`: Shared modifiers and system instructions
 
 #### Config Preservation & Deep Merging
@@ -491,17 +490,16 @@ Modularized as a package (`src/gui/windows/settings_window/`):
 | `tab_tools.py` | `ToolsTabMixin` — TextEditTool, ScreenSnip, Audio Tool |
 | `tab_tts.py` | `TTSTabMixin` — TTS voice, AI Director, export & playback |
 | `tab_keys.py` | `KeysTabMixin` — API key management per provider |
-| `tab_endpoints.py` | `EndpointsTabMixin` — Flask endpoints, prompt editor |
 | `tab_theme.py` | `ThemeTabMixin` — theme/mode, chat colors, live preview |
 
-- **Tabbed Interface**: General, Provider (profile selector + key pools), Generation (typing settings), Tools, TTS, API Keys, Endpoints, Theme
+- **Tabbed Interface**: General, Provider (profile selector + key pools), Generation (typing settings), Tools, TTS, API Keys, Theme
 - **Uniform Layout**: Standardized field widths and hint positioning via `FormFieldsMixin`
 - **API Key Naming**: Supports associative names for API keys via inline comments
 - **Model Dropdowns**: Interactive dropdowns for model selection with background refreshing
 - **Live Preview**: Theme tab shows real-time preview of color changes
 - **Validation**: Port numbers, hotkey formats
 - **Backup**: Creates `.bak` file before saving
-- **Hot-Reload**: API keys and endpoints reload without restart
+- **Hot-Reload**: API keys reload without restart
 
 ### PromptEditorWindow
 
@@ -524,7 +522,7 @@ GUI editor for `prompts.json` — modularized as a package (`src/gui/windows/pro
 - **Settings Tab**: Edit text output rules and system instructions
 - **Modifiers Tab**: Manage global modifier buttons
 - **Groups Tab**: Organize actions into popup groups for both tools
-- **Playground Tab**: Test actions and endpoints with live preview
+- **Playground Tab**: Test actions with live preview
 - **Hot-Reload**: Triggers `reload_options()` on save for immediate effect
 - **Default Tagging**: Saving, adding, or duplicating an action marks it `_is_default: false`, protecting it from future update overwrites
 

@@ -38,7 +38,7 @@ class GeneralTabMixin:
         self._add_toggle_field(content, "show_ai_response_in_chat_window",
                                "Show AI response in chat window",
                                self.config_data.config.get("show_ai_response_in_chat_window", False),
-                               hint="For direct chat popup and endpoint requests. Actions/modifiers override this.")
+                               hint="For direct chat popup. Actions/modifiers override this.")
 
         self._add_toggle_field(content, "chat_use_origin_system_prompt",
                                "Use origin system prompt in chat",

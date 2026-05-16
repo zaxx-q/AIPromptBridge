@@ -10,7 +10,7 @@ AIPromptBridge/
 ├── requirements.txt            # Python dependencies
 ├── config.ini                  # Configuration (auto-generated on first run)
 ├── chat_sessions.json          # Saved chat sessions (auto-created)
-├── prompts.json                # Unified prompt configuration (TextEdit, Snip, Endpoints)
+├── prompts.json # Unified prompt configuration (TextEdit, Snip, Audio, TTS)
 ├── profiles.json               # Connection profiles (auto-generated on first run)
 ├── keys.json                   # API key pools, XOR-obfuscated (auto-created on first run)
 ├── tools_config.json           # Tools configuration (auto-generated on demand)
@@ -25,8 +25,7 @@ AIPromptBridge/
 ├── docs/                       # Documentation
 │   ├── PROJECT_STRUCTURE.md    # This file
 │   ├── ARCHITECTURE.md         # Technical architecture details
-│   ├── BUILD_PROCESS.md        # Build system & architecture decisions
-│   └── SHAREX_SETUP.md         # ShareX integration guide
+│   └── BUILD_PROCESS.md # Build system & architecture decisions
 │
 └── src/
     ├── __init__.py
@@ -45,7 +44,7 @@ AIPromptBridge/
     ├── updater.py              # Self-update: GitHub Releases check, download, staging, trigger
     ├── utils.py                # Utility functions and build state detection (is_compiled)
     ├── version.py              # Application version source of truth
-    ├── web_server.py           # Flask server and API endpoints
+    ├── web_server.py # Flask server for internal API
     │
     ├── audio/                  # Audio Subsystem
     │   ├── __init__.py
@@ -101,9 +100,8 @@ AIPromptBridge/
     │       │   ├── tab_generation.py   # Generation tab mixin (typing speed settings)
     │       │   ├── tab_tools.py        # Tools tab mixin (TextEdit, ScreenSnip, Audio)
     │       │   ├── tab_tts.py          # TTS tab mixin (voice, director, export)
-    │       │   ├── tab_keys.py         # API Keys tab mixin
-    │       │   ├── tab_endpoints.py    # Endpoints tab mixin
-    │       │   └── tab_theme.py        # Theme tab mixin (theme, chat colors, preview)
+    │   │ ├── tab_keys.py # API Keys tab mixin
+    │   │ └── tab_theme.py # Theme tab mixin (theme, chat colors, preview)
     │       ├── connection_manager.py   # Connection Profile Manager window
     │       ├── tts_window.py       # TTS UI (voice selection, AI Director, playback)
     │       └── utils.py            # Window management utilities
@@ -131,7 +129,7 @@ AIPromptBridge/
 | Module | Purpose |
 |--------|---------|
 | `tray.py` | System tray icon with console show/hide, restart, session browser |
-| `web_server.py` | Flask REST API endpoints for image processing |
+| `web_server.py` | Flask server for internal API (sessions, models) |
 | `terminal.py` | Interactive terminal commands when console is visible |
 | `console.py` | Centralized Rich console configuration with custom theme |
 | `config.py` | Custom INI parser with multiline support, key name parsing, change notification pub/sub |
