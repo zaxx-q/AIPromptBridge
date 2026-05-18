@@ -333,6 +333,11 @@ class KeysTabMixin:
 
         Called by the settings window's save handler.
         """
+        # Ensure _key_store is available even if the Keys tab was never loaded (lazy loading)
+        if not hasattr(self, '_key_store'):
+            from src.key_store import KeyStore
+            self._key_store = KeyStore.get_instance()
+
         # Apply provider → pool assignments (dropdowns live in Provider tab)
         provider_vars = self.widgets.get("keys_provider_pool_vars", {})
         for provider in ["google", "openrouter", "custom"]:
