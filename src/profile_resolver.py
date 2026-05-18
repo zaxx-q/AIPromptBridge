@@ -85,10 +85,14 @@ def resolve_profile(
             thinking = profile.thinking
             merged_config["thinking_enabled"] = thinking
 
-            merged_config["thinking_budget"] = profile.thinking_budget
-            merged_config["thinking_level"] = profile.thinking_level
-            merged_config["reasoning_effort"] = profile.reasoning_effort
-            merged_config["request_timeout"] = profile.request_timeout
+            if profile.thinking_budget is not None:
+                merged_config["thinking_budget"] = profile.thinking_budget
+            if profile.thinking_level:
+                merged_config["thinking_level"] = profile.thinking_level
+            if profile.reasoning_effort:
+                merged_config["reasoning_effort"] = profile.reasoning_effort
+            if profile.request_timeout is not None:
+                merged_config["request_timeout"] = profile.request_timeout
 
             if profile.custom_url:
                 merged_config["custom_url"] = profile.custom_url

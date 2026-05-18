@@ -34,7 +34,7 @@ PROFILE_DEFAULTS: Dict[str, Any] = {
     "reasoning_effort": "high",
     "temperature": None,
     "max_tokens": None,
-    "request_timeout": 120,
+    "request_timeout": None,  # None = use global from config.ini
     "custom_url": "",
     "gemini_endpoint": "",
     "api_key_name": "",
@@ -97,7 +97,7 @@ class ConnectionProfile:
     reasoning_effort: str = "high"
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
-    request_timeout: int = 120
+    request_timeout: Optional[int] = None  # None = use global config.ini value
     custom_url: str = ""
     gemini_endpoint: str = ""
     api_key_name: str = ""
@@ -112,27 +112,49 @@ class ConnectionProfile:
         clean = {}
         for k, default in PROFILE_DEFAULTS.items():
             val = data.get(k, default)
-            # Type coercion for numeric fields
-            if k == "thinking_budget" and val is not None:
-                try:
-                    val = int(val)
-                except (ValueError, TypeError):
-                    val = -1
-            elif k == "temperature" and val is not None and val != "":
-                try:
-                    val = float(val)
-                except (ValueError, TypeError):
+
+            # Required string fields — never blank
+            if k == "provider":
+                if not val or not isinstance(val, str) or val.strip() == "":
+                    val = PROFILE_DEFAULTS["provider"]
+            elif k == "model":
+                if not val or not isinstance(val, str) or val.strip() == "":
+                    val = PROFILE_DEFAULTS["model"]
+
+            # Optional numeric fields — None is valid (means "use default")
+            elif k == "thinking_budget":
+                if val is not None and val != "":
+                    try:
+                        val = int(val)
+                    except (ValueError, TypeError):
+                        val = -1
+                else:
+                    val = None  # explicit: blank = no override
+            elif k == "temperature":
+                if val is not None and val != "":
+                    try:
+                        val = float(val)
+                    except (ValueError, TypeError):
+                        val = None
+                else:
                     val = None
-            elif k == "max_tokens" and val is not None and val != "":
-                try:
-                    val = int(val)
-                except (ValueError, TypeError):
+            elif k == "max_tokens":
+                if val is not None and val != "":
+                    try:
+                        val = int(val)
+                    except (ValueError, TypeError):
+                        val = None
+                else:
                     val = None
-            elif k == "request_timeout" and val is not None:
-                try:
-                    val = int(val)
-                except (ValueError, TypeError):
-                    val = 120
+            elif k == "request_timeout":
+                if val is not None and val != "":
+                    try:
+                        val = int(val)
+                    except (ValueError, TypeError):
+                        val = None
+                else:
+                    val = None
+
             clean[k] = val
         return cls(**clean)
 
@@ -142,10 +164,16 @@ class ConnectionProfile:
         config[f"{self.provider}_model"] = self.model
         config["streaming_enabled"] = self.streaming
         config["thinking_enabled"] = self.thinking
-        config["thinking_budget"] = self.thinking_budget
-        config["thinking_level"] = self.thinking_level
-        config["reasoning_effort"] = self.reasoning_effort
-        config["request_timeout"] = self.request_timeout
+        # Thinking sub-fields: only override if profile has a value
+        if self.thinking_budget is not None:
+            config["thinking_budget"] = self.thinking_budget
+        if self.thinking_level:
+            config["thinking_level"] = self.thinking_level
+        if self.reasoning_effort:
+            config["reasoning_effort"] = self.reasoning_effort
+        # request_timeout: only override if profile has a value
+        if self.request_timeout is not None:
+            config["request_timeout"] = self.request_timeout
         config["custom_url"] = self.custom_url
         config["gemini_endpoint"] = self.gemini_endpoint
 
