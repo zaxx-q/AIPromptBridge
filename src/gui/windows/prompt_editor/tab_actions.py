@@ -17,7 +17,6 @@ from ...themes import (
 )
 from ...custom_widgets import ScrollableButtonList, create_section_header, create_emoji_button, TkScrollableFrame
 from ...custom_widgets import ask_themed_string
-from ...core import show_connection_manager
 
 
 class ActionsTabMixin:
@@ -470,7 +469,12 @@ class ActionsTabMixin:
 
     def _open_profile_manager(self):
         """Open the Manage Profiles dialog."""
-        show_connection_manager()
+        try:
+            from ..connection_manager import ConnectionProfileManager
+            ConnectionProfileManager(self.root, colors=self.colors,
+                                     on_close=self._refresh_profile_dropdown)
+        except Exception as e:
+            print(f"[PromptEditor] Error opening connection manager: {e}")
 
     def _add_action(self):
         """Add a new action."""

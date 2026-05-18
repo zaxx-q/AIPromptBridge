@@ -140,7 +140,6 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         self.geometry("780x740")
         self.minsize(680, 580)
         self.transient(parent)
-        self.grab_set()
 
         if self.use_ctk:
             self.configure(fg_color=self.colors.bg)
