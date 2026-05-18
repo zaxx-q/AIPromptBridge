@@ -83,13 +83,13 @@ FIELD_HELP = {
     "thinking_budget": "Token budget for thinking (Gemini 2.5 models only). -1 = auto/unlimited. Leave empty for default.",
     "thinking_level": "Thinking intensity (Gemini 3.x models only). Leave empty for default.",
     "reasoning_effort": "Reasoning effort (OpenAI-compatible APIs only). Leave empty for default.",
-    "temperature": "Controls randomness (0.0-2.0). Optional — leave empty to use model default.",
-    "max_tokens": "Maximum output tokens. Optional — leave empty to use model default.",
-    "request_timeout": "Request timeout in seconds. Optional — leave empty to use the global timeout from settings.",
+    "temperature": "Controls randomness (0.0-2.0). Leave empty to use model default.",
+    "max_tokens": "Maximum output tokens. Leave empty to use model default.",
+    "request_timeout": "Request timeout in seconds. Leave empty to use the global timeout from settings.",
     "custom_url": "Full URL for the OpenAI-compatible API endpoint. Required when provider is 'custom'.",
-    "gemini_endpoint": "Custom Gemini API base URL. Optional — leave empty for the default Google endpoint.",
-    "api_key_name": "Use a specific named key from the pool. Optional — leave empty to use pool rotation.",
-    "api_key_pool": "Override which key pool this profile uses. Optional — leave empty to use provider default.",
+    "gemini_endpoint": "Custom Gemini API base URL. Leave empty for the default Google endpoint.",
+    "api_key_name": "Use a specific named key from the pool. Leave empty to use pool rotation.",
+    "api_key_pool": "Override which key pool this profile uses. Leave empty to use provider default.",
 }
 
 # Summary row icons

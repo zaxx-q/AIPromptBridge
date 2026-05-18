@@ -334,7 +334,7 @@ class Tooltip:
             label = ctk.CTkLabel(
                 frame,
                 text=self.text,
-                font=get_ctk_font(size=10),
+                font=get_ctk_font(size=11),
                 text_color=self.colors.text,
                 wraplength=300,
                 justify="left"
@@ -352,7 +352,7 @@ class Tooltip:
             label = tk.Label(
                 frame,
                 text=self.text,
-                font=("Arial", 9),
+                font=("Arial", 10),
                 bg=self.colors.surface0,
                 fg=self.colors.text,
                 padx=8,
