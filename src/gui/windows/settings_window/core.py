@@ -110,13 +110,10 @@ class SettingsWindow(
         self.config_data = parse_config_full()
         self.original_config = dict(self.config_data.config)
 
-        # Load from web_server if available (in-memory values)
-        try:
-            from .... import web_server
-            for key, value in web_server.CONFIG.items():
-                self.config_data.config[key] = value
-        except (ImportError, AttributeError):
-            pass
+        # NOTE: web_server.CONFIG overlay removed. Connection profile keys
+        # (provider, model, streaming, thinking, etc.) are injected into
+        # CONFIG at runtime by populate_config() and belong in profiles.json
+        # — not config.ini. The settings window reads from config.ini only.
 
         if self.master:
             if self.use_ctk:
@@ -454,10 +451,6 @@ class SettingsWindow(
             # Handle TTS voice (strip extra info)
             if key == "tts_default_voice" and isinstance(value, str) and " — " in value:
                 value = value.split(" — ")[0]
-
-            # Handle gemini_endpoint empty -> None
-            if key == "gemini_endpoint" and isinstance(value, str) and not value.strip():
-                value = None
 
             self.config_data.config[key] = value
 

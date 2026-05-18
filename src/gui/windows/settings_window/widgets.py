@@ -22,7 +22,7 @@ from ...themes import (
     get_ctk_label_colors, get_ctk_entry_colors,
     get_ctk_combobox_colors,
 )
-from ...custom_widgets import ScrollableComboBox, create_emoji_button
+from ...custom_widgets import ScrollableComboBox
 
 # =============================================================================
 # Layout Constants — used by all tab mixins for uniform appearance
@@ -350,81 +350,6 @@ class FormFieldsMixin:
 
         if hint:
             self._add_inline_hint(row, hint)
-
-    def _add_model_dropdown_field(self, parent, key: str, label: str, value: str,
-                                  provider: str, hint: str = None):
-        """
-        Add a model dropdown field with refresh button.
-
-        Args:
-            parent: Parent widget
-            key: Config key name (e.g., 'custom_model')
-            label: Display label
-            value: Current value
-            provider: Provider type for fetching models
-            hint: Optional hint text
-        """
-        row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
-        row.pack(fill="x", pady=4)
-
-        self.vars[key] = tk.StringVar(master=self.root, value=value or "")
-
-        if self.use_ctk:
-            ctk.CTkLabel(row, text=label, font=get_ctk_font(13), width=LABEL_WIDTH, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
-
-            # Create scrollable combobox for handling many models
-            dropdown = ScrollableComboBox(
-                row, colors=self.colors, variable=self.vars[key],
-                values=[value] if value else [],
-                width=DROPDOWN_WIDTH_LG, height=34, font_size=13
-            )
-            dropdown.pack(side="left", padx=(8, 0))
-            self.widgets[key] = dropdown
-
-            # Status label (before refresh button so it's visible)
-            status_label = ctk.CTkLabel(row, text="", font=get_ctk_font(11), width=150,
-                                       **get_ctk_label_colors(self.colors, muted=True))
-
-            # Refresh button
-            refresh_btn = create_emoji_button(
-                row, "", "🔄", self.colors, "secondary", 40, 34,
-                command=lambda: self._refresh_models(provider, dropdown, status_label)
-            )
-            refresh_btn.pack(side="left", padx=(8, 0))
-
-            status_label.pack(side="left", padx=(8, 0))
-            self.widgets[f"{key}_status"] = status_label
-        else:
-            from tkinter import ttk
-            tk.Label(row, text=label, font=("Segoe UI", 10), width=LABEL_WIDTH // 8, anchor="w",
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
-
-            dropdown = ttk.Combobox(
-                row, textvariable=self.vars[key],
-                values=[value] if value else [],
-                width=DROPDOWN_WIDTH_LG // 10
-            )
-            dropdown.pack(side="left", padx=(8, 0))
-            self.widgets[key] = dropdown
-
-            # Status label
-            status_label = tk.Label(row, text="", font=("Segoe UI", 9),
-                                   bg=self.colors.bg, fg=self.colors.blockquote, width=18)
-
-            # Refresh button
-            refresh_btn = tk.Button(
-                row, text="🔄", font=("Segoe UI", 9),
-                bg=self.colors.surface1, fg=self.colors.fg,
-                command=lambda: self._refresh_models(provider, dropdown, status_label)
-            )
-            refresh_btn.pack(side="left", padx=(6, 0))
-
-            status_label.pack(side="left", padx=(6, 0))
-            self.widgets[f"{key}_status"] = status_label
-
-        if hint:
-            self._add_hint(parent, hint)
 
     # -------------------------------------------------------------------------
     # Hint helpers
