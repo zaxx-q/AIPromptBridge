@@ -281,32 +281,34 @@ class TTSPlaygroundMixin:
         def _target():
             try:
                 from ....request_pipeline import RequestPipeline, RequestContext, RequestOrigin
-                from ....config import load_config
                 from ....key_manager import KeyManager
-                
-                config = load_config()
+                from .... import web_server as _ws
+                from ....profile_resolver import resolve_profile
+    
                 from ....key_store import KeyStore
                 key_store = KeyStore.get_instance()
                 key_managers = key_store.build_key_managers()
-                
+    
                 task = task_template.replace("{text}", input_text)
-                
+    
                 messages = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": task}
                 ]
-                
-                provider = config.get("default_provider", "google")
-                model = config.get(f"{provider}_model", "")
-                ai_params = {}
-                
+    
+                provider = _ws.get_active_setting("provider", "google")
+                model = _ws.get_active_setting("model", "")
+    
+                # Resolve profile to get merged config with connection keys
+                resolved = resolve_profile(None, _ws.CONFIG, _ws.AI_PARAMS, key_managers)
+    
                 ctx = RequestContext(
                     origin=RequestOrigin.TTS_TOOL,
                     provider=provider, model=model,
                     streaming=False, thinking_enabled=False
                 )
                 ctx = RequestPipeline.execute_simple(
-                    ctx, messages, config, ai_params, key_managers
+                    ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers
                 )
                 
                 def _update():
@@ -386,17 +388,20 @@ class TTSPlaygroundMixin:
             try:
                 from ....api_client import get_provider_for_type
                 from ....audio.wav_utils import pcm_to_wav, get_pcm_duration
-                from ....config import load_config
                 from ....key_manager import KeyManager
-                
-                config = load_config()
+                from .... import web_server as _ws
+                from ....profile_resolver import resolve_profile
+    
+                # Resolve profile to get merged config with connection keys
+                resolved = resolve_profile(None, _ws.CONFIG, _ws.AI_PARAMS, _ws.KEY_MANAGERS)
+    
                 from ....key_store import KeyStore
                 key_store = KeyStore.get_instance()
                 keys_data = key_store.get_pool_for_provider("google")
                 key_strings = [kd["key"] for kd in keys_data if kd.get("key")]
                 key_manager = KeyManager(key_strings, "google")
-                
-                provider = get_provider_for_type("google", key_manager, config)
+    
+                provider = get_provider_for_type("google", key_manager, resolved.config)
                 pcm_data, error = provider.generate_tts(
                     text=full_prompt,
                     model=model,

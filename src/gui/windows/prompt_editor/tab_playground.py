@@ -442,13 +442,12 @@ class PlaygroundTabMixin:
                 font=("Segoe UI", 9), bg=self.colors.input_bg, fg=self.colors.fg, width=15
             ).pack(side="left", padx=(5, 0), fill="x", expand=True)
 
-        # Load defaults
+        # Load defaults from active profile
         try:
-            from ....config import load_config
-            config = load_config()
-            default_provider = config.get("default_provider", "google")
+            from .... import web_server as _ws
+            default_provider = _ws.get_active_setting("provider", "google")
             self.playground_provider_var.set(default_provider)
-            self.playground_model_var.set(config.get(f"{default_provider}_model", ""))
+            self.playground_model_var.set(_ws.get_active_setting("model", ""))
         except:
             pass
 
@@ -1427,26 +1426,26 @@ class PlaygroundTabMixin:
 
     def _get_request_config(self, messages) -> Dict:
         """Helper to get common request config."""
-        from ....config import load_config
-        from ....key_manager import KeyManager
-
-        config = load_config()
-        
+        from .... import web_server as _ws
+        from ....profile_resolver import resolve_profile
         from ....key_store import KeyStore
+
         key_store = KeyStore.get_instance()
         key_managers = key_store.build_key_managers()
-            
-        ai_params = {}
+
+        # Resolve profile to get merged config with connection keys
+        resolved = resolve_profile(None, _ws.CONFIG, _ws.AI_PARAMS, key_managers)
+
         provider = self.playground_provider_var.get()
         model = self.playground_model_var.get()
-        
+
         return {
             "messages": messages,
             "provider": provider,
             "model": model,
-            "config": config,
-            "ai_params": ai_params,
-            "key_managers": key_managers
+            "config": resolved.config,
+            "ai_params": resolved.ai_params,
+            "key_managers": resolved.key_managers
         }
 
     def _run_streaming_test(self, params):

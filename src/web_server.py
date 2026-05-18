@@ -17,6 +17,10 @@ CONFIG = {}
 AI_PARAMS = {}
 KEY_MANAGERS = {}
 
+# Connection profile state — the single source of truth for connection settings
+ACTIVE_PROFILE = None  # Current ConnectionProfile object
+SESSION_OVERRIDES = {}  # In-memory session overrides from terminal toggles
+
 # Cached models list
 CACHED_MODELS = None
 
@@ -32,7 +36,7 @@ def index():
         "status": "running",
         "gui_available": HAVE_GUI,
         "gui_running": get_gui_status()["running"],
-        "default_provider": CONFIG.get("default_provider", "google"),
+        "default_provider": get_active_setting("provider", "google"),
         "available_providers": available_providers,
         "sessions": len(list_sessions())
     })
@@ -55,18 +59,21 @@ def health():
 def get_models():
     """Fetch available models from upstream API"""
     global CACHED_MODELS
-    
+
     # Check for force refresh
     force_refresh = request.args.get('refresh', 'false').lower() in ('true', '1', 'yes')
-    
+
     if not force_refresh and CACHED_MODELS is not None:
         return jsonify({
             "object": "list",
             "data": CACHED_MODELS,
             "cached": True
         })
-    
-    models, error = fetch_models(CONFIG, KEY_MANAGERS)
+
+    # Resolve profile to get merged config with connection keys
+    from .profile_resolver import resolve_profile
+    resolved = resolve_profile(None, CONFIG, AI_PARAMS, KEY_MANAGERS)
+    models, error = fetch_models(resolved.config, resolved.key_managers)
     
     if error:
         return jsonify({"error": error}), 500
@@ -119,10 +126,14 @@ def server_error(e):
 
 def init_web_server(config, ai_params, key_managers):
     """Initialize web server with configuration"""
-    global CONFIG, AI_PARAMS, KEY_MANAGERS
+    global CONFIG, AI_PARAMS, KEY_MANAGERS, ACTIVE_PROFILE
     CONFIG = config
     AI_PARAMS = ai_params
     KEY_MANAGERS = key_managers
+
+    # Set active profile from ProfileStore
+    from .connection_profiles import ProfileStore
+    ACTIVE_PROFILE = ProfileStore.get_instance().get_active_profile()
 
     return app
 
@@ -131,12 +142,12 @@ def switch_active_profile(profile_name: str) -> bool:
     """
     Switch the active connection profile at runtime.
 
-    Updates ProfileStore, repopulates CONFIG/AI_PARAMS, and fires
-    config change notifications so all listeners (chat windows, etc.) update.
+    Updates ProfileStore, sets ACTIVE_PROFILE, repopulates CONFIG/AI_PARAMS,
+    and fires config change notifications so all listeners update.
 
     Returns True on success, False if profile not found.
     """
-    global CONFIG, AI_PARAMS
+    global CONFIG, AI_PARAMS, ACTIVE_PROFILE, SESSION_OVERRIDES
 
     from .connection_profiles import ProfileStore
     from .config import notify_config_change
@@ -145,14 +156,49 @@ def switch_active_profile(profile_name: str) -> bool:
     if not store.set_active_profile(profile_name):
         return False
 
-    profile = store.get_active_profile()
-    profile.populate_config(CONFIG)
-    profile.populate_ai_params(AI_PARAMS)
+    ACTIVE_PROFILE = store.get_active_profile()
+    SESSION_OVERRIDES.clear()  # Profile switch resets session overrides
+
+    # Profile is the source of truth — no longer populating CONFIG/AI_PARAMS
+    # (connection keys are read via ACTIVE_PROFILE / get_active_setting() / resolve_profile())
 
     # Rebuild key managers if profile specifies a key pool/name override
-    if profile.api_key_pool or profile.api_key_name:
+    if ACTIVE_PROFILE.api_key_pool or ACTIVE_PROFILE.api_key_name:
         from .key_store import KeyStore
         KEY_MANAGERS.update(KeyStore.get_instance().build_key_managers())
 
     notify_config_change("_bulk_update", None)
     return True
+
+
+def get_active_setting(key: str, default=None):
+    """Read a connection setting from the active profile, with session override support.
+
+    Checks SESSION_OVERRIDES first (terminal toggles), then ACTIVE_PROFILE,
+    then returns the default.
+
+    Supported keys: provider, model, streaming, thinking, thinking_budget,
+    thinking_level, reasoning_effort, custom_url, gemini_endpoint,
+    request_timeout, temperature, max_tokens, api_key_name, api_key_pool
+    """
+    if key in SESSION_OVERRIDES:
+        return SESSION_OVERRIDES[key]
+    if ACTIVE_PROFILE:
+        mapping = {
+            "provider": ACTIVE_PROFILE.provider,
+            "model": ACTIVE_PROFILE.model,
+            "streaming": ACTIVE_PROFILE.streaming,
+            "thinking": ACTIVE_PROFILE.thinking,
+            "thinking_budget": ACTIVE_PROFILE.thinking_budget,
+            "thinking_level": ACTIVE_PROFILE.thinking_level,
+            "reasoning_effort": ACTIVE_PROFILE.reasoning_effort,
+            "custom_url": ACTIVE_PROFILE.custom_url,
+            "gemini_endpoint": ACTIVE_PROFILE.gemini_endpoint,
+            "request_timeout": ACTIVE_PROFILE.request_timeout,
+            "temperature": ACTIVE_PROFILE.temperature,
+            "max_tokens": ACTIVE_PROFILE.max_tokens,
+            "api_key_name": ACTIVE_PROFILE.api_key_name,
+            "api_key_pool": ACTIVE_PROFILE.api_key_pool,
+        }
+        return mapping.get(key, default)
+    return default

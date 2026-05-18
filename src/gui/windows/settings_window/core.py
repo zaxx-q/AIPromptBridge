@@ -110,10 +110,10 @@ class SettingsWindow(
         self.config_data = parse_config_full()
         self.original_config = dict(self.config_data.config)
 
-        # NOTE: web_server.CONFIG overlay removed. Connection profile keys
-        # (provider, model, streaming, thinking, etc.) are injected into
-        # CONFIG at runtime by populate_config() and belong in profiles.json
-        # — not config.ini. The settings window reads from config.ini only.
+        # NOTE: Connection profile keys (provider, model, streaming, thinking, etc.)
+        # are managed via profiles.json and read at runtime through
+        # ACTIVE_PROFILE / get_active_setting() / resolve_profile() — not config.ini.
+        # The settings window reads from config.ini only.
 
         if self.master:
             if self.use_ctk:

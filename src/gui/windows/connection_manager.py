@@ -79,15 +79,15 @@ FIELD_HELP = {
     "provider": "API provider for this profile. Required.",
     "model": "Model ID to use. Required. Click 🔄 to fetch available models.",
     "streaming": "Stream responses token-by-token instead of waiting for the full response.",
-    "thinking": "Enable extended thinking/reasoning mode. When enabled, thinking-related fields below become available.",
+    "thinking": "Enable sending thinking parameters. When enabled, thinking-related fields below become available.",
     "thinking_budget": "Token budget for thinking (Gemini 2.5 models only). -1 = auto/unlimited. Leave empty for default.",
     "thinking_level": "Thinking intensity (Gemini 3.x models only). Leave empty for default.",
     "reasoning_effort": "Reasoning effort (OpenAI-compatible APIs only). Leave empty for default.",
     "temperature": "Controls randomness (0.0-2.0). Leave empty to use model default.",
     "max_tokens": "Maximum output tokens. Leave empty to use model default.",
     "request_timeout": "Request timeout in seconds. Leave empty to use the global timeout from settings.",
-    "custom_url": "Full URL for the OpenAI-compatible API endpoint. Required when provider is 'custom'.",
-    "gemini_endpoint": "Custom Gemini API base URL. Leave empty for the default Google endpoint.",
+    "custom_url": "Full URL for the OpenAI-compatible API endpoint. Usually ends with '/v1'. Leave empty for the default OpenAI endpoint.",
+    "gemini_endpoint": "Custom Gemini API base URL. Usually ends with '/v1beta'. Leave empty for the default Google endpoint.",
     "api_key_name": "Use a specific named key from the pool. Leave empty to use pool rotation.",
     "api_key_pool": "Override which key pool this profile uses. Leave empty to use provider default.",
 }
@@ -556,31 +556,30 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         def _fetch():
             try:
-                from ...config import load_config
                 from ...key_store import KeyStore
                 from ...key_manager import KeyManager
                 from ...api_client import get_provider_for_type
-
-                config = load_config()
+                from ... import web_server as _ws
+    
                 key_store = KeyStore.get_instance()
                 keys_data = key_store.get_pool_for_provider(provider)
                 key_strings = [kd["key"] for kd in keys_data if kd.get("key")]
                 if not key_strings:
                     self._schedule_ui(lambda: self._set_model_status("No API keys", "error"))
                     return
-
+    
                 temp_km = KeyManager(key_strings, provider)
                 temp_config = {"request_timeout": 30}
-
+    
                 if provider == "custom":
-                    url = custom_url_value or config.get("custom_url", "")
+                    url = custom_url_value or _ws.get_active_setting("custom_url", "")
                     if url:
                         temp_config["custom_url"] = url
                     else:
                         self._schedule_ui(lambda: self._set_model_status("No custom URL", "error"))
                         return
                 elif provider == "google":
-                    endpoint = gemini_endpoint_value or config.get("gemini_endpoint", "")
+                    endpoint = gemini_endpoint_value or _ws.get_active_setting("gemini_endpoint", "")
                     if endpoint:
                         temp_config["gemini_endpoint"] = endpoint
 
@@ -805,20 +804,24 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         def _test_thread():
             try:
-                from ...config import load_config
                 from ...key_manager import KeyManager
                 from ...api_client import call_api_stream_unified
-
-                config = load_config()
+                from ... import web_server as _ws
+    
+                # Build config from profile data directly (no load_config needed)
+                config = {}
                 ai_params = {}
-
+    
                 from ...key_store import KeyStore
                 key_store = KeyStore.get_instance()
                 key_managers = key_store.build_key_managers()
-
-                provider = profile_data.get("provider") or config.get("default_provider", "google")
-                model = profile_data.get("model") or config.get(f"{provider}_model", "")
-
+    
+                provider = profile_data.get("provider") or _ws.get_active_setting("provider", "google")
+                model = profile_data.get("model") or _ws.get_active_setting("model", "")
+    
+                config["default_provider"] = provider
+                config[f"{provider}_model"] = model
+    
                 if "streaming" in profile_data:
                     config["streaming_enabled"] = profile_data["streaming"]
                 if "thinking" in profile_data:
@@ -858,7 +861,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         return
 
                 thinking_enabled = config.get("thinking_enabled", False)
-                thinking_output = config.get("thinking_output", "reasoning_content")
+                thinking_output = _ws.CONFIG.get("thinking_output", "reasoning_content")
 
                 messages = [{"role": "user", "content": "Say 'Hello! Profile test successful.' in exactly those words."}]
 

@@ -117,8 +117,9 @@ class AudioAnalyzerWindow:
         self.compression_preset = "recommended"
         
         # Provider/Model state
-        self.provider = config.get("default_provider", "google")
-        self.model = config.get(f"{self.provider}_model", "")
+        from ... import web_server as _ws
+        self.provider = _ws.get_active_setting("provider", "google")
+        self.model = _ws.get_active_setting("model", "")
         self.available_models: List[str] = []
         
         # Profile selector mode
@@ -1890,9 +1891,15 @@ class AudioAnalyzerWindow:
     def _on_provider_changed(self, provider: str):
         """Handle provider dropdown change."""
         if self._use_profile_mode:
-            return  # Provider is determined by the profile
+            return # Provider is determined by the profile
         self.provider = provider
-        self.model = self.config.get(f"{provider}_model", "")
+        from ... import web_server as _ws
+        # When user manually switches provider in non-profile mode,
+        # get the model for that provider from the active profile
+        if _ws.ACTIVE_PROFILE and _ws.ACTIVE_PROFILE.provider == provider:
+            self.model = _ws.ACTIVE_PROFILE.model
+        else:
+            self.model = ""  # User switched to a different provider; will load models
         self.model_dropdown.set(self.model or "(loading...)")
         
         # Reload models for new provider

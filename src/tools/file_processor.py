@@ -1906,10 +1906,10 @@ class FileProcessor(BaseTool):
         
         # Import web_server for current config
         from src import web_server
-        
-        current_provider = web_server.CONFIG.get("default_provider", "google")
-        current_model = web_server.CONFIG.get(f"{current_provider}_model", "not set")
-        current_thinking = web_server.CONFIG.get("thinking_enabled", False)
+
+        current_provider = web_server.get_active_setting("provider", "google")
+        current_model = web_server.get_active_setting("model", "not set")
+        current_thinking = web_server.get_active_setting("thinking", False)
         default_delay = get_setting(self.tools_config, "default_delay_between_requests", 1.0)
         
         # Display current settings
@@ -1944,7 +1944,7 @@ class FileProcessor(BaseTool):
                     current_provider = provider_choice.lower()
         
         # Model
-        current_model = web_server.CONFIG.get(f"{current_provider}_model", "")
+        current_model = web_server.get_active_setting("model", "")
         try:
             model_input = input(f"\nModel [{current_model}]: ").strip()
         except (EOFError, KeyboardInterrupt):
@@ -2058,7 +2058,7 @@ class FileProcessor(BaseTool):
             print(f"   Provider: {cp.provider}")
             print(f"   Model:    {cp.model}")
             from src import web_server
-            current_thinking = web_server.CONFIG.get("thinking_enabled", False)
+            current_thinking = web_server.get_active_setting("thinking", False)
             thinking_status = "ON" if current_thinking else "OFF"
             print(f"   Thinking: {thinking_status} (System Setting)")
             print(f"   Delay:    {cp.delay_between_requests}s")
@@ -2553,7 +2553,8 @@ class FileProcessor(BaseTool):
         """
         from src.api_client import call_api_with_retry
         from src import web_server
-        
+        from src.profile_resolver import resolve_profile
+
         # Build message (respect user's filename context preference)
         # Pass original_name so the AI sees the real filename, not a temp processed one
         message = self.file_handler.build_api_message(
@@ -2561,15 +2562,18 @@ class FileProcessor(BaseTool):
             include_filename=self._include_filename,
             display_name=original_name
         )
-        
+
+        # Resolve profile to get merged config with connection keys
+        resolved = resolve_profile(None, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+
         # Call API
         response, error = call_api_with_retry(
             provider=checkpoint.provider,
             messages=[message],
             model_override=checkpoint.model if checkpoint.model else None,
-            config=web_server.CONFIG,
-            ai_params=web_server.AI_PARAMS,
-            key_managers=web_server.KEY_MANAGERS
+            config=resolved.config,
+            ai_params=resolved.ai_params,
+            key_managers=resolved.key_managers
         )
         
         if error:
@@ -2598,19 +2602,23 @@ class FileProcessor(BaseTool):
         """
         from src.api_client import call_api_with_retry
         from src import web_server
+        from src.profile_resolver import resolve_profile
         from src.providers.gemini_native import GeminiNativeProvider
-        
+
+        # Resolve profile to get merged config with connection keys
+        resolved = resolve_profile(None, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+
         # Get the provider
         provider_name = checkpoint.provider.lower()
         if provider_name != "google":
             raise Exception("Files API only supported for Google/Gemini provider")
-        
-        key_manager = web_server.KEY_MANAGERS.get(provider_name)
+
+        key_manager = resolved.key_managers.get(provider_name)
         if not key_manager:
             raise Exception("Google key manager not found")
-        
+
         # Create provider instance for upload
-        provider = GeminiNativeProvider(key_manager=key_manager, config=web_server.CONFIG)
+        provider = GeminiNativeProvider(key_manager=key_manager, config=resolved.config)
         
         # Upload file
         if interactive:
@@ -2639,9 +2647,9 @@ class FileProcessor(BaseTool):
                 provider=checkpoint.provider,
                 messages=messages,
                 model_override=checkpoint.model if checkpoint.model else None,
-                config=web_server.CONFIG,
-                ai_params=web_server.AI_PARAMS,
-                key_managers=web_server.KEY_MANAGERS
+                config=resolved.config,
+                ai_params=resolved.ai_params,
+                key_managers=resolved.key_managers
             )
             
             if error:
@@ -2902,7 +2910,11 @@ class FileProcessor(BaseTool):
         """
         from src.api_client import call_api_with_retry
         from src import web_server
-        
+        from src.profile_resolver import resolve_profile
+
+        # Resolve profile to get merged config with connection keys
+        resolved = resolve_profile(None, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+
         # Apply preprocessing if configured and not skipped
         if not skip_preprocessing:
             process_path, preprocess_result = self._preprocess_audio_if_needed(filepath, interactive)
@@ -2949,14 +2961,14 @@ class FileProcessor(BaseTool):
                     display_name=chunk_display
                 )
                 
-                # Call API
+                # Call API (use resolved config from outer scope)
                 response, error = call_api_with_retry(
                     provider=checkpoint.provider,
                     messages=[message],
                     model_override=checkpoint.model if checkpoint.model else None,
-                    config=web_server.CONFIG,
-                    ai_params=web_server.AI_PARAMS,
-                    key_managers=web_server.KEY_MANAGERS
+                    config=resolved.config,
+                    ai_params=resolved.ai_params,
+                    key_managers=resolved.key_managers
                 )
                 
                 if error:

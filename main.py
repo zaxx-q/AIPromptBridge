@@ -79,10 +79,16 @@ except ImportError as e:
     # Silent - will show in startup
 
 
-def get_base_url(config, provider):
-    """Get the base URL for a provider"""
+def get_base_url(config, provider, profile=None):
+    """Get the base URL for a provider.
+
+    Args:
+        config: Config dict (used as fallback when profile is None).
+        provider: Provider name string.
+        profile: Optional ConnectionProfile — preferred source for URL fields.
+    """
     if provider == "custom":
-        url = config.get("custom_url", "")
+        url = (profile.custom_url if profile else None) or config.get("custom_url", "")
         if url:
             # Extract base URL (remove /chat/completions if present)
             if "/chat/completions" in url:
@@ -92,7 +98,7 @@ def get_base_url(config, provider):
     elif provider == "openrouter":
         return "openrouter.ai/api/v1"
     elif provider == "google":
-        return config.get("gemini_endpoint") or "generativelanguage.googleapis.com"
+        return (profile.gemini_endpoint if profile else None) or config.get("gemini_endpoint") or "generativelanguage.googleapis.com"
     return "Unknown"
 
 
@@ -128,23 +134,19 @@ def initialize():
     key_store.load()
     web_server.KEY_MANAGERS = key_store.build_key_managers()
 
-    # ─── Ensure CONFIG has all connection keys (safe defaults) ────────────
-    from src.connection_profiles import ensure_config_connection_keys
-    ensure_config_connection_keys(config)
-
-    # ─── Populate from active connection profile ──────────────────────────
+    # ─── Set active connection profile ────────────────────────────────────
     from src.connection_profiles import ProfileStore
     profile_store = ProfileStore.get_instance()
     active_profile = profile_store.get_active_profile()
-    active_profile.populate_config(config)
-    active_profile.populate_ai_params(ai_params)
+    # Profile is the source of truth — no longer populating CONFIG/AI_PARAMS
+    # (connection keys are read via ACTIVE_PROFILE / get_active_setting() / resolve_profile())
 
     # ─── Configuration Summary ────────────────────────────────────────────
-    provider = config.get('default_provider', 'google')
-    model = config.get(f'{provider}_model', 'not set')
-    base_url = get_base_url(config, provider)
-    streaming = config.get('streaming_enabled', True)
-    thinking = config.get('thinking_enabled', False)
+    provider = active_profile.provider
+    model = active_profile.model
+    base_url = get_base_url(config, provider, profile=active_profile)
+    streaming = active_profile.streaming
+    thinking = active_profile.thinking
     
     if HAVE_RICH:
         # Create a nice table for configuration

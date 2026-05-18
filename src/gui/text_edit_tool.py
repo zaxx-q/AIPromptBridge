@@ -782,7 +782,8 @@ class TextEditToolApp:
                 print(f"{'\u2500'*60}\n")
             elif show_gui:
                 # Stream directly into chat window for real-time display
-                streaming_enabled = self.config.get("streaming_enabled", True)
+                from .. import web_server as _ws
+                streaming_enabled = _ws.get_active_setting("streaming", True)
                 
                 print(f"\n{'─'*60}")
                 print(f"[AI Response] Opening chat window{'...' if streaming_enabled else ' (non-streaming)...'}")
@@ -826,7 +827,8 @@ class TextEditToolApp:
                 print(f"{'─'*60}\n")
             else:
                 # Replace mode: type response to active field
-                streaming_enabled = self.config.get("streaming_enabled", True)
+                from .. import web_server as _ws
+                streaming_enabled = _ws.get_active_setting("streaming", True)
                 
                 if streaming_enabled:
                     print(f"[AI Response] Streaming to active field... [{self.abort_hotkey.title()} to abort]")

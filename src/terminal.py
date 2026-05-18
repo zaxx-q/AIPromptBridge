@@ -18,10 +18,16 @@ from rich.columns import Columns
 from rich.text import Text
 
 
-def get_base_url_for_status(config, provider):
-    """Get the base URL for a provider (for status display)"""
+def get_base_url_for_status(config, provider, profile=None):
+    """Get the base URL for a provider (for status display).
+
+    Args:
+        config: Config dict (used as fallback when profile is None).
+        provider: Provider name string.
+        profile: Optional ConnectionProfile — preferred source for URL fields.
+    """
     if provider == "custom":
-        url = config.get("custom_url", "")
+        url = (profile.custom_url if profile else None) or config.get("custom_url", "")
         if url:
             # Extract base URL (remove /chat/completions if present)
             if "/chat/completions" in url:
@@ -31,7 +37,7 @@ def get_base_url_for_status(config, provider):
     elif provider == "openrouter":
         return "openrouter.ai/api/v1"
     elif provider == "google":
-        url = config.get("gemini_endpoint") or "generativelanguage.googleapis.com"
+        url = (profile.gemini_endpoint if profile else None) or config.get("gemini_endpoint") or "generativelanguage.googleapis.com"
         if "://" in url:
             url = url.split("://")[-1]
         if "/v1beta" in url:
@@ -221,26 +227,30 @@ def terminal_session_manager():
                 # Model management with two-tier display
                 from . import web_server
                 from .api_client import fetch_models
-                
+    
                 if HAVE_RICH:
                     console.print("[bold]🤖 Model Management[/bold]")
+    
+                provider = web_server.get_active_setting("provider", "custom")
+                current_model = web_server.get_active_setting("model", "not set")
                 
-                provider = web_server.CONFIG.get("default_provider", "custom")
-                current_model = web_server.CONFIG.get(f"{provider}_model", "not set")
-                
+                # Resolve profile to get merged config with connection keys
+                from .profile_resolver import resolve_profile
+                resolved = resolve_profile(None, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+    
                 if HAVE_RICH:
-                    console.print(f"   Provider: [cyan]{provider}[/cyan]")
-                    console.print(f"   Current:  [green]{current_model}[/green]")
+                    console.print(f" Provider: [cyan]{provider}[/cyan]")
+                    console.print(f" Current: [green]{current_model}[/green]")
                     with console.status("[bold blue]Fetching available models...[/bold blue]"):
-                        models, error = fetch_models(web_server.CONFIG, web_server.KEY_MANAGERS)
+                        models, error = fetch_models(resolved.config, resolved.key_managers)
                 else:
                     print(f"\n{'─'*64}")
                     print("🤖 MODEL MANAGEMENT")
                     print(f"{'─'*64}")
-                    print(f"   Provider: {provider}")
-                    print(f"   Current:  {current_model}")
-                    print(f"\n   Fetching available models...")
-                    models, error = fetch_models(web_server.CONFIG, web_server.KEY_MANAGERS)
+                    print(f" Provider: {provider}")
+                    print(f" Current: {current_model}")
+                    print(f"\n Fetching available models...")
+                    models, error = fetch_models(resolved.config, resolved.key_managers)
                 
                 if error:
                     if HAVE_RICH:
@@ -356,10 +366,9 @@ def terminal_session_manager():
                             except ValueError:
                                 new_model = choice
                             
-                            config_key = f"{provider}_model"
                             # In-memory only — model is owned by the active profile.
                             # Switch profile or edit on Connection Manager for persistent changes.
-                            web_server.CONFIG[config_key] = new_model
+                            web_server.SESSION_OVERRIDES["model"] = new_model
                             print(f" ✅ Model: {new_model} (session)")
                     except:
                         pass
@@ -374,12 +383,12 @@ def terminal_session_manager():
 
                 store = ProfileStore.get_instance()
                 active_profile = store.get_active_profile_name()
-
-                provider = web_server.CONFIG.get("default_provider", "google")
-                model = web_server.CONFIG.get(f"{provider}_model", "not set")
-                base_url = get_base_url_for_status(web_server.CONFIG, provider)
-                streaming = web_server.CONFIG.get("streaming_enabled", True)
-                thinking = web_server.CONFIG.get("thinking_enabled", False)
+    
+                provider = web_server.get_active_setting("provider", "google")
+                model = web_server.get_active_setting("model", "not set")
+                base_url = get_base_url_for_status(web_server.CONFIG, provider, profile=web_server.ACTIVE_PROFILE)
+                streaming = web_server.get_active_setting("streaming", True)
+                thinking = web_server.get_active_setting("thinking", False)
 
                 if HAVE_RICH:
                     grid = Table.grid(expand=True, padding=(0, 2))
@@ -445,10 +454,10 @@ def terminal_session_manager():
             elif key == 'k':
                 # Toggle thinking mode (session-scoped, in-memory only)
                 from . import web_server
-
-                current = web_server.CONFIG.get("thinking_enabled", False)
+    
+                current = web_server.get_active_setting("thinking", False)
                 new_value = not current
-                web_server.CONFIG["thinking_enabled"] = new_value
+                web_server.SESSION_OVERRIDES["thinking"] = new_value
 
                 if HAVE_RICH:
                     status = "[green]ON[/green]" if new_value else "[red]OFF[/red]"
@@ -460,10 +469,10 @@ def terminal_session_manager():
             elif key == 'r':
                 # Toggle streaming mode (session-scoped, in-memory only)
                 from . import web_server
-
-                current = web_server.CONFIG.get("streaming_enabled", True)
+    
+                current = web_server.get_active_setting("streaming", True)
                 new_value = not current
-                web_server.CONFIG["streaming_enabled"] = new_value
+                web_server.SESSION_OVERRIDES["streaming"] = new_value
 
                 if HAVE_RICH:
                     status = "[green]ON[/green]" if new_value else "[red]OFF[/red]"
@@ -520,8 +529,8 @@ def terminal_session_manager():
                             new_profile = choice
 
                         if switch_active_profile(new_profile):
-                            provider = web_server.CONFIG.get("default_provider", "google")
-                            model = web_server.CONFIG.get(f"{provider}_model", "")
+                            provider = web_server.get_active_setting("provider", "google")
+                            model = web_server.get_active_setting("model", "")
                             if HAVE_RICH:
                                 console.print(f"   ✅ Switched to [green]{new_profile}[/green]")
                                 console.print(f"      Provider: [cyan]{provider}[/cyan]  Model: [green]{model}[/green]")

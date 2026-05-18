@@ -28,6 +28,10 @@ def main():
     key_store.load()
     web_server.KEY_MANAGERS = key_store.build_key_managers()
 
+    # Set ACTIVE_PROFILE from ProfileStore
+    from src.connection_profiles import ProfileStore
+    web_server.ACTIVE_PROFILE = ProfileStore.get_instance().get_active_profile()
+
     # Run the menu
     show_tools_menu()
 

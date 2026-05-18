@@ -10,7 +10,7 @@ Usage:
 
     store = ProfileStore.get_instance()
     profile = store.get_active_profile()
-    store.set_active_profile("GPT Heavy")
+    store.set_active_profile("Fast Model")
 """
 
 import json
@@ -26,7 +26,7 @@ PROFILES_FILE = "profiles.json"
 PROFILE_DEFAULTS: Dict[str, Any] = {
     "description": "",
     "provider": "google",
-    "model": "gemini-3-flash",
+    "model": "gemini-3-flash-preview",
     "streaming": True,
     "thinking": False,
     "thinking_budget": -1,
@@ -41,55 +41,13 @@ PROFILE_DEFAULTS: Dict[str, Any] = {
     "api_key_pool": "",
 }
 
-# Fields that map to config.ini keys when populating web_server.CONFIG
-PROFILE_TO_CONFIG_MAP = {
-    "provider": "default_provider",
-    "model": None,  # dynamic: "{provider}_model"
-    "streaming": "streaming_enabled",
-    "thinking": "thinking_enabled",
-    "thinking_budget": "thinking_budget",
-    "thinking_level": "thinking_level",
-    "reasoning_effort": "reasoning_effort",
-    "request_timeout": "request_timeout",
-    "custom_url": "custom_url",
-    "gemini_endpoint": "gemini_endpoint",
-}
-
-# Fields that map to ai_params dict
-PROFILE_AI_PARAM_FIELDS = {"temperature", "max_tokens"}
-
-# Safe defaults for connection keys that must exist in CONFIG dict.
-CONNECTION_KEY_DEFAULTS: Dict[str, Any] = {
-    "default_provider": "google",
-    "google_model": "gemini-3-flash-preview",
-    "custom_model": "",
-    "openrouter_model": "",
-    "custom_url": "",
-    "gemini_endpoint": "",
-    "streaming_enabled": True,
-    "thinking_enabled": False,
-    "thinking_budget": -1,
-    "thinking_level": "high",
-    "reasoning_effort": "high",
-}
-
-def ensure_config_connection_keys(config: Dict[str, Any]) -> None:
-    """Ensure CONFIG dict has all connection keys with safe defaults.
-
-    Called after load_config() and before profile population to guarantee
-    that connection keys exist even if config.ini is missing or was created
-    without them (post-refactor).
-    """
-    for config_key, default in CONNECTION_KEY_DEFAULTS.items():
-        if config_key not in config:
-            config[config_key] = default
 
 @dataclass
 class ConnectionProfile:
     """A complete connection profile — every field has a value."""
     description: str = ""
     provider: str = "google"
-    model: str = "gemini-3-flash"
+    model: str = "gemini-3-flash-preview"
     streaming: bool = True
     thinking: bool = False
     thinking_budget: int = -1
@@ -157,37 +115,6 @@ class ConnectionProfile:
 
             clean[k] = val
         return cls(**clean)
-
-    def populate_config(self, config: Dict[str, Any]) -> None:
-        """Write profile values into a config dict (web_server.CONFIG style)."""
-        config["default_provider"] = self.provider
-        config[f"{self.provider}_model"] = self.model
-        config["streaming_enabled"] = self.streaming
-        config["thinking_enabled"] = self.thinking
-        # Thinking sub-fields: only override if profile has a value
-        if self.thinking_budget is not None:
-            config["thinking_budget"] = self.thinking_budget
-        if self.thinking_level:
-            config["thinking_level"] = self.thinking_level
-        if self.reasoning_effort:
-            config["reasoning_effort"] = self.reasoning_effort
-        # request_timeout: only override if profile has a value
-        if self.request_timeout is not None:
-            config["request_timeout"] = self.request_timeout
-        config["custom_url"] = self.custom_url
-        config["gemini_endpoint"] = self.gemini_endpoint
-
-    def populate_ai_params(self, ai_params: Dict[str, Any]) -> None:
-        """Write profile AI param values into an ai_params dict."""
-        if self.temperature is not None:
-            ai_params["temperature"] = self.temperature
-        else:
-            ai_params.pop("temperature", None)
-        if self.max_tokens is not None:
-            ai_params["max_tokens"] = self.max_tokens
-        else:
-            ai_params.pop("max_tokens", None)
-
 
 class ProfileStore:
     """Singleton store for connection profiles backed by profiles.json."""

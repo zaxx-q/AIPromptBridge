@@ -231,10 +231,16 @@ class TTSToolApp:
                     {"role": "user", "content": task}
                 ]
                 
-                provider = self.config.get("default_provider", "google")
-                model = model_override or self.config.get(f"{provider}_model", "")
-                
-                thinking_enabled = self.config.get("thinking_enabled", False)
+                from .. import web_server as _ws
+                from ..profile_resolver import resolve_profile
+    
+                provider = _ws.get_active_setting("provider", "google")
+                model = model_override or _ws.get_active_setting("model", "")
+                thinking_enabled = _ws.get_active_setting("thinking", False)
+    
+                # Resolve profile to get merged config with connection keys
+                resolved = resolve_profile(None, self.config, self.ai_params, self.key_managers)
+    
                 ctx = RequestContext(
                     origin=RequestOrigin.TTS_TOOL,
                     provider=provider,
@@ -242,9 +248,9 @@ class TTSToolApp:
                     streaming=False,
                     thinking_enabled=thinking_enabled
                 )
-                
+    
                 ctx = RequestPipeline.execute_simple(
-                    ctx, messages, self.config, self.ai_params, self.key_managers
+                    ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers
                 )
                 
                 if ctx.error:

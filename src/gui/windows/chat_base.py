@@ -64,10 +64,9 @@ class ChatWindowBase(ABC):
         # Model selection — per-session override takes priority over global
         self.available_models: List[Dict] = []
         from ... import web_server
-        provider = web_server.CONFIG.get("default_provider", "google")
         # Use session's model_override if set, otherwise None (will show global sentinel)
-        self.selected_model = self.session.model_override  # None = use global
-        self._last_global_model = web_server.CONFIG.get(f"{provider}_model", "")
+        self.selected_model = self.session.model_override # None = use global
+        self._last_global_model = web_server.get_active_setting("model", "")
         
         # Profile selector mode: show profiles instead of model list
         self._use_profile_mode = self._compute_profile_mode()
@@ -193,7 +192,7 @@ class ChatWindowBase(ABC):
     def _create_info_label(self):
         """Create session info label."""
         from ... import web_server
-        current_provider = web_server.CONFIG.get("default_provider", "google")
+        current_provider = web_server.get_active_setting("provider", "google")
         info_text = f"Session: {self.session.session_id} | Origin: {self.session.origin} | Provider: {current_provider}"
         
         if HAVE_CTK:
@@ -1063,8 +1062,7 @@ class ChatWindowBase(ABC):
     def _get_global_sentinel(self) -> str:
         """Build the '(Use Global: <model>)' sentinel label from current config."""
         from ... import web_server
-        provider = web_server.CONFIG.get("default_provider", "google")
-        global_model = web_server.CONFIG.get(f"{provider}_model", "")
+        global_model = web_server.get_active_setting("model", "")
         return f"(Use Global: {global_model})" if global_model else "(Use Global)"
     
     def _load_models(self):
@@ -1131,11 +1129,10 @@ class ChatWindowBase(ABC):
     def _refresh_global_sentinel(self):
         """Update the global sentinel label in the dropdown when the global model changes."""
         if self._destroyed or self._use_profile_mode:
-            return  # Profile mode doesn't use the global model sentinel
+            return # Profile mode doesn't use the global model sentinel
         try:
             from ... import web_server
-            provider = web_server.CONFIG.get("default_provider", "google")
-            current_global = web_server.CONFIG.get(f"{provider}_model", "")
+            current_global = web_server.get_active_setting("model", "")
             
             if current_global != self._last_global_model:
                 self._last_global_model = current_global
@@ -1325,31 +1322,25 @@ class ChatWindowBase(ABC):
         def process_regeneration():
             from ... import web_server
             from ...request_pipeline import RequestPipeline, RequestContext, RequestOrigin, StreamCallback
-            
-            streaming_enabled = web_server.CONFIG.get("streaming_enabled", True)
-            current_provider = web_server.CONFIG.get("default_provider", "google")
-            current_model = self.session.model_override or web_server.CONFIG.get(f"{current_provider}_model", "")
-            thinking_enabled = web_server.CONFIG.get("thinking_enabled", False)
-            effective_config = web_server.CONFIG
-            effective_ai_params = web_server.AI_PARAMS
-            effective_key_managers = web_server.KEY_MANAGERS
-
-            # Apply profile override if active
+            from ...profile_resolver import resolve_profile, resolve_profile_by_name
+    
+            # Always resolve profile to get a merged config with connection keys
             if self.session.profile_override:
-                from ...profile_resolver import resolve_profile_by_name
                 resolved = resolve_profile_by_name(
                     self.session.profile_override, web_server.CONFIG,
                     web_server.AI_PARAMS, web_server.KEY_MANAGERS
                 )
-                current_provider = resolved.provider
-                current_model = resolved.model
-                effective_config = resolved.config
-                effective_ai_params = resolved.ai_params
-                effective_key_managers = resolved.key_managers
-                if resolved.streaming is not None:
-                    streaming_enabled = resolved.streaming
-                if resolved.thinking_enabled is not None:
-                    thinking_enabled = resolved.thinking_enabled
+            else:
+                resolved = resolve_profile(None, web_server.CONFIG,
+                    web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+    
+            current_provider = resolved.provider
+            current_model = self.session.model_override or resolved.model
+            streaming_enabled = resolved.streaming
+            thinking_enabled = resolved.thinking_enabled
+            effective_config = resolved.config
+            effective_ai_params = resolved.ai_params
+            effective_key_managers = resolved.key_managers
 
             ctx = RequestContext(
                 origin=RequestOrigin.CHAT_WINDOW,
@@ -2260,30 +2251,25 @@ class ChatWindowBase(ABC):
                     self.input_text.delete("1.0", tk.END)
             self._safe_after(0, update_ui)
             
-            streaming_enabled = web_server.CONFIG.get("streaming_enabled", True)
-            current_provider = web_server.CONFIG.get("default_provider", "google")
-            current_model = self.session.model_override or web_server.CONFIG.get(f"{current_provider}_model", "")
-            thinking_enabled = web_server.CONFIG.get("thinking_enabled", False)
-            effective_config = web_server.CONFIG
-            effective_ai_params = web_server.AI_PARAMS
-            effective_key_managers = web_server.KEY_MANAGERS
-
-            # Apply profile override if active
+            from ...profile_resolver import resolve_profile, resolve_profile_by_name
+    
+            # Always resolve profile to get a merged config with connection keys
             if self.session.profile_override:
-                from ...profile_resolver import resolve_profile_by_name
                 resolved = resolve_profile_by_name(
                     self.session.profile_override, web_server.CONFIG,
                     web_server.AI_PARAMS, web_server.KEY_MANAGERS
                 )
-                current_provider = resolved.provider
-                current_model = resolved.model
-                effective_config = resolved.config
-                effective_ai_params = resolved.ai_params
-                effective_key_managers = resolved.key_managers
-                if resolved.streaming is not None:
-                    streaming_enabled = resolved.streaming
-                if resolved.thinking_enabled is not None:
-                    thinking_enabled = resolved.thinking_enabled
+            else:
+                resolved = resolve_profile(None, web_server.CONFIG,
+                    web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+    
+            current_provider = resolved.provider
+            current_model = self.session.model_override or resolved.model
+            streaming_enabled = resolved.streaming
+            thinking_enabled = resolved.thinking_enabled
+            effective_config = resolved.config
+            effective_ai_params = resolved.ai_params
+            effective_key_managers = resolved.key_managers
 
             ctx = RequestContext(
                 origin=RequestOrigin.CHAT_WINDOW,
