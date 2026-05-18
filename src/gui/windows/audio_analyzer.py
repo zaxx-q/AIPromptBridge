@@ -1093,9 +1093,13 @@ class AudioAnalyzerWindow:
             # Update via GUICoordinator (thread-safe like transcription_popup.py)
             try:
                 if self.meter_style == "progressbar" and self.level_bar:
-                    GUICoordinator.get_instance().run_on_gui_thread(
-                        lambda l=amplified: self.level_bar.set(l)
-                    )
+                    def _set_level(l=amplified):
+                        if not self._destroyed and self.level_bar:
+                            try:
+                                self.level_bar.set(l)
+                            except tk.TclError:
+                                pass
+                    GUICoordinator.get_instance().run_on_gui_thread(_set_level)
             except Exception:
                 pass  # Window may be closing
         
@@ -2333,28 +2337,33 @@ class AudioAnalyzerWindow:
     def _close(self):
         """Close window and cleanup."""
         self._destroyed = True
-        
+
+        # Null out level meter widgets immediately to prevent
+        # queued callbacks from touching destroyed widgets
+        self.level_bar = None
+        self.level_canvas = None
+
         # Stop unified stream first
         if self.recorder:
             self.recorder.stop_stream()
             logging.debug("[AudioAnalyzer] Unified stream stopped on close")
-        
+
         # Stop recording/playback and cleanup
         if self.recorder:
             self.recorder.cleanup()
             self.recorder = None
-        
+
         unregister_window(self._get_window_tag())
-        
+
         if self.on_close_callback:
             self.on_close_callback()
-        
+
         try:
             if self.root:
                 self.root.destroy()
         except tk.TclError:
             pass
-        
+
         self.root = None
 
 
