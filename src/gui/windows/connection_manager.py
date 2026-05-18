@@ -280,29 +280,29 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         # --- Summary Panel ---
         if self.use_ctk:
-            ctk.CTkFrame(editor, fg_color=c.surface1, height=1).pack(fill="x", pady=(10, 5))
+            ctk.CTkFrame(editor, fg_color=c.surface1, height=1).pack(fill="x", pady=(10, 4))
         else:
-            tk.Frame(editor, bg=c.surface1, height=1).pack(fill="x", pady=(10, 5))
+            tk.Frame(editor, bg=c.surface1, height=1).pack(fill="x", pady=(10, 4))
     
         self._summary_frame = ctk.CTkFrame(editor, fg_color=c.surface0, corner_radius=8) if self.use_ctk else tk.Frame(editor, bg=c.surface0)
         self._summary_frame.pack(fill="x", pady=(0, 5))
     
-        # Summary header with emoji fix
+        # Summary header
         if self.use_ctk:
             if HAVE_EMOJI and prepare_emoji_content:
-                title_content = prepare_emoji_content("📋 Profile Summary", size=12)
-                ctk.CTkLabel(self._summary_frame, font=get_ctk_font(11, "bold"),
-                    **title_content, **get_ctk_label_colors(c)).pack(anchor="w", padx=10, pady=(6, 2))
+                title_content = prepare_emoji_content("📋 Profile Summary", size=14)
+                ctk.CTkLabel(self._summary_frame, font=get_ctk_font(13, "bold"),
+                    **title_content, **get_ctk_label_colors(c)).pack(anchor="w", padx=12, pady=(8, 2))
             else:
-                ctk.CTkLabel(self._summary_frame, text="Profile Summary", font=get_ctk_font(11, "bold"),
-                    **get_ctk_label_colors(c)).pack(anchor="w", padx=10, pady=(6, 2))
+                ctk.CTkLabel(self._summary_frame, text="Profile Summary", font=get_ctk_font(13, "bold"),
+                    **get_ctk_label_colors(c)).pack(anchor="w", padx=12, pady=(8, 2))
         else:
-            tk.Label(self._summary_frame, text="Profile Summary", font=("Segoe UI", 9, "bold"),
-                bg=c.surface0, fg=c.fg).pack(anchor="w", padx=10, pady=(6, 2))
+            tk.Label(self._summary_frame, text="Profile Summary", font=("Segoe UI", 11, "bold"),
+                bg=c.surface0, fg=c.fg).pack(anchor="w", padx=12, pady=(8, 2))
     
         # Summary content area (rebuilt dynamically in _update_summary)
         self._summary_content = ctk.CTkFrame(self._summary_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self._summary_frame, bg=c.surface0)
-        self._summary_content.pack(fill="x", padx=10, pady=(0, 6))
+        self._summary_content.pack(fill="x", padx=12, pady=(0, 8))
 
         # --- Action Buttons ---
         btn_row = ctk.CTkFrame(right, fg_color="transparent") if self.use_ctk else tk.Frame(right, bg=c.bg)
@@ -680,13 +680,13 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         if not self.current_profile:
             if self.use_ctk:
                 lbl = ctk.CTkLabel(self._summary_content, text="No profile selected",
-                    font=get_ctk_font(10), **get_ctk_label_colors(c, muted=True))
-                lbl.pack(anchor="w")
+                    font=get_ctk_font(12), **get_ctk_label_colors(c, muted=True))
+                lbl.pack(anchor="w", pady=(2, 0))
                 self._summary_widgets.append(lbl)
             else:
                 lbl = tk.Label(self._summary_content, text="No profile selected",
-                    font=("Segoe UI", 8), bg=c.surface0, fg=c.blockquote)
-                lbl.pack(anchor="w")
+                    font=("Segoe UI", 10), bg=c.surface0, fg=c.blockquote)
+                lbl.pack(anchor="w", pady=(2, 0))
                 self._summary_widgets.append(lbl)
             return
 
@@ -694,33 +694,30 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         if is_active:
             if self.use_ctk:
                 if HAVE_EMOJI and prepare_emoji_content:
-                    active_content = prepare_emoji_content("⭐ Active Profile", size=11)
+                    active_content = prepare_emoji_content("⭐ Active Profile", size=13)
                     active_lbl = ctk.CTkLabel(self._summary_content,
-                        font=get_ctk_font(10, "bold"),
+                        font=get_ctk_font(12, "bold"),
                         **active_content, **get_ctk_label_colors(c))
                 else:
                     active_lbl = ctk.CTkLabel(self._summary_content,
-                        text="★ Active Profile", font=get_ctk_font(10, "bold"),
+                        text="★ Active Profile", font=get_ctk_font(12, "bold"),
                         **get_ctk_label_colors(c))
-                active_lbl.pack(anchor="w")
+                active_lbl.pack(anchor="w", pady=(2, 0))
                 self._summary_widgets.append(active_lbl)
             else:
                 active_lbl = tk.Label(self._summary_content, text="★ Active Profile",
-                    font=("Segoe UI", 8, "bold"), bg=c.surface0, fg=c.accent)
-                active_lbl.pack(anchor="w")
+                    font=("Segoe UI", 10, "bold"), bg=c.surface0, fg=c.accent)
+                active_lbl.pack(anchor="w", pady=(2, 0))
                 self._summary_widgets.append(active_lbl)
 
-        # Separator line
-        if self.use_ctk:
-            sep = ctk.CTkFrame(self._summary_content, fg_color=c.surface2, height=1)
-            sep.pack(fill="x", pady=3)
-            self._summary_widgets.append(sep)
-        else:
-            sep = tk.Frame(self._summary_content, bg=c.surface2, height=1)
-            sep.pack(fill="x", pady=3)
-            self._summary_widgets.append(sep)
+        # Grid container for key-value rows
+        grid_frame = ctk.CTkFrame(self._summary_content, fg_color="transparent") if self.use_ctk else tk.Frame(self._summary_content, bg=c.surface0)
+        grid_frame.pack(fill="x", pady=(4, 0))
+        self._summary_widgets.append(grid_frame)
+        grid_frame.columnconfigure(2, weight=1)
 
-        # Build icon + key-value rows
+        # Build icon + key-value rows using grid for tight alignment
+        grid_row = 0
         for key, label, field_type, _ in self.profile_fields:
             widget_info = self.field_widgets.get(key)
             if not widget_info:
@@ -740,54 +737,48 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 val = widget_info["var"].get().strip()
                 if not val:
                     continue  # Skip empty optional fields
-                if len(val) > 30:
-                    val = val[:28] + "…"
+                if len(val) > 40:
+                    val = val[:38] + "…"
 
             icon = SUMMARY_ICONS.get(key, "  ")
 
             if self.use_ctk:
-                row_frame = ctk.CTkFrame(self._summary_content, fg_color="transparent")
-                row_frame.pack(fill="x", pady=1)
-                self._summary_widgets.append(row_frame)
-
                 if HAVE_EMOJI and prepare_emoji_content:
-                    icon_content = prepare_emoji_content(icon, size=12)
-                    icon_lbl = ctk.CTkLabel(row_frame, font=get_ctk_font(10),
-                        width=22, **icon_content, **get_ctk_label_colors(c))
+                    icon_content = prepare_emoji_content(icon, size=13)
+                    icon_lbl = ctk.CTkLabel(grid_frame, font=get_ctk_font(12),
+                        width=24, **icon_content, **get_ctk_label_colors(c))
                 else:
-                    icon_lbl = ctk.CTkLabel(row_frame, text=icon, font=get_ctk_font(10),
-                        width=22, **get_ctk_label_colors(c))
-                icon_lbl.pack(side="left")
+                    icon_lbl = ctk.CTkLabel(grid_frame, text=icon, font=get_ctk_font(12),
+                        width=24, **get_ctk_label_colors(c))
+                icon_lbl.grid(row=grid_row, column=0, sticky="w", pady=1)
                 self._summary_widgets.append(icon_lbl)
 
-                key_lbl = ctk.CTkLabel(row_frame, text=f"{label}:", font=get_ctk_font(10),
-                    width=110, anchor="w", **get_ctk_label_colors(c, muted=True))
-                key_lbl.pack(side="left")
+                key_lbl = ctk.CTkLabel(grid_frame, text=f"{label}:", font=get_ctk_font(12),
+                    anchor="w", **get_ctk_label_colors(c, muted=True))
+                key_lbl.grid(row=grid_row, column=1, sticky="w", padx=(0, 12), pady=1)
                 self._summary_widgets.append(key_lbl)
 
-                val_lbl = ctk.CTkLabel(row_frame, text=val, font=get_ctk_font(10),
+                val_lbl = ctk.CTkLabel(grid_frame, text=val, font=get_ctk_font(12, "bold"),
                     anchor="w", **get_ctk_label_colors(c))
-                val_lbl.pack(side="left", fill="x", expand=True)
+                val_lbl.grid(row=grid_row, column=2, sticky="w", pady=1)
                 self._summary_widgets.append(val_lbl)
             else:
-                row_frame = tk.Frame(self._summary_content, bg=c.surface0)
-                row_frame.pack(fill="x", pady=1)
-                self._summary_widgets.append(row_frame)
-
-                icon_lbl = tk.Label(row_frame, text=icon, font=("Segoe UI", 8),
+                icon_lbl = tk.Label(grid_frame, text=icon, font=("Segoe UI", 10),
                     bg=c.surface0, fg=c.fg, width=3)
-                icon_lbl.pack(side="left")
+                icon_lbl.grid(row=grid_row, column=0, sticky="w", pady=1)
                 self._summary_widgets.append(icon_lbl)
 
-                key_lbl = tk.Label(row_frame, text=f"{label}:", font=("Segoe UI", 8),
-                    bg=c.surface0, fg=c.blockquote, width=14, anchor="w")
-                key_lbl.pack(side="left")
+                key_lbl = tk.Label(grid_frame, text=f"{label}:", font=("Segoe UI", 10),
+                    bg=c.surface0, fg=c.blockquote, anchor="w")
+                key_lbl.grid(row=grid_row, column=1, sticky="w", padx=(0, 10), pady=1)
                 self._summary_widgets.append(key_lbl)
 
-                val_lbl = tk.Label(row_frame, text=val, font=("Segoe UI", 8),
+                val_lbl = tk.Label(grid_frame, text=val, font=("Segoe UI", 10, "bold"),
                     bg=c.surface0, fg=c.fg, anchor="w")
-                val_lbl.pack(side="left", fill="x", expand=True)
+                val_lbl.grid(row=grid_row, column=2, sticky="w", pady=1)
                 self._summary_widgets.append(val_lbl)
+
+            grid_row += 1
 
     # ─── Unsaved Changes ────────────────────────────────────────────────
 
