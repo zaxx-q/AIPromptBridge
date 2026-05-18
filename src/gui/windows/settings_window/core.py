@@ -115,8 +115,6 @@ class SettingsWindow(
             from .... import web_server
             for key, value in web_server.CONFIG.items():
                 self.config_data.config[key] = value
-            for key, value in web_server.AI_PARAMS.items():
-                self.config_data.ai_params[key] = value
         except (ImportError, AttributeError):
             pass
 
@@ -461,22 +459,7 @@ class SettingsWindow(
             if key == "gemini_endpoint" and isinstance(value, str) and not value.strip():
                 value = None
 
-            # Route ai_param_ prefixed keys to ai_params dict
-            if hasattr(self, '_ai_param_keys') and key in self._ai_param_keys:
-                param_name = key[len("ai_param_"):]
-                str_val = str(value).strip() if value is not None else ""
-                if str_val:
-                    try:
-                        if '.' in str_val:
-                            self.config_data.ai_params[param_name] = float(str_val)
-                        else:
-                            self.config_data.ai_params[param_name] = int(str_val)
-                    except ValueError:
-                        self.config_data.ai_params[param_name] = str_val
-                else:
-                    self.config_data.ai_params.pop(param_name, None)
-            else:
-                self.config_data.config[key] = value
+            self.config_data.config[key] = value
 
         # Save API keys via KeyStore (pool-based)
         if hasattr(self, '_save_keys_to_store'):
@@ -502,12 +485,6 @@ class SettingsWindow(
                     print(f"[Settings] Reloaded API keys ({total_keys} total)")
                 except Exception as e:
                     print(f"[Settings] Note: Could not hot-reload API keys: {e}")
-
-                # Sync AI parameters
-                web_server.AI_PARAMS.clear()
-                web_server.AI_PARAMS.update(self.config_data.ai_params)
-                if self.config_data.ai_params:
-                    print(f"[Settings] AI params: {self.config_data.ai_params}")
 
                 # Notify config change listeners
                 from ....config import notify_config_change
@@ -557,13 +534,6 @@ class SettingsWindow(
                             var.set(str(default_value))
                         else:
                             var.set(str(default_value) if default_value is not None else "")
-
-            # Clear AI parameters
-            self.config_data.ai_params.clear()
-            if hasattr(self, '_ai_param_keys'):
-                for ap_key in self._ai_param_keys:
-                    if ap_key in self.vars:
-                        self.vars[ap_key].set("")
 
             # Update theme preview if available
             if self.preview_frame:
