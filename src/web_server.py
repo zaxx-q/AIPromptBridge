@@ -161,11 +161,9 @@ def switch_active_profile(profile_name: str) -> bool:
 
     # Profile is the source of truth — no longer populating CONFIG/AI_PARAMS
     # (connection keys are read via ACTIVE_PROFILE / get_active_setting() / resolve_profile())
-
-    # Rebuild key managers if profile specifies a key pool/name override
-    if ACTIVE_PROFILE.api_key_pool or ACTIVE_PROFILE.api_key_name:
-        from .key_store import KeyStore
-        KEY_MANAGERS.update(KeyStore.get_instance().build_key_managers())
+    #
+    # Key overrides (api_key_pool / api_key_name) are handled at request time
+    # by resolve_profile() — no need to mutate global KEY_MANAGERS here.
 
     notify_config_change("_bulk_update", None)
     return True

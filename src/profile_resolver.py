@@ -97,6 +97,18 @@ def resolve_profile(
         if active.max_tokens is not None:
             merged_ai_params["max_tokens"] = active.max_tokens
 
+        # Apply key override from active profile (same logic as Step 2 for action profiles)
+        if active.api_key_pool or active.api_key_name:
+            resolved_km = _resolve_key_override(
+                active.api_key_pool,
+                active.api_key_name,
+                provider,
+                key_managers,
+            )
+            if resolved_km is not None:
+                effective_key_managers = dict(key_managers)
+                effective_key_managers[provider] = resolved_km
+
     # Step 3: If action specifies a profile, override with action profile values
     profile_name = None
 
