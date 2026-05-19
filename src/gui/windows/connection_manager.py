@@ -548,9 +548,15 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         custom_url_info = self.field_widgets.get("custom_url")
         custom_url_value = custom_url_info["var"].get() if custom_url_info else ""
-
+    
         gemini_endpoint_info = self.field_widgets.get("gemini_endpoint")
         gemini_endpoint_value = gemini_endpoint_info["var"].get() if gemini_endpoint_info else ""
+    
+        api_key_pool_info = self.field_widgets.get("api_key_pool")
+        api_key_pool_value = api_key_pool_info["var"].get().strip() if api_key_pool_info else ""
+    
+        api_key_name_info = self.field_widgets.get("api_key_name")
+        api_key_name_value = api_key_name_info["var"].get().strip() if api_key_name_info else ""
 
         self._set_model_status("🔄 Loading...", "info")
 
@@ -562,13 +568,36 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 from ... import web_server as _ws
     
                 key_store = KeyStore.get_instance()
-                keys_data = key_store.get_pool_for_provider(provider)
-                key_strings = [kd["key"] for kd in keys_data if kd.get("key")]
-                if not key_strings:
-                    self._schedule_ui(lambda: self._set_model_status("No API keys", "error"))
-                    return
     
-                temp_km = KeyManager(key_strings, provider)
+                # Resolve key manager using profile's api_key_pool and api_key_name
+                # (mirrors the logic in _test_profile)
+                if api_key_pool_value:
+                    temp_km = key_store.build_key_manager_for_pool(api_key_pool_value, provider)
+                    if not temp_km or not temp_km.has_keys():
+                        _pool_err = api_key_pool_value
+                        self._schedule_ui(lambda p=_pool_err: self._set_model_status(f"Pool '{p}' has no keys", "error"))
+                        return
+                else:
+                    keys_data = key_store.get_pool_for_provider(provider)
+                    key_strings = [kd["key"] for kd in keys_data if kd.get("key")]
+                    if not key_strings:
+                        self._schedule_ui(lambda: self._set_model_status("No API keys", "error"))
+                        return
+                    temp_km = KeyManager(key_strings, provider)
+    
+                if api_key_name_value:
+                    source_pool = api_key_pool_value or key_store.get_provider_pool_id(provider)
+                    pool_keys = key_store.get_pool(source_pool)
+                    matched = [kd for kd in pool_keys if kd.get("name") == api_key_name_value and kd.get("key")]
+                    if matched:
+                        temp_km = KeyManager(
+                            [kd["key"] for kd in matched], provider,
+                            key_names=[kd["name"] for kd in matched]
+                        )
+                    else:
+                        _key_err = api_key_name_value
+                        self._schedule_ui(lambda k=_key_err: self._set_model_status(f"Key '{k}' not found", "error"))
+                        return
                 temp_config = {"request_timeout": 30}
     
                 if provider == "custom":
