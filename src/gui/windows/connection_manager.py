@@ -890,10 +890,9 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         return
 
                 thinking_enabled = config.get("thinking_enabled", False)
-                thinking_output = _ws.CONFIG.get("thinking_output", "reasoning_content")
-
+            
                 messages = [{"role": "user", "content": "Say 'Hello! Profile test successful.' in exactly those words."}]
-
+            
                 def stream_callback(type_, content):
                     if type_ == "text":
                         dialog.append_text(content)
@@ -901,7 +900,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         dialog.append_thinking(content)
                     elif type_ == "error":
                         dialog.append_error(str(content))
-
+            
                 call_api_stream_unified(
                     provider_type=provider,
                     messages=messages,
@@ -911,7 +910,6 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                     key_managers=key_managers,
                     callback=stream_callback,
                     thinking_enabled=thinking_enabled,
-                    thinking_output=thinking_output,
                 )
             except Exception as e:
                 dialog.append_error(str(e))

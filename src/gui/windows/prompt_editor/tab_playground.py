@@ -1478,7 +1478,6 @@ class PlaygroundTabMixin:
                     key_managers=params["key_managers"],
                     callback=stream_callback,
                     thinking_enabled=thinking_enabled,
-                    thinking_output=params["config"].get("thinking_output", "reasoning_content")
                 )
                 
                 if error:

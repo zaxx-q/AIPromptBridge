@@ -33,12 +33,6 @@ DEFAULT_CONFIG = {
     # - "on_attachment": Create session when chat window has attachments.
     # - "always_window": Create session whenever a new chat window is opened from Tools.
     "auto_save_session": "on_attachment",
-    # How to handle thinking output: filter, raw, or reasoning_content
-    # This is a display preference, NOT a connection setting.
-    # - filter: Hide thinking content
-    # - raw: Include thinking in main response
-    # - reasoning_content: Separate field (for collapsible display)
-    "thinking_output": "reasoning_content",
     # TextEditTool settings
     "text_edit_tool_enabled": True,
     "text_edit_tool_hotkey": "ctrl+space",
@@ -390,16 +384,6 @@ request_timeout = 120
 
 # Session management
 max_sessions = 200
-
-# ============================================================
-# THINKING OUTPUT DISPLAY
-# ============================================================
-# How to handle thinking output: filter, raw, or reasoning_content
-# - filter: Hide thinking content
-# - raw: Include thinking in main response
-# - reasoning_content: Separate field (for collapsible display)
-# This is a display preference and does NOT change when switching profiles.
-thinking_output = reasoning_content
 
 # ============================================================
 # TEXT EDIT TOOL - Hotkey-triggered text processing with AI

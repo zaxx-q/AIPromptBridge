@@ -190,7 +190,6 @@ def call_api_stream_unified(
     key_managers: Dict,
     callback: Callable[[str, Any], None],
     thinking_enabled: bool = False,
-    thinking_output: str = "reasoning_content"
 ) -> Tuple[Optional[str], Optional[str], Optional[Dict], Optional[str]]:
     """
     Unified streaming API call using new provider classes.
@@ -204,7 +203,6 @@ def call_api_stream_unified(
         key_managers: Dictionary of key managers
         callback: Callback function (type, content)
         thinking_enabled: Enable thinking/reasoning mode
-        thinking_output: How to handle thinking (filter, raw, reasoning_content)
     
     Returns:
         (full_text, reasoning_text, usage_data, error) tuple
@@ -235,11 +233,7 @@ def call_api_stream_unified(
         
         elif cb_type == CallbackType.THINKING:
             accumulated_thinking += content
-            if thinking_output != "filter":
-                if thinking_output == "raw":
-                    callback("text", content)
-                else:
-                    callback("thinking", content)
+            callback("thinking", content)
         
         elif cb_type == CallbackType.TOOL_CALLS:
             callback("tool_calls", content)
@@ -274,7 +268,7 @@ def call_api_stream_unified(
         return None, None, None, result.error
 
 
-def call_custom_api_stream(key_manager, url, model, messages, ai_params, timeout, callback, thinking_output="reasoning_content"):
+def call_custom_api_stream(key_manager, url, model, messages, ai_params, timeout, callback):
     """
     Call custom OpenAI-compatible API with streaming support.
     
@@ -308,11 +302,7 @@ def call_custom_api_stream(key_manager, url, model, messages, ai_params, timeout
             callback("text", content)
         elif cb_type == CallbackType.THINKING:
             accumulated_thinking += content
-            if thinking_output != "filter":
-                if thinking_output == "raw":
-                    callback("text", content)
-                else:
-                    callback("thinking", content)
+            callback("thinking", content)
         elif cb_type == CallbackType.USAGE:
             usage_data = content
             callback("usage", content)
@@ -503,8 +493,7 @@ def call_api_chat_stream(session, config, ai_params, key_managers, callback, pro
         return None, None, None, error
     
     thinking_enabled = config.get("thinking_enabled", False)
-    thinking_output = config.get("thinking_output", "reasoning_content")
-    
+
     return call_api_stream_unified(
         provider_type=provider,
         messages=messages,
@@ -514,7 +503,6 @@ def call_api_chat_stream(session, config, ai_params, key_managers, callback, pro
         key_managers=key_managers,
         callback=callback,
         thinking_enabled=thinking_enabled,
-        thinking_output=thinking_output
     )
 
 

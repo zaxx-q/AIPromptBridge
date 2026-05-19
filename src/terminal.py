@@ -409,10 +409,6 @@ def terminal_session_manager():
                     grid.add_row("[bold]🌊 Streaming[/bold]", stream_icon)
                     grid.add_row("[bold]💭 Thinking[/bold]", think_icon)
 
-                    if thinking:
-                        thinking_output = web_server.CONFIG.get("thinking_output", "reasoning_content")
-                        grid.add_row("[dim]   Output[/dim]", thinking_output)
-
                     # Server
                     host = web_server.CONFIG.get("host", "127.0.0.1")
                     port = web_server.CONFIG.get("port", 5000)

@@ -399,8 +399,6 @@ class RequestPipeline:
                 if callbacks.on_error:
                     callbacks.on_error(content)
         
-        thinking_output = config.get("thinking_output", "reasoning_content")
-        
         text, reasoning, usage, error = call_api_stream_unified(
             provider_type=ctx.provider,
             messages=messages,
@@ -410,7 +408,6 @@ class RequestPipeline:
             key_managers=key_managers,
             callback=stream_wrapper,
             thinking_enabled=ctx.thinking_enabled,
-            thinking_output=thinking_output
         )
         
         ctx.elapsed_time = time.time() - start_time

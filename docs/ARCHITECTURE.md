@@ -385,7 +385,6 @@ The config parser (`src/config.py`) is a custom INI parser, NOT Python's `config
 # managed via Connection Profiles — see profiles.json.
 # config.ini only holds non-connection settings:
 
-thinking_output = reasoning_content
 max_retries = 3
 retry_delay = 5
 
