@@ -509,32 +509,32 @@ class OpenAICompatibleProvider(BaseProvider):
             
             # Handle error responses
             if response.status_code != 200:
-                error_text = response.text[:500]
+                error_text = response.text
                 status_code = response.status_code
-                
+    
                 reason = self.get_retry_reason(status_code, error_text)
-                
+    
                 if self.should_retry(reason, retry_count):
                     delay = self.get_retry_delay(reason)
-                    error_brief = self._extract_error_brief(error_text, status_code)
+                    error_brief = self._extract_error_brief(error_text[:500], status_code)
                     self.log_retry(reason, retry_count + 1, delay, error_brief)
-                    
+    
                     # Rotate key for rate limit and auth errors
                     if reason in (RetryReason.RATE_LIMITED, RetryReason.AUTH_ERROR):
                         self.rotate_key_if_possible(f"({reason.value})")
-                    
+    
                     if delay > 0:
                         time.sleep(delay)
-                    
+    
                     return self.generate_stream(
                         messages, model, params, callback, thinking_enabled, retry_count + 1
                     )
-                
-                self.log_error(f"API error: {error_text}", status_code)
-                callback(CallbackType.ERROR, error_text)
+    
+                full_error = f"API error ({status_code}): {error_text}"
+                callback(CallbackType.ERROR, full_error)
                 return ProviderResult(
                     success=False,
-                    error=f"API error ({status_code}): {error_text}",
+                    error=full_error,
                     retry_count=retry_count
                 )
             
@@ -578,9 +578,12 @@ class OpenAICompatibleProvider(BaseProvider):
                     # Check for error object in SSE stream
                     if "error" in data:
                         error_obj = data["error"]
-                        error_brief = self._extract_error_brief(json.dumps(error_obj), error_obj.get("code", 0) if isinstance(error_obj, dict) else 0)
-                        full_error = f"Stream error: {error_brief}"
-                        self.log_error(full_error)
+                        if isinstance(error_obj, dict):
+                            error_message = error_obj.get("message", str(error_obj))
+                            error_type = error_obj.get("type", "")
+                            full_error = f"Stream error ({error_type}): {error_message}" if error_type else f"Stream error: {error_message}"
+                        else:
+                            full_error = f"Stream error: {error_obj}"
                         callback(CallbackType.ERROR, full_error)
                         return ProviderResult(
                             success=False,
@@ -829,25 +832,24 @@ class OpenAICompatibleProvider(BaseProvider):
             
             # Handle error responses
             if response.status_code != 200:
-                error_text = response.text[:500]
+                error_text = response.text
                 status_code = response.status_code
-                
+    
                 reason = self.get_retry_reason(status_code, error_text)
-                
+    
                 if self.should_retry(reason, retry_count):
                     delay = self.get_retry_delay(reason)
-                    error_brief = self._extract_error_brief(error_text, status_code)
+                    error_brief = self._extract_error_brief(error_text[:500], status_code)
                     self.log_retry(reason, retry_count + 1, delay, error_brief)
-                    
+    
                     if reason in (RetryReason.RATE_LIMITED, RetryReason.AUTH_ERROR):
                         self.rotate_key_if_possible(f"({reason.value})")
-                    
+    
                     if delay > 0:
                         time.sleep(delay)
-                    
+    
                     return self.generate(messages, model, params, thinking_enabled, retry_count + 1)
-                
-                self.log_error(f"API error: {error_text}", status_code)
+    
                 return ProviderResult(
                     success=False,
                     error=f"API error ({status_code}): {error_text}",
@@ -885,11 +887,15 @@ class OpenAICompatibleProvider(BaseProvider):
                 # Check for error object in response body
                 if "error" in data:
                     error_obj = data["error"]
-                    error_brief = self._extract_error_brief(json.dumps(error_obj))
-                    self.log_error(f"API error: {error_brief}")
+                    if isinstance(error_obj, dict):
+                        error_message = error_obj.get("message", str(error_obj))
+                        error_type = error_obj.get("type", "")
+                        full_error = f"API error ({error_type}): {error_message}" if error_type else f"API error: {error_message}"
+                    else:
+                        full_error = f"API error: {error_obj}"
                     return ProviderResult(
                         success=False,
-                        error=f"API error: {error_brief}",
+                        error=full_error,
                         retry_count=retry_count
                     )
         
@@ -898,7 +904,6 @@ class OpenAICompatibleProvider(BaseProvider):
                     finish_reason = choice.get("finish_reason")
                     if finish_reason in ("content_filter", "blocked"):
                         block_msg = f"Response blocked: {finish_reason}"
-                        self.log_error(block_msg)
                         return ProviderResult(
                             success=False,
                             error=block_msg,

@@ -1094,32 +1094,31 @@ class GeminiNativeProvider(BaseProvider):
             
             # Handle error responses
             if response.status_code != 200:
-                error_text = response.text[:500]
+                error_text = response.text
                 status_code = response.status_code
-                
+    
                 reason = self.get_retry_reason(status_code, error_text)
-                
+    
                 if self.should_retry(reason, retry_count):
                     delay = self.get_retry_delay(reason)
-                    # Extract brief error description from response
-                    error_brief = self._extract_error_brief(error_text, status_code)
+                    error_brief = self._extract_error_brief(error_text[:500], status_code)
                     self.log_retry(reason, retry_count + 1, delay, error_brief)
-                    
+    
                     if reason in (RetryReason.RATE_LIMITED, RetryReason.AUTH_ERROR):
                         self.rotate_key_if_possible(f"({reason.value})")
-                    
+    
                     if delay > 0:
                         time.sleep(delay)
-                    
+    
                     return self.generate_stream(
                         messages, model, params, callback, thinking_enabled, retry_count + 1
                     )
-                
-                self.log_error(f"API error: {error_text}", status_code)
-                callback(CallbackType.ERROR, error_text)
+    
+                full_error = f"API error ({status_code}): {error_text}"
+                callback(CallbackType.ERROR, full_error)
                 return ProviderResult(
                     success=False,
-                    error=f"API error ({status_code}): {error_text}",
+                    error=full_error,
                     retry_count=retry_count
                 )
             
@@ -1148,11 +1147,15 @@ class GeminiNativeProvider(BaseProvider):
                     # Check for error object in SSE stream (e.g., 503 overloaded)
                     if "error" in data:
                         error_obj = data["error"]
-                        error_brief = self._extract_error_brief(json.dumps(error_obj), error_obj.get("code", 0) if isinstance(error_obj, dict) else 0)
-                        error_code = error_obj.get("code", 0) if isinstance(error_obj, dict) else 0
-                        error_status = error_obj.get("status", "") if isinstance(error_obj, dict) else ""
-                        full_error = f"Stream error [{error_status}] ({error_code}): {error_brief}" if error_status else f"Stream error ({error_code}): {error_brief}"
-                        self.log_error(full_error, error_code)
+                        if isinstance(error_obj, dict):
+                            error_code = error_obj.get("code", 0)
+                            error_status = error_obj.get("status", "")
+                            error_message = error_obj.get("message", str(error_obj))
+                        else:
+                            error_code = 0
+                            error_status = ""
+                            error_message = str(error_obj)
+                        full_error = f"Stream error [{error_status}] ({error_code}): {error_message}" if error_status else f"Stream error ({error_code}): {error_message}"
                         callback(CallbackType.ERROR, full_error)
                         return ProviderResult(
                             success=False,
@@ -1199,7 +1202,6 @@ class GeminiNativeProvider(BaseProvider):
                         if finish_reason in ("SAFETY", "RECITATION", "BLOCKED", "PROHIBITED"):
                             if not accumulated_content.strip() and not accumulated_tool_calls:
                                 block_msg = f"Response blocked: {finish_reason}"
-                                self.log_error(block_msg)
                                 callback(CallbackType.ERROR, block_msg)
                                 return ProviderResult(
                                     success=False,
@@ -1382,25 +1384,24 @@ class GeminiNativeProvider(BaseProvider):
             
             # Handle error responses
             if response.status_code != 200:
-                error_text = response.text[:500]
+                error_text = response.text
                 status_code = response.status_code
-                
+    
                 reason = self.get_retry_reason(status_code, error_text)
-                
+    
                 if self.should_retry(reason, retry_count):
                     delay = self.get_retry_delay(reason)
-                    error_brief = self._extract_error_brief(error_text, status_code)
+                    error_brief = self._extract_error_brief(error_text[:500], status_code)
                     self.log_retry(reason, retry_count + 1, delay, error_brief)
-                    
+    
                     if reason in (RetryReason.RATE_LIMITED, RetryReason.AUTH_ERROR):
                         self.rotate_key_if_possible(f"({reason.value})")
-                    
+    
                     if delay > 0:
                         time.sleep(delay)
-                    
+    
                     return self.generate(messages, model, params, thinking_enabled, retry_count + 1)
-                
-                self.log_error(f"API error: {error_text}", status_code)
+    
                 return ProviderResult(
                     success=False,
                     error=f"API error ({status_code}): {error_text}",
@@ -1414,11 +1415,15 @@ class GeminiNativeProvider(BaseProvider):
             # Check for error object in response body
             if "error" in data:
                 error_obj = data["error"]
-                error_brief = self._extract_error_brief(json.dumps(error_obj), error_obj.get("code", 0) if isinstance(error_obj, dict) else 0)
-                error_code = error_obj.get("code", 0) if isinstance(error_obj, dict) else 0
-                error_status = error_obj.get("status", "") if isinstance(error_obj, dict) else ""
-                full_error = f"API error [{error_status}] ({error_code}): {error_brief}" if error_status else f"API error ({error_code}): {error_brief}"
-                self.log_error(full_error, error_code)
+                if isinstance(error_obj, dict):
+                    error_code = error_obj.get("code", 0)
+                    error_status = error_obj.get("status", "")
+                    error_message = error_obj.get("message", str(error_obj))
+                else:
+                    error_code = 0
+                    error_status = ""
+                    error_message = str(error_obj)
+                full_error = f"API error [{error_status}] ({error_code}): {error_message}" if error_status else f"API error ({error_code}): {error_message}"
                 return ProviderResult(
                     success=False,
                     error=full_error,
@@ -1432,9 +1437,8 @@ class GeminiNativeProvider(BaseProvider):
                     content_parts_check = candidate.get("content", {}).get("parts", [])
                     has_content = any("text" in p and not p.get("thought") for p in content_parts_check if isinstance(p, dict))
                     if not has_content:
-                        block_msg = f"Response blocked: {finish_reason}"
-                        self.log_error(block_msg)
-                        return ProviderResult(
+                                block_msg = f"Response blocked: {finish_reason}"
+                                return ProviderResult(
                             success=False,
                             error=block_msg,
                             retry_count=retry_count
