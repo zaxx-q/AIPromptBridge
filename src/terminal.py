@@ -383,10 +383,11 @@ def terminal_session_manager():
 
                 store = ProfileStore.get_instance()
                 active_profile = store.get_active_profile_name()
-    
+                profile = web_server.ACTIVE_PROFILE  # ConnectionProfile object
+
                 provider = web_server.get_active_setting("provider", "google")
                 model = web_server.get_active_setting("model", "not set")
-                base_url = get_base_url_for_status(web_server.CONFIG, provider, profile=web_server.ACTIVE_PROFILE)
+                base_url = get_base_url_for_status(web_server.CONFIG, provider, profile=profile)
                 streaming = web_server.get_active_setting("streaming", True)
                 thinking = web_server.get_active_setting("thinking", False)
 
@@ -397,11 +398,20 @@ def terminal_session_manager():
 
                     # Active Profile
                     grid.add_row("[bold]🔌 Profile[/bold]", f"[yellow]{active_profile}[/yellow]")
+                    if profile and profile.description:
+                        grid.add_row("[dim] Description[/dim]", f"[dim]{profile.description}[/dim]")
 
                     # Provider Info
                     grid.add_row("[bold]📡 Provider[/bold]", f"[cyan]{provider}[/cyan]")
-                    grid.add_row("[dim]   Base URL[/dim]", f"[dim]{base_url}[/dim]")
+                    grid.add_row("[dim] Base URL[/dim]", f"[dim]{base_url}[/dim]")
                     grid.add_row("[bold]🤖 Model[/bold]", f"[green]{model}[/green]")
+
+                    # API Key Info from profile
+                    if profile and (profile.api_key_pool or profile.api_key_name):
+                        pool_str = f"[magenta]{profile.api_key_pool}[/magenta]" if profile.api_key_pool else "[dim]default[/dim]"
+                        name_str = f"[magenta]{profile.api_key_name}[/magenta]" if profile.api_key_name else "[dim]any[/dim]"
+                        grid.add_row("[bold]🗝️ API Pool[/bold]", pool_str)
+                        grid.add_row("[bold]🏷️ API Key Name[/bold]", name_str)
 
                     # Settings
                     stream_icon = "[green]ON[/green]" if streaming else "[red]OFF[/red]"
@@ -409,20 +419,39 @@ def terminal_session_manager():
                     grid.add_row("[bold]🌊 Streaming[/bold]", stream_icon)
                     grid.add_row("[bold]💭 Thinking[/bold]", think_icon)
 
+                    if thinking and profile:
+                        if profile.thinking_budget is not None and profile.thinking_budget != -1:
+                            grid.add_row("[dim] Budget[/dim]", str(profile.thinking_budget))
+                        if provider == "google" and profile.thinking_level:
+                            grid.add_row("[dim] Level[/dim]", profile.thinking_level)
+                        elif provider in ("custom", "openrouter") and profile.reasoning_effort:
+                            grid.add_row("[dim] Effort[/dim]", profile.reasoning_effort)
+
+                    # AI Params from profile
+                    if profile:
+                        if profile.temperature is not None:
+                            grid.add_row("[bold]🌡️ Temperature[/bold]", f"{profile.temperature}")
+                        if profile.max_tokens is not None:
+                            grid.add_row("[bold]📏 Max Tokens[/bold]", f"{profile.max_tokens:,}")
+                        if profile.request_timeout is not None:
+                            grid.add_row("[bold]⏱️ Timeout[/bold]", f"{profile.request_timeout}s")
+
                     # Server
                     host = web_server.CONFIG.get("host", "127.0.0.1")
                     port = web_server.CONFIG.get("port", 5000)
                     grid.add_row("[bold]🚀 Server[/bold]", f"[link=http://{host}:{port}]http://{host}:{port}[/link]")
 
-                    # Keys
-                    key_status = []
-                    for p, km in web_server.KEY_MANAGERS.items():
-                        count = km.get_key_count()
-                        color = "green" if count > 0 else "red"
-                        active = " [bold]◄[/bold]" if p == provider else ""
-                        key_status.append(f"[{color}]{p}: {count}[/{color}]{active}")
+                    # Keys — total across all pools
+                    try:
+                        from .key_store import KeyStore
+                        ks = KeyStore.get_instance()
+                        total_keys = sum(p.get("key_count", 0) for p in ks.list_pools())
+                        pool_count = len(ks.list_pools())
+                        key_str = f"[green]{total_keys}[/green] keys in [cyan]{pool_count}[/cyan] pools"
+                    except Exception:
+                        key_str = "[dim]N/A[/dim]"
 
-                    grid.add_row("[bold]🔑 API Keys[/bold]", ", ".join(key_status))
+                    grid.add_row("[bold]🔑 API Keys[/bold]", key_str)
 
                     console.print(Panel(grid, title="[bold]System Info[/bold]", border_style="blue"))
                     console.print()
@@ -430,21 +459,44 @@ def terminal_session_manager():
                     print(f"\n{'─'*64}")
                     print("📊 INFO")
                     print(f"{'─'*64}")
-                    print(f"   🔌 Profile:   {active_profile}")
-                    print(f"   📡 Provider:  {provider}")
-                    print(f"      Base URL:  {base_url}")
-                    print(f"   🤖 Model:     {model}")
+                    print(f" 🔌 Profile: {active_profile}")
+                    if profile and profile.description:
+                        print(f" Description: {profile.description}")
+                    print(f" 📡 Provider: {provider}")
+                    print(f" Base URL: {base_url}")
+                    print(f" 🤖 Model: {model}")
+                    if profile and (profile.api_key_pool or profile.api_key_name):
+                        print(f" 🗝️ API Pool: {profile.api_key_pool or 'default'}")
+                        print(f" 🏷️ API Key Name: {profile.api_key_name or 'any'}")
                     stream_status = "✅ ON" if streaming else "✗ OFF"
                     think_status = "✅ ON" if thinking else "✗ OFF"
-                    print(f"\n   🌊 Streaming: {stream_status}")
-                    print(f"   💭 Thinking:  {think_status}")
+                    print(f"\n 🌊 Streaming: {stream_status}")
+                    print(f" 💭 Thinking: {think_status}")
+                    if thinking and profile:
+                        if profile.thinking_budget is not None and profile.thinking_budget != -1:
+                            print(f"  Budget: {profile.thinking_budget}")
+                        if provider == "google" and profile.thinking_level:
+                            print(f"  Level: {profile.thinking_level}")
+                        elif provider in ("custom", "openrouter") and profile.reasoning_effort:
+                            print(f"  Effort: {profile.reasoning_effort}")
+                    if profile:
+                        if profile.temperature is not None:
+                            print(f"\n 🌡️ Temperature: {profile.temperature}")
+                        if profile.max_tokens is not None:
+                            print(f" 📏 Max Tokens: {profile.max_tokens:,}")
+                        if profile.request_timeout is not None:
+                            print(f" ⏱️ Timeout: {profile.request_timeout}s")
                     host = web_server.CONFIG.get("host", "127.0.0.1")
                     port = web_server.CONFIG.get("port", 5000)
-                    print(f"\n   🚀 Server:    http://{host}:{port}")
-                    print(f"\n   🔑 API Keys:")
-                    for p, km in web_server.KEY_MANAGERS.items():
-                        count = km.get_key_count()
-                        print(f"      {p}: {count}")
+                    print(f"\n 🚀 Server: http://{host}:{port}")
+                    try:
+                        from .key_store import KeyStore
+                        ks = KeyStore.get_instance()
+                        total_keys = sum(p.get("key_count", 0) for p in ks.list_pools())
+                        pool_count = len(ks.list_pools())
+                        print(f"\n 🔑 API Keys: {total_keys} keys in {pool_count} pools")
+                    except Exception:
+                        print(f"\n 🔑 API Keys: N/A")
                     print(f"{'─'*64}\n")
             
             elif key == 'k':
