@@ -1114,7 +1114,10 @@ class GeminiNativeProvider(BaseProvider):
                         messages, model, params, callback, thinking_enabled, retry_count + 1
                     )
     
-                full_error = f"API error ({status_code}): {error_text}"
+                # Extract the actual API error message from the response
+                error_message = self._extract_error_brief(error_text[:500], status_code) if error_text else f"HTTP {status_code}"
+                # Prepend status code: "429: <message>"
+                full_error = f"{status_code}: {error_message}" if error_message != f"HTTP {status_code}" else error_message
                 callback(CallbackType.ERROR, full_error)
                 return ProviderResult(
                     success=False,
@@ -1151,15 +1154,15 @@ class GeminiNativeProvider(BaseProvider):
                             error_code = error_obj.get("code", 0)
                             error_status = error_obj.get("status", "")
                             error_message = error_obj.get("message", str(error_obj))
+                            # Compact format: "429 RESOURCE_EXHAUSTED: <message>"
+                            prefix = f"{error_code} {error_status}" if error_status else str(error_code) if error_code else ""
+                            error_text = f"{prefix}: {error_message}" if prefix else error_message
                         else:
-                            error_code = 0
-                            error_status = ""
-                            error_message = str(error_obj)
-                        full_error = f"Stream error [{error_status}] ({error_code}): {error_message}" if error_status else f"Stream error ({error_code}): {error_message}"
-                        callback(CallbackType.ERROR, full_error)
+                            error_text = str(error_obj)
+                        callback(CallbackType.ERROR, error_text)
                         return ProviderResult(
                             success=False,
-                            error=full_error,
+                            error=error_text,
                             retry_count=retry_count
                         )
 
@@ -1402,9 +1405,13 @@ class GeminiNativeProvider(BaseProvider):
     
                     return self.generate(messages, model, params, thinking_enabled, retry_count + 1)
     
+                # Extract the actual API error message from the response
+                error_message = self._extract_error_brief(error_text[:500], status_code) if error_text else f"HTTP {status_code}"
+                # Prepend status code: "429: <message>"
+                full_error = f"{status_code}: {error_message}" if error_message != f"HTTP {status_code}" else error_message
                 return ProviderResult(
                     success=False,
-                    error=f"API error ({status_code}): {error_text}",
+                    error=full_error,
                     retry_count=retry_count
                 )
             
@@ -1419,14 +1426,13 @@ class GeminiNativeProvider(BaseProvider):
                     error_code = error_obj.get("code", 0)
                     error_status = error_obj.get("status", "")
                     error_message = error_obj.get("message", str(error_obj))
+                    prefix = f"{error_code} {error_status}" if error_status else str(error_code) if error_code else ""
+                    error_text = f"{prefix}: {error_message}" if prefix else error_message
                 else:
-                    error_code = 0
-                    error_status = ""
-                    error_message = str(error_obj)
-                full_error = f"API error [{error_status}] ({error_code}): {error_message}" if error_status else f"API error ({error_code}): {error_message}"
+                    error_text = str(error_obj)
                 return ProviderResult(
                     success=False,
-                    error=full_error,
+                    error=error_text,
                     retry_count=retry_count
                 )
     

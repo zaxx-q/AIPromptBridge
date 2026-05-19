@@ -530,7 +530,10 @@ class OpenAICompatibleProvider(BaseProvider):
                         messages, model, params, callback, thinking_enabled, retry_count + 1
                     )
     
-                full_error = f"API error ({status_code}): {error_text}"
+                # Extract the actual API error message from the response
+                error_message = self._extract_error_brief(error_text[:500], status_code) if error_text else f"HTTP {status_code}"
+                # Prepend status code: "429: <message>"
+                full_error = f"{status_code}: {error_message}" if error_message != f"HTTP {status_code}" else error_message
                 callback(CallbackType.ERROR, full_error)
                 return ProviderResult(
                     success=False,
@@ -579,15 +582,18 @@ class OpenAICompatibleProvider(BaseProvider):
                     if "error" in data:
                         error_obj = data["error"]
                         if isinstance(error_obj, dict):
-                            error_message = error_obj.get("message", str(error_obj))
+                            error_code = error_obj.get("code", 0)
                             error_type = error_obj.get("type", "")
-                            full_error = f"Stream error ({error_type}): {error_message}" if error_type else f"Stream error: {error_message}"
+                            error_message = error_obj.get("message", str(error_obj))
+                            # Compact format: "429 rate_limit_exceeded: <message>"
+                            prefix = f"{error_code} {error_type}" if error_type else str(error_code) if error_code else ""
+                            error_text = f"{prefix}: {error_message}" if prefix else error_message
                         else:
-                            full_error = f"Stream error: {error_obj}"
-                        callback(CallbackType.ERROR, full_error)
+                            error_text = str(error_obj)
+                        callback(CallbackType.ERROR, error_text)
                         return ProviderResult(
                             success=False,
-                            error=full_error,
+                            error=error_text,
                             retry_count=retry_count
                         )
 
@@ -850,9 +856,13 @@ class OpenAICompatibleProvider(BaseProvider):
     
                     return self.generate(messages, model, params, thinking_enabled, retry_count + 1)
     
+                # Extract the actual API error message from the response
+                error_message = self._extract_error_brief(error_text[:500], status_code) if error_text else f"HTTP {status_code}"
+                # Prepend status code: "429: <message>"
+                full_error = f"{status_code}: {error_message}" if error_message != f"HTTP {status_code}" else error_message
                 return ProviderResult(
                     success=False,
-                    error=f"API error ({status_code}): {error_text}",
+                    error=full_error,
                     retry_count=retry_count
                 )
             
@@ -888,14 +898,16 @@ class OpenAICompatibleProvider(BaseProvider):
                 if "error" in data:
                     error_obj = data["error"]
                     if isinstance(error_obj, dict):
-                        error_message = error_obj.get("message", str(error_obj))
+                        error_code = error_obj.get("code", 0)
                         error_type = error_obj.get("type", "")
-                        full_error = f"API error ({error_type}): {error_message}" if error_type else f"API error: {error_message}"
+                        error_message = error_obj.get("message", str(error_obj))
+                        prefix = f"{error_code} {error_type}" if error_type else str(error_code) if error_code else ""
+                        error_text = f"{prefix}: {error_message}" if prefix else error_message
                     else:
-                        full_error = f"API error: {error_obj}"
+                        error_text = str(error_obj)
                     return ProviderResult(
                         success=False,
-                        error=full_error,
+                        error=error_text,
                         retry_count=retry_count
                     )
         

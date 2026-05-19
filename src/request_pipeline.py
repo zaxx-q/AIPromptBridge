@@ -115,20 +115,29 @@ class RequestPipeline:
         """Log when request completes - always includes token usage"""
         if HAVE_RICH:
             style = "green" if not ctx.error else "red"
-            title = "[bold green]SUCCESS[/bold green]" if not ctx.error else f"[bold red]FAILED: {ctx.error}[/bold red]"
-            
+            if ctx.error:
+                # Use brief error in title to avoid stretching the panel
+                error_brief = ctx.error[:80] + "..." if len(ctx.error) > 80 else ctx.error
+                title = f"[bold red]FAILED: {error_brief}[/bold red]"
+            else:
+                title = "[bold green]SUCCESS[/bold green]"
+
             summary = []
             if not ctx.error:
                 summary.append(f"Length: {len(ctx.response_text)} chars")
                 if ctx.reasoning_text:
                     summary.append(f"Thinking: {len(ctx.reasoning_text)} chars")
-            
+
             summary.append(f"Elapsed: {ctx.elapsed_time:.2f}s")
             if ctx.retry_count > 0:
                 summary.append(f"Retries: {ctx.retry_count}")
-            
+
+            # Show full error inside the panel body (not title) so it wraps naturally
+            if ctx.error and len(ctx.error) > 80:
+                summary.insert(0, ctx.error)
+
             summary.append(f"\n{ctx.get_usage_summary()}")
-            
+
             print_panel(
                 "\n".join(summary),
                 title=title,
@@ -148,7 +157,7 @@ class RequestPipeline:
                 print(f"  Elapsed: {ctx.elapsed_time:.1f}s")
                 if ctx.retry_count > 0:
                     print(f"  Retries: {ctx.retry_count}")
-            
+
             # ALWAYS log token usage
             print(f"  {ctx.get_usage_summary()}")
             print(f"{'='*60}\n")
