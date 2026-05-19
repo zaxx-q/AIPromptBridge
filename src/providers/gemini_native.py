@@ -1144,6 +1144,22 @@ class GeminiNativeProvider(BaseProvider):
                 
                 try:
                     data = json.loads(line[6:])
+
+                    # Check for error object in SSE stream (e.g., 503 overloaded)
+                    if "error" in data:
+                        error_obj = data["error"]
+                        error_brief = self._extract_error_brief(json.dumps(error_obj), error_obj.get("code", 0) if isinstance(error_obj, dict) else 0)
+                        error_code = error_obj.get("code", 0) if isinstance(error_obj, dict) else 0
+                        error_status = error_obj.get("status", "") if isinstance(error_obj, dict) else ""
+                        full_error = f"Stream error [{error_status}] ({error_code}): {error_brief}" if error_status else f"Stream error ({error_code}): {error_brief}"
+                        self.log_error(full_error, error_code)
+                        callback(CallbackType.ERROR, full_error)
+                        return ProviderResult(
+                            success=False,
+                            error=full_error,
+                            retry_count=retry_count
+                        )
+
                     candidate = data.get("candidates", [{}])[0]
                     content_parts = candidate.get("content", {}).get("parts", [])
                     
@@ -1176,7 +1192,21 @@ class GeminiNativeProvider(BaseProvider):
                             accumulated_tool_calls.append(tool_call)
                             callback(CallbackType.TOOL_CALLS, [tool_call])
                             last_content_time = time.time()
-                    
+
+                    # Check for blocked finish reasons (SAFETY, RECITATION, etc.)
+                    if isinstance(candidate, dict):
+                        finish_reason = candidate.get("finishReason")
+                        if finish_reason in ("SAFETY", "RECITATION", "BLOCKED", "PROHIBITED"):
+                            if not accumulated_content.strip() and not accumulated_tool_calls:
+                                block_msg = f"Response blocked: {finish_reason}"
+                                self.log_error(block_msg)
+                                callback(CallbackType.ERROR, block_msg)
+                                return ProviderResult(
+                                    success=False,
+                                    error=block_msg,
+                                    retry_count=retry_count
+                                )
+
                     # Capture usage metadata
                     if "usageMetadata" in data:
                         usage = data["usageMetadata"]
@@ -1380,6 +1410,36 @@ class GeminiNativeProvider(BaseProvider):
             # Parse response
             data = response.json()
             candidate = data.get("candidates", [{}])[0]
+    
+            # Check for error object in response body
+            if "error" in data:
+                error_obj = data["error"]
+                error_brief = self._extract_error_brief(json.dumps(error_obj), error_obj.get("code", 0) if isinstance(error_obj, dict) else 0)
+                error_code = error_obj.get("code", 0) if isinstance(error_obj, dict) else 0
+                error_status = error_obj.get("status", "") if isinstance(error_obj, dict) else ""
+                full_error = f"API error [{error_status}] ({error_code}): {error_brief}" if error_status else f"API error ({error_code}): {error_brief}"
+                self.log_error(full_error, error_code)
+                return ProviderResult(
+                    success=False,
+                    error=full_error,
+                    retry_count=retry_count
+                )
+    
+            # Check for blocked finish reasons
+            if isinstance(candidate, dict):
+                finish_reason = candidate.get("finishReason")
+                if finish_reason in ("SAFETY", "RECITATION", "BLOCKED", "PROHIBITED"):
+                    content_parts_check = candidate.get("content", {}).get("parts", [])
+                    has_content = any("text" in p and not p.get("thought") for p in content_parts_check if isinstance(p, dict))
+                    if not has_content:
+                        block_msg = f"Response blocked: {finish_reason}"
+                        self.log_error(block_msg)
+                        return ProviderResult(
+                            success=False,
+                            error=block_msg,
+                            retry_count=retry_count
+                        )
+    
             content_parts = candidate.get("content", {}).get("parts", [])
             
             accumulated_content = ""

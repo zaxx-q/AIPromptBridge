@@ -574,7 +574,20 @@ class OpenAICompatibleProvider(BaseProvider):
                     json_str = line[6:]
                     data = json.loads(json_str)
                     chunk_count += 1
-                    
+
+                    # Check for error object in SSE stream
+                    if "error" in data:
+                        error_obj = data["error"]
+                        error_brief = self._extract_error_brief(json.dumps(error_obj), error_obj.get("code", 0) if isinstance(error_obj, dict) else 0)
+                        full_error = f"Stream error: {error_brief}"
+                        self.log_error(full_error)
+                        callback(CallbackType.ERROR, full_error)
+                        return ProviderResult(
+                            success=False,
+                            error=full_error,
+                            retry_count=retry_count
+                        )
+
                     # Get choices array - may be empty in usage-only chunks
                     choices = data.get("choices", [])
                     if choices:
@@ -629,7 +642,20 @@ class OpenAICompatibleProvider(BaseProvider):
                             accumulated_tool_calls.extend(tool_calls)
                             callback(CallbackType.TOOL_CALLS, tool_calls)
                             last_content_time = time.time()
-                    
+
+                        # Check for blocked finish reasons (content_filter, etc.)
+                        finish_reason = choice.get("finish_reason")
+                        if finish_reason in ("content_filter", "blocked"):
+                            if not accumulated_content.strip() and not accumulated_tool_calls:
+                                block_msg = f"Response blocked: {finish_reason}"
+                                self.log_error(block_msg)
+                                callback(CallbackType.ERROR, block_msg)
+                                return ProviderResult(
+                                    success=False,
+                                    error=block_msg,
+                                    retry_count=retry_count
+                                )
+
                     # Handle usage data (comes with stream_options.include_usage)
                     # This may come in a chunk with empty choices array
                     if "usage" in data:
@@ -855,8 +881,31 @@ class OpenAICompatibleProvider(BaseProvider):
                 elif not isinstance(choice, dict):
                     self.log("warn", f"choice is not dict: {type(choice)}, raw: {json.dumps(data)[:500]}")
                     choice = {}
-            
-            message = choice.get("message") if isinstance(choice, dict) else None
+        
+                # Check for error object in response body
+                if "error" in data:
+                    error_obj = data["error"]
+                    error_brief = self._extract_error_brief(json.dumps(error_obj))
+                    self.log_error(f"API error: {error_brief}")
+                    return ProviderResult(
+                        success=False,
+                        error=f"API error: {error_brief}",
+                        retry_count=retry_count
+                    )
+        
+                # Check for blocked finish reasons
+                if isinstance(choice, dict):
+                    finish_reason = choice.get("finish_reason")
+                    if finish_reason in ("content_filter", "blocked"):
+                        block_msg = f"Response blocked: {finish_reason}"
+                        self.log_error(block_msg)
+                        return ProviderResult(
+                            success=False,
+                            error=block_msg,
+                            retry_count=retry_count
+                        )
+        
+                message = choice.get("message") if isinstance(choice, dict) else None
             if message is None:
                 message = {}
             elif not isinstance(message, dict):
