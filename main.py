@@ -5,7 +5,6 @@ Main entry point
 
 Usage:
     python main.py              # Start with tray (console hidden)
-    python main.py --no-tray    # Start in terminal mode (no tray)
     python main.py --show-console   # Start with tray + console visible
     python main.py --no-wt      # Skip Windows Terminal auto-detection
 
@@ -447,15 +446,9 @@ def parse_args():
         epilog="""
 Examples:
   python main.py                  Start with tray (console hidden by default)
-  python main.py --no-tray        Start in terminal mode (no tray icon)
   python main.py --show-console   Start with tray and console visible
   python main.py --no-wt          Skip Windows Terminal auto-detection
         """
-    )
-    parser.add_argument(
-        '--no-tray',
-        action='store_true',
-        help='Run in terminal mode without system tray'
     )
     parser.add_argument(
         '--show-console',
@@ -727,8 +720,8 @@ def main():
     if sys.platform == 'win32':
         mutex_handle = acquire_single_instance_mutex()
         if mutex_handle is None:
-            if args.show_console or (not args.no_tray):
-                # If console is visible or tray is enabled, we might want to alert
+            if args.show_console:
+                # If console is visible, we might want to alert
                 pass
             
             if HAVE_RICH:
@@ -738,7 +731,7 @@ def main():
             
             # If we are in tray mode (hidden console), just exit silently
             # User probably just double clicked the icon again
-            if not args.show_console and not args.no_tray:
+            if not args.show_console:
                 sys.exit(0)
 
             print("Press Enter to exit...")
@@ -913,7 +906,7 @@ def main():
         print()
     
     # ─── Tray Mode vs Terminal Mode ───────────────────────────────────────
-    use_tray = HAVE_TRAY and not args.no_tray and sys.platform == 'win32'
+    use_tray = HAVE_TRAY and sys.platform == 'win32'
     
     if use_tray:
         # Tray mode: hide console by default, run server in background
@@ -960,12 +953,7 @@ def main():
         
     else:
         # Terminal mode: normal behavior
-        if args.no_tray:
-            if HAVE_RICH:
-                console.print("[dim]📟 Running in terminal mode (--no-tray)[/dim]")
-            else:
-                print("📟 Running in terminal mode (--no-tray)")
-        elif not HAVE_TRAY:
+        if not HAVE_TRAY:
             if HAVE_RICH:
                 console.print("[dim]📟 Running in terminal mode (tray not available)[/dim]")
                 console.print("   Install with: [cyan]pip install infi.systray[/cyan]")

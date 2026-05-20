@@ -928,7 +928,7 @@ def test_tray_integration():
 def test_settings_integration():
     section("TEST 14: Settings Window Integration")
 
-    settings_path = PROJECT_ROOT / "src" / "gui" / "windows" / "settings_window.py"
+    settings_path = PROJECT_ROOT / "src" / "gui" / "windows" / "settings_window" / "tab_general.py"
     settings_source = settings_path.read_text()
 
     if "update_check_enabled" in settings_source:

@@ -271,7 +271,6 @@ For advanced users, configuration files are stored in the application root:
 ## 🔧 Command Line Options
 
 ```bash
-AIPromptBridge.exe --no-tray          # No tray icon
 AIPromptBridge.exe --show-console     # Doesn't automatically hide console at startup, also enable debug logs
 AIPromptBridge.exe --no-wt            # Skip Windows Terminal detection and redirection (handled by launcher)
 ```

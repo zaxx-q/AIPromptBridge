@@ -557,6 +557,20 @@ def background_update_check(config: dict):
             info = check_for_update()
             if info:
                 _print_update_notification(info)
+                
+                # Show the GUI popup if GUI is available and we are not in terminal mode
+                try:
+                    from .gui.core import GUICoordinator, HAVE_GUI
+                    if HAVE_GUI:
+                        coordinator = GUICoordinator.get_instance()
+                        
+                        def _show_update_dialog():
+                            from .gui.windows.update_dialogs import show_update_available_dialog
+                            show_update_available_dialog(info, __version__)
+                        
+                        coordinator.run_on_gui_thread(_show_update_dialog)
+                except Exception as e:
+                    print(f"[Error] Failed to show startup update dialog: {e}")
         except Exception:
             pass  # Silent fail on background check
 
