@@ -97,6 +97,7 @@ class FileProcessor(BaseTool):
         self._processing_callback: Optional[Callable] = None
         self._large_file_mode: Dict[str, str] = {}  # file_path -> mode
         self._audio_preprocessing: Optional[Dict[str, Any]] = None  # Audio preprocessing settings
+        self._pdf_temp_dirs: List[Path] = []  # PDF temporary directories to clean up
         
         # Custom instructions state
         self._custom_instructions: Optional[str] = None  # Batch-wide instructions
@@ -121,6 +122,9 @@ class FileProcessor(BaseTool):
                 elif resume:
                     return self._resume_from_checkpoint()
                 else:
+                    checkpoint = self.checkpoint_manager.load()
+                    if checkpoint and hasattr(checkpoint, "pdf_temp_dirs") and checkpoint.pdf_temp_dirs:
+                        self._cleanup_pdf_temp_dirs(checkpoint.pdf_temp_dirs)
                     self.checkpoint_manager.clear()
             
             # Check for failed files checkpoint (only if no main checkpoint)
@@ -131,73 +135,83 @@ class FileProcessor(BaseTool):
                 elif retry:
                     return self._resume_from_failed_checkpoint()
                 else:
+                    checkpoint = self.checkpoint_manager.load_failed()
+                    if checkpoint and hasattr(checkpoint, "pdf_temp_dirs") and checkpoint.pdf_temp_dirs:
+                        self._cleanup_pdf_temp_dirs(checkpoint.pdf_temp_dirs)
                     self.checkpoint_manager.clear_failed()
             
-            # Step 1: Input selection
-            scan_result = self._step_input_selection()
-            if scan_result is None:
-                return ToolResult(success=False, message="Cancelled")
-            
-            # Step 1.5: Audio Effects (if audio files detected)
-            if "audio" in scan_result.by_type:
-                self._audio_preprocessing = self._step_audio_preprocessing(scan_result)
-                # None means cancelled, empty dict means skip preprocessing
-                if self._audio_preprocessing is None:
+            try:
+                # Step 1: Input selection
+                scan_result = self._step_input_selection()
+                if scan_result is None:
                     return ToolResult(success=False, message="Cancelled")
                 
-                # Step 1.6: Audio Optimization (after effects)
-                self._audio_preprocessing = self._step_audio_optimization(scan_result, self._audio_preprocessing)
-                if self._audio_preprocessing is None:
+                # Step 1.5: Audio Effects (if audio files detected)
+                if "audio" in scan_result.by_type:
+                    self._audio_preprocessing = self._step_audio_preprocessing(scan_result)
+                    # None means cancelled, empty dict means skip preprocessing
+                    if self._audio_preprocessing is None:
+                        return ToolResult(success=False, message="Cancelled")
+                    
+                    # Step 1.6: Audio Optimization (after effects)
+                    self._audio_preprocessing = self._step_audio_optimization(scan_result, self._audio_preprocessing)
+                    if self._audio_preprocessing is None:
+                        return ToolResult(success=False, message="Cancelled")
+                
+                # Step 2: Prompt selection
+                prompt_key, prompt_text = self._step_prompt_selection(scan_result)
+                if prompt_key is None:
                     return ToolResult(success=False, message="Cancelled")
-            
-            # Step 2: Prompt selection
-            prompt_key, prompt_text = self._step_prompt_selection(scan_result)
-            if prompt_key is None:
-                return ToolResult(success=False, message="Cancelled")
-            
-            # Step 2.5: Custom instructions (optional)
-            custom_result = self._step_custom_instructions(prompt_key, len(scan_result.files))
-            if custom_result is None:
-                return ToolResult(success=False, message="Cancelled")
-            
-            self._custom_instructions, self._ask_per_file = custom_result
-            
-            # Step 2.6: Filename context (optional)
-            self._include_filename = self._step_filename_context()
-            
-            # Step 3: Output configuration
-            output_config = self._step_output_configuration(scan_result, prompt_key)
-            if output_config is None:
-                return ToolResult(success=False, message="Cancelled")
-            
-            # Step 4: Execution settings
-            exec_settings = self._step_execution_settings()
-            if exec_settings is None:
-                return ToolResult(success=False, message="Cancelled")
-            
-            # Create checkpoint (include audio preprocessing and custom instructions)
-            input_files = [str(f.path) for f in scan_result.files]
-            self._current_checkpoint = self.checkpoint_manager.create(
-                input_path=str(scan_result.input_path),
-                input_files=input_files,
-                prompt_key=prompt_key,
-                prompt_text=prompt_text,
-                output_mode=output_config["mode"],
-                output_path=output_config["path"],
-                naming_template=output_config["naming"],
-                output_extension=output_config["extension"],
-                provider=exec_settings["provider"],
-                model=exec_settings["model"],
-                delay=exec_settings["delay"],
-                use_batch=exec_settings.get("use_batch", False),
-                audio_preprocessing=self._audio_preprocessing,
-                custom_instructions=self._custom_instructions,
-                skip_per_file_prompts=not self._ask_per_file,
-                include_filename=self._include_filename
-            )
-            
-            # Step 5: Execute processing
-            return self._execute_processing()
+                
+                # Step 2.5: Custom instructions (optional)
+                custom_result = self._step_custom_instructions(prompt_key, len(scan_result.files))
+                if custom_result is None:
+                    return ToolResult(success=False, message="Cancelled")
+                
+                self._custom_instructions, self._ask_per_file = custom_result
+                
+                # Step 2.6: Filename context (optional)
+                self._include_filename = self._step_filename_context()
+                
+                # Step 3: Output configuration
+                output_config = self._step_output_configuration(scan_result, prompt_key)
+                if output_config is None:
+                    return ToolResult(success=False, message="Cancelled")
+                
+                # Step 4: Execution settings
+                exec_settings = self._step_execution_settings()
+                if exec_settings is None:
+                    return ToolResult(success=False, message="Cancelled")
+                
+                # Create checkpoint (include audio preprocessing and custom instructions)
+                input_files = [str(f.path) for f in scan_result.files]
+                self._current_checkpoint = self.checkpoint_manager.create(
+                    input_path=str(scan_result.input_path),
+                    input_files=input_files,
+                    prompt_key=prompt_key,
+                    prompt_text=prompt_text,
+                    output_mode=output_config["mode"],
+                    output_path=output_config["path"],
+                    naming_template=output_config["naming"],
+                    output_extension=output_config["extension"],
+                    provider=exec_settings["provider"],
+                    model=exec_settings["model"],
+                    delay=exec_settings["delay"],
+                    use_batch=exec_settings.get("use_batch", False),
+                    audio_preprocessing=self._audio_preprocessing,
+                    custom_instructions=self._custom_instructions,
+                    skip_per_file_prompts=not self._ask_per_file,
+                    include_filename=self._include_filename,
+                    pdf_temp_dirs=[str(d) for d in self._pdf_temp_dirs]
+                )
+                
+                # Step 5: Execute processing
+                return self._execute_processing()
+            finally:
+                # If we didn't save a checkpoint to disk, clean up temp dirs immediately!
+                if not self.checkpoint_manager.exists() and not self.checkpoint_manager.failed_exists():
+                    if self._pdf_temp_dirs:
+                        self._cleanup_pdf_temp_dirs()
             
         except KeyboardInterrupt:
             print("\n\n⚠️  Interrupted by user")
@@ -334,6 +348,11 @@ class FileProcessor(BaseTool):
                             if scan_result is None:
                                 return None
             
+            # PDF Splitting Step
+            scan_result = self._handle_pdf_splitting(scan_result)
+            if scan_result is None:
+                return None
+            
             # Confirm
             try:
                 confirm = input(f"\nProceed with {len(scan_result.files)} files? [Y/n]: ").strip().lower()
@@ -341,6 +360,7 @@ class FileProcessor(BaseTool):
                 return None
             
             if confirm == 'n':
+                self._cleanup_pdf_temp_dirs()
                 continue
             
             return scan_result
@@ -1895,6 +1915,130 @@ class FileProcessor(BaseTool):
     # STEP 4: Execution Settings
     # ─────────────────────────────────────────────────────────────────
     
+    def _print_system_info(self):
+        """Print current system/profile info (styled like 'i' command in terminal.py)"""
+        from src import web_server
+        from src.connection_profiles import ProfileStore
+        
+        store = ProfileStore.get_instance()
+        active_profile = store.get_active_profile_name()
+        profile = web_server.ACTIVE_PROFILE  # ConnectionProfile object
+        
+        provider = web_server.get_active_setting("provider", "google")
+        model = web_server.get_active_setting("model", "not set")
+        
+        # Determine Base URL
+        base_url = "Unknown"
+        if provider == "custom":
+            url = (profile.custom_url if profile else None) or web_server.CONFIG.get("custom_url", "")
+            if url:
+                if "/chat/completions" in url:
+                    url = url.replace("/chat/completions", "")
+                base_url = url
+            else:
+                base_url = "Not configured"
+        elif provider == "openrouter":
+            base_url = "openrouter.ai/api/v1"
+        elif provider == "google":
+            url = (profile.gemini_endpoint if profile else None) or web_server.CONFIG.get("gemini_endpoint") or "generativelanguage.googleapis.com"
+            if "://" in url:
+                url = url.split("://")[-1]
+            if "/v1beta" in url:
+                url = url.split("/v1beta")[0]
+            base_url = url
+            
+        streaming = web_server.get_active_setting("streaming", True)
+        thinking = web_server.get_active_setting("thinking", False)
+        
+        default_delay = get_setting(self.tools_config, "default_delay_between_requests", 1.0)
+        
+        if HAVE_RICH:
+            from rich.table import Table as RichTable
+            from rich.panel import Panel as RichPanel
+            
+            grid = RichTable.grid(expand=True, padding=(0, 2))
+            grid.add_column(justify="left")
+            grid.add_column(justify="left")
+            
+            # Active Profile
+            grid.add_row("[bold]🔌 Profile[/bold]", f"[yellow]{active_profile}[/yellow]")
+            if profile and profile.description:
+                grid.add_row("[dim] Description[/dim]", f"[dim]{profile.description}[/dim]")
+                
+            # Provider Info
+            grid.add_row("[bold]📡 Provider[/bold]", f"[cyan]{provider}[/cyan]")
+            grid.add_row("[dim] Base URL[/dim]", f"[dim]{base_url}[/dim]")
+            grid.add_row("[bold]🤖 Model[/bold]", f"[green]{model}[/green]")
+            
+            # API Key Info from profile
+            if profile and (profile.api_key_pool or profile.api_key_name):
+                pool_str = f"[magenta]{profile.api_key_pool}[/magenta]" if profile.api_key_pool else "[dim]default[/dim]"
+                name_str = f"[magenta]{profile.api_key_name}[/magenta]" if profile.api_key_name else "[dim]any[/dim]"
+                grid.add_row("[bold]🗝️ API Pool[/bold]", pool_str)
+                grid.add_row("[bold]🏷️ API Key Name[/bold]", name_str)
+                
+            # Settings
+            stream_icon = "[green]ON[/green]" if streaming else "[red]OFF[/red]"
+            think_icon = "[green]ON[/green]" if thinking else "[red]OFF[/red]"
+            grid.add_row("[bold]🌊 Streaming[/bold]", stream_icon)
+            grid.add_row("[bold]💭 Thinking[/bold]", think_icon)
+            
+            if thinking and profile:
+                if profile.thinking_budget is not None and profile.thinking_budget != -1:
+                    grid.add_row("[dim] Budget[/dim]", str(profile.thinking_budget))
+                if provider == "google" and profile.thinking_level:
+                    grid.add_row("[dim] Level[/dim]", profile.thinking_level)
+                elif provider in ("custom", "openrouter") and profile.reasoning_effort:
+                    grid.add_row("[dim] Effort[/dim]", profile.reasoning_effort)
+                    
+            # AI Params from profile
+            if profile:
+                if profile.temperature is not None:
+                    grid.add_row("[bold]🌡️ Temperature[/bold]", f"{profile.temperature}")
+                if profile.max_tokens is not None:
+                    grid.add_row("[bold]📏 Max Tokens[/bold]", f"{profile.max_tokens:,}")
+                if profile.request_timeout is not None:
+                    grid.add_row("[bold]⏱️ Timeout[/bold]", f"{profile.request_timeout}s")
+                    
+            # Delay between requests
+            grid.add_row("[bold]⏱️ Request Delay[/bold]", f"{default_delay}s")
+            
+            console.print(RichPanel(grid, title="[bold]System Info[/bold]", border_style="blue"))
+            console.print()
+        else:
+            print(f"\n{'─'*64}")
+            print("📊 SYSTEM INFO")
+            print(f"{'─'*64}")
+            print(f" 🔌 Profile: {active_profile}")
+            if profile and profile.description:
+                print(f" Description: {profile.description}")
+            print(f" 📡 Provider: {provider}")
+            print(f" Base URL: {base_url}")
+            print(f" 🤖 Model: {model}")
+            if profile and (profile.api_key_pool or profile.api_key_name):
+                print(f" 🗝️ API Pool: {profile.api_key_pool or 'default'}")
+                print(f" 🏷️ API Key Name: {profile.api_key_name or 'any'}")
+            stream_status = "✅ ON" if streaming else "✗ OFF"
+            think_status = "✅ ON" if thinking else "✗ OFF"
+            print(f"\n 🌊 Streaming: {stream_status}")
+            print(f" 💭 Thinking: {think_status}")
+            if thinking and profile:
+                if profile.thinking_budget is not None and profile.thinking_budget != -1:
+                    print(f"  Budget: {profile.thinking_budget}")
+                if provider == "google" and profile.thinking_level:
+                    print(f"  Level: {profile.thinking_level}")
+                elif provider in ("custom", "openrouter") and profile.reasoning_effort:
+                    print(f"  Effort: {profile.reasoning_effort}")
+            if profile:
+                if profile.temperature is not None:
+                    print(f"\n 🌡️ Temperature: {profile.temperature}")
+                if profile.max_tokens is not None:
+                    print(f" 📏 Max Tokens: {profile.max_tokens:,}")
+                if profile.request_timeout is not None:
+                    print(f" ⏱️ Timeout: {profile.request_timeout}s")
+            print(f" ⏱️ Request Delay: {default_delay}s")
+            print(f"{'─'*64}\n")
+
     def _step_execution_settings(self) -> Optional[Dict[str, Any]]:
         """
         Step 4: Configure execution settings (provider, model, etc.)
@@ -1906,54 +2050,107 @@ class FileProcessor(BaseTool):
         
         # Import web_server for current config
         from src import web_server
+        from src.connection_profiles import ProfileStore
+        from src.web_server import switch_active_profile
 
+        # Display current settings using System Info panel
+        self._print_system_info()
+        
         current_provider = web_server.get_active_setting("provider", "google")
         current_model = web_server.get_active_setting("model", "not set")
-        current_thinking = web_server.get_active_setting("thinking", False)
-        default_delay = get_setting(self.tools_config, "default_delay_between_requests", 1.0)
         
-        # Display current settings
-        print(f"\nCurrent Settings:")
-        print(f"  Provider: {current_provider}")
-        print(f"  Model:    {current_model}")
-        thinking_status = "ON" if current_thinking else "OFF"
-        print(f"  Thinking: {thinking_status} (System Setting)")
-        print(f"  Delay:    {default_delay}s between requests")
-        
-        # Provider selection
-        print("\nProvider:")
-        providers = list(web_server.KEY_MANAGERS.keys())
-        for i, p in enumerate(providers, 1):
-            key_count = web_server.KEY_MANAGERS[p].get_key_count()
-            marker = " ◄" if p == current_provider else ""
-            status = f"({key_count} keys)" if key_count > 0 else "(no keys)"
-            print(f"  [{i}] {p} {status}{marker}")
+        # Ask configuration choice
+        print("How would you like to configure execution settings?")
+        print("  [1] Use active connection profile (default)")
+        print("  [2] Select a different connection profile")
+        print("  [3] Override provider and model manually")
+        print("  [Q] Cancel")
         
         try:
-            provider_choice = input(f"\nProvider [{current_provider}]: ").strip()
+            choice = input("\nChoice [1]: ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             return None
-        
-        if provider_choice:
-            try:
-                idx = int(provider_choice) - 1
-                if 0 <= idx < len(providers):
-                    current_provider = providers[idx]
-            except ValueError:
-                if provider_choice.lower() in providers:
-                    current_provider = provider_choice.lower()
-        
-        # Model
-        current_model = web_server.get_active_setting("model", "")
-        try:
-            model_input = input(f"\nModel [{current_model}]: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            return None
-        
-        if model_input:
-            current_model = model_input
             
+        if choice == 'q':
+            return None
+            
+        if not choice:
+            choice = '1'
+            
+        if choice == '2':
+            # Select different connection profile
+            store = ProfileStore.get_instance()
+            names = store.get_profile_names()
+            active = store.get_active_profile_name()
+            
+            print("\n🔌 Connection Profiles:")
+            for i, name in enumerate(names, 1):
+                marker = " ◄" if name == active else ""
+                print(f"  [{i}] {name}{marker}")
+                
+            try:
+                profile_choice = input(f"\nSelect profile [1-{len(names)}] or enter name (q to cancel): ").strip()
+            except (EOFError, KeyboardInterrupt):
+                return None
+                
+            if not profile_choice:
+                profile_choice = active
+            elif profile_choice.lower() == 'q':
+                return None
+                
+            try:
+                idx = int(profile_choice) - 1
+                if 0 <= idx < len(names):
+                    new_profile = names[idx]
+                else:
+                    new_profile = profile_choice
+            except ValueError:
+                new_profile = profile_choice
+                
+            if switch_active_profile(new_profile):
+                print(f"\n✅ Switched to profile: {new_profile}")
+                # print updated system info
+                self._print_system_info()
+                current_provider = web_server.get_active_setting("provider", "google")
+                current_model = web_server.get_active_setting("model", "not set")
+            else:
+                print(f"\n✗ Profile '{new_profile}' not found. Continuing with active profile '{active}'.")
+                
+        elif choice == '3':
+            # Override provider and model manually
+            print("\nProvider:")
+            providers = list(web_server.KEY_MANAGERS.keys())
+            for i, p in enumerate(providers, 1):
+                key_count = web_server.KEY_MANAGERS[p].get_key_count()
+                marker = " ◄" if p == current_provider else ""
+                status = f"({key_count} keys)" if key_count > 0 else "(no keys)"
+                print(f"  [{i}] {p} {status}{marker}")
+            
+            try:
+                provider_choice = input(f"\nProvider [{current_provider}]: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                return None
+            
+            if provider_choice:
+                try:
+                    idx = int(provider_choice) - 1
+                    if 0 <= idx < len(providers):
+                        current_provider = providers[idx]
+                except ValueError:
+                    if provider_choice.lower() in providers:
+                        current_provider = provider_choice.lower()
+            
+            # Model
+            try:
+                model_input = input(f"\nModel [{current_model}]: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                return None
+            
+            if model_input:
+                current_model = model_input
+
         # Delay
+        default_delay = get_setting(self.tools_config, "default_delay_between_requests", 1.0)
         try:
             delay_input = input(f"\nDelay between requests (seconds) [{default_delay}]: ").strip()
         except (EOFError, KeyboardInterrupt):
@@ -2306,6 +2503,9 @@ class FileProcessor(BaseTool):
                 # Clear any old failed checkpoint on complete success
                 self.checkpoint_manager.clear_failed()
                 result.message = f"Processed {result.processed_count} files successfully"
+                # Clean up PDF temp directories on complete success
+                if self._pdf_temp_dirs:
+                    self._cleanup_pdf_temp_dirs()
         else:
             result.message = f"Processed {result.processed_count}/{total} files"
         
@@ -2351,6 +2551,104 @@ class FileProcessor(BaseTool):
         else:
             return None
     
+    def _cleanup_pdf_temp_dirs(self, temp_dirs: Optional[List[Any]] = None):
+        """
+        Delete temporary directories created during PDF splitting.
+        """
+        import shutil
+        dirs_to_clean = []
+        
+        if temp_dirs is not None:
+            dirs_to_clean = temp_dirs
+        elif self._pdf_temp_dirs:
+            dirs_to_clean = self._pdf_temp_dirs
+            
+        for d in dirs_to_clean:
+            path = Path(d)
+            if path.exists() and path.is_dir():
+                try:
+                    shutil.rmtree(path)
+                except Exception as e:
+                    print_warning(f"Failed to clean up temp directory {path}: {e}")
+        
+        if temp_dirs is None:
+            self._pdf_temp_dirs = []
+
+    def _handle_pdf_splitting(self, scan_result: ScanResult) -> Optional[ScanResult]:
+        """
+        Check if PDF files are present and prompt the user if they want to split them.
+        """
+        has_pdfs = any(f.path.suffix.lower() == ".pdf" and f.file_type == "document" for f in scan_result.files)
+        if not has_pdfs:
+            return scan_result
+
+        from .pdf_processor import is_pypdf_available, get_pdf_page_count, parse_page_range, split_pdf
+        
+        if not is_pypdf_available():
+            print_warning("\n⚠️ pypdf is not installed. PDF splitting is unavailable.")
+            print_info("To enable splitting, run: uv pip install pypdf")
+            return scan_result
+
+        self._print_header("📁 FILE PROCESSOR - PDF Splitting Options")
+        print("\nPDF files detected. How would you like to process them?")
+        print("  [1] Process each PDF as a single file (default)")
+        print("  [2] Split PDFs into individual pages and process page-by-page")
+        
+        try:
+            choice = input("\nChoice [1]: ").strip() or "1"
+        except (EOFError, KeyboardInterrupt):
+            return None
+
+        if choice != "2":
+            return scan_result
+
+        try:
+            range_str = input("Enter page range to split (e.g. 'all', '1-5', '3,5,8') [all]: ").strip() or "all"
+        except (EOFError, KeyboardInterrupt):
+            return None
+
+        import tempfile
+        new_files = []
+        
+        for f in scan_result.files:
+            if f.path.suffix.lower() == ".pdf" and f.file_type == "document":
+                try:
+                    page_count = get_pdf_page_count(f.path)
+                    if not page_count:
+                        new_files.append(f)
+                        continue
+                    
+                    pages = parse_page_range(range_str, page_count)
+                    if not pages:
+                        print_warning(f"No valid pages in range for '{f.path.name}'. Keeping original.")
+                        new_files.append(f)
+                        continue
+
+                    # Create temp dir
+                    temp_dir = Path(tempfile.mkdtemp(prefix="pdf_split_"))
+                    self._pdf_temp_dirs.append(temp_dir)
+                    
+                    print_info(f"Splitting '{f.path.name}' ({page_count} pages) -> page files...")
+                    split_paths = split_pdf(f.path, pages, temp_dir)
+                    
+                    for sp in split_paths:
+                        new_files.append(self.file_handler.get_file_info(sp))
+                        
+                except Exception as e:
+                    print_error(f"Failed to split '{f.path.name}': {e}")
+                    print_info("Keeping original PDF file.")
+                    new_files.append(f)
+            else:
+                new_files.append(f)
+                
+        # Rebuild scan_result
+        scan_result.files = new_files
+        scan_result.by_type.clear()
+        for f in scan_result.files:
+            scan_result.by_type.setdefault(f.file_type, []).append(f)
+            
+        return scan_result
+
     def _resume_from_checkpoint(self) -> ToolResult:
         """Resume processing from saved checkpoint"""
         self._current_checkpoint = self.checkpoint_manager.load()
@@ -2366,6 +2664,10 @@ class FileProcessor(BaseTool):
         
         # Restore filename context preference from checkpoint
         self._include_filename = self._current_checkpoint.include_filename
+        
+        # Restore PDF temp dirs from checkpoint
+        if hasattr(self._current_checkpoint, "pdf_temp_dirs") and self._current_checkpoint.pdf_temp_dirs:
+            self._pdf_temp_dirs = [Path(p) for p in self._current_checkpoint.pdf_temp_dirs]
         
         return self._execute_processing()
     
@@ -2427,6 +2729,10 @@ class FileProcessor(BaseTool):
         
         # Restore filename context preference from checkpoint
         self._include_filename = self._current_checkpoint.include_filename
+        
+        # Restore PDF temp dirs from checkpoint
+        if hasattr(self._current_checkpoint, "pdf_temp_dirs") and self._current_checkpoint.pdf_temp_dirs:
+            self._pdf_temp_dirs = [Path(p) for p in self._current_checkpoint.pdf_temp_dirs]
         
         # Clear the failed checkpoint since we're using it now
         # (A new one will be created if there are still failures)

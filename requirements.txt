@@ -21,3 +21,6 @@ infi.systray
 
 # Audio Tool dependencies
 PyAudioWPatch
+
+# PDF Tool dependencies
+pypdf>=4.0.0
