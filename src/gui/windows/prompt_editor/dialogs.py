@@ -93,7 +93,7 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         else:
             tk.Button(
                 self.main_frame, text="Close", font=("Segoe UI", 10),
-                bg=colors.accent, fg="#ffffff",
+                bg=colors.accent, fg=colors.accent_fg,
                 command=self.destroy
             ).pack()
             

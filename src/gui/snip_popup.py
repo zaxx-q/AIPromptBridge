@@ -565,7 +565,7 @@ class AttachedSnipPopup:
             text="➤",
             font=("Arial", 14),
             bg=self.colors.blue,
-            fg="#ffffff",
+            fg=self.colors.accent_fg,
             padx=12,
             pady=8,
             cursor="hand2"

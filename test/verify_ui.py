@@ -3,7 +3,8 @@ import sys
 import os
 sys.path.append(os.getcwd())
 
-from src.gui.prompt_editor import PromptEditorWindow, HAVE_CTK
+from src.gui.windows.prompt_editor import PromptEditorWindow
+from src.gui.platform import HAVE_CTK
 if HAVE_CTK:
     import customtkinter as ctk
 

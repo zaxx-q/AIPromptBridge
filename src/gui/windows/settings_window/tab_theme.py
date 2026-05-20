@@ -154,7 +154,7 @@ class ThemeTabMixin:
                             ("Success", preview_colors.accent_green),
                             ("Warning", preview_colors.accent_yellow),
                             ("Danger", preview_colors.accent_red)]:
-            fg = "#ffffff" if label != "Warning" else "#000000"
+            fg = preview_colors.accent_fg
             if self.use_ctk:
                 ctk.CTkLabel(
                     btn_row, text=label, font=get_ctk_font(12),

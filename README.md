@@ -59,26 +59,22 @@ Lightweight chat windows with:
 - Streaming responses (real-time typing)
 - Markdown rendering
 - Session history (browse and restore)
-- Multi-theme UI with 7 color schemes
+- Multi-theme UI with 6 color schemes
 
 ### 🎨 Theme System
 
-The app supports 7 distinct themes with both Dark and Light variants:
+The app supports 6 distinct themes with both Dark and Light variants:
 
 | Catppuccin | Dracula | Nord |
 |------------|---------|------|
 | <img src="docs/images/themes/theme_catppuccin.png" width="250"> | <img src="docs/images/themes/theme_dracula.png" width="250"> | <img src="docs/images/themes/theme_nord.png" width="250"> |
 
-| Gruvbox | OneDark | Minimal |
-|---------|---------|---------|
-| <img src="docs/images/themes/theme_gruvbox.png" width="250"> | <img src="docs/images/themes/theme_onedark.png" width="250"> | <img src="docs/images/themes/theme_minimal.png" width="250"> |
-
-| High Contrast | | |
-|---------------|---|---|
-| <img src="docs/images/themes/theme_highcontrast.png" width="250"> | | |
+| Gruvbox | Minimal | High Contrast |
+|---------|---------|---------------|
+| <img src="docs/images/themes/theme_gruvbox.png" width="250"> | <img src="docs/images/themes/theme_minimal.png" width="250"> | <img src="docs/images/themes/theme_highcontrast.png" width="250"> |
 
 Customizable appearance with:
-- **7 themes**: Catppuccin, Dracula, Nord, Gruvbox, OneDark, Minimal, High Contrast
+- **6 themes**: Catppuccin, Dracula, Nord, Gruvbox, Minimal, High Contrast
 - **Dark/Light modes**: Each theme has both variants
 - **System detection**: Auto-switches based on Windows theme
 - **Live preview**: See theme changes instantly in Settings

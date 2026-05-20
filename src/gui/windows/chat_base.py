@@ -327,7 +327,7 @@ class ChatWindowBase(ABC):
             self.delete_btn = tk.Button(
                 btn_frame, text="🗑️", font=("Segoe UI", 10),
                 bg=self.colors.get("accent_red", "#f38ba8"),
-                fg="#ffffff",
+                fg=self.colors["accent_fg"],
                 relief=tk.FLAT, padx=4, pady=4,
                 command=self._delete_session, cursor="hand2"
             )
@@ -735,7 +735,7 @@ class ChatWindowBase(ABC):
             
             self.send_btn = tk.Button(
                 btn_row, text="Send", font=("Segoe UI", 10, "bold"),
-                bg=self.colors["accent"], fg="#ffffff",
+                bg=self.colors["accent"], fg=self.colors["accent_fg"],
                 relief=tk.FLAT, padx=12, pady=6,
                 command=self._send, cursor="hand2"
             )
@@ -1824,7 +1824,7 @@ class ChatWindowBase(ABC):
                 text="▶",
                 font=("Segoe UI", 10),
                 bg=self.colors["accent"],
-                fg="#ffffff",
+                fg=self.colors["accent_fg"],
                 relief=tk.FLAT,
                 width=3,
                 command=lambda p=file_path: self._toggle_audio(p),
@@ -2730,7 +2730,7 @@ class ChatWindowBase(ABC):
             tk.Button(
                 btn_frame, text="Save",
                 font=("Segoe UI", 10),
-                bg=self.colors["accent"], fg="#ffffff",
+                bg=self.colors["accent"], fg=self.colors["accent_fg"],
                 relief=tk.FLAT, padx=10, pady=6,
                 command=do_save, cursor="hand2"
             ).pack(side="right", padx=(5, 0))
@@ -2951,7 +2951,7 @@ class _EditMessageDialog:
             tk.Button(
                 btn_frame, text="Save",
                 font=("Segoe UI", 10),
-                bg=colors["accent"], fg="#ffffff",
+                bg=colors["accent"], fg=colors["accent_fg"],
                 relief=tk.FLAT, padx=10, pady=6,
                 command=self._save, cursor="hand2"
             ).pack(side=tk.LEFT, padx=2)

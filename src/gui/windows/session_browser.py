@@ -181,7 +181,7 @@ class SessionListItem(tk.Frame):
         
         if selected:
             bg = self.colors.accent
-            fg = "#ffffff"
+            fg = self.colors.accent_fg
         else:
             bg = self.colors.surface0
             fg = self.colors.fg
@@ -545,7 +545,7 @@ class BrowserWindowBase(ABC):
             tk.Button(
                 btn_frame, text="Save",
                 font=("Segoe UI", 10),
-                bg=self.colors["accent"], fg="#ffffff",
+                bg=self.colors["accent"], fg=self.colors["accent_fg"],
                 relief=tk.FLAT, padx=10, pady=6,
                 command=do_save, cursor="hand2"
             ).pack(side="right", padx=(5, 0))
@@ -858,7 +858,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             ]:
                 accent_yellow = self.colors.get("accent_yellow", "#f9e2af")
                 if bg_color == self.colors["accent"]:
-                    fg_color = "#ffffff"
+                    fg_color = self.colors["accent_fg"]
                 elif bg_color == accent_yellow:
                     fg_color = self.colors["bg"]
                 else:
@@ -1173,7 +1173,7 @@ class AttachedBrowserWindow(BrowserWindowBase):
             ]:
                 accent_yellow = self.colors.get("accent_yellow", "#f9e2af")
                 if bg_color == self.colors["accent"]:
-                    fg_color = "#ffffff"
+                    fg_color = self.colors["accent_fg"]
                 elif bg_color == accent_yellow:
                     fg_color = self.colors["bg"]
                 else:

@@ -184,7 +184,7 @@ class SegmentedToggle:
                     text=display_text,
                     font=("Arial", 9),
                     bg=self.colors.blue if is_selected else self.colors.surface0,
-                    fg="#ffffff" if is_selected else self.colors.text,
+                    fg=self.colors.accent_fg if is_selected else self.colors.text,
                     padx=12,
                     pady=4,
                     cursor="hand2"
@@ -249,7 +249,7 @@ class SegmentedToggle:
             is_selected = value == self.current_value
             segment.config(
                 bg=self.colors.blue if is_selected else self.colors.surface0,
-                fg="#ffffff" if is_selected else self.colors.text
+                fg=self.colors.accent_fg if is_selected else self.colors.text
             )
     
     def get(self) -> str:
@@ -596,12 +596,12 @@ class ModifierBar:
             if HAVE_CTK:
                 btn.configure(
                     fg_color=self.colors.blue if is_active else self.colors.surface0,
-                    text_color="#ffffff" if is_active else self.colors.text
+                    text_color=self.colors.accent_fg if is_active else self.colors.text
                 )
             else:
                 btn.config(
                     bg=self.colors.blue if is_active else self.colors.surface0,
-                    fg="#ffffff" if is_active else self.colors.text
+                    fg=self.colors.accent_fg if is_active else self.colors.text
                 )
     
     def _on_hover_tk(self, btn, key: str, entering: bool):
@@ -1369,7 +1369,7 @@ class InputPopup(BasePopup):
                 corner_radius=8,
                 fg_color=self.colors.blue,
                 hover_color=self.colors.lavender,
-                text_color="#ffffff",
+                text_color=self.colors.accent_fg,
                 font=get_ctk_font(size=14),
                 command=self._submit
             )
@@ -1460,7 +1460,7 @@ class InputPopup(BasePopup):
                 text="➤",
                 font=("Arial", 12),
                 bg=self.accent_color,
-                fg="#ffffff",
+                fg=self.colors.accent_fg,
                 activebackground="#1976D2",
                 relief=tk.FLAT,
                 bd=0,
@@ -1646,7 +1646,7 @@ class PromptSelectionPopup(BasePopup):
                 corner_radius=8,
                 fg_color=self.colors.blue,
                 hover_color=self.colors.lavender,
-                text_color="#ffffff",
+                text_color=self.colors.accent_fg,
                 font=get_ctk_font(size=14),
                 command=self._on_custom_submit
             )
@@ -1744,7 +1744,7 @@ class PromptSelectionPopup(BasePopup):
                 text="➤",
                 font=("Arial", 12),
                 bg=self.accent_color,
-                fg="#ffffff",
+                fg=self.colors.accent_fg,
                 activebackground="#1976D2",
                 relief=tk.FLAT,
                 bd=0,
@@ -2054,7 +2054,7 @@ class AttachedInputPopup:
                 corner_radius=8,
                 fg_color=self.colors.blue,
                 hover_color=self.colors.lavender,
-                text_color="#ffffff",
+                text_color=self.colors.accent_fg,
                 font=get_ctk_font(size=14),
                 command=self._submit
             )
@@ -2169,7 +2169,7 @@ class AttachedInputPopup:
                 text="➤",
                 font=("Arial", 14),
                 bg=self.colors.blue,
-                fg="#ffffff",
+                fg=self.colors.accent_fg,
                 padx=14,
                 pady=8,
                 cursor="hand2"
@@ -2714,7 +2714,7 @@ class AttachedPromptPopup:
                 text="      ✏️",
                 font=("Arial", 12),
                 bg=self.colors.blue,
-                fg="#ffffff",
+                fg=self.colors.accent_fg,
                 width=4,
                 pady=8,
                 cursor="hand2"
@@ -2777,7 +2777,7 @@ class AttachedPromptPopup:
                 text="❓",
                 font=("Arial", 12),
                 bg=self.colors.green,
-                fg="#ffffff",
+                fg=self.colors.accent_fg,
                 width=3,
                 pady=8,
                 cursor="hand2"
@@ -3607,7 +3607,7 @@ class ErrorPopup:
                 corner_radius=6,
                 fg_color=self.colors.blue,
                 hover_color=self.colors.accent_green,
-                text_color="#ffffff",
+                text_color=self.colors.accent_fg,
                 font=get_ctk_font(size=11),
                 command=self._close
             )
@@ -3723,7 +3723,7 @@ class ErrorPopup:
                 text="OK",
                 font=("Arial", 10),
                 bg=self.colors.blue,
-                fg="#ffffff",
+                fg=self.colors.accent_fg,
                 padx=16,
                 pady=6,
                 cursor="hand2"

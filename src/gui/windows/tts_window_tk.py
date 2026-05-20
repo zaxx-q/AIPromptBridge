@@ -123,7 +123,7 @@ def _create_top_action_bar_tk(window, parent):
         text="🔊 Generate Audio",
         font=("Segoe UI", 11, "bold"),
         bg=colors.green,
-        fg="#ffffff",
+        fg=colors.accent_fg,
         relief="flat",
         padx=15,
         pady=5,
@@ -312,7 +312,7 @@ def _create_preview_section_tk(window, parent):
     # Play/Pause button
     window.play_pause_btn = tk.Button(
         row_frame, text="▶", font=("Segoe UI", 12),
-        bg=colors.green, fg="#ffffff", relief="flat",
+        bg=colors.green, fg=colors.accent_fg, relief="flat",
         width=3, command=window._toggle_playback, state="disabled"
     )
     window.play_pause_btn.pack(side="left", padx=(0, 8))
@@ -476,7 +476,7 @@ def _create_director_section_tk(window, parent):
         text="🎬 Generate Style",
         font=("Segoe UI", 9, "bold"),
         bg=colors.accent,
-        fg="#ffffff",
+        fg=colors.accent_fg,
         relief="flat",
         padx=10,
         pady=2,

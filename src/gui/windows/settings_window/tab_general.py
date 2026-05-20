@@ -107,7 +107,7 @@ class GeneralTabMixin:
                 font=get_ctk_font(13),
                 fg_color=self.colors.accent,
                 hover_color=self.colors.surface2,
-                text_color="#ffffff",
+                text_color=self.colors.accent_fg,
                 command=self._on_check_updates_now,
             )
             check_btn.pack(side="left")
@@ -121,9 +121,9 @@ class GeneralTabMixin:
             check_btn = tk.Button(
                 update_row, text="Check Now",
                 font=("Segoe UI", 10),
-                bg=self.colors.accent, fg="#ffffff",
+                bg=self.colors.accent, fg=self.colors.accent_fg,
                 activebackground=self.colors.surface1,
-                activeforeground="#ffffff",
+                activeforeground=self.colors.accent_fg,
                 relief="flat", padx=12, pady=4,
                 command=self._on_check_updates_now,
             )

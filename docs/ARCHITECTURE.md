@@ -404,7 +404,6 @@ The theme system (`src/gui/themes.py`) provides centralized color management wit
 | `dracula` | Dark purple-based | Classic (dark), Pro (light) |
 | `nord` | Arctic blue palette | Polar Night (dark), Snow Storm (light) |
 | `gruvbox` | Retro earthy colors | Dark, Light |
-| `onedark` | Atom editor theme | Dark, Light |
 | `minimal` | Clean, minimal design | Dark, Light |
 | `highcontrast` | Maximum readability | Dark, Light |
 

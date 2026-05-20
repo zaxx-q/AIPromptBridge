@@ -122,7 +122,7 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
                 anchor="w",
                 command=lambda id=item_id: self.select(id),
                 bg=self.colors.accent if is_selected else self.colors.surface0,
-                fg="#ffffff" if is_selected else self.colors.fg,
+                fg=self.colors.accent_fg if is_selected else self.colors.fg,
                 relief="flat",
                 padx=10,
                 pady=5
@@ -169,7 +169,7 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
         else:
             btn.configure(
                 bg=self.colors.accent if is_selected else self.colors.surface0,
-                fg="#ffffff" if is_selected else self.colors.fg
+                fg=self.colors.accent_fg if is_selected else self.colors.fg
             )
 
     def clear(self):
@@ -338,7 +338,7 @@ def create_emoji_button(parent, text: str, icon: str, colors: ThemeColors,
         
         # Map variant to colors
         bg_color = colors.accent
-        fg_color = "#ffffff"
+        fg_color = colors.accent_fg
         
         if variant == "success":
             bg_color = colors.accent_green
@@ -686,7 +686,7 @@ class ScrollableComboBox:
             highlightthickness=0,
             relief="flat",
             selectbackground=self.colors.accent,
-            selectforeground="#ffffff",
+            selectforeground=self.colors.accent_fg,
             padx=8,
             pady=4
         )
@@ -702,7 +702,7 @@ class ScrollableComboBox:
         # Configure tags for styling
         self._text_widget.tag_configure("item", spacing1=2, spacing3=2)
         self._text_widget.tag_configure("hover", background=self.colors.surface1)
-        self._text_widget.tag_configure("selected", background=self.colors.accent, foreground="#ffffff")
+        self._text_widget.tag_configure("selected", background=self.colors.accent, foreground=self.colors.accent_fg)
         
         # Populate items
         self._populate_dropdown_items()
@@ -1181,7 +1181,7 @@ class ThemedInputDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             ).pack(side="left", padx=5)
         else:
             tk.Button(btn_frame, text="OK", command=self._ok,
-                     bg=colors.accent, fg="#ffffff").pack(side="left", padx=5)
+                     bg=colors.accent, fg=colors.accent_fg).pack(side="left", padx=5)
             tk.Button(btn_frame, text="Cancel", command=self._cancel,
                      bg=colors.surface1, fg=colors.fg).pack(side="left", padx=5)
         

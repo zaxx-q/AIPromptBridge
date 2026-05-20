@@ -1190,7 +1190,7 @@ class TTSWindow:
                 self.play_pause_btn.configure(
                     text="▶",
                     bg=self.colors.green,
-                    fg="#ffffff"
+                    fg=self.colors.accent_fg
                 )
     
     def _update_status(self, text: str, color: str = None):

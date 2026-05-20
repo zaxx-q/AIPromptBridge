@@ -1322,7 +1322,7 @@ class AudioAnalyzerWindow:
                 self.record_btn.configure(
                     text="🔴 Record",
                     bg=self.colors.red,
-                    fg="#ffffff"
+                    fg=self.colors.accent_fg
                 )
 
     def _toggle_recording(self):
@@ -1685,7 +1685,7 @@ class AudioAnalyzerWindow:
                 self.play_pause_btn.configure(
                     text="▶",
                     bg=self.colors.green,
-                    fg="#ffffff"
+                    fg=self.colors.accent_fg
                 )
 
     def _toggle_playback(self):

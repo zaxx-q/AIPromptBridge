@@ -257,7 +257,7 @@ def _create_top_action_bar_tk(window, parent):
         text="📤 Send",
         font=("Segoe UI", 10, "bold"),
         bg=colors.green,
-        fg="#ffffff",
+        fg=colors.accent_fg,
         relief="flat",
         padx=15,
         pady=5,
@@ -357,7 +357,7 @@ def _create_recording_section_tk(window, parent):
         text="🔴 Record",
         font=("Segoe UI", 10, "bold"),
         bg=colors.red,
-        fg="#ffffff",
+        fg=colors.accent_fg,
         relief="flat",
         padx=12,
         pady=4,
@@ -447,7 +447,7 @@ def _create_preview_section_tk(window, parent):
     # Play/Pause
     window.play_pause_btn = tk.Button(
         row, text="▶", font=("Segoe UI", 12),
-        bg=colors.green, fg="#ffffff", relief="flat",
+        bg=colors.green, fg=colors.accent_fg, relief="flat",
         width=3, command=window._toggle_playback, state="disabled"
     )
     window.play_pause_btn.pack(side="left", padx=(0, 8))

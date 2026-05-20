@@ -481,7 +481,7 @@ class PlaygroundTabMixin:
                                                        text_color=self.colors.fg)
         else:
             tk.Button(btn_frame, text="🧪 Test with API", font=("Segoe UI", 10),
-                     bg=self.colors.accent, fg="#ffffff",
+                     bg=self.colors.accent, fg=self.colors.accent_fg,
                      command=self._test_playground_with_api).pack(side="left", padx=(0, 10))
             self.playground_test_status = tk.Label(btn_frame, text="", font=("Segoe UI", 9),
                                                    bg=self.colors.bg, fg=self.colors.fg)

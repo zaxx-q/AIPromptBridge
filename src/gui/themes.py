@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """
-Theme System for AIPromptBridge GUI
-
-Provides a centralized theme registry with multiple color schemes.
-Each theme has dark and light variants.
-
-Themes available:
-- catppuccin: Warm pastel colors (Mocha/Latte)
-- dracula: Dark purple-based theme (Classic/Pro)
-- nord: Arctic blue palette (Polar Night/Snow Storm)
-- gruvbox: Retro earthy colors (Dark/Light)
-- onedark: Atom editor theme (Dark/Light)
-- minimal: Clean, minimal design (Dark/Light)
-- highcontrast: Maximum readability (Dark/Light)
+# Theme System for AIPromptBridge GUI
+#
+# Provides a centralized theme registry with multiple color schemes.
+# Each theme has dark and light variants.
+#
+# Themes available:
+# - catppuccin: Warm pastel colors (Mocha/Latte)
+# - dracula: Dark purple-based theme (Classic/Pro)
+# - nord: Arctic blue palette (Polar Night/Snow Storm)
+# - gruvbox: Retro earthy colors (Dark/Light)
+# - minimal: Clean, minimal design (Dark/Light)
+# - highcontrast: Maximum readability (Dark/Light)
 
 CustomTkinter Integration:
 - get_ctk_button_colors(): Get button styling kwargs
@@ -116,6 +115,17 @@ class ThemeColors:
     def red(self) -> str:
         """Alias for accent_red (legacy popup compatibility)."""
         return self.accent_red
+
+    @property
+    def accent_fg(self) -> str:
+        """Text color for use on accent-colored backgrounds.
+        
+        Uses the theme's bg color, matching the official Catppuccin pattern
+        where button text_color is the base background. This provides
+        high contrast for both dark themes (dark text on pastel accents)
+        and light themes (light text on saturated accents).
+        """
+        return self.bg
 
 
 # =============================================================================
@@ -354,63 +364,6 @@ GRUVBOX_LIGHT = ThemeColors(
     peach="#af3a03",
 )
 
-# One Dark (Atom)
-ONEDARK_DARK = ThemeColors(
-    bg="#282c34",
-    fg="#abb2bf",
-    text_bg="#21252b",
-    input_bg="#3e4451",
-    border="#4b5263",
-    accent="#61afef",
-    accent_green="#98c379",
-    accent_yellow="#e5c07b",
-    accent_red="#e06c75",
-    user_bg="#2c323c",
-    user_accent="#61afef",
-    assistant_bg="#2d3a2e",
-    assistant_accent="#98c379",
-    code_bg="#1e2127",
-    header1="#e5c07b",
-    header2="#61afef",
-    header3="#56b6c2",
-    bullet="#c678dd",
-    blockquote="#9096a3",  # Improved readability (was #5c6370)
-    surface0="#21252b",
-    surface1="#3e4451",
-    surface2="#4b5263",
-    overlay0="#9096a3",    # Improved readability (was #5c6370)
-    lavender="#c678dd",
-    peach="#d19a66",
-)
-
-# One Light
-ONEDARK_LIGHT = ThemeColors(
-    bg="#fafafa",
-    fg="#383a42",
-    text_bg="#ffffff",
-    input_bg="#ffffff",
-    border="#d4d4d4",
-    accent="#4078f2",
-    accent_green="#50a14f",
-    accent_yellow="#c18401",
-    accent_red="#e45649",
-    user_bg="#f0f0f0",
-    user_accent="#4078f2",
-    assistant_bg="#e8f5e9",
-    assistant_accent="#50a14f",
-    code_bg="#f0f0f0",
-    header1="#c18401",
-    header2="#4078f2",
-    header3="#0184bc",
-    bullet="#a626a4",
-    blockquote="#a0a1a7",
-    surface0="#e5e5e5",
-    surface1="#d4d4d4",
-    surface2="#b4b4b4",
-    overlay0="#a0a1a7",
-    lavender="#a626a4",
-    peach="#986801",
-)
 
 # Minimal Dark
 MINIMAL_DARK = ThemeColors(
@@ -419,17 +372,17 @@ MINIMAL_DARK = ThemeColors(
     text_bg="#222222",
     input_bg="#2a2a2a",
     border="#404040",
-    accent="#6b9fff",
-    accent_green="#4caf50",
+    accent="#5a8ff0",
+    accent_green="#43a047",
     accent_yellow="#ffb74d",
     accent_red="#f44336",
     user_bg="#252530",
-    user_accent="#6b9fff",
+    user_accent="#5a8ff0",
     assistant_bg="#253025",
-    assistant_accent="#4caf50",
+    assistant_accent="#43a047",
     code_bg="#161616",
     header1="#ffb74d",
-    header2="#6b9fff",
+    header2="#5a8ff0",
     header3="#4dd0e1",
     bullet="#ba68c8",
     blockquote="#b3b3b3",  # Improved readability (was #808080)
@@ -548,13 +501,11 @@ class ThemeRegistry:
         themes = ThemeRegistry.list_themes()
     """
     
-    # Theme name -> (dark_colors, light_colors)
     _themes: Dict[str, tuple] = {
         "catppuccin": (CATPPUCCIN_DARK, CATPPUCCIN_LIGHT),
         "dracula": (DRACULA_DARK, DRACULA_LIGHT),
         "nord": (NORD_DARK, NORD_LIGHT),
         "gruvbox": (GRUVBOX_DARK, GRUVBOX_LIGHT),
-        "onedark": (ONEDARK_DARK, ONEDARK_LIGHT),
         "minimal": (MINIMAL_DARK, MINIMAL_LIGHT),
         "highcontrast": (HIGHCONTRAST_DARK, HIGHCONTRAST_LIGHT),
     }
@@ -657,6 +608,7 @@ class ThemeRegistry:
             "button_bg": colors.surface0,
             "border": colors.border,
             "accent": colors.accent,
+            "accent_fg": colors.accent_fg,
             "accent_green": colors.accent_green,
             "accent_yellow": colors.accent_yellow,
             "accent_red": colors.accent_red,
@@ -764,6 +716,25 @@ def get_ctk_font(size: int = 12, weight: str = "normal", family: str = None):
     return (family, size, weight)
 
 
+def _adjust_hex_color(hex_color: str, factor: float) -> str:
+    """Adjust brightness of a hex color by a factor. factor < 1.0 darkens, > 1.0 lightens."""
+    hex_color = hex_color.lstrip('#')
+    if len(hex_color) != 6:
+        return f"#{hex_color}"
+    try:
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        
+        r = max(0, min(255, int(r * factor)))
+        g = max(0, min(255, int(g * factor)))
+        b = max(0, min(255, int(b * factor)))
+        
+        return f"#{r:02x}{g:02x}{b:02x}"
+    except ValueError:
+        return f"#{hex_color}"
+
+
 def get_ctk_button_colors(colors: ThemeColors, variant: str = "primary") -> dict:
     """
     Get CTkButton color kwargs based on theme and variant.
@@ -779,28 +750,28 @@ def get_ctk_button_colors(colors: ThemeColors, variant: str = "primary") -> dict
         return {
             "fg_color": colors.accent,
             "hover_color": colors.lavender,
-            "text_color": "#ffffff",
+            "text_color": colors.accent_fg,
             "border_width": 0,
         }
     elif variant == "success":
         return {
             "fg_color": colors.accent_green,
-            "hover_color": "#45a049",
-            "text_color": "#2b2b2b",
+            "hover_color": _adjust_hex_color(colors.accent_green, 0.85),
+            "text_color": colors.accent_fg,
             "border_width": 0,
         }
     elif variant == "warning":
         return {
             "fg_color": colors.accent_yellow,
             "hover_color": colors.peach,
-            "text_color": "#2b2b2b",
+            "text_color": colors.accent_fg,
             "border_width": 0,
         }
     elif variant == "danger":
         return {
             "fg_color": colors.accent_red,
-            "hover_color": "#c0392b",
-            "text_color": "#ffffff",
+            "hover_color": _adjust_hex_color(colors.accent_red, 0.85),
+            "text_color": colors.accent_fg,
             "border_width": 0,
         }
     elif variant == "ghost":

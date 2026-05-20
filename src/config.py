@@ -48,7 +48,7 @@ DEFAULT_CONFIG = {
     "screen_snip_enabled": True,
     "screen_snip_hotkey": "ctrl+alt+x",
     # UI Theme settings
-    # Available themes: catppuccin, dracula, nord, gruvbox, onedark, minimal, highcontrast
+    # Available themes: catppuccin, dracula, nord, gruvbox, minimal, highcontrast
     "ui_theme": "dracula",
     # Theme mode: auto (follows system), dark, light
     "ui_theme_mode": "auto",
@@ -491,7 +491,7 @@ tts_use_official_endpoint = false
 # ============================================================
 # UI THEME SETTINGS
 # ============================================================
-# Available themes: catppuccin, dracula, nord, gruvbox, onedark, minimal, highcontrast
+# Available themes: catppuccin, dracula, nord, gruvbox, minimal, highcontrast
 ui_theme = dracula
 
 # Theme mode: auto (follows system dark/light), dark, light
