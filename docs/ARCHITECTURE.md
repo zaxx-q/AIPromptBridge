@@ -38,21 +38,30 @@ flowchart TB
     end
     
     subgraph Pipeline["Request Pipeline"]
-        RP["request_pipeline.py<br/>• Logging<br/>• Token tracking<br/>• Origin tracking"]
+        RP["request_pipeline.py<br/>• Logging<br/>• Token tracking<br/>• Origin tracking<br/>• Abort signal propagation"]
     end
     
     subgraph APIClient["API Client"]
-        AC["api_client.py<br/>get_provider_for_type()"]
+        AC["api_client.py<br/>create_provider()"]
+    end
+
+    subgraph Registry["Provider Registry"]
+        PR["registry.py<br/>ProviderDefinition & Registry"]
     end
     
-    subgraph Providers["Providers"]
-        OAI["OpenAI-compatible<br/>Provider"]
-        Gemini["Gemini Native<br/>Provider<br/>+ TTS"]
-        Custom["Custom<br/>Endpoint"]
+    subgraph Providers["Providers (BaseProvider)"]
+        Gemini["GeminiNativeProvider<br/>(gemini_native.py)"]
+        Anthropic["AnthropicProvider<br/>(anthropic.py)"]
+        OAI["OpenAICompatibleProvider<br/>(openai_compatible.py)"]
+        InlineThinking["Inline Thinking<br/>(inline_thinking.py)"]
+    end
+
+    subgraph GeminiSvcs["Gemini Services"]
+        GS["gemini_services.py<br/>• Files API<br/>• Batch API<br/>• Native TTS"]
     end
     
     subgraph KeyMgr["Key Manager"]
-        KM["key_manager.py<br/>• Multiple keys per provider<br/>• Auto-rotation on error<br/>• Exhaustion detection<br/>• Retry with backoff"]
+        KM["key_manager.py<br/>• Multiple keys per pool<br/>• Auto-rotation on 429/401/403<br/>• Exhaustion detection<br/>• Delay + retry same key on 5xx"]
     end
     
     Tray --> Pipeline
@@ -67,48 +76,89 @@ flowchart TB
     TET --> TypingInd
     Popups --> Pipeline
     Pipeline --> APIClient
-    APIClient --> OAI
-    APIClient --> Gemini
-    APIClient --> Custom
-    OAI --> KM
+    APIClient --> PR
+    PR --> Gemini
+    PR --> Anthropic
+    PR --> OAI
+    Gemini -.-> InlineThinking
+    OAI -.-> InlineThinking
+    Anthropic -.-> InlineThinking
+    Gemini --> GS
+    Tools -.-> GS
     Gemini --> KM
-    Custom --> KM
+    Anthropic --> KM
+    OAI --> KM
 ```
 
 ## Provider System
 
-All AI API calls flow through the unified provider system in `src/providers/`.
+All AI API calls flow through the unified provider system in `src/providers/`. The architecture is registry-driven, features centralized retry loops and key rotation, supports abort events, and provides a unified base URL configuration.
 
 ### Provider Interface
 
+The abstract class `BaseProvider` (`src/providers/base.py`) owns the orchestration, key rotation, timing, and exception handling for all generation calls. Subclasses are simplified and only implement request compilation and response stream chunk extraction.
+
 ```python
 class BaseProvider:
-    def call_api(messages, config, ai_params, key_manager) -> ProviderResult
-    def call_api_streaming(messages, config, ai_params, key_manager, callback) -> ProviderResult
-    def get_model_list(config, key_manager) -> List[str]
-    def upload_file(path) -> (file_obj, error)  # Optional
-    def create_batch(messages, model, params) -> (batch_obj, error)  # Optional
+    # Central Orchestrators (owned by BaseProvider, DO NOT override):
+    def generate(self, messages, model, params, thinking_enabled=False, abort_event=None) -> ProviderResult
+    def generate_stream(self, messages, model, params, callback, thinking_enabled=False, abort_event=None) -> ProviderResult
+
+    # Subclass implementations:
+    @abstractmethod
+    def _do_generate(self, messages, model, params, thinking_enabled, api_key, abort_event) -> ProviderResult
+    @abstractmethod
+    def _do_generate_stream(self, messages, model, params, callback, thinking_enabled, api_key, abort_event) -> ProviderResult
+    @abstractmethod
+    def fetch_models(self) -> Tuple[Optional[List[Dict]], Optional[str]]
 ```
 
-### Available Providers
+### Provider Registry & Definition
 
-| Provider | Class | Use Case |
-| ---------- | ------- | ---------- |
-| `google` | `GeminiNativeProvider` | Native Gemini API (Thinking, Batch, Files) |
-| `openrouter` | `OpenAICompatibleProvider` | OpenRouter.ai models |
-| `custom` | `OpenAICompatibleProvider` | Any OpenAI-compatible endpoint |
+The `ProviderDefinition` dataclass (`src/providers/registry.py`) defines metadata for each provider, mapping provider type IDs to specific provider classes, authentication styles, default base URLs, and KeyStore key pools.
 
-### Retry Logic
+| Provider ID | Display Name | Default Base URL | Auth Style | Provider Class | Key Pool |
+|---|---|---|---|---|---|
+| `google` | Google Gemini | `https://generativelanguage.googleapis.com/v1beta` | `x-goog-api-key` header | `GeminiNativeProvider` | `google` |
+| `anthropic` | Anthropic Claude | `https://api.anthropic.com/v1` | `x-api-key` header | `AnthropicProvider` | `anthropic` |
+| `openai` | OpenAI | `https://api.openai.com/v1` | `Bearer` token | `OpenAICompatibleProvider` | `openai` |
+| `openrouter` | OpenRouter | `https://openrouter.ai/api/v1` | `Bearer` token | `OpenAICompatibleProvider` | `openrouter` |
+| `xai` | xAI / Grok | `https://api.x.ai/v1` | `Bearer` token | `OpenAICompatibleProvider` | `xai` |
+| `mistral` | Mistral | `https://api.mistral.ai/v1` | `Bearer` token | `OpenAICompatibleProvider` | `mistral` |
+| `cohere` | Cohere | `https://api.cohere.ai/compatibility/v1` | `Bearer` token | `OpenAICompatibleProvider` | `cohere` |
+| `custom` | Custom (OAI-Compatible) | *(user-provided)* | `Bearer` token | `OpenAICompatibleProvider` | `custom` |
 
-The provider system includes automatic retry with key rotation:
+*Factory resolution is managed via `create_provider(provider_type, key_manager, config)` in `registry.py`.*
 
-| Error | Action | Delay |
-| ------- | -------- | ------- |
-| 429 Rate Limit | Rotate to next key | None |
-| 401/402/403 Auth | Rotate to next key | None |
-| 5xx Server Error | Retry same key | 2 seconds |
-| Empty Response | Rotate to next key | 2 seconds |
-| Network Error | Rotate to next key | 1 second |
+### Retry and Key Rotation Logic
+
+Centralized error handling and key-rotation loops are managed automatically by the `BaseProvider` wrapper. If an error is encountered:
+
+| Error Type | Action | Delay |
+| ----------- | ------ | ----- |
+| **429 Rate Limit** | Rotate key immediately and retry | None |
+| **401/402/403 Auth** | Rotate key immediately and retry | None |
+| **5xx Server Error** | Delay and retry with the same key | `config.retry_delay` (Default: 5s) |
+| **Empty Response** | Rotate key, delay, and retry | 2 seconds |
+| **Network Error / Timeout** | Delay and retry | 1 second |
+
+### Abort Signal Propagation
+
+Every request call accepts an optional `threading.Event` as `abort_event`. Centralized loops in `BaseProvider` and SSE iteration streams check `abort_event.is_set()` and raise an `AbortedError` to immediately close HTTP connections and callback with `CallbackType.ABORTED` if cancelled by the user.
+
+### Inline Thinking Extraction
+
+For models served via OpenRouter or custom endpoints that emit reasoning text enclosed in tags (e.g. DeepSeek-R1) instead of using native API thinking JSON fields, `src/providers/inline_thinking.py` parses and separates thinking text from content blocks using robust regex patterns covering:
+- XML-style tags: `<think>`, `<thinking>`, `<thought>`
+- Pipe tags: `<|think|>`
+- Channel tags: `<|channel>thought`
+
+### Google Services Isolation
+
+To keep `gemini_native.py` focused purely on LLM text generation, all Google-specific secondary operations are isolated in `src/providers/gemini_services.py`:
+- **Files API** (`upload_file`, `delete_file`, `list_files`) - used for large file transfers
+- **Batch API** (`create_batch`) - used by `file_processor.py`
+- **Native TTS Generation** - generates official Gemini speech WAV waveforms
 
 ## GUI Threading Model
 
@@ -301,18 +351,17 @@ Per-session profile override (chat window dropdown)
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `provider` | `google`, `openrouter`, `custom` | API provider |
+| `provider` | `google`, `anthropic`, `openai`, `openrouter`, `xai`, `mistral`, `cohere`, `custom` | API provider ID |
 | `model` | string | Model identifier |
 | `streaming` | bool | Enable streaming responses |
 | `thinking` | bool | Enable thinking/reasoning |
 | `thinking_budget` | int | Gemini 2.5 thinking token budget (-1 = auto) |
 | `thinking_level` | `low`, `high` | Gemini 3.x thinking level |
-| `reasoning_effort` | `low`, `medium`, `high` | OpenAI-compatible reasoning |
+| `reasoning_effort` | `low`, `medium`, `high` | OpenAI-compatible reasoning effort |
 | `temperature` | float or null | Sampling temperature |
 | `max_tokens` | int or null | Max output tokens |
 | `request_timeout` | int | Request timeout in seconds |
-| `custom_url` | string | Custom endpoint URL |
-| `gemini_endpoint` | string | Gemini API endpoint override |
+| `base_url` | string | Base URL override for API requests (uses registry default if blank) |
 | `api_key_name` | string | Select key by display name |
 | `api_key_pool` | string | Key pool override |
 

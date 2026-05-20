@@ -80,7 +80,7 @@ Customizable appearance with:
 - **Live preview**: See theme changes instantly in Settings
 
 ### 🔄 Robust Backend
-- **Multi-provider support** - Google Gemini, OpenRouter, custom endpoints
+- **Multi-provider support** - Google Gemini, Anthropic Claude, OpenAI, OpenRouter, xAI (Grok), Mistral, Cohere, and Custom OpenAI-compatible endpoints
 - **Connection Profiles** - Dedicated connection profiles (`profiles.json`) for provider, model, thinking, streaming, and advanced params — assignable per-action or globally
 - **Automatic key rotation** - Switch API keys on rate limits (429, 401, 403)
 - **Smart retry logic** - Handles errors gracefully with configurable delays
@@ -251,17 +251,26 @@ For advanced users, configuration files are stored in the application root:
 
 ### Getting API Keys
 - **Google Gemini (Recommended)**: Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- **Anthropic Claude**: Get an API key from [Anthropic Console](https://platform.claude.com/settings/workspaces/default/keys)
 - **OpenRouter**: Get an API key from [OpenRouter](https://openrouter.ai/keys)
 - **OpenAI**: Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+- **xAI (Grok)**: Get an API key from [xAI Console](https://console.x.ai/)
+- **Mistral**: Get an API key from [Mistral Console](https://console.mistral.ai/)
+- **Cohere**: Get an API key from [Cohere Dashboard](https://dashboard.cohere.com/)
 
 ### API Key Management
-- Add multiple API keys (one per line) for automatic rotation
+- Add multiple API keys in pools for each provider for automatic rotation
 - If one key hits rate limits, the next one is used automatically
 - The system tracks exhausted keys and skips them
 - Keys rotate on: 429 (rate limit), 401/402/403 (auth errors), empty responses
-- **Security**: You can also provide keys via Environment Variables instead of `config.ini`:
+- **Security**: You can also provide keys via Environment Variables (auto-migrated to `keys.json` on first run if it doesn't exist):
   - `GEMINI_API_KEY`
+  - `ANTHROPIC_API_KEY`
+  - `OPENAI_API_KEY`
   - `OPENROUTER_API_KEY`
+  - `XAI_API_KEY`
+  - `MISTRAL_API_KEY`
+  - `COHERE_API_KEY`
   - `CUSTOM_API_KEY`
 
 ## 🔧 Command Line Options

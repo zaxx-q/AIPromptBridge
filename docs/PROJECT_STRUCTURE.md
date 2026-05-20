@@ -108,9 +108,13 @@ AIPromptBridge/
     │
     ├── providers/              # AI Provider Implementations
     │   ├── __init__.py         # Provider exports and factory
-    │   ├── base.py             # Abstract base provider, retry logic, ProviderResult
-    │   ├── gemini_native.py    # Native Gemini API (Batch, Files API, TTS support)
-    │   └── openai_compatible.py # OpenRouter, Custom, Google OpenAI-compat
+    │   ├── base.py             # Abstract BaseProvider with centralized retry/abort
+    │   ├── registry.py         # Provider registry, definitions, and create_provider factory
+    │   ├── anthropic.py        # Anthropic Claude Messages API provider
+    │   ├── inline_thinking.py  # Regex-based extraction of <think> blocks
+    │   ├── gemini_native.py    # Native Gemini API provider (generation pipeline)
+    │   ├── gemini_services.py  # Gemini-specific services (Files API, Batch, TTS)
+    │   └── openai_compatible.py # OpenAI, OpenRouter, xAI, Mistral, Cohere, Custom providers
     │
     └── tools/                  # Tools Package - Batch file processing
         ├── __init__.py         # Tool exports
@@ -162,9 +166,13 @@ AIPromptBridge/
 
 | Module | Purpose |
 |--------|---------|
-| `base.py` | Abstract BaseProvider with retry logic |
-| `openai_compatible.py` | OpenAI API format (OpenRouter, custom endpoints) |
-| `gemini_native.py` | Native Google Gemini API with thinking and TTS support |
+| `base.py` | Abstract BaseProvider with centralized retry loops, abort checking, and HTTP error sanitization |
+| `registry.py` | Provider registry, metadata definitions, and `create_provider()` factory resolver |
+| `anthropic.py` | Native Anthropic Claude Messages API provider with SSE streaming and adaptive thinking |
+| `inline_thinking.py` | Regex-based inline `<think>` block extractor for models without native thinking channels |
+| `gemini_native.py` | Refactored Gemini Native provider focusing strictly on generation pipelines |
+| `gemini_services.py` | Google Gemini services: Files API upload/delete, Batch jobs, and official TTS |
+| `openai_compatible.py` | OpenAI format provider covering OpenAI, OpenRouter, xAI (Grok), Mistral, Cohere, and Custom |
 
 ### Tools (`src/tools/`)
 
