@@ -41,7 +41,7 @@ except ImportError:
 
 # Profile fields: (key, label, field_type, options)
 PROFILE_FIELDS = [
-    ("provider", "Provider", "combobox", ["google", "openrouter", "custom"]),
+    ("provider", "Provider", "combobox", ["google", "anthropic", "openai", "openrouter", "xai", "mistral", "cohere", "custom"]),
     ("model", "Model", "model_dropdown", None),
     ("streaming", "Streaming", "toggle", None),
     ("thinking", "Thinking", "toggle", None),
@@ -51,18 +51,15 @@ PROFILE_FIELDS = [
     ("temperature", "Temperature", "entry", None),
     ("max_tokens", "Max Tokens", "entry", None),
     ("request_timeout", "Request Timeout (s)", "entry", None),
-    ("custom_url", "Custom URL", "entry", None),
-    ("gemini_endpoint", "Gemini Endpoint", "entry", None),
+    ("base_url", "Base URL", "entry", None),
     ("api_key_name", "API Key Name", "entry", None),
     ("api_key_pool", "API Key Pool", "combobox", None),
 ]
 
 PROVIDER_FIELD_VISIBILITY = {
-    "custom_url": {"custom"},
-    "gemini_endpoint": {"google"},
     "thinking_budget": {"google"},
     "thinking_level": {"google"},
-    "reasoning_effort": {"custom", "openrouter"},
+    "reasoning_effort": {"openai", "openrouter", "xai", "mistral", "cohere", "custom"},
 }
 
 # Thinking sub-fields that require thinking toggle to be ON
@@ -72,7 +69,7 @@ THINKING_FIELDS = {"thinking_budget", "thinking_level", "reasoning_effort"}
 REQUIRED_FIELDS = {"provider", "model"}
 
 # Conditionally required fields: {key: {provider_values}}
-CONDITIONAL_REQUIRED = {"custom_url": {"custom"}}
+CONDITIONAL_REQUIRED = {"base_url": {"custom"}}
 
 # Help text for field tooltips
 FIELD_HELP = {
@@ -86,8 +83,7 @@ FIELD_HELP = {
     "temperature": "Controls randomness (0.0-2.0). Leave empty to use model default.",
     "max_tokens": "Maximum output tokens. Leave empty to use model default.",
     "request_timeout": "Request timeout in seconds. Leave empty to use the global timeout from settings.",
-    "custom_url": "Full URL for the OpenAI-compatible API endpoint. Usually ends with '/v1'. Leave empty for the default OpenAI endpoint.",
-    "gemini_endpoint": "Custom Gemini API base URL. Usually ends with '/v1beta'. Leave empty for the default Google endpoint.",
+    "base_url": "Custom base URL for the API endpoint. Leave empty to use the provider's default URL.",
     "api_key_name": "Use a specific named key from the pool. Leave empty to use pool rotation.",
     "api_key_pool": "Override which key pool this profile uses. Leave empty to use provider default.",
 }
@@ -99,8 +95,7 @@ SUMMARY_ICONS = {
     "streaming": "🌊",
     "thinking": "💭",
     "request_timeout": "⏱️",
-    "custom_url": "🔗",
-    "gemini_endpoint": "🌐",
+    "base_url": "🔗",
     "temperature": "🌡️",
     "max_tokens": "📏",
     "thinking_budget": "🧠",
@@ -478,8 +473,8 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             tk.Entry(row, textvariable=var, font=("Segoe UI", 9),
                 bg=c.input_bg, fg=c.fg, width=25).pack(side="left", padx=(5, 0))
 
-        # Store label reference for custom_url dynamic bold
-        if key == "custom_url":
+        # Store label reference for base_url dynamic bold
+        if key == "base_url":
             self._custom_url_label = lbl
 
         # Track unsaved changes
@@ -516,11 +511,11 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             if provider_ok and thinking_ok:
                 row.pack(fill="x", pady=3)
 
-        # Dynamic bold for custom_url label when provider is custom
+        # Dynamic bold for base_url label when provider is custom
         if self._custom_url_label:
             is_cond_required = False
             for ckey, cproviders in CONDITIONAL_REQUIRED.items():
-                if ckey == "custom_url" and provider in cproviders:
+                if ckey == "base_url" and provider in cproviders:
                     is_cond_required = True
                     break
             if is_cond_required:
@@ -546,11 +541,8 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self._set_model_status("Select provider first", "error")
             return
 
-        custom_url_info = self.field_widgets.get("custom_url")
-        custom_url_value = custom_url_info["var"].get() if custom_url_info else ""
-    
-        gemini_endpoint_info = self.field_widgets.get("gemini_endpoint")
-        gemini_endpoint_value = gemini_endpoint_info["var"].get() if gemini_endpoint_info else ""
+        base_url_info = self.field_widgets.get("base_url")
+        base_url_value = base_url_info["var"].get() if base_url_info else ""
     
         api_key_pool_info = self.field_widgets.get("api_key_pool")
         api_key_pool_value = api_key_pool_info["var"].get().strip() if api_key_pool_info else ""
@@ -564,7 +556,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             try:
                 from ...key_store import KeyStore
                 from ...key_manager import KeyManager
-                from ...api_client import get_provider_for_type
+                from ...providers import create_provider
                 from ... import web_server as _ws
     
                 key_store = KeyStore.get_instance()
@@ -600,19 +592,16 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         return
                 temp_config = {"request_timeout": 30}
     
-                if provider == "custom":
-                    url = custom_url_value or _ws.get_active_setting("custom_url", "")
-                    if url:
-                        temp_config["custom_url"] = url
-                    else:
-                        self._schedule_ui(lambda: self._set_model_status("No custom URL", "error"))
-                        return
-                elif provider == "google":
-                    endpoint = gemini_endpoint_value or _ws.get_active_setting("gemini_endpoint", "")
-                    if endpoint:
-                        temp_config["gemini_endpoint"] = endpoint
+                if base_url_value:
+                    temp_config["base_url"] = base_url_value
+                else:
+                    temp_config["base_url"] = _ws.get_active_setting("base_url", "")
+                
+                if provider == "custom" and not temp_config["base_url"]:
+                    self._schedule_ui(lambda: self._set_model_status("No base URL", "error"))
+                    return
 
-                provider_instance = get_provider_for_type(provider, temp_km, temp_config)
+                provider_instance = create_provider(provider, temp_km, temp_config)
                 models, error = provider_instance.fetch_models()
 
                 if error:
@@ -856,7 +845,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 if "thinking" in profile_data:
                     config["thinking_enabled"] = profile_data["thinking"]
                 for field in ("thinking_budget", "thinking_level", "reasoning_effort",
-                              "request_timeout", "custom_url", "gemini_endpoint"):
+                              "request_timeout", "base_url"):
                     if field in profile_data and profile_data[field]:
                         config[field] = profile_data[field]
                 if "temperature" in profile_data and profile_data["temperature"] is not None:
@@ -1020,8 +1009,8 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             errors.append("Provider is required")
         if not profile_data.get("model"):
             errors.append("Model is required")
-        if profile_data.get("provider") == "custom" and not profile_data.get("custom_url"):
-            errors.append("Custom URL is required for custom provider")
+        if profile_data.get("provider") == "custom" and not profile_data.get("base_url"):
+            errors.append("Base URL is required for custom provider")
 
         if errors:
             messagebox.showwarning("Validation", "\n".join(errors), parent=self)

@@ -43,7 +43,9 @@ _FORMAT_VERSION = 2
 _OBF_PREFIX = "$OBF$"
 
 # Built-in provider IDs that always have a pool by default
-_BUILTIN_PROVIDERS = ("google", "openrouter", "custom")
+_BUILTIN_PROVIDERS = (
+    "google", "openrouter", "custom", "anthropic", "openai", "xai", "mistral", "cohere"
+)
 
 # Salt mixed into the machine key derivation
 _SALT = b"AIPromptBridge::key-obfuscation::v1"
@@ -193,8 +195,8 @@ class KeyStore:
         print_info("Migrating API keys from config.ini → keys.json …")
 
         # Parse legacy key sections directly from config.ini
-        legacy_keys: Dict[str, List[str]] = {"custom": [], "openrouter": [], "google": []}
-        legacy_names: Dict[str, List[str]] = {"custom": [], "openrouter": [], "google": []}
+        legacy_keys: Dict[str, List[str]] = {p: [] for p in _BUILTIN_PROVIDERS}
+        legacy_names: Dict[str, List[str]] = {p: [] for p in _BUILTIN_PROVIDERS}
 
         config_path = Path(CONFIG_FILE)
         if config_path.exists():
@@ -225,7 +227,12 @@ class KeyStore:
         env_map = {
             "google": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
             "openrouter": ["OPENROUTER_API_KEY"],
-            "custom": ["OPENAI_API_KEY", "CUSTOM_API_KEY"],
+            "custom": ["CUSTOM_API_KEY"],
+            "anthropic": ["ANTHROPIC_API_KEY"],
+            "openai": ["OPENAI_API_KEY"],
+            "xai": ["XAI_API_KEY"],
+            "mistral": ["MISTRAL_API_KEY"],
+            "cohere": ["COHERE_API_KEY"],
         }
         for provider, env_vars in env_map.items():
             if not legacy_keys[provider]:
@@ -251,6 +258,8 @@ class KeyStore:
                 display = provider.capitalize()
                 if provider == "openrouter":
                     display = "OpenRouter"
+                elif provider == "xai":
+                    display = "xAI"
                 self._pools[provider] = {
                     "display_name": display,
                     "keys": keys_list,
@@ -278,6 +287,8 @@ class KeyStore:
                 display = provider.capitalize()
                 if provider == "openrouter":
                     display = "OpenRouter"
+                elif provider == "xai":
+                    display = "xAI"
                 self._pools[provider] = {"display_name": display, "keys": []}
             if provider not in self._provider_pool_map:
                 self._provider_pool_map[provider] = provider

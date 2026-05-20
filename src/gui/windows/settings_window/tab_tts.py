@@ -101,4 +101,4 @@ class TTSTabMixin:
         self._add_toggle_field(content, "tts_use_official_endpoint",
                                "Use Official Google Endpoint",
                                self.config_data.config.get("tts_use_official_endpoint", False),
-                               hint="Always use official Google API for TTS, ignoring gemini_endpoint")
+                               hint="Always use official Google API for TTS, ignoring base_url")

@@ -176,7 +176,7 @@ def get_active_setting(key: str, default=None):
     then returns the default.
 
     Supported keys: provider, model, streaming, thinking, thinking_budget,
-    thinking_level, reasoning_effort, custom_url, gemini_endpoint,
+    thinking_level, reasoning_effort, base_url,
     request_timeout, temperature, max_tokens, api_key_name, api_key_pool
     """
     if key in SESSION_OVERRIDES:
@@ -190,8 +190,7 @@ def get_active_setting(key: str, default=None):
             "thinking_budget": ACTIVE_PROFILE.thinking_budget,
             "thinking_level": ACTIVE_PROFILE.thinking_level,
             "reasoning_effort": ACTIVE_PROFILE.reasoning_effort,
-            "custom_url": ACTIVE_PROFILE.custom_url,
-            "gemini_endpoint": ACTIVE_PROFILE.gemini_endpoint,
+            "base_url": ACTIVE_PROFILE.base_url,
             "request_timeout": ACTIVE_PROFILE.request_timeout,
             "temperature": ACTIVE_PROFILE.temperature,
             "max_tokens": ACTIVE_PROFILE.max_tokens,

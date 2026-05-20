@@ -415,6 +415,106 @@ class TestStreamingRetry(unittest.TestCase):
         self.assertIn("thinkingLevel", thinking_config)
         self.assertEqual(thinking_config["thinkingLevel"], "high")
         self.assertNotIn("thinkingBudget", thinking_config)
+    @patch('requests.post')
+    @patch('time.sleep')
+    def test_openai_inline_thinking_extraction_streaming(self, mock_sleep, mock_post):
+        """Test inline thinking block extraction from OpenAI-compatible streaming content"""
+        provider = OpenAICompatibleProvider("custom", "http://fake.url", self.key_manager, self.config)
+        
+        # Mock streaming response where the think block is inside content chunk
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.iter_lines.return_value = [
+            'data: {"choices": [{"delta": {"content": "<think>Let me "}}]}',
+            'data: {"choices": [{"delta": {"content": "think about this</think>Answer text"}}]}',
+            'data: [DONE]'
+        ]
+        mock_post.return_value = mock_response
+        
+        callback = MagicMock()
+        result = provider.generate_stream(
+            messages=[{"role": "user", "content": "hi"}],
+            model="test-model",
+            params={},
+            callback=callback
+        )
+        
+        # Verify result contains the split fields
+        self.assertTrue(result.success)
+        self.assertEqual(result.content, "Answer text")
+        self.assertEqual(result.thinking_content, "Let me think about this")
+
+    @patch('requests.post')
+    @patch('time.sleep')
+    def test_openai_inline_thinking_extraction_nonstreaming(self, mock_sleep, mock_post):
+        """Test inline thinking block extraction from OpenAI-compatible non-streaming content"""
+        provider = OpenAICompatibleProvider("custom", "http://fake.url", self.key_manager, self.config)
+        
+        # Mock non-streaming response where the think block is inside message content
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{
+                "message": {
+                    "content": "<think>Let me analyze</think>Final conclusion"
+                }
+            }],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 20,
+                "total_tokens": 30
+            }
+        }
+        mock_post.return_value = mock_response
+        
+        result = provider.generate(
+            messages=[{"role": "user", "content": "hi"}],
+            model="test-model",
+            params={}
+        )
+        
+        # Verify
+        self.assertTrue(result.success)
+        self.assertEqual(result.content, "Final conclusion")
+        self.assertEqual(result.thinking_content, "Let me analyze")
+
+    @patch('requests.post')
+    @patch('time.sleep')
+    def test_openai_inline_thinking_only_triggers_empty_retry(self, mock_sleep, mock_post):
+        """Test that a response with ONLY inline thinking block is retried as empty"""
+        provider = OpenAICompatibleProvider("custom", "http://fake.url", self.key_manager, self.config)
+        
+        # First attempt: only think tag
+        mock_response_empty = MagicMock()
+        mock_response_empty.status_code = 200
+        mock_response_empty.iter_lines.return_value = [
+            'data: {"choices": [{"delta": {"content": "<think>Thinking only</think>"}}]}',
+            'data: [DONE]'
+        ]
+        
+        # Second attempt: actual content
+        mock_response_valid = MagicMock()
+        mock_response_valid.status_code = 200
+        mock_response_valid.iter_lines.return_value = [
+            'data: {"choices": [{"delta": {"content": "<think>Thinking</think>Actual response"}}]}',
+            'data: [DONE]'
+        ]
+        
+        mock_post.side_effect = [mock_response_empty, mock_response_valid]
+        
+        callback = MagicMock()
+        result = provider.generate_stream(
+            messages=[{"role": "user", "content": "hi"}],
+            model="test-model",
+            params={},
+            callback=callback
+        )
+        
+        # Verify it retried and got the valid response
+        self.assertTrue(result.success)
+        self.assertEqual(result.content, "Actual response")
+        self.assertEqual(result.thinking_content, "Thinking")
+        self.assertEqual(result.retry_count, 1)
 
 if __name__ == '__main__':
     unittest.main()

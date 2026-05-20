@@ -2782,7 +2782,7 @@ class FileProcessor(BaseTool):
         from src.api_client import call_api_with_retry
         from src import web_server
         from src.profile_resolver import resolve_profile
-        from src.providers.gemini_native import GeminiNativeProvider
+        from src.providers import create_provider
 
         # Resolve effective settings using profile or checkpoint fallback
         provider_name, model_override, resolved = self._resolve_execution_settings(checkpoint)
@@ -2797,7 +2797,7 @@ class FileProcessor(BaseTool):
             raise Exception("Google key manager not found")
 
         # Create provider instance for upload
-        provider = GeminiNativeProvider(key_manager=key_manager, config=resolved.config)
+        provider = create_provider("google", key_manager, resolved.config)
         
         # Upload file
         if interactive:
@@ -3231,7 +3231,7 @@ class FileProcessor(BaseTool):
             String with Batch Operation details
         """
         from src import web_server
-        from src.providers.gemini_native import GeminiNativeProvider
+        from src.providers import create_provider
         # Determine content type for the message construction
         # We need to construct messages just like normal, then call create_batch
         
@@ -3247,7 +3247,7 @@ class FileProcessor(BaseTool):
         if not key_manager:
             raise ValueError("Google key manager not found")
         
-        provider = GeminiNativeProvider(key_manager=key_manager, config=resolved.config)
+        provider = create_provider("google", key_manager, resolved.config)
         
         if not hasattr(provider, "create_batch"):
              raise ValueError(f"Provider {provider_name} does not support Batch API")

@@ -86,10 +86,31 @@ def get_base_url(config, provider, profile=None):
         provider: Provider name string.
         profile: Optional ConnectionProfile — preferred source for URL fields.
     """
+    url = (profile.base_url if profile else None) or config.get("base_url", "")
+    if not url:
+        try:
+            from src.providers.registry import get_provider_definition
+            defn = get_provider_definition(provider)
+            if defn:
+                url = defn.default_base_url
+        except Exception:
+            pass
+
+    if url:
+        if "://" in url:
+            url = url.split("://")[-1]
+        if "/chat/completions" in url:
+            url = url.replace("/chat/completions", "")
+        if "/v1beta" in url:
+            url = url.split("/v1beta")[0]
+        return url
+
+    # Legacy fallbacks
     if provider == "custom":
-        url = (profile.custom_url if profile else None) or config.get("custom_url", "")
+        url = config.get("custom_url", "")
         if url:
-            # Extract base URL (remove /chat/completions if present)
+            if "://" in url:
+                url = url.split("://")[-1]
             if "/chat/completions" in url:
                 url = url.replace("/chat/completions", "")
             return url
@@ -97,7 +118,7 @@ def get_base_url(config, provider, profile=None):
     elif provider == "openrouter":
         return "openrouter.ai/api/v1"
     elif provider == "google":
-        return (profile.gemini_endpoint if profile else None) or config.get("gemini_endpoint") or "generativelanguage.googleapis.com"
+        return config.get("gemini_endpoint") or "generativelanguage.googleapis.com"
     return "Unknown"
 
 
@@ -491,7 +512,7 @@ def _migrate_stale_files(bin_dir: Path, root_dir: Path):
     This handles the edge case where files end up next to the internal .exe
     instead of the launcher directory.
     """
-    managed_files = ["chat_sessions.json", "tools_config.json", "keys.json"]
+    managed_files = ["chat_sessions.json", "tools_config.json", "keys.json", "profiles.json"]
     managed_globs = ["config.ini*", "prompts.json*", "*file_processor.json", ".file_processor_*.json"]
     managed_folders = ["session_attachments"]
 

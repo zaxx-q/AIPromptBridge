@@ -44,6 +44,11 @@ class ProviderTabMixin:
         self._create_pool_assignment_dropdown(content, "custom")
         self._create_pool_assignment_dropdown(content, "openrouter")
         self._create_pool_assignment_dropdown(content, "google")
+        self._create_pool_assignment_dropdown(content, "anthropic")
+        self._create_pool_assignment_dropdown(content, "openai")
+        self._create_pool_assignment_dropdown(content, "xai")
+        self._create_pool_assignment_dropdown(content, "mistral")
+        self._create_pool_assignment_dropdown(content, "cohere")
 
         # --- Request Settings ---
         create_section_header(content, "🔄 Request Settings", self.colors, top_padding=20)

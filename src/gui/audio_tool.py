@@ -25,7 +25,7 @@ from typing import Callable
 from .prompts import PromptsConfig
 from ..messages import build_audio_message, build_file_message
 from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
-from ..api_client import get_provider_for_type
+from ..providers import create_provider
 
 
 class AudioToolApp:
@@ -281,7 +281,7 @@ class AudioToolApp:
                         
                         key_manager = resolved.key_managers.get("google")
                         if key_manager:
-                            prov_instance = get_provider_for_type("google", key_manager, resolved.config)
+                            prov_instance = create_provider("google", key_manager, resolved.config)
                             uploaded_file, error = prov_instance.upload_file(Path(temp_file_path))
                             
                             if uploaded_file:

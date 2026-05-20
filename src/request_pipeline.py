@@ -199,7 +199,8 @@ class RequestPipeline:
         ai_params: Dict,
         key_managers: Dict,
         callbacks: StreamCallback,
-        log_raw: bool = False
+        log_raw: bool = False,
+        abort_event: Optional[Any] = None
     ) -> RequestContext:
         """
         Execute streaming API request with logging.
@@ -212,6 +213,7 @@ class RequestPipeline:
             key_managers: Dictionary of key managers
             callbacks: Streaming callbacks
             log_raw: Whether to log raw AI output
+            abort_event: Optional abort event
         
         Returns:
             Updated RequestContext with response data
@@ -255,17 +257,27 @@ class RequestPipeline:
                 ctx.error = content
                 if callbacks.on_error:
                     callbacks.on_error(content)
+                    
+            elif data_type == "aborted":
+                ctx.error = "Request aborted"
+                if callbacks.on_error:
+                    callbacks.on_error("Request aborted")
         
         # Execute the actual API call — pass model_override so per-session
         # model selection is respected in the streaming path
         text, reasoning, usage, error = call_api_chat_stream(
             session, config, ai_params, key_managers, stream_wrapper,
-            model_override=ctx.model
+            model_override=ctx.model, abort_event=abort_event
         )
         
         ctx.elapsed_time = time.time() - start_time
         if error:
             ctx.error = error
+        else:
+            if text is not None:
+                ctx.response_text = text
+            if reasoning is not None:
+                ctx.reasoning_text = reasoning
         
         RequestPipeline.log_request_complete(ctx)
         
@@ -281,7 +293,8 @@ class RequestPipeline:
         config: Dict,
         ai_params: Dict,
         key_managers: Dict,
-        log_raw: bool = False
+        log_raw: bool = False,
+        abort_event: Optional[Any] = None
     ) -> RequestContext:
         """
         Execute non-streaming API request with logging.
@@ -293,6 +306,7 @@ class RequestPipeline:
             ai_params: AI parameters
             key_managers: Dictionary of key managers
             log_raw: Whether to log raw AI output
+            abort_event: Optional abort event
         
         Returns:
             Updated RequestContext with response data
@@ -309,7 +323,8 @@ class RequestPipeline:
             model_override=ctx.model,
             config=config,
             ai_params=ai_params,
-            key_managers=key_managers
+            key_managers=key_managers,
+            abort_event=abort_event
         )
         
         ctx.elapsed_time = time.time() - start_time
@@ -339,7 +354,8 @@ class RequestPipeline:
         ai_params: Dict,
         key_managers: Dict,
         callbacks: StreamCallback,
-        log_raw: bool = False
+        log_raw: bool = False,
+        abort_event: Optional[Any] = None
     ) -> RequestContext:
         """
         Execute streaming API request using the unified streaming API.
@@ -355,6 +371,7 @@ class RequestPipeline:
             key_managers: Dictionary of key managers
             callbacks: Streaming callbacks
             log_raw: Whether to log raw AI output
+            abort_event: Optional abort event
         
         Returns:
             Updated RequestContext with response data
@@ -398,6 +415,11 @@ class RequestPipeline:
                 ctx.error = content
                 if callbacks.on_error:
                     callbacks.on_error(content)
+                    
+            elif data_type == "aborted":
+                ctx.error = "Request aborted"
+                if callbacks.on_error:
+                    callbacks.on_error("Request aborted")
         
         text, reasoning, usage, error = call_api_stream_unified(
             provider_type=ctx.provider,
@@ -408,11 +430,17 @@ class RequestPipeline:
             key_managers=key_managers,
             callback=stream_wrapper,
             thinking_enabled=ctx.thinking_enabled,
+            abort_event=abort_event,
         )
         
         ctx.elapsed_time = time.time() - start_time
         if error:
             ctx.error = error
+        else:
+            if text is not None:
+                ctx.response_text = text
+            if reasoning is not None:
+                ctx.reasoning_text = reasoning
         
         RequestPipeline.log_request_complete(ctx)
         

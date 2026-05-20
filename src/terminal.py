@@ -26,24 +26,26 @@ def get_base_url_for_status(config, provider, profile=None):
         provider: Provider name string.
         profile: Optional ConnectionProfile — preferred source for URL fields.
     """
-    if provider == "custom":
-        url = (profile.custom_url if profile else None) or config.get("custom_url", "")
-        if url:
-            # Extract base URL (remove /chat/completions if present)
-            if "/chat/completions" in url:
-                url = url.replace("/chat/completions", "")
-            return url
-        return "Not configured"
-    elif provider == "openrouter":
-        return "openrouter.ai/api/v1"
-    elif provider == "google":
-        url = (profile.gemini_endpoint if profile else None) or config.get("gemini_endpoint") or "generativelanguage.googleapis.com"
+    url = (profile.base_url if profile else None) or config.get("base_url", "")
+    if not url:
+        try:
+            from .providers.registry import get_provider_definition
+            defn = get_provider_definition(provider)
+            if defn:
+                url = defn.default_base_url
+        except Exception:
+            pass
+
+    if url:
         if "://" in url:
             url = url.split("://")[-1]
+        if "/chat/completions" in url:
+            url = url.replace("/chat/completions", "")
         if "/v1beta" in url:
             url = url.split("/v1beta")[0]
         return url
-    return "Unknown"
+    return "Not configured"
+
 
 
 def print_system_info(include_server_and_keys=True, delay_val=None):

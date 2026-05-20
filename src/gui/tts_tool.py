@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any, List, Callable
 from .hotkey import HotkeyListener
 from .prompts import PromptsConfig
 from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
-from ..api_client import get_provider_for_type
+from ..providers import create_provider
 from ..audio.wav_utils import pcm_to_wav, get_pcm_duration, save_wav
 from ..audio.tts_constants import get_voice_details
 
@@ -295,7 +295,7 @@ class TTSToolApp:
                         callback_error("No Google API key configured")
                     return
                 
-                provider = get_provider_for_type("google", key_manager, self.config)
+                provider = create_provider("google", key_manager, self.config)
                 
                 pcm_data, error = provider.generate_tts(
                     text=text,

@@ -88,10 +88,8 @@ def resolve_profile(
             merged_config["reasoning_effort"] = active.reasoning_effort
         if active.request_timeout is not None:
             merged_config["request_timeout"] = active.request_timeout
-        if active.custom_url:
-            merged_config["custom_url"] = active.custom_url
-        if active.gemini_endpoint:
-            merged_config["gemini_endpoint"] = active.gemini_endpoint
+        if active.base_url:
+            merged_config["base_url"] = active.base_url
         if active.temperature is not None:
             merged_ai_params["temperature"] = active.temperature
         if active.max_tokens is not None:
@@ -141,10 +139,8 @@ def resolve_profile(
                 if profile.request_timeout is not None:
                     merged_config["request_timeout"] = profile.request_timeout
 
-                if profile.custom_url:
-                    merged_config["custom_url"] = profile.custom_url
-                if profile.gemini_endpoint:
-                    merged_config["gemini_endpoint"] = profile.gemini_endpoint
+                if profile.base_url:
+                    merged_config["base_url"] = profile.base_url
 
                 if profile.temperature is not None:
                     merged_ai_params["temperature"] = profile.temperature

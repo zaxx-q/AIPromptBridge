@@ -386,7 +386,7 @@ class TTSPlaygroundMixin:
         
         def _target():
             try:
-                from ....api_client import get_provider_for_type
+                from ....providers import create_provider
                 from ....audio.wav_utils import pcm_to_wav, get_pcm_duration
                 from ....key_manager import KeyManager
                 from .... import web_server as _ws
@@ -401,7 +401,7 @@ class TTSPlaygroundMixin:
                 key_strings = [kd["key"] for kd in keys_data if kd.get("key")]
                 key_manager = KeyManager(key_strings, "google")
     
-                provider = get_provider_for_type("google", key_manager, resolved.config)
+                provider = create_provider("google", key_manager, resolved.config)
                 pcm_data, error = provider.generate_tts(
                     text=full_prompt,
                     model=model,

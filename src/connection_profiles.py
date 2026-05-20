@@ -35,8 +35,7 @@ PROFILE_DEFAULTS: Dict[str, Any] = {
     "temperature": None,
     "max_tokens": None,
     "request_timeout": None,  # None = use global from config.ini
-    "custom_url": "",
-    "gemini_endpoint": "",
+    "base_url": "",
     "api_key_name": "",
     "api_key_pool": "",
 }
@@ -56,8 +55,7 @@ class ConnectionProfile:
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     request_timeout: Optional[int] = None  # None = use global config.ini value
-    custom_url: str = ""
-    gemini_endpoint: str = ""
+    base_url: str = ""
     api_key_name: str = ""
     api_key_pool: str = ""
 
