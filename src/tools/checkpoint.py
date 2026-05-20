@@ -43,8 +43,7 @@ class FileProcessorCheckpoint:
     output_extension: str  # Output file extension
     
     # Execution settings
-    provider: str
-    model: str
+    profile_name: str
     delay_between_requests: float
     use_batch: bool = False
     
@@ -141,6 +140,11 @@ class FileProcessorCheckpoint:
     
     def get_summary(self) -> Dict[str, Any]:
         """Get a summary of checkpoint state"""
+        from src.connection_profiles import ProfileStore
+        profile = ProfileStore.get_instance().get_profile(self.profile_name)
+        provider = profile.provider if profile else "unknown"
+        model = profile.model if profile else "unknown"
+
         summary = {
             "session_id": self.session_id,
             "created_at": self.created_at,
@@ -152,8 +156,9 @@ class FileProcessorCheckpoint:
             "remaining": len(self.remaining_files),
             "progress_percent": self.progress_percent,
             "output_path": self.output_path,
-            "provider": self.provider,
-            "model": self.model,
+            "provider": provider,
+            "model": model,
+            "profile_name": self.profile_name,
         }
         
         if self.is_retry_checkpoint:
@@ -222,10 +227,9 @@ class FileProcessorCheckpoint:
             output_path=original.output_path,
             naming_template=original.naming_template,
             output_extension=original.output_extension,
-            provider=original.provider,
-            model=original.model,
             delay_between_requests=original.delay_between_requests,
             use_batch=original.use_batch,
+            profile_name=original.profile_name,
             audio_preprocessing=original.audio_preprocessing,  # Preserve audio settings
             custom_instructions=original.custom_instructions,  # Preserve batch instructions
             per_file_instructions=failed_per_file_instructions,  # Preserve per-file for failed files
@@ -414,15 +418,14 @@ class CheckpointManager:
         output_path: str,
         naming_template: str,
         output_extension: str,
-        provider: str,
-        model: str,
         delay: float,
         use_batch: bool = False,
         audio_preprocessing: Optional[Dict[str, Any]] = None,
         custom_instructions: Optional[str] = None,
         skip_per_file_prompts: bool = False,
         include_filename: bool = True,
-        pdf_temp_dirs: Optional[List[str]] = None
+        pdf_temp_dirs: Optional[List[str]] = None,
+        profile_name: Optional[str] = None
     ) -> FileProcessorCheckpoint:
         """
         Create a new checkpoint.
@@ -436,8 +439,6 @@ class CheckpointManager:
             output_path: Output directory
             naming_template: File naming template
             output_extension: Output file extension
-            provider: AI provider name
-            model: Model name
             delay: Delay between requests in seconds
             use_batch: Whether to use Batch API
             audio_preprocessing: Audio preprocessing settings (preset, intensity, optimization)
@@ -445,11 +446,16 @@ class CheckpointManager:
             skip_per_file_prompts: Whether to skip per-file instruction prompts
             include_filename: Whether to include filename in AI context
             pdf_temp_dirs: PDF temporary directories to clean up
+            profile_name: Connection profile name used
         
         Returns:
             New FileProcessorCheckpoint
         """
         now = datetime.now().isoformat()
+        
+        if profile_name is None:
+            from src.connection_profiles import ProfileStore
+            profile_name = ProfileStore.get_instance().get_active_profile_name()
         
         return FileProcessorCheckpoint(
             session_id=str(uuid.uuid4())[:8],
@@ -463,10 +469,9 @@ class CheckpointManager:
             output_path=output_path,
             naming_template=naming_template,
             output_extension=output_extension,
-            provider=provider,
-            model=model,
             delay_between_requests=delay,
             use_batch=use_batch,
+            profile_name=profile_name,
             audio_preprocessing=audio_preprocessing,
             custom_instructions=custom_instructions,
             per_file_instructions={},

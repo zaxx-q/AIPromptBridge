@@ -104,6 +104,16 @@ class FileProcessor(BaseTool):
         self._ask_per_file: bool = False  # Whether to prompt for per-file instructions
         self._include_filename: bool = True  # Whether to include filename in context
     
+    def _resolve_execution_settings(self, checkpoint: FileProcessorCheckpoint) -> Tuple[str, Optional[str], Any]:
+        """
+        Resolve the effective provider, model, and profile config/parameters for a checkpoint.
+        """
+        from src import web_server
+        from src.profile_resolver import resolve_profile_by_name
+
+        resolved = resolve_profile_by_name(checkpoint.profile_name, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+        return resolved.provider, resolved.model, resolved
+    
     def run_interactive(self) -> ToolResult:
         """
         Run the File Processor interactively in terminal.
@@ -194,15 +204,14 @@ class FileProcessor(BaseTool):
                     output_path=output_config["path"],
                     naming_template=output_config["naming"],
                     output_extension=output_config["extension"],
-                    provider=exec_settings["provider"],
-                    model=exec_settings["model"],
                     delay=exec_settings["delay"],
                     use_batch=exec_settings.get("use_batch", False),
                     audio_preprocessing=self._audio_preprocessing,
                     custom_instructions=self._custom_instructions,
                     skip_per_file_prompts=not self._ask_per_file,
                     include_filename=self._include_filename,
-                    pdf_temp_dirs=[str(d) for d in self._pdf_temp_dirs]
+                    pdf_temp_dirs=[str(d) for d in self._pdf_temp_dirs],
+                    profile_name=exec_settings.get("profile_name")
                 )
                 
                 # Step 5: Execute processing
@@ -247,6 +256,9 @@ class FileProcessor(BaseTool):
             return ToolResult(success=False, message="No files found")
         
         # Create checkpoint
+        from src.connection_profiles import ProfileStore
+        active_profile = ProfileStore.get_instance().get_active_profile_name()
+        
         input_files = [str(f.path) for f in scan_result.files]
         self._current_checkpoint = self.checkpoint_manager.create(
             input_path=input_path,
@@ -257,10 +269,9 @@ class FileProcessor(BaseTool):
             output_path=output_config.get("path", str(path.parent)),
             naming_template=output_config.get("naming", "{filename}_processed"),
             output_extension=output_config.get("extension", ".txt"),
-            provider=kwargs.get("provider", "google"),
-            model=kwargs.get("model", ""),
             delay=kwargs.get("delay", 1.0),
-            use_batch=kwargs.get("use_batch", False)
+            use_batch=kwargs.get("use_batch", False),
+            profile_name=kwargs.get("profile_name", active_profile)
         )
         
         return self._execute_processing(interactive=False)
@@ -1945,7 +1956,6 @@ class FileProcessor(BaseTool):
         print("How would you like to configure execution settings?")
         print("  [1] Use active connection profile (default)")
         print("  [2] Select a different connection profile")
-        print("  [3] Override provider and model manually")
         print("  [Q] Cancel")
         
         try:
@@ -1957,6 +1967,10 @@ class FileProcessor(BaseTool):
             return None
             
         if not choice:
+            choice = '1'
+            
+        if choice not in ['1', '2']:
+            print("\n⚠️ Invalid choice. Using active connection profile.")
             choice = '1'
             
         if choice == '2':
@@ -1997,39 +2011,6 @@ class FileProcessor(BaseTool):
                 current_model = web_server.get_active_setting("model", "not set")
             else:
                 print(f"\n✗ Profile '{new_profile}' not found. Continuing with active profile '{active}'.")
-                
-        elif choice == '3':
-            # Override provider and model manually
-            print("\nProvider:")
-            providers = list(web_server.KEY_MANAGERS.keys())
-            for i, p in enumerate(providers, 1):
-                key_count = web_server.KEY_MANAGERS[p].get_key_count()
-                marker = " ◄" if p == current_provider else ""
-                status = f"({key_count} keys)" if key_count > 0 else "(no keys)"
-                print(f"  [{i}] {p} {status}{marker}")
-            
-            try:
-                provider_choice = input(f"\nProvider [{current_provider}]: ").strip()
-            except (EOFError, KeyboardInterrupt):
-                return None
-            
-            if provider_choice:
-                try:
-                    idx = int(provider_choice) - 1
-                    if 0 <= idx < len(providers):
-                        current_provider = providers[idx]
-                except ValueError:
-                    if provider_choice.lower() in providers:
-                        current_provider = provider_choice.lower()
-            
-            # Model
-            try:
-                model_input = input(f"\nModel [{current_model}]: ").strip()
-            except (EOFError, KeyboardInterrupt):
-                return None
-            
-            if model_input:
-                current_model = model_input
 
         # Delay
         default_delay = get_setting(self.tools_config, "default_delay_between_requests", 1.0)
@@ -2044,11 +2025,15 @@ class FileProcessor(BaseTool):
             except ValueError:
                 pass
         
+        # Get active profile name
+        active_profile_name = ProfileStore.get_instance().get_active_profile_name()
+
         settings = {
             "provider": current_provider,
             "model": current_model,
             "delay": default_delay,
-            "use_batch": False
+            "use_batch": False,
+            "profile_name": active_profile_name
         }
         
         # Batch API (Google/Gemini only)
@@ -2131,11 +2116,17 @@ class FileProcessor(BaseTool):
         if interactive and HAVE_MSVCRT:
             keyboard_thread = self._start_keyboard_listener()
         
+        # Resolve settings to print correct provider and model
+        provider, model, resolved = self._resolve_execution_settings(cp)
+
         if interactive:
             self._print_header("📁 FILE PROCESSOR - Processing")
             print(f"\n🚀 Starting processing of {len(remaining)} files")
-            print(f"   Provider: {cp.provider}")
-            print(f"   Model:    {cp.model}")
+            profile_name = getattr(cp, "profile_name", None)
+            if profile_name:
+                print(f"   Profile:  {profile_name}")
+            print(f"   Provider: {provider}")
+            print(f"   Model:    {model}")
             from src import web_server
             current_thinking = web_server.get_active_setting("thinking", False)
             thinking_status = "ON" if current_thinking else "OFF"
@@ -2278,7 +2269,7 @@ class FileProcessor(BaseTool):
                             )
                     
                     # Check for Batch API
-                    elif cp.use_batch and cp.provider.lower() == "google":
+                    elif cp.use_batch and provider.lower() == "google":
                          response = self._process_file_batch(
                             process_path, final_prompt, cp, interactive
                         )
@@ -2751,14 +2742,14 @@ class FileProcessor(BaseTool):
             display_name=original_name
         )
 
-        # Resolve profile to get merged config with connection keys
-        resolved = resolve_profile(None, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+        # Resolve effective settings using profile or checkpoint fallback
+        provider, model_override, resolved = self._resolve_execution_settings(checkpoint)
 
         # Call API
         response, error = call_api_with_retry(
-            provider=checkpoint.provider,
+            provider=provider,
             messages=[message],
-            model_override=checkpoint.model if checkpoint.model else None,
+            model_override=model_override if model_override else None,
             config=resolved.config,
             ai_params=resolved.ai_params,
             key_managers=resolved.key_managers
@@ -2793,15 +2784,15 @@ class FileProcessor(BaseTool):
         from src.profile_resolver import resolve_profile
         from src.providers.gemini_native import GeminiNativeProvider
 
-        # Resolve profile to get merged config with connection keys
-        resolved = resolve_profile(None, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+        # Resolve effective settings using profile or checkpoint fallback
+        provider_name, model_override, resolved = self._resolve_execution_settings(checkpoint)
 
         # Get the provider
-        provider_name = checkpoint.provider.lower()
-        if provider_name != "google":
+        provider_name_lower = provider_name.lower()
+        if provider_name_lower != "google":
             raise Exception("Files API only supported for Google/Gemini provider")
 
-        key_manager = resolved.key_managers.get(provider_name)
+        key_manager = resolved.key_managers.get(provider_name_lower)
         if not key_manager:
             raise Exception("Google key manager not found")
 
@@ -2832,9 +2823,9 @@ class FileProcessor(BaseTool):
             
             # Call API
             response, error = call_api_with_retry(
-                provider=checkpoint.provider,
+                provider=provider_name,
                 messages=messages,
-                model_override=checkpoint.model if checkpoint.model else None,
+                model_override=model_override if model_override else None,
                 config=resolved.config,
                 ai_params=resolved.ai_params,
                 key_managers=resolved.key_managers
@@ -3100,8 +3091,8 @@ class FileProcessor(BaseTool):
         from src import web_server
         from src.profile_resolver import resolve_profile
 
-        # Resolve profile to get merged config with connection keys
-        resolved = resolve_profile(None, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+        # Resolve effective settings using profile or checkpoint fallback
+        provider, model_override, resolved = self._resolve_execution_settings(checkpoint)
 
         # Apply preprocessing if configured and not skipped
         if not skip_preprocessing:
@@ -3151,9 +3142,9 @@ class FileProcessor(BaseTool):
                 
                 # Call API (use resolved config from outer scope)
                 response, error = call_api_with_retry(
-                    provider=checkpoint.provider,
+                    provider=provider,
                     messages=[message],
-                    model_override=checkpoint.model if checkpoint.model else None,
+                    model_override=model_override if model_override else None,
                     config=resolved.config,
                     ai_params=resolved.ai_params,
                     key_managers=resolved.key_managers
@@ -3244,16 +3235,19 @@ class FileProcessor(BaseTool):
         # Determine content type for the message construction
         # We need to construct messages just like normal, then call create_batch
         
+        # Resolve effective settings using profile or checkpoint fallback
+        provider_name, model_override, resolved = self._resolve_execution_settings(checkpoint)
+        
         # Get provider (Batch API is Google/Gemini only)
-        provider_name = checkpoint.provider.lower()
-        if provider_name != "google":
+        provider_name_lower = provider_name.lower()
+        if provider_name_lower != "google":
             raise ValueError("Batch API only supported for Google/Gemini provider")
         
-        key_manager = web_server.KEY_MANAGERS.get(provider_name)
+        key_manager = resolved.key_managers.get(provider_name_lower)
         if not key_manager:
             raise ValueError("Google key manager not found")
         
-        provider = GeminiNativeProvider(key_manager=key_manager, config=web_server.CONFIG)
+        provider = GeminiNativeProvider(key_manager=key_manager, config=resolved.config)
         
         if not hasattr(provider, "create_batch"):
              raise ValueError(f"Provider {provider_name} does not support Batch API")
@@ -3304,7 +3298,7 @@ class FileProcessor(BaseTool):
             
         result, error = provider.create_batch(
             messages=msgs,
-            model=checkpoint.model,
+            model=model_override,
             params={"temperature": 0.7}, # defaults?
             display_name=f"Batch: {filepath.name}"
         )
