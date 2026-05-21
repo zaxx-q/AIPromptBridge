@@ -820,6 +820,35 @@ def main():
     # Initialize (new compact output)
     config, ai_params = initialize()
     
+    # Check if onboarding completed
+    onboarding_completed = config.get("onboarding_completed", False)
+    if isinstance(onboarding_completed, str):
+        onboarding_completed = onboarding_completed.strip().lower() in ("true", "1")
+        
+    if not onboarding_completed and HAVE_GUI:
+        if HAVE_RICH:
+            console.print("[bold cyan]🚀 Starting Onboarding Wizard...[/bold cyan]")
+            console.print()
+        else:
+            print("🚀 Starting Onboarding Wizard...")
+            print()
+            
+        from src.gui.windows import show_onboarding_blocking
+        show_onboarding_blocking()
+        
+        # Reload configuration and key managers after onboarding closes
+        config = load_config()
+        web_server.CONFIG = config
+        
+        key_store = KeyStore.get_instance()
+        key_store.load()
+        web_server.KEY_MANAGERS = key_store.build_key_managers()
+        
+        from src.connection_profiles import ProfileStore
+        profile_store = ProfileStore.get_instance()
+        # This will reload active profile settings
+        profile_store.reload()
+    
     # ─── Background Update Check ───────────────────────────────────────────
     try:
         from src.updater import background_update_check

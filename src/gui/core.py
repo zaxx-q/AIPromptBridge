@@ -265,6 +265,8 @@ class GUICoordinator:
                     self._create_audio_analyzer_window(request)
                 elif request_type == 'tts_window':
                     self._create_tts_window(request)
+                elif request_type == 'onboarding':
+                    self._create_onboarding_window(request)
                 elif request_type == 'callback':
                     # Generic callback execution on GUI thread
                     callback = request.get('callback')
@@ -712,6 +714,20 @@ class GUICoordinator:
             'ai_params': ai_params,
             'key_managers': key_managers,
             'initial_text': initial_text,
+            'on_close': on_close
+        })
+    
+    def _create_onboarding_window(self, request):
+        """Create an onboarding wizard window on the GUI thread"""
+        from .windows import create_attached_onboarding_window
+        on_close = request.get('on_close')
+        create_attached_onboarding_window(self._root, on_close)
+
+    def request_onboarding_window(self, on_close: Optional[Callable] = None):
+        """Request creation of an onboarding window (thread-safe)"""
+        self.ensure_running()
+        self._request_queue.put({
+            'type': 'onboarding',
             'on_close': on_close
         })
     

@@ -80,6 +80,9 @@ class GeneralTabMixin:
                                self.config_data.config.get("session_image_quality", 85),
                                1, 100, hint="Compression level for webp/jpg")
 
+        # Welcome Guide
+        self._create_welcome_guide_row(content)
+
         # --- Updates ---
         create_section_header(content, "⬆️ Updates", self.colors, top_padding=20)
 
@@ -346,3 +349,54 @@ class GeneralTabMixin:
         else:
             tk.Label(row, text=info_text, font=("Segoe UI", 9),
                     bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(32, 0))
+
+    def _create_welcome_guide_row(self, parent):
+        """Create the Welcome Guide button row."""
+        row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        row.pack(fill="x", pady=4)
+        
+        if self.use_ctk:
+            from ...themes import get_ctk_button_colors
+            guide_btn = ctk.CTkButton(
+                row, text="Run Welcome Guide", width=150, height=32,
+                font=get_ctk_font(13),
+                fg_color=self.colors.accent,
+                hover_color=self.colors.surface2,
+                text_color=self.colors.accent_fg,
+                command=self._on_run_welcome_guide,
+            )
+            guide_btn.pack(side="left")
+            
+            hint_lbl = ctk.CTkLabel(
+                row, text="Launch the onboarding wizard to configure keys, profiles, and take a feature tour.",
+                font=get_ctk_font(11),
+                **get_ctk_label_colors(self.colors, muted=True)
+            )
+            hint_lbl.pack(side="left", padx=(15, 0))
+        else:
+            guide_btn = tk.Button(
+                row, text="Run Welcome Guide",
+                font=("Segoe UI", 10),
+                bg=self.colors.accent, fg=self.colors.accent_fg,
+                activebackground=self.colors.surface1,
+                activeforeground=self.colors.accent_fg,
+                relief="flat", padx=12, pady=4,
+                command=self._on_run_welcome_guide,
+            )
+            guide_btn.pack(side="left")
+            
+            hint_lbl = tk.Label(
+                row, text="Launch the onboarding wizard to configure keys, profiles, and take a feature tour.",
+                font=("Segoe UI", 9),
+                bg=self.colors.bg, fg=self.colors.blockquote
+            )
+            hint_lbl.pack(side="left", padx=(15, 0))
+            
+    def _on_run_welcome_guide(self):
+        """Run the welcome guide wizard."""
+        try:
+            from ...core import GUICoordinator
+            GUICoordinator.get_instance().request_onboarding_window()
+        except Exception as e:
+            print(f"[Settings] Error running welcome guide: {e}")
+

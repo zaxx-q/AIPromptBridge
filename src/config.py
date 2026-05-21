@@ -103,6 +103,8 @@ DEFAULT_CONFIG = {
     "profile_selector_enabled": True,
     # Update settings
     "update_check_enabled": True,       # Auto-check on startup
+    # Onboarding settings
+    "onboarding_completed": False,
 }
 
 # API URLs
@@ -544,6 +546,12 @@ profile_selector_enabled = true
 # ============================================================
 # Automatically check for updates on startup
 update_check_enabled = true
+
+# ============================================================
+# ONBOARDING SETTINGS
+# ============================================================
+# Tracks whether the first-time startup onboarding wizard has been completed
+# onboarding_completed = false
 
 # ============================================================
 # AI PARAMETERS — Now in Connection Profiles (profiles.json)

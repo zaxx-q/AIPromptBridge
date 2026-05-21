@@ -62,6 +62,13 @@ from .tts_window import (
     create_tts_window
 )
 
+# Onboarding window
+from .onboarding_window import (
+    OnboardingWizard,
+    create_attached_onboarding_window,
+    show_onboarding_blocking
+)
+
 __all__ = [
     # Utils
     'get_icon_path',
@@ -102,4 +109,10 @@ __all__ = [
     # TTS window
     'TTSWindow',
     'create_tts_window',
+    
+    # Onboarding window
+    'OnboardingWizard',
+    'create_attached_onboarding_window',
+    'show_onboarding_blocking',
 ]
+
