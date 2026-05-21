@@ -30,6 +30,7 @@ from ..custom_widgets import (
 )
 from ..popups import Tooltip
 from .utils import set_window_icon
+from ...model_defaults import get_fallback_models
 
 try:
     from ..emoji_renderer import get_emoji_renderer, HAVE_PIL, prepare_emoji_content
@@ -532,6 +533,15 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         # Update summary when provider changes
         self._update_summary()
 
+        # Populate model dropdown with fallback list so it's never empty
+        fallback = get_fallback_models(provider)
+        if fallback and self._model_dropdown_widget:
+            model_info = self.field_widgets.get("model")
+            current_model = model_info["var"].get() if model_info else ""
+            self._model_dropdown_widget.configure(values=fallback)
+            if model_info and current_model not in fallback:
+                model_info["var"].set(fallback[0])
+
     # ─── Model fetching ──────────────────────────────────────────────────
 
     def _refresh_models(self):
@@ -606,11 +616,35 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
                 if error:
                     err_msg = str(error)[:35]
-                    self._schedule_ui(lambda: self._set_model_status(err_msg, "error"))
+                    fallback = get_fallback_models(provider)
+
+                    def _fallback_with_error(msg=err_msg, fb=fallback):
+                        if self._destroyed:
+                            return
+                        if self._model_dropdown_widget and fb:
+                            self._model_dropdown_widget.configure(values=fb)
+                            model_info = self.field_widgets.get("model")
+                            if model_info and model_info["var"].get() not in fb:
+                                model_info["var"].set(fb[0])
+                        self._set_model_status(msg, "error")
+
+                    self._schedule_ui(_fallback_with_error)
                     return
 
                 if not models:
-                    self._schedule_ui(lambda: self._set_model_status("No models", "warning"))
+                    fallback = get_fallback_models(provider)
+
+                    def _fallback_no_models(fb=fallback):
+                        if self._destroyed:
+                            return
+                        if self._model_dropdown_widget and fb:
+                            self._model_dropdown_widget.configure(values=fb)
+                            model_info = self.field_widgets.get("model")
+                            if model_info and model_info["var"].get() not in fb:
+                                model_info["var"].set(fb[0])
+                        self._set_model_status("No models", "warning")
+
+                    self._schedule_ui(_fallback_no_models)
                     return
 
                 model_ids = [m.get("id", str(m)) for m in models]
@@ -626,7 +660,19 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
             except Exception as e:
                 err_msg = str(e)[:30]
-                self._schedule_ui(lambda: self._set_model_status(err_msg, "error"))
+                fallback = get_fallback_models(provider)
+
+                def _fallback_on_exception(msg=err_msg, fb=fallback):
+                    if self._destroyed:
+                        return
+                    if self._model_dropdown_widget and fb:
+                        self._model_dropdown_widget.configure(values=fb)
+                        model_info = self.field_widgets.get("model")
+                        if model_info and model_info["var"].get() not in fb:
+                            model_info["var"].set(fb[0])
+                    self._set_model_status(msg, "error")
+
+                self._schedule_ui(_fallback_on_exception)
 
         threading.Thread(target=_fetch, daemon=True).start()
 

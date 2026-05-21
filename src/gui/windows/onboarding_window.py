@@ -34,17 +34,7 @@ except ImportError:
     HAVE_EMOJI = False
     prepare_emoji_content = None
 
-# Hardcoded default models list in case model fetching fails or offline
-DEFAULT_MODELS = {
-    "google": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-3-flash-preview"],
-    "anthropic": ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest", "claude-3-opus-latest"],
-    "openai": ["gpt-4o", "gpt-4o-mini", "o3-mini"],
-    "openrouter": ["google/gemini-2.5-flash", "anthropic/claude-3.5-sonnet"],
-    "xai": ["grok-2-latest"],
-    "mistral": ["mistral-large-latest", "open-mixtral-8x22b"],
-    "cohere": ["command-r-plus"],
-    "custom": ["local-model"],
-}
+from ...model_defaults import get_fallback_models
 
 
 def _adjust_hex_color(hex_color: str, factor: float) -> str:
@@ -858,7 +848,7 @@ class OnboardingWizard:
             else:
                 self._base_url_row.pack_forget()
 
-        models = DEFAULT_MODELS.get(provider_id, [])
+        models = get_fallback_models(provider_id)
         self.model_combo.configure(values=models)
 
         if models:
@@ -911,11 +901,29 @@ class OnboardingWizard:
 
                 if error:
                     err_msg = str(error)[:35]
-                    self._schedule_ui(lambda: self._set_model_status(err_msg, "error"))
+                    fallback = get_fallback_models(provider)
+
+                    def _fallback_with_error(msg=err_msg, fb=fallback):
+                        if hasattr(self, "model_combo") and self.model_combo:
+                            self.model_combo.configure(values=fb)
+                            if fb and self._model_var.get() not in fb:
+                                self._model_var.set(fb[0])
+                        self._set_model_status(msg, "error")
+
+                    self._schedule_ui(_fallback_with_error)
                     return
 
                 if not models:
-                    self._schedule_ui(lambda: self._set_model_status("No models", "warning"))
+                    fallback = get_fallback_models(provider)
+
+                    def _fallback_no_models(fb=fallback):
+                        if hasattr(self, "model_combo") and self.model_combo:
+                            self.model_combo.configure(values=fb)
+                            if fb and self._model_var.get() not in fb:
+                                self._model_var.set(fb[0])
+                        self._set_model_status("No models", "warning")
+
+                    self._schedule_ui(_fallback_no_models)
                     return
 
                 model_ids = [m.get("id", str(m)) for m in models]
@@ -931,7 +939,16 @@ class OnboardingWizard:
 
             except Exception as e:
                 err_msg = str(e)[:30]
-                self._schedule_ui(lambda: self._set_model_status(err_msg, "error"))
+                fallback = get_fallback_models(provider)
+    
+                def _fallback_on_exception(msg=err_msg, fb=fallback):
+                    if hasattr(self, "model_combo") and self.model_combo:
+                        self.model_combo.configure(values=fb)
+                        if fb and self._model_var.get() not in fb:
+                            self._model_var.set(fb[0])
+                    self._set_model_status(msg, "error")
+    
+                self._schedule_ui(_fallback_on_exception)
 
         threading.Thread(target=_fetch, daemon=True).start()
 

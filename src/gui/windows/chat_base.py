@@ -27,6 +27,7 @@ from ..themes import (
     get_ctk_combobox_colors, sync_ctk_appearance
 )
 from .utils import set_window_icon, set_dark_titlebar
+from ...model_defaults import get_fallback_models
 
 
 class ChatWindowBase(ABC):
@@ -1107,8 +1108,68 @@ class ChatWindowBase(ABC):
                         pass
                 
                 self._safe_after(0, update_dropdown)
+            elif not self._destroyed:
+                # Fetch failed or returned empty — use fallback list
+                provider = web_server.get_active_setting("default_provider", "google")
+                fallback_ids = get_fallback_models(provider)
+                if fallback_ids:
+                    self.available_models = [{"id": mid} for mid in fallback_ids]
+
+                    def update_fallback_dropdown():
+                        if self._destroyed:
+                            return
+                        try:
+                            sentinel = self._get_global_sentinel()
+                            dropdown_values = [sentinel] + fallback_ids
+
+                            if HAVE_CTK:
+                                self.model_dropdown.configure(values=dropdown_values)
+                            else:
+                                self.model_dropdown.configure(values=dropdown_values)
+
+                            if self.session.model_override:
+                                self.model_dropdown.set(self.session.model_override)
+                            else:
+                                self.model_dropdown.set(sentinel)
+                        except Exception:
+                            pass
+
+                    self._safe_after(0, update_fallback_dropdown)
+                if error:
+                    print(f"[ChatWindowBase] Error loading models: {error}")
         except Exception as e:
             print(f"[ChatWindowBase] Error loading models: {e}")
+            # Exception during fetch — try fallback
+            if not self._destroyed:
+                try:
+                    from ... import web_server
+                    provider = web_server.get_active_setting("default_provider", "google")
+                except Exception:
+                    provider = "google"
+                fallback_ids = get_fallback_models(provider)
+                if fallback_ids:
+                    self.available_models = [{"id": mid} for mid in fallback_ids]
+
+                    def update_fallback_on_error():
+                        if self._destroyed:
+                            return
+                        try:
+                            sentinel = self._get_global_sentinel()
+                            dropdown_values = [sentinel] + fallback_ids
+
+                            if HAVE_CTK:
+                                self.model_dropdown.configure(values=dropdown_values)
+                            else:
+                                self.model_dropdown.configure(values=dropdown_values)
+
+                            if self.session.model_override:
+                                self.model_dropdown.set(self.session.model_override)
+                            else:
+                                self.model_dropdown.set(sentinel)
+                        except Exception:
+                            pass
+
+                    self._safe_after(0, update_fallback_on_error)
     
     def _on_config_changed(self, key: str, value=None):
         """Handle config change events — marshal to GUI thread for sentinel update.
