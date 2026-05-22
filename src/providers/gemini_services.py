@@ -347,7 +347,7 @@ def generate_tts(
     if not current_key:
         return None, "No API key available"
     
-    key_num = provider.key_manager.get_key_number()
+    key_label = provider.key_manager.get_key_label()
     timeout = provider.config.get("request_timeout", 120)
     
     if provider.config.get("tts_use_official_endpoint", False):
@@ -361,9 +361,13 @@ def generate_tts(
     
     body = _build_tts_request_body(text, voice_name, multi_speaker_config)
     
+    key_str = str(key_label)
+    if not key_str.startswith("#"):
+        key_str = f"'{key_str}'"
+        
     provider.log("info", f"[TTS] Request: model={model}, voice={voice_name}, "
              f"multi_speaker={'yes' if multi_speaker_config else 'no'}, "
-             f"key={key_num}, retry={retry_count}")
+             f"key={key_str}, retry={retry_count}")
     
     try:
         response = requests.post(url, headers=headers, json=body, timeout=timeout)

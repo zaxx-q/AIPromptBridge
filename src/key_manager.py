@@ -33,6 +33,8 @@ class KeyManager:
         with self.lock:
             if not self.keys:
                 return None
+            if len(self.keys) <= 1:
+                return self.keys[0]
             self.exhausted_keys.add(self.current_index)
             for i in range(len(self.keys)):
                 next_index = (self.current_index + 1 + i) % len(self.keys)
@@ -44,6 +46,17 @@ class KeyManager:
             self.exhausted_keys.clear()
             self.current_index = 0
             return self.keys[0] if self.keys else None
+
+    def get_key_label(self):
+        """Get a friendly display label for the current key (name if set, else index)"""
+        with self.lock:
+            if not self.keys:
+                return "None"
+            if self.current_index >= len(self.keys):
+                self.current_index = 0
+            if self.current_index < len(self.key_names) and self.key_names[self.current_index]:
+                return self.key_names[self.current_index]
+            return f"#{self.current_index + 1}"
     
     def get_key_count(self):
         """Get total number of keys"""

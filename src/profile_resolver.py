@@ -233,7 +233,7 @@ def _resolve_key_override(
             for kd in keys_data:
                 if kd.get("name", "").lower().strip() == name_lower:
                     from .key_manager import KeyManager
-                    return KeyManager([kd["key"]], provider)
+                    return KeyManager([kd["key"]], provider, key_names=[kd.get("name", "")])
             logging.warning(
                 f"[ProfileResolver] Key '{key_name}' not found in pool '{pool_id}'"
             )
@@ -246,7 +246,7 @@ def _resolve_key_override(
         for kd in keys_data:
             if kd.get("name", "").lower().strip() == name_lower:
                 from .key_manager import KeyManager
-                return KeyManager([kd["key"]], provider)
+                return KeyManager([kd["key"]], provider, key_names=[kd.get("name", "")])
         logging.warning(
             f"[ProfileResolver] Key '{key_name}' not found in pool '{pool_for_provider}' for provider '{provider}'"
         )
@@ -266,7 +266,7 @@ def _legacy_resolve_by_name(
     named_key = km.get_key_by_name(key_name)
     if named_key:
         from .key_manager import KeyManager
-        return KeyManager([named_key], provider)
+        return KeyManager([named_key], provider, key_names=[key_name])
     logging.warning(
         f"[ProfileResolver] API key named '{key_name}' not found for provider '{provider}'"
     )

@@ -137,7 +137,7 @@ class BaseProvider(ABC):
                 if not current_key:
                     return ProviderResult(success=False, error="No API key available")
                 
-                key_num = self.key_manager.get_key_number()
+                key_num = self.key_manager.get_key_label()
                 self.log_request(model, key_num, thinking_enabled, streaming=True, retry=retry)
                 
                 result = self._do_generate_stream(
@@ -203,7 +203,7 @@ class BaseProvider(ABC):
                 if not current_key:
                     return ProviderResult(success=False, error="No API key available")
                 
-                key_num = self.key_manager.get_key_number()
+                key_num = self.key_manager.get_key_label()
                 self.log_request(model, key_num, thinking_enabled, streaming=False, retry=retry)
                 
                 result = self._do_generate(
@@ -540,14 +540,20 @@ class BaseProvider(ABC):
             else:
                 print(f"    {prefix} {message}")
     
-    def log_request(self, model: str, key_num: int, thinking: bool, streaming: bool, retry: int = 0):
+    def log_request(self, model: str, key_num: Any, thinking: bool, streaming: bool, retry: int = 0):
         """Log request start"""
         retry_str = f", retry {retry}" if retry > 0 else ""
-        self.log("info", f"Request to {model} with key #{key_num} (thinking: {thinking}, stream: {streaming}{retry_str})")
+        key_str = str(key_num)
+        if not key_str.startswith("#"):
+            key_str = f"'{key_str}'"
+        self.log("info", f"Request to {model} with key {key_str} (thinking: {thinking}, stream: {streaming}{retry_str})")
     
-    def log_success(self, key_num: int):
+    def log_success(self, key_num: Any):
         """Log successful completion"""
-        self.log("info", f"Request completed successfully with key #{key_num}")
+        key_str = str(key_num)
+        if not key_str.startswith("#"):
+            key_str = f"'{key_str}'"
+        self.log("info", f"Request completed successfully with key {key_str}")
     
     def log_retry(self, reason: RetryReason, retry_count: int, delay: float, error_detail: str = ""):
         """Log retry attempt with optional error detail"""

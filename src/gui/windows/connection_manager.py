@@ -85,7 +85,7 @@ FIELD_HELP = {
     "max_tokens": "Maximum output tokens. Leave empty to use model default.",
     "request_timeout": "Request timeout in seconds. Leave empty to use the global timeout from settings.",
     "base_url": "Custom base URL for the API endpoint. Leave empty to use the provider's default URL.",
-    "api_key_name": "Use a specific named key from the pool. Leave empty to use pool rotation.",
+    "api_key_name": "Use a specific named key from the pool. When set, key rotation is disabled and only this key will be used. Leave empty to use pool rotation.",
     "api_key_pool": "Override which key pool this profile uses. Leave empty to use provider default.",
 }
 
