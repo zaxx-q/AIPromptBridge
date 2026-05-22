@@ -115,11 +115,6 @@ def print_system_info(include_server_and_keys=True, delay_val=None):
             grid.add_row("[bold]⏱️ Request Delay[/bold]", f"{delay_val}s")
 
         if include_server_and_keys:
-            # Server
-            host = web_server.CONFIG.get("host", "127.0.0.1")
-            port = web_server.CONFIG.get("port", 5000)
-            grid.add_row("[bold]🚀 Server[/bold]", f"[link=http://{host}:{port}]http://{host}:{port}[/link]")
-
             # Keys — total across all pools
             try:
                 from .key_store import KeyStore
@@ -168,9 +163,6 @@ def print_system_info(include_server_and_keys=True, delay_val=None):
         if delay_val is not None:
             print(f" ⏱️ Request Delay: {delay_val}s")
         if include_server_and_keys:
-            host = web_server.CONFIG.get("host", "127.0.0.1")
-            port = web_server.CONFIG.get("port", 5000)
-            print(f"\n 🚀 Server: http://{host}:{port}")
             try:
                 from .key_store import KeyStore
                 ks = KeyStore.get_instance()
