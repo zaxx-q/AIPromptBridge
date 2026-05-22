@@ -883,7 +883,7 @@ def main():
                 console.print()
             else:
                 print("⚠️  WARNING: No API keys configured!")
-                print("   Please add your API keys to config.ini or use the Settings window.")
+                print("   Please add your API keys. Use the Settings window.")
                 print()
     
     # ─── Server Info ──────────────────────────────────────────────────────

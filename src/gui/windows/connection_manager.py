@@ -539,7 +539,8 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             model_info = self.field_widgets.get("model")
             current_model = model_info["var"].get() if model_info else ""
             self._model_dropdown_widget.configure(values=fallback)
-            if model_info and current_model not in fallback:
+            # Only override if the current model field is empty/blank
+            if model_info and not current_model.strip():
                 model_info["var"].set(fallback[0])
 
     # ─── Model fetching ──────────────────────────────────────────────────
@@ -624,7 +625,8 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         if self._model_dropdown_widget and fb:
                             self._model_dropdown_widget.configure(values=fb)
                             model_info = self.field_widgets.get("model")
-                            if model_info and model_info["var"].get() not in fb:
+                            # Only overwrite if current is empty
+                            if model_info and not model_info["var"].get().strip():
                                 model_info["var"].set(fb[0])
                         self._set_model_status(msg, "error")
 
@@ -640,7 +642,8 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         if self._model_dropdown_widget and fb:
                             self._model_dropdown_widget.configure(values=fb)
                             model_info = self.field_widgets.get("model")
-                            if model_info and model_info["var"].get() not in fb:
+                            # Only overwrite if current is empty
+                            if model_info and not model_info["var"].get().strip():
                                 model_info["var"].set(fb[0])
                         self._set_model_status("No models", "warning")
 
@@ -668,7 +671,8 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                     if self._model_dropdown_widget and fb:
                         self._model_dropdown_widget.configure(values=fb)
                         model_info = self.field_widgets.get("model")
-                        if model_info and model_info["var"].get() not in fb:
+                        # Only overwrite if current is empty
+                        if model_info and not model_info["var"].get().strip():
                             model_info["var"].set(fb[0])
                     self._set_model_status(msg, "error")
 

@@ -853,7 +853,8 @@ class OnboardingWizard:
 
         if models:
             current_model = self._model_var.get()
-            if current_model not in models:
+            # Only overwrite if current model is empty
+            if not current_model.strip():
                 self._model_var.set(models[0])
 
     def _refresh_models(self):
@@ -906,7 +907,8 @@ class OnboardingWizard:
                     def _fallback_with_error(msg=err_msg, fb=fallback):
                         if hasattr(self, "model_combo") and self.model_combo:
                             self.model_combo.configure(values=fb)
-                            if fb and self._model_var.get() not in fb:
+                            # Only overwrite if empty
+                            if fb and not self._model_var.get().strip():
                                 self._model_var.set(fb[0])
                         self._set_model_status(msg, "error")
 
@@ -919,7 +921,8 @@ class OnboardingWizard:
                     def _fallback_no_models(fb=fallback):
                         if hasattr(self, "model_combo") and self.model_combo:
                             self.model_combo.configure(values=fb)
-                            if fb and self._model_var.get() not in fb:
+                            # Only overwrite if empty
+                            if fb and not self._model_var.get().strip():
                                 self._model_var.set(fb[0])
                         self._set_model_status("No models", "warning")
 
@@ -944,7 +947,8 @@ class OnboardingWizard:
                 def _fallback_on_exception(msg=err_msg, fb=fallback):
                     if hasattr(self, "model_combo") and self.model_combo:
                         self.model_combo.configure(values=fb)
-                        if fb and self._model_var.get() not in fb:
+                        # Only overwrite if empty
+                        if fb and not self._model_var.get().strip():
                             self._model_var.set(fb[0])
                     self._set_model_status(msg, "error")
     
