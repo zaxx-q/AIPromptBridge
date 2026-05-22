@@ -60,107 +60,110 @@ def resolve_profile(
     """
     from . import web_server as _ws
 
-    # Step 1: Base values from ACTIVE_PROFILE + SESSION_OVERRIDES
     active = _ws.ACTIVE_PROFILE
-    provider = _ws.SESSION_OVERRIDES.get("provider", active.provider if active else "google")
-    model = _ws.SESSION_OVERRIDES.get("model", active.model if active else "")
-    streaming = _ws.SESSION_OVERRIDES.get("streaming", active.streaming if active else True)
-    thinking = _ws.SESSION_OVERRIDES.get("thinking", active.thinking if active else False)
+    profile_name = None
+    profile = None
+
+    if action:
+        profile_name = action.get("connection_profile")
+        if profile_name:
+            profile = _get_profile(profile_name)
+            if not profile:
+                logging.warning(
+                    f"[ProfileResolver] Profile '{profile_name}' not found, using defaults"
+                )
+
+    # Effective profile to extract configuration parameters from
+    effective_profile = profile if profile else active
+
+    # Resolve provider, model, streaming, and thinking status
+    if profile:
+        # When an action/dropdown profile is explicitly selected, use its settings directly.
+        provider = profile.provider
+        model = profile.model
+        streaming = profile.streaming
+        thinking = profile.thinking
+    else:
+        # Fall back to active profile + session overrides
+        provider = _ws.SESSION_OVERRIDES.get("provider", active.provider if active else "google")
+        model = _ws.SESSION_OVERRIDES.get("model", active.model if active else "")
+        streaming = _ws.SESSION_OVERRIDES.get("streaming", active.streaming if active else True)
+        thinking = _ws.SESSION_OVERRIDES.get("thinking", active.thinking if active else False)
 
     merged_config = dict(config)
     merged_ai_params = dict(ai_params)
     effective_key_managers = key_managers
 
-    # Step 2: Always write config-style connection keys into merged_config
-    # This ensures providers receive the keys they expect, regardless
-    # of whether CONFIG has connection keys populated.
+    # Write config-style connection keys
     merged_config["default_provider"] = provider
     merged_config[f"{provider}_model"] = model
     merged_config["streaming_enabled"] = streaming
     merged_config["thinking_enabled"] = thinking
 
-    if active:
-        if active.thinking_budget is not None:
-            merged_config["thinking_budget"] = active.thinking_budget
-        if active.thinking_level:
-            merged_config["thinking_level"] = active.thinking_level
-        if active.reasoning_effort:
-            merged_config["reasoning_effort"] = active.reasoning_effort
-        if active.request_timeout is not None:
-            merged_config["request_timeout"] = active.request_timeout
-        if active.base_url:
-            merged_config["base_url"] = active.base_url
-        if active.temperature is not None:
-            merged_ai_params["temperature"] = active.temperature
-        if active.max_tokens is not None:
-            merged_ai_params["max_tokens"] = active.max_tokens
+    # Apply other connection parameters from the effective profile, ensuring no leakage
+    if effective_profile:
+        # thinking_budget
+        if effective_profile.thinking_budget is not None:
+            merged_config["thinking_budget"] = effective_profile.thinking_budget
+        else:
+            merged_config.pop("thinking_budget", None)
 
-        # Apply key override from active profile (same logic as Step 2 for action profiles)
-        if active.api_key_pool or active.api_key_name:
+        # thinking_level
+        if effective_profile.thinking_level:
+            merged_config["thinking_level"] = effective_profile.thinking_level
+        else:
+            merged_config.pop("thinking_level", None)
+
+        # reasoning_effort
+        if effective_profile.reasoning_effort:
+            merged_config["reasoning_effort"] = effective_profile.reasoning_effort
+        else:
+            merged_config.pop("reasoning_effort", None)
+
+        # request_timeout
+        if effective_profile.request_timeout is not None:
+            merged_config["request_timeout"] = effective_profile.request_timeout
+        else:
+            merged_config.pop("request_timeout", None)
+
+        # base_url override - if empty/None on the effective profile, we clear it so providers fallback to default URL
+        if effective_profile.base_url:
+            merged_config["base_url"] = effective_profile.base_url
+        else:
+            merged_config.pop("base_url", None)
+
+        # temperature
+        if effective_profile.temperature is not None:
+            merged_ai_params["temperature"] = effective_profile.temperature
+        else:
+            merged_ai_params.pop("temperature", None)
+
+        # max_tokens
+        if effective_profile.max_tokens is not None:
+            merged_ai_params["max_tokens"] = effective_profile.max_tokens
+        else:
+            merged_ai_params.pop("max_tokens", None)
+
+        # API key overrides
+        if effective_profile.api_key_pool or effective_profile.api_key_name:
             resolved_km = _resolve_key_override(
-                active.api_key_pool,
-                active.api_key_name,
+                effective_profile.api_key_pool,
+                effective_profile.api_key_name,
                 provider,
                 key_managers,
             )
             if resolved_km is not None:
                 effective_key_managers = dict(key_managers)
                 effective_key_managers[provider] = resolved_km
-
-    # Step 3: If action specifies a profile, override with action profile values
-    profile_name = None
-
-    if action:
-        profile_name = action.get("connection_profile")
-
-        if profile_name:
-            profile = _get_profile(profile_name)
-            if profile:
-                if profile.provider:
-                    provider = profile.provider
-                    merged_config["default_provider"] = provider
-
-                if profile.model:
-                    model = profile.model
-                    merged_config[f"{provider}_model"] = model
-
-                streaming = profile.streaming
-                merged_config["streaming_enabled"] = streaming
-
-                thinking = profile.thinking
-                merged_config["thinking_enabled"] = thinking
-
-                if profile.thinking_budget is not None:
-                    merged_config["thinking_budget"] = profile.thinking_budget
-                if profile.thinking_level:
-                    merged_config["thinking_level"] = profile.thinking_level
-                if profile.reasoning_effort:
-                    merged_config["reasoning_effort"] = profile.reasoning_effort
-                if profile.request_timeout is not None:
-                    merged_config["request_timeout"] = profile.request_timeout
-
-                if profile.base_url:
-                    merged_config["base_url"] = profile.base_url
-
-                if profile.temperature is not None:
-                    merged_ai_params["temperature"] = profile.temperature
-                if profile.max_tokens is not None:
-                    merged_ai_params["max_tokens"] = profile.max_tokens
-
-                if profile.api_key_pool or profile.api_key_name:
-                    resolved_km = _resolve_key_override(
-                        profile.api_key_pool,
-                        profile.api_key_name,
-                        provider,
-                        key_managers,
-                    )
-                    if resolved_km is not None:
-                        effective_key_managers = dict(key_managers)
-                        effective_key_managers[provider] = resolved_km
-            else:
-                logging.warning(
-                    f"[ProfileResolver] Profile '{profile_name}' not found, using defaults"
-                )
+    else:
+        # No effective profile, clear any overridden parameters to use defaults
+        merged_config.pop("thinking_budget", None)
+        merged_config.pop("thinking_level", None)
+        merged_config.pop("reasoning_effort", None)
+        merged_config.pop("request_timeout", None)
+        merged_config.pop("base_url", None)
+        merged_ai_params.pop("temperature", None)
+        merged_ai_params.pop("max_tokens", None)
 
     if not model and provider:
         model = merged_config.get(f"{provider}_model", "")
