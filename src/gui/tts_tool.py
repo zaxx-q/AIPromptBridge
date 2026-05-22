@@ -289,13 +289,17 @@ class TTSToolApp:
         """
         def _target():
             try:
-                key_manager = self.key_managers.get("google")
+                from ..profile_resolver import resolve_profile
+    
+                resolved = resolve_profile(None, self.config, self.ai_params, self.key_managers)
+    
+                key_manager = resolved.key_managers.get("google")
                 if not key_manager:
                     if callback_error:
                         callback_error("No Google API key configured")
                     return
-                
-                provider = create_provider("google", key_manager, self.config)
+    
+                provider = create_provider("google", key_manager, resolved.config)
                 
                 pcm_data, error = provider.generate_tts(
                     text=text,
