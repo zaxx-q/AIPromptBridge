@@ -53,7 +53,7 @@ PROFILE_FIELDS = [
     ("max_tokens", "Max Tokens", "entry", None),
     ("request_timeout", "Request Timeout (s)", "entry", None),
     ("base_url", "Base URL", "entry", None),
-    ("api_key_name", "API Key Name", "entry", None),
+    ("api_key_name", "API Key Name", "key_name_dropdown", None),
     ("api_key_pool", "API Key Pool", "combobox", None),
 ]
 
@@ -131,6 +131,8 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         self._destroyed = False
         self._last_saved_values: Optional[dict] = None
         self._custom_url_label = None
+        self._api_key_name_dropdown = None
+        self._ignore_select_event = False
 
         self.title("Connection Profiles")
         self.geometry("780x740")
@@ -161,8 +163,29 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 self.profile_fields.append(field)
 
         self._build_ui()
+
+        # Subscribe to KeyStore changes to refresh key name options
+        try:
+            from ...key_store import KeyStore
+            self._keystore_callback = self._on_keystore_changed
+            KeyStore.get_instance().subscribe(self._keystore_callback)
+        except Exception:
+            self._keystore_callback = None
+
+        # Trace api_key_pool changes to update key name options
+        pool_info = self.field_widgets.get("api_key_pool")
+        if pool_info:
+            pool_info["var"].trace_add("write", lambda *_: self._update_api_key_name_options())
+
+        # Trace name and description changes for unsaved indicator
+        self.name_var.trace_add("write", lambda *_: self._check_unsaved())
+        self.description_var.trace_add("write", lambda *_: self._check_unsaved())
+
         self._refresh_list()
         self.deiconify()
+
+        # Intercept window close for unsaved changes guard
+        self.protocol("WM_DELETE_WINDOW", self._on_close_attempt)
 
     # ─── Build UI ─────────────────────────────────────────────────────────
 
@@ -270,6 +293,8 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 self._build_model_dropdown_field(row, key, label, c)
             elif field_type == "combobox":
                 self._build_combobox_field(row, key, label, options, c)
+            elif field_type == "key_name_dropdown":
+                self._build_key_name_dropdown_field(row, key, label, c)
             else:
                 self._build_entry_field(row, key, label, c)
 
@@ -483,6 +508,41 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         self.field_widgets[key] = {"var": var, "type": "entry"}
 
+    def _build_key_name_dropdown_field(self, row, key: str, label: str, c: ThemeColors):
+        """Build a key name dropdown field with auto-populated options from KeyStore."""
+        var = tk.StringVar()
+        is_required = key in REQUIRED_FIELDS
+
+        if self.use_ctk:
+            font = get_ctk_font(12, "bold") if is_required else get_ctk_font(12)
+            ctk.CTkLabel(row, text=f"{label}:", font=font, width=150, anchor="w",
+                         **get_ctk_label_colors(c)).pack(side="left")
+            self._add_help_icon(row, key, c)
+            dropdown = ScrollableComboBox(
+                row, colors=c, variable=var, values=[],
+                width=220, height=30, font_size=12,
+                state="normal"
+            )
+            dropdown.pack(side="left", padx=(8, 0))
+            self._api_key_name_dropdown = dropdown
+        else:
+            font = ("Segoe UI", 9, "bold") if is_required else ("Segoe UI", 9)
+            tk.Label(row, text=f"{label}:", font=font, width=14, anchor="w",
+                     bg=c.bg, fg=c.fg).pack(side="left")
+            self._add_help_icon(row, key, c)
+            dropdown = ScrollableComboBox(
+                row, colors=c, variable=var, values=[],
+                width=220, height=30, font_size=10,
+                state="normal"
+            )
+            dropdown.pack(side="left", padx=(5, 0))
+            self._api_key_name_dropdown = dropdown
+
+        # Track unsaved changes
+        var.trace_add("write", lambda *_: self._check_unsaved())
+
+        self.field_widgets[key] = {"var": var, "type": "key_name_dropdown", "widget": dropdown}
+
     # ─── Provider-aware visibility ────────────────────────────────────────
 
     def _on_provider_change(self, provider: str = None):
@@ -533,6 +593,9 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         # Update summary when provider changes
         self._update_summary()
 
+        # Refresh key name options when provider changes
+        self._update_api_key_name_options()
+
         # Populate model dropdown with fallback list so it's never empty
         fallback = get_fallback_models(provider)
         if fallback and self._model_dropdown_widget:
@@ -542,6 +605,46 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             # Only override if the current model field is empty/blank
             if model_info and not current_model.strip():
                 model_info["var"].set(fallback[0])
+
+    # ─── Key Name Options ────────────────────────────────────────────────
+
+    def _update_api_key_name_options(self, *args):
+        """Refresh the API Key Name dropdown options based on selected pool/provider."""
+        if not self._api_key_name_dropdown or self._destroyed:
+            return
+
+        try:
+            from ...key_store import KeyStore
+            key_store = KeyStore.get_instance()
+
+            # Resolve pool ID
+            pool_info = self.field_widgets.get("api_key_pool")
+            pool_id = pool_info["var"].get().strip() if pool_info else ""
+
+            if not pool_id:
+                # Use provider's default pool
+                provider_info = self.field_widgets.get("provider")
+                provider = provider_info["var"].get() if provider_info else ""
+                pool_id = key_store.get_provider_pool_id(provider) if provider else ""
+
+            # Fetch key names from pool
+            names = []
+            if pool_id and key_store.pool_exists(pool_id):
+                keys_data = key_store.get_pool(pool_id)
+                seen = set()
+                for kd in keys_data:
+                    name = kd.get("name", "")
+                    if name and name not in seen:
+                        names.append(name)
+                        seen.add(name)
+
+            self._api_key_name_dropdown.configure(values=[""] + names)
+        except Exception:
+            pass
+
+    def _on_keystore_changed(self):
+        """Called when KeyStore is modified — refresh key name options on GUI thread."""
+        self._schedule_ui(self._update_api_key_name_options)
 
     # ─── Model fetching ──────────────────────────────────────────────────
 
@@ -852,12 +955,36 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         if self._last_saved_values is None:
             return
         try:
-            current = self._collect_profile_values()
-            is_dirty = current != self._last_saved_values
-            indicator = "● " if is_dirty else ""
+            indicator = "● " if self._is_dirty() else ""
             self.title(f"{indicator}Connection Profiles")
         except Exception:
             pass
+
+    def _is_dirty(self) -> bool:
+        """Check if the current form values differ from the last saved state."""
+        if self._last_saved_values is None:
+            return False
+        current = self._collect_profile_values()
+        current["name"] = self.name_var.get().strip()
+        current["description"] = self.description_var.get().strip()
+        return current != self._last_saved_values
+
+    def _prompt_unsaved_if_dirty(self) -> bool:
+        """Prompt user about unsaved changes. Returns True to proceed, False to abort."""
+        if not self._is_dirty():
+            return True
+        result = messagebox.askyesnocancel(
+            "Unsaved Changes",
+            f"You have unsaved changes to profile '{self.current_profile}'.\n\n"
+            "Save changes before proceeding?",
+            parent=self
+        )
+        if result is True:  # Yes — save
+            return self._save_profile()
+        elif result is False:  # No — discard
+            return True
+        else:  # Cancel
+            return False
 
     # ─── Test profile ─────────────────────────────────────────────────────
 
@@ -980,7 +1107,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         for key, widget_info in self.field_widgets.items():
             if widget_info["type"] == "toggle":
                 profile[key] = widget_info["var"].get()
-            elif widget_info["type"] in ("entry", "combobox", "model_dropdown"):
+            elif widget_info["type"] in ("entry", "combobox", "model_dropdown", "key_name_dropdown"):
                 val = widget_info["var"].get().strip()
                 if key == "temperature":
                     try:
@@ -1009,8 +1136,26 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self.profile_listbox.add_item(name, name, icon)
 
     def _on_profile_select(self, name):
+        # Skip entirely when reverting selection (avoid reloading and losing unsaved changes)
+        if self._ignore_select_event:
+            return
+
+        # Guard: check for unsaved changes before switching profiles
+        if not self._prompt_unsaved_if_dirty():
+            # Revert listbox selection without triggering recursive call
+            self._ignore_select_event = True
+            if self.current_profile:
+                self.profile_listbox.select(self.current_profile)
+            else:
+                self.profile_listbox.selection_clear()
+            self._ignore_select_event = False
+            return
+
         from ...connection_profiles import ProfileStore
         self.current_profile = name
+        # Reset saved state before loading to prevent trace callbacks
+        # from briefly showing the dirty indicator during field population
+        self._last_saved_values = None
         store = ProfileStore.get_instance()
         profile_data = store.get_profile_dict(name) or {}
 
@@ -1027,6 +1172,14 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 w = widget_info.get("widget")
                 if w and hasattr(w, "set"):
                     w.set(str_val)
+            elif widget_info["type"] == "key_name_dropdown":
+                str_val = str(val) if val is not None and val != "" else ""
+                if str_val == "None":
+                    str_val = ""
+                widget_info["var"].set(str_val)
+                w = widget_info.get("widget")
+                if w and hasattr(w, "set"):
+                    w.set(str_val)
             else:
                 str_val = str(val) if val is not None and val != "" else ""
                 # Convert None to empty string for display
@@ -1039,14 +1192,16 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         # Track saved state for unsaved indicator
         self._last_saved_values = self._collect_profile_values()
+        self._last_saved_values["name"] = name.strip()
+        self._last_saved_values["description"] = self.description_var.get().strip()
         self.title("Connection Profiles")
 
-    def _save_profile(self):
+    def _save_profile(self) -> bool:
         from ...connection_profiles import ProfileStore
         name = self.name_var.get().strip()
         if not name:
             messagebox.showwarning("Missing Name", "Please enter a profile name.", parent=self)
-            return
+            return False
 
         profile_data = self._collect_profile_values()
         desc = self.description_var.get().strip()
@@ -1064,7 +1219,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         if errors:
             messagebox.showwarning("Validation", "\n".join(errors), parent=self)
-            return
+            return False
 
         store = ProfileStore.get_instance()
 
@@ -1075,7 +1230,11 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         store.set_profile_from_dict(name, profile_data)
         self.current_profile = name
         self._refresh_list()
+        # Ignore select event to avoid re-triggering _on_profile_select
+        # (which would check dirty state before we update _last_saved_values)
+        self._ignore_select_event = True
         self.profile_listbox.select(name)
+        self._ignore_select_event = False
         self._update_summary()
 
         # If this is the active profile, apply changes live
@@ -1086,11 +1245,18 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         # Update saved state and clear unsaved indicator
         self._last_saved_values = self._collect_profile_values()
+        self._last_saved_values["name"] = name.strip()
+        self._last_saved_values["description"] = self.description_var.get().strip()
         self.title("Connection Profiles")
 
         self.save_status.configure(text=f"✅ Saved '{name}'")
+        return True
 
     def _new_profile(self):
+        if not self._prompt_unsaved_if_dirty():
+            return
+        # Reset dirty state so _on_profile_select won't re-prompt
+        self._last_saved_values = None
         name = ask_themed_string(self, "New Profile", "Enter profile name:", self.colors)
         if name:
             from ...connection_profiles import ProfileStore, ConnectionProfile
@@ -1098,12 +1264,18 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             store.set_profile(name, ConnectionProfile())
             self.current_profile = name
             self._refresh_list()
+            self._ignore_select_event = True
             self.profile_listbox.select(name)
+            self._ignore_select_event = False
             self._on_profile_select(name)
 
     def _duplicate_profile(self):
         if not self.current_profile:
             return
+        if not self._prompt_unsaved_if_dirty():
+            return
+        # Reset dirty state so _on_profile_select won't re-prompt
+        self._last_saved_values = None
         name = ask_themed_string(self, "Duplicate Profile", "Enter new profile name:", self.colors)
         if name:
             from ...connection_profiles import ProfileStore
@@ -1113,7 +1285,10 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self.current_profile = name
             self.name_var.set(name)
             self._refresh_list()
+            self._ignore_select_event = True
             self.profile_listbox.select(name)
+            self._ignore_select_event = False
+            self._on_profile_select(name)
             self.save_status.configure(text=f"✅ Duplicated as '{name}'")
 
     def _delete_profile(self):
@@ -1129,13 +1304,33 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             for widget_info in self.field_widgets.values():
                 if widget_info["type"] == "toggle":
                     widget_info["var"].set(False)
+                elif widget_info["type"] == "key_name_dropdown":
+                    widget_info["var"].set("")
+                    w = widget_info.get("widget")
+                    if w and hasattr(w, "set"):
+                        w.set("")
                 else:
                     widget_info["var"].set("")
             self._refresh_list()
             self._update_summary()
-
+            self._last_saved_values = None
+            self.title("Connection Profiles")
+    
+    def _on_close_attempt(self):
+        """Handle window close — check for unsaved changes first."""
+        if not self._prompt_unsaved_if_dirty():
+            return  # User cancelled — keep window open
+        self.destroy()
+    
     def destroy(self):
         self._destroyed = True
+        # Unsubscribe from KeyStore notifications
+        if hasattr(self, '_keystore_callback') and self._keystore_callback:
+            try:
+                from ...key_store import KeyStore
+                KeyStore.get_instance().unsubscribe(self._keystore_callback)
+            except Exception:
+                pass
         if self.on_close:
             self.on_close()
         super().destroy()

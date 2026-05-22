@@ -25,6 +25,7 @@ ignored.
 import base64
 import hashlib
 import json
+import logging
 import os
 import platform
 import re
@@ -115,7 +116,7 @@ class KeyStore:
 
     def __init__(self) -> None:
         # Pool ID → pool data:
-        #   {"display_name": str, "keys": [{"key": str, "name": str}, ...]}
+        # {"display_name": str, "keys": [{"key": str, "name": str}, ...]}
         # Keys stored *obfuscated* in memory exactly as on disk; deobfuscated
         # only when handed out via get_pool() / build_key_managers().
         self._pools: Dict[str, Dict[str, Any]] = {}
@@ -126,6 +127,9 @@ class KeyStore:
         self._file_path = KEYS_FILE
         self._data_lock = threading.Lock()
 
+        # Pub/sub listeners for key store change notifications
+        self._listeners: List[Any] = []
+
     # -- Singleton -----------------------------------------------------------
 
     @classmethod
@@ -135,6 +139,26 @@ class KeyStore:
                 if cls._instance is None:
                     cls._instance = cls()
         return cls._instance
+
+    # -- Pub/Sub Listeners ---------------------------------------------------
+
+    def subscribe(self, callback):
+        """Register a callback to be invoked when the store is saved/modified."""
+        if callback not in self._listeners:
+            self._listeners.append(callback)
+
+    def unsubscribe(self, callback):
+        """Remove a previously registered callback."""
+        if callback in self._listeners:
+            self._listeners.remove(callback)
+
+    def _notify_listeners(self):
+        """Invoke all registered listener callbacks."""
+        for cb in list(self._listeners):
+            try:
+                cb()
+            except Exception as e:
+                logging.error(f"[KeyStore] Error notifying listener: {e}")
 
     # -- Load / Save ---------------------------------------------------------
 
@@ -179,6 +203,7 @@ class KeyStore:
                 }
             with open(target, "w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2, ensure_ascii=False)
+            self._notify_listeners()
             return True
         except Exception as exc:
             from .console import print_error
