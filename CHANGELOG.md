@@ -1,5 +1,56 @@
 # Changelog
 
+## [7.0.0] - 2026-05-21
+
+### New Features
+
+- **Connection Profiles**: Introduced a dedicated Connection Profile system (`profiles.json`) replacing the previous model presets. Each profile is a complete, self-contained set of AI connection settings; provider, model, streaming, thinking, temperature, max tokens, timeout, base URL, and API key overrides; with no sparse fallbacks. Profiles can be assigned globally or per-action, and switched at runtime from the terminal, tray menu, or a new Connection Profile Manager window.
+- **Connection Profile Manager**: A new GUI window for creating, editing, duplicating, testing, and deleting connection profiles. Features include a live summary panel, unsaved-change indicators, field validation, contextual help tooltips, and in-editor model fetching with fallback lists. Accessible from the system tray ("Profiles"), Settings window, Prompt Editor, and terminal (`P` key).
+- **Anthropic Claude Support**: Added a native Anthropic Claude Messages API provider with SSE streaming, adaptive thinking configuration, and full integration into the provider registry.
+- **Multi-Provider Architecture**: Expanded provider support from 3 to 8 built-in providers; Google Gemini, Anthropic Claude, OpenAI, OpenRouter, xAI (Grok), Mistral, Cohere, and Custom OpenAI-compatible endpoints; all managed through a centralized provider registry with per-provider metadata, default base URLs, and key pool mappings.
+- **Pool-Based API Key Management**: API keys are now stored in `keys.json` (XOR-obfuscated) organized into named pools, managed by a new `KeyStore` singleton. Keys are automatically migrated from `config.ini` and environment variables on first launch. The Keys tab in Settings provides full pool CRUD (create, rename, delete) and per-key management (add, remove, reorder). Provider-to-pool assignments are configured in the Connection tab.
+- **Onboarding Wizard**: A new first-time setup wizard guides users through API key entry, provider/model selection, and a feature tour with hotkey reference cards. The wizard can be re-launched anytime from Settings ("Run Welcome Guide").
+- **PDF Processing**: Added PDF document support for OpenAI-compatible and OpenRouter providers. The File Processor tool now offers optional page-by-page splitting for PDF files using `pypdf`, with support for page range selection (e.g., "1-5", "3,5,8", "all").
+- **Inline Thinking Extraction**: Models served via OpenRouter or custom endpoints that emit reasoning text in XML-style tags (e.g., `<think>`, `<thinking>`) are now automatically parsed, separating thinking content from the final response for collapsible display.
+- **Fallback Model Lists**: All model dropdowns (Chat Window, Audio Analyzer, Connection Manager, Onboarding) now display curated fallback model lists when live API fetching fails or is unavailable.
+- **Gemma 4 System Instructions**: Gemma 4+ models now use native `systemInstruction` support instead of prepending system prompts to user messages (legacy Gemma 1–3 behavior is preserved).
+
+### Improvements
+
+- **Unified Provider Architecture**: Redesigned the provider subsystem to eliminate code duplication. A centralized `BaseProvider` now owns retry loops, key rotation, timing, abort signal propagation, and HTTP error handling. Subclasses only implement request compilation and response parsing.
+- **Streaming Idle Timeout**: Added content-idle timeout detection for streaming responses, catching hangs masked by SSE heartbeats or empty keep-alive signals that standard socket timeouts miss.
+- **Better API Error Messages**: Streaming and non-streaming API errors now show the actual error message from the provider (e.g., rate limit details, safety blocks) instead of generic "Empty response" messages.
+- **Settings Reorganization**: The Generation tab has been merged into the Tools tab (typing settings) and Provider tab (renamed to "Connection"), simplifying the settings interface. The Connection tab now features the active profile selector and key pool assignments.
+- **Theme Refinements**: Removed the OneDark theme and optimized accent contrast across all remaining themes. Button text colors now use a dedicated `accent_fg` field for consistent readability against colored backgrounds.
+- **Terminal Dashboard**: The `I` (Info) command now displays comprehensive profile metadata including description, API key pool/name, thinking parameters, temperature, max tokens, timeout, and total key counts across all pools.
+- **Session-Scoped Toggles**: Thinking and streaming toggles in the terminal (`K` and `R` keys) now apply only to the current session and are not persisted to `config.ini`, preventing accidental permanent changes.
+- **Configuration Simplification**: Connection settings (provider, model, streaming, thinking, AI parameters) have been removed from `config.ini` and are now exclusively managed through Connection Profiles. The `load_config()` function returns only the config dict; endpoints are loaded from `prompts.json`.
+- **File Processor Profiles**: The batch File Processor now uses connection profiles instead of raw provider/model selection. Execution settings offer profile switching or manual override, and checkpoints store the profile name for consistent resume behavior.
+- **Relocated Dialogs**: `ThemedInputDialog` and `ask_themed_string` moved from the Prompt Editor package to `custom_widgets.py` for broader reuse across Settings and other windows.
+- **ScrollableComboBox**: Fixed focus-out race conditions that could overwrite explicit dropdown selections, and improved filtering logic to correctly reflect entry text when the dropdown is opened or values are refreshed.
+- **Tooltip Readability**: Increased font size in the Tooltip component for improved readability across all UI elements.
+- **API Key Logging**: Named API keys are now shown by name in request logs instead of generic index numbers. Key rotation is automatically disabled when a specific named key is selected via a profile override.
+
+### Removed
+
+- **Flask API Endpoints**: Removed the entire Flask API endpoint feature (HTTP POST routes like `/ocr`, `/ocr_translate`). The built-in Snip Tool and direct tool integrations fully replace this functionality.
+- **`--no-tray` Option**: Removed the `--no-tray` command-line argument. The application now always runs in tray mode on Windows.
+- **OneDark Theme**: Removed the OneDark theme (both dark and light variants) from the theme registry.
+- **`thinking_output` Setting**: Removed the `thinking_output` config option (`filter`/`raw`/`reasoning_content`). Thinking content is now always displayed as collapsible `reasoning_content`.
+- **Terminal Info**: Removed the internal server URL from the terminal Info command output.
+
+### Fixes
+
+- **Profile Resolution Leakage**: Fixed active profile settings (base_url, temperature, max_tokens, etc.) leaking into override profiles. When an action selects a different connection profile, only that profile's values are used; empty fields now properly clear inherited parameters instead of falling through to the active profile.
+- **TTS Base URL**: Fixed TTS audio generation ignoring the resolved connection profile's `base_url` when `tts_use_official_endpoint` is disabled.
+- **Audio Analyzer Stability**: Fixed potential `TclError` crashes during Audio Analyzer window destruction by immediately nullifying level meter widgets before cleanup, preventing queued thread-safe callbacks from touching destroyed widgets.
+- **Snip Tool Overrides**: Fixed action configuration not being passed through to API calls in the Snip Tool, ensuring per-action settings (like connection profiles) are correctly applied.
+- **Audio Tool Presets**: Fixed preset/profile overrides not being carried through the Audio Tool's background processing pipeline.
+- **Chat Window Profiles**: Fixed chat window not applying connection profile overrides for configuration, AI parameters, and key managers during streaming and non-streaming requests.
+- **Preset Manager**: Fixed model fetching not reflecting custom Gemini endpoints, and added proper API key pool/name override support for preset testing.
+- **Settings Save**: Fixed an error when saving settings if the Keys tab had never been loaded during the current session.
+- **Profile Method Indentation**: Fixed `_get_profile_names` being incorrectly nested inside another method's return statement in both Audio Analyzer and Chat Base classes.
+
 ## [6.4.1] - 2026-04-30
 
 ### Improvements
