@@ -8,17 +8,11 @@ Standalone dialog classes that can be used independently:
 
 import queue
 import tkinter as tk
-from tkinter import messagebox
-from typing import Callable, Optional
 
 from ...platform import HAVE_CTK, ctk
 from ...themes import (
-    ThemeColors, get_colors,
-    get_ctk_button_colors, get_ctk_frame_colors, get_ctk_entry_colors,
-    get_ctk_textbox_colors, get_ctk_combobox_colors, get_ctk_label_colors,
-    get_ctk_font
+    get_ctk_button_colors, get_ctk_textbox_colors, get_ctk_font
 )
-from ...custom_widgets import ScrollableButtonList, ScrollableComboBox, create_emoji_button, TkScrollableFrame, ask_themed_string
 from ..utils import set_window_icon
 
 
@@ -59,6 +53,10 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         else:
             self.configure(bg=colors.bg)
 
+        # Dark titlebar support (must happen before deiconify)
+        self.withdraw()
+        from ..utils import set_dark_titlebar
+        set_dark_titlebar(self)
         set_window_icon(self)
             
         # Main content area
@@ -99,12 +97,16 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             
         # State
         self.thinking_started = False
+        self._has_content = False  # True once any text/thinking content arrives
+        self._completed = False    # True once test is finished
         
         # Start message
         self._safe_insert("Waiting for response...\n\n")
         
         # Start queue polling
         self._check_queue()
+        
+        self.deiconify()
         
     def _check_queue(self):
         """Poll the queue for updates."""
@@ -126,7 +128,12 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             
     def append_text(self, text):
         """Append normal response text."""
-        # If we were thinking, close the block now that we have text
+        if not self._has_content:
+            self._has_content = True
+            # Clear the "Waiting for response..." placeholder
+            self._safe_clear_and_insert(text)
+            return
+            
         if self.thinking_started:
             self.end_thinking()
             
@@ -134,6 +141,19 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         
     def append_thinking(self, text):
         """Append thinking/reasoning text."""
+        if not self._has_content:
+            self._has_content = True
+            # Clear the "Waiting for response..." placeholder
+            def _clear_then_insert():
+                try:
+                    if self.use_ctk:
+                        self.output_box.delete("0.0", "end")
+                    else:
+                        self.output_box.delete("1.0", "end")
+                except Exception:
+                    pass
+            self.queue.put(_clear_then_insert)
+
         if not self.thinking_started:
             self._safe_insert("\n========== THINKING ==========\n", "thinking")
             self.thinking_started = True
@@ -148,7 +168,27 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         
     def append_error(self, text):
         """Append error message."""
-        self._safe_insert(f"\n[Error] {text}\n", "error")
+        if not self._has_content:
+            self._has_content = True
+            self._safe_clear_and_insert(f"❌ Error: {text}\n", "error")
+        else:
+            self._safe_insert(f"\n❌ Error: {text}\n", "error")
+
+    def mark_done(self, usage: dict = None):
+        """Mark the test as complete with optional usage stats."""
+        self._completed = True
+        if self.thinking_started:
+            self.end_thinking()
+
+        parts = ["\n\n✅ Test complete."]
+        if usage:
+            prompt = usage.get("prompt_tokens", 0)
+            completion = usage.get("completion_tokens", 0)
+            total = usage.get("total_tokens", 0)
+            est = " (est)" if usage.get("estimated", False) else ""
+            parts.append(f"📊 Tokens: {prompt} in | {completion} out | {total} total{est}")
+
+        self._safe_insert("\n".join(parts) + "\n")
         
     def _safe_insert(self, text, tag=None):
         """Thread-safe text insertion via queue."""
@@ -163,4 +203,21 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             except Exception:
                 pass
         
+        self.queue.put(_update)
+
+    def _safe_clear_and_insert(self, text, tag=None):
+        """Thread-safe: clear output box then insert text."""
+        def _update():
+            try:
+                if self.use_ctk:
+                    self.output_box.delete("0.0", "end")
+                    self.output_box.insert("end", text)
+                    self.output_box.see("end")
+                else:
+                    self.output_box.delete("1.0", "end")
+                    self.output_box.insert("end", text, tag)
+                    self.output_box.see("end")
+            except Exception:
+                pass
+
         self.queue.put(_update)

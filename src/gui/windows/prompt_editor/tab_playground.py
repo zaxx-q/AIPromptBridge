@@ -1455,37 +1455,49 @@ class PlaygroundTabMixin:
         # Define thread target
         def _target():
             try:
-                from ....api_client import call_api_stream_unified
+                from ....request_pipeline import (
+                    RequestPipeline, RequestContext, RequestOrigin, StreamCallback
+                )
 
                 # Check for thinking support in config to show proper UI
                 thinking_enabled = params["config"].get("thinking_enabled", False)
                 
-                def stream_callback(type_, content):
-                    if type_ == "text":
-                        dialog.append_text(content)
-                    elif type_ == "thinking":
-                        dialog.append_thinking(content)
-                    elif type_ == "error":
-                        dialog.append_error(content)
-                
-                # Execute unified streaming call
-                text, reasoning, usage, error = call_api_stream_unified(
-                    provider_type=params["provider"],
-                    messages=params["messages"],
+                ctx = RequestContext(
+                    origin=RequestOrigin.POPUP_PROMPT,
+                    provider=params["provider"],
                     model=params["model"],
+                    streaming=True,
+                    thinking_enabled=thinking_enabled,
+                )
+
+                usage_data = {}
+
+                callbacks = StreamCallback(
+                    on_text=lambda content: dialog.append_text(content),
+                    on_thinking=lambda content: dialog.append_thinking(content),
+                    on_error=lambda content: dialog.append_error(str(content)),
+                    on_usage=lambda u: usage_data.update(u),
+                )
+
+                ctx = RequestPipeline.execute_unified_stream(
+                    ctx=ctx,
+                    messages=params["messages"],
                     config=params["config"],
                     ai_params=params["ai_params"],
                     key_managers=params["key_managers"],
-                    callback=stream_callback,
-                    thinking_enabled=thinking_enabled,
+                    callbacks=callbacks,
                 )
-                
-                if error:
-                    dialog.append_error(error)
-                
-                # Mark done
-                if dialog.thinking_started:
-                    dialog.end_thinking()
+
+                if ctx.error:
+                    dialog.append_error(ctx.error)
+
+                final_usage = {
+                    "prompt_tokens": ctx.input_tokens,
+                    "completion_tokens": ctx.output_tokens,
+                    "total_tokens": ctx.total_tokens,
+                    "estimated": ctx.estimated,
+                } if ctx.input_tokens or ctx.output_tokens else (usage_data or None)
+                dialog.mark_done(usage=final_usage)
                     
                 # Update main window status
                 self.queue.put(self._update_status_success)

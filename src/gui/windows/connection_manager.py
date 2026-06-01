@@ -11,17 +11,16 @@ Usage:
     ConnectionProfileManager(parent_root, colors)
 """
 
-import queue
 import threading
 import tkinter as tk
 from tkinter import messagebox
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from ..platform import HAVE_CTK, ctk
 from ..themes import (
     ThemeColors, get_colors,
-    get_ctk_button_colors, get_ctk_frame_colors, get_ctk_entry_colors,
-    get_ctk_textbox_colors, get_ctk_combobox_colors, get_ctk_label_colors,
+    get_ctk_entry_colors,
+    get_ctk_combobox_colors, get_ctk_label_colors,
     get_ctk_font
 )
 from ..custom_widgets import (
@@ -1000,7 +999,9 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         def _test_thread():
             try:
                 from ...key_manager import KeyManager
-                from ...api_client import call_api_stream_unified
+                from ...request_pipeline import (
+                    RequestPipeline, RequestContext, RequestOrigin, StreamCallback
+                )
                 from ... import web_server as _ws
     
                 # Build config from profile data directly (no load_config needed)
@@ -1059,24 +1060,53 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             
                 messages = [{"role": "user", "content": "Say 'Hello! Profile test successful.' in exactly those words."}]
             
-                def stream_callback(type_, content):
-                    if type_ == "text":
-                        dialog.append_text(content)
-                    elif type_ == "thinking":
-                        dialog.append_thinking(content)
-                    elif type_ == "error":
-                        dialog.append_error(str(content))
-            
-                call_api_stream_unified(
-                    provider_type=provider,
-                    messages=messages,
+                # Create RequestContext for pipeline logging
+                ctx = RequestContext(
+                    origin=RequestOrigin.POPUP_PROMPT,
+                    provider=provider,
                     model=model,
+                    streaming=True,
+                    thinking_enabled=thinking_enabled,
+                )
+
+                # Build StreamCallback for the dialog
+                usage_data = {}
+
+                callbacks = StreamCallback(
+                    on_text=lambda content: dialog.append_text(content),
+                    on_thinking=lambda content: dialog.append_thinking(content),
+                    on_error=lambda content: dialog.append_error(str(content)),
+                    on_usage=lambda u: usage_data.update(u),
+                )
+
+                # Execute through RequestPipeline
+                ctx = RequestPipeline.execute_unified_stream(
+                    ctx=ctx,
+                    messages=messages,
                     config=config,
                     ai_params=ai_params,
                     key_managers=key_managers,
-                    callback=stream_callback,
-                    thinking_enabled=thinking_enabled,
+                    callbacks=callbacks,
                 )
+
+                # Check for errors in the return context
+                if ctx.error:
+                    dialog.append_error(ctx.error)
+
+                # Mark completion with usage
+                final_usage = ctx.usage if hasattr(ctx, 'usage') else None
+                if not final_usage and usage_data:
+                    final_usage = usage_data
+                elif not final_usage:
+                    # Build from ctx fields
+                    final_usage = {
+                        "prompt_tokens": ctx.input_tokens,
+                        "completion_tokens": ctx.output_tokens,
+                        "total_tokens": ctx.total_tokens,
+                        "estimated": ctx.estimated,
+                    }
+                dialog.mark_done(usage=final_usage)
+
             except Exception as e:
                 dialog.append_error(str(e))
 

@@ -26,7 +26,7 @@ PROFILES_FILE = "profiles.json"
 PROFILE_DEFAULTS: Dict[str, Any] = {
     "description": "",
     "provider": "google",
-    "model": "gemini-3-flash-preview",
+    "model": "gemini-flash-latest",
     "streaming": True,
     "thinking": False,
     "thinking_budget": -1,
@@ -46,7 +46,7 @@ class ConnectionProfile:
     """A complete connection profile — every field has a value."""
     description: str = ""
     provider: str = "google"
-    model: str = "gemini-3-flash-preview"
+    model: str = "gemini-flash-latest"
     streaming: bool = True
     thinking: bool = False
     thinking_budget: int = -1
