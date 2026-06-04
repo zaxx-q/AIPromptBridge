@@ -52,18 +52,14 @@ class ChatSession:
     def add_message(self, role, content, attachments=None, gemini_parts=None):
         """
         Add a message to the session.
-        
+
         Args:
             role: "user" or "assistant"
             content: Text content
             attachments: Optional list of attachment dicts [{"path": "...", "mime_type": "..."}]
             gemini_parts: Optional list of raw Gemini parts (containing thought signatures, etc.)
         """
-        message = {
-            "role": role,
-            "content": content,
-            "timestamp": datetime.now().isoformat()
-        }
+        message = {"role": role, "content": content, "timestamp": datetime.now().isoformat()}
         if attachments:
             message["attachments"] = attachments
         if gemini_parts:
@@ -76,7 +72,7 @@ class ChatSession:
     def get_conversation_for_api(self, include_image=True, include_system_instruction=True):
         """
         Convert session messages to API format.
-        
+
         Args:
             include_image: Whether to include image data in messages
             include_system_instruction: Whether to prepend system instruction if available
@@ -112,13 +108,9 @@ class ChatSession:
 
                                 if mime.startswith("audio/"):
                                     # Audio uses inline_data
-                                    content_parts.append({
-                                        "type": "inline_data",
-                                        "inline_data": {
-                                            "mime_type": mime,
-                                            "data": b64
-                                        }
-                                    })
+                                    content_parts.append(
+                                        {"type": "inline_data", "inline_data": {"mime_type": mime, "data": b64}}
+                                    )
                                 elif mime.startswith("image/"):
                                     # Images use image_url (standard abstraction)
                                     data_url = f"data:{mime};base64,{b64}"
@@ -127,14 +119,13 @@ class ChatSession:
                                     # Documents (PDFs, etc.) use inline_data
                                     # Providers convert this to their native format
                                     # (e.g., OpenRouter file type, Gemini inline_data)
-                                    content_parts.append({
-                                        "type": "inline_data",
-                                        "inline_data": {
-                                            "mime_type": mime,
-                                            "data": b64
-                                        },
-                                        "filename": attach.get("filename", "")
-                                    })
+                                    content_parts.append(
+                                        {
+                                            "type": "inline_data",
+                                            "inline_data": {"mime_type": mime, "data": b64},
+                                            "filename": attach.get("filename", ""),
+                                        }
+                                    )
 
                     # Add text content last (context -> question ordering)
                     content_parts.append({"type": "text", "text": content})
@@ -206,9 +197,9 @@ def save_sessions():
         try:
             data = {
                 "_counter": SESSION_COUNTER,
-                "sessions": {str(sid): session.to_dict() for sid, session in CHAT_SESSIONS.items()}
+                "sessions": {str(sid): session.to_dict() for sid, session in CHAT_SESSIONS.items()},
             }
-            with open(SESSIONS_FILE, 'w', encoding='utf-8') as f:
+            with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception as e:
             print(f"[Warning] Failed to save sessions: {e}")
@@ -219,7 +210,7 @@ def load_sessions():
     global CHAT_SESSIONS, SESSION_COUNTER
     try:
         if Path(SESSIONS_FILE).exists():
-            with open(SESSIONS_FILE, 'r', encoding='utf-8') as f:
+            with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             # Handle new format with _counter and sessions
@@ -262,6 +253,7 @@ def add_session(session, max_sessions=200):
     # Cleanup attachments for removed sessions
     # (Only runs if items were actually removed)
     if removed_ids:
+
         def cleanup():
             import time
 
@@ -316,14 +308,16 @@ def list_sessions():
     with SESSION_LOCK:
         sessions = []
         for sid, session in reversed(list(CHAT_SESSIONS.items())):
-            sessions.append({
-                "id": sid,
-                "title": session.title or "(No title)",
-                "origin": session.origin,
-                "messages": len(session.messages),
-                "updated": session.updated_at,
-                "created": session.created_at
-            })
+            sessions.append(
+                {
+                    "id": sid,
+                    "title": session.title or "(No title)",
+                    "origin": session.origin,
+                    "messages": len(session.messages),
+                    "updated": session.updated_at,
+                    "created": session.created_at,
+                }
+            )
         return sessions
 
 
@@ -358,6 +352,7 @@ def delete_session(session_id):
     if deleted_id is not None:
         try:
             from .attachment_manager import delete_session_attachments
+
             # Use the numeric ID for attachment cleanup
             numeric_id = int(deleted_id) if isinstance(deleted_id, str) and deleted_id.isdigit() else deleted_id
             if isinstance(numeric_id, int):

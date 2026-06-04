@@ -38,6 +38,7 @@ from .utils import set_dark_titlebar, set_window_icon
 
 _BROWSER_INSTANCES = set()
 
+
 def notify_browsers_refresh():
     """Notify all open browser windows to refresh their session lists."""
     for browser in list(_BROWSER_INSTANCES):
@@ -52,24 +53,19 @@ def notify_browsers_refresh():
 # Session List Components (lightweight tk-based for performance)
 # =============================================================================
 
+
 class SessionListItem(tk.Frame):
     """
     A single session row in the session browser list.
     Uses lightweight tk widgets with grid layout for proper alignment.
     """
 
-    def __init__(self, parent, session_data: Dict, colors: ThemeColors,
-                 on_click, on_double_click, **kwargs):
+    def __init__(self, parent, session_data: Dict, colors: ThemeColors, on_click, on_double_click, **kwargs):
         # Remove CTk-specific kwargs if present
-        kwargs.pop('fg_color', None)
-        kwargs.pop('corner_radius', None)
+        kwargs.pop("fg_color", None)
+        kwargs.pop("corner_radius", None)
 
-        super().__init__(
-            parent,
-            bg=colors.surface0,
-            height=36,
-            **kwargs
-        )
+        super().__init__(parent, bg=colors.surface0, height=36, **kwargs)
         self.session_data = session_data
         self.colors = colors
         self.on_click_callback = on_click
@@ -79,27 +75,27 @@ class SessionListItem(tk.Frame):
 
         # Use grid layout for column alignment (pixel-perfect)
         # MUST match SessionListHeader grid config
-        self.grid_columnconfigure(0, minsize=60)   # ID
-        self.grid_columnconfigure(1, weight=1)     # Title
+        self.grid_columnconfigure(0, minsize=60)  # ID
+        self.grid_columnconfigure(1, weight=1)  # Title
         self.grid_columnconfigure(2, minsize=100)  # Origin
-        self.grid_columnconfigure(3, minsize=70)   # Msgs
+        self.grid_columnconfigure(3, minsize=70)  # Msgs
         self.grid_columnconfigure(4, minsize=140)  # Updated
 
         self.pack_propagate(False)
         self.grid_propagate(False)
 
         # Data preparation
-        sid = str(session_data.get('id', ''))
-        title = session_data.get('title', '') or 'Untitled'
+        sid = str(session_data.get("id", ""))
+        title = session_data.get("title", "") or "Untitled"
         # Truncate very long titles for display
         if len(title) > 60:
-            title = title[:60] + '...'
+            title = title[:60] + "..."
 
-        endpoint = session_data.get('origin', '')
-        msgs = str(session_data.get('messages', 0))
-        updated = session_data.get('updated', '')
+        endpoint = session_data.get("origin", "")
+        msgs = str(session_data.get("messages", 0))
+        updated = session_data.get("updated", "")
         if updated:
-            updated = updated[:16].replace('T', ' ')
+            updated = updated[:16].replace("T", " ")
 
         font = ("Segoe UI", 10)
         self.cells = []
@@ -131,13 +127,13 @@ class SessionListItem(tk.Frame):
                 anchor=anchor,
                 padx=5,
                 pady=8,
-                cursor="hand2"
+                cursor="hand2",
             )
 
             if emoji_img:
                 lbl.configure(image=emoji_img, compound="left")
 
-            lbl.grid(row=0, column=col, sticky=sticky, padx=(10 if col==0 else 0, 0))
+            lbl.grid(row=0, column=col, sticky=sticky, padx=(10 if col == 0 else 0, 0))
             self.cells.append(lbl)
 
             # Event binding
@@ -203,25 +199,20 @@ class SessionListHeader(tk.Frame):
 
     def __init__(self, parent, colors: ThemeColors, on_sort, current_sort, descending, **kwargs):
         # Remove CTk-specific kwargs
-        kwargs.pop('fg_color', None)
-        kwargs.pop('corner_radius', None)
+        kwargs.pop("fg_color", None)
+        kwargs.pop("corner_radius", None)
 
-        super().__init__(
-            parent,
-            bg=colors.surface1,
-            height=30,
-            **kwargs
-        )
+        super().__init__(parent, bg=colors.surface1, height=30, **kwargs)
         self.colors = colors
         self.on_sort = on_sort
         self.current_sort = current_sort
         self.descending = descending
 
         # Grid config (Must match SessionListItem)
-        self.grid_columnconfigure(0, minsize=60)   # ID
-        self.grid_columnconfigure(1, weight=1)     # Title
+        self.grid_columnconfigure(0, minsize=60)  # ID
+        self.grid_columnconfigure(1, weight=1)  # Title
         self.grid_columnconfigure(2, minsize=100)  # Origin
-        self.grid_columnconfigure(3, minsize=70)   # Msgs
+        self.grid_columnconfigure(3, minsize=70)  # Msgs
         self.grid_columnconfigure(4, minsize=140)  # Updated
 
         self.pack_propagate(False)
@@ -250,9 +241,9 @@ class SessionListHeader(tk.Frame):
                 anchor=anchor,
                 padx=5,
                 pady=6,
-                cursor="hand2"
+                cursor="hand2",
             )
-            lbl.grid(row=0, column=col, sticky=sticky, padx=(10 if col==0 else 0, 0))
+            lbl.grid(row=0, column=col, sticky=sticky, padx=(10 if col == 0 else 0, 0))
 
             lbl.bind("<Button-1>", lambda e: self.on_sort(actual_sort_key) if self.on_sort else None)
             self.cells[actual_sort_key] = lbl
@@ -268,13 +259,7 @@ class SessionListHeader(tk.Frame):
         self.current_sort = current_sort
         self.descending = descending
 
-        display_map = {
-            "ID": "ID",
-            "Title": "Title",
-            "Origin": "Origin",
-            "Messages": "Msgs",
-            "Updated": "Updated"
-        }
+        display_map = {"ID": "ID", "Title": "Title", "Origin": "Origin", "Messages": "Msgs", "Updated": "Updated"}
 
         for key, lbl in self.cells.items():
             base_text = display_map.get(key, key)
@@ -289,10 +274,11 @@ class SessionListHeader(tk.Frame):
 # Browser Window Base
 # =============================================================================
 
+
 class BrowserWindowBase(ABC):
     """
     Base class for session browser windows.
-    
+
     Subclasses must implement:
     - _create_root() -> creates the root window
     - _get_window_tag() -> return unique window tag
@@ -371,24 +357,20 @@ class BrowserWindowBase(ABC):
         # Sort
         reverse = self.sort_descending
         if self.sort_column == "ID":
-            sessions.sort(key=lambda s: s['id'] if isinstance(s['id'], int) else 0, reverse=reverse)
+            sessions.sort(key=lambda s: s["id"] if isinstance(s["id"], int) else 0, reverse=reverse)
         elif self.sort_column == "Title":
-            sessions.sort(key=lambda s: (s['title'] or '').lower(), reverse=reverse)
+            sessions.sort(key=lambda s: (s["title"] or "").lower(), reverse=reverse)
         elif self.sort_column == "Origin":
-            sessions.sort(key=lambda s: s.get('origin', ''), reverse=reverse)
+            sessions.sort(key=lambda s: s.get("origin", ""), reverse=reverse)
         elif self.sort_column == "Messages":
-            sessions.sort(key=lambda s: s['messages'], reverse=reverse)
+            sessions.sort(key=lambda s: s["messages"], reverse=reverse)
         elif self.sort_column == "Updated":
-            sessions.sort(key=lambda s: s['updated'] or '', reverse=reverse)
+            sessions.sort(key=lambda s: s["updated"] or "", reverse=reverse)
 
         # Create items
         for session in sessions:
             item = SessionListItem(
-                self.session_list,
-                session,
-                self.theme,
-                on_click=self._on_select,
-                on_double_click=self._on_double_click
+                self.session_list, session, self.theme, on_click=self._on_select, on_double_click=self._on_double_click
             )
             item.pack(fill="x", pady=1)
             self.session_items.append(item)
@@ -400,9 +382,9 @@ class BrowserWindowBase(ABC):
         if self.selected_item:
             self.selected_item.set_selected(False)
 
-        self.selected_session_id = session_data.get('id')
+        self.selected_session_id = session_data.get("id")
         for item in self.session_items:
-            if item.session_data.get('id') == self.selected_session_id:
+            if item.session_data.get("id") == self.selected_session_id:
                 item.set_selected(True)
                 self.selected_item = item
                 break
@@ -416,7 +398,7 @@ class BrowserWindowBase(ABC):
 
     def _update_status(self, text: str):
         """Update status label."""
-        if hasattr(self, 'status_label') and self.status_label:
+        if hasattr(self, "status_label") and self.status_label:
             self.status_label.configure(text=text)
 
     @abstractmethod
@@ -487,19 +469,13 @@ class BrowserWindowBase(ABC):
 
         # Build UI
         if HAVE_CTK:
-            ctk.CTkLabel(
-                dialog, text="Session Title:",
-                font=get_ctk_font(size=12),
-                text_color=self.theme.fg
-            ).pack(anchor="w", padx=20, pady=(15, 5))
+            ctk.CTkLabel(dialog, text="Session Title:", font=get_ctk_font(size=12), text_color=self.theme.fg).pack(
+                anchor="w", padx=20, pady=(15, 5)
+            )
 
             entry_colors = get_ctk_entry_colors(self.theme)
             entry = ctk.CTkEntry(
-                dialog,
-                textvariable=title_var,
-                font=get_ctk_font(size=12),
-                height=32, corner_radius=8,
-                **entry_colors
+                dialog, textvariable=title_var, font=get_ctk_font(size=12), height=32, corner_radius=8, **entry_colors
             )
             entry.pack(fill="x", padx=20, pady=(0, 10))
 
@@ -508,26 +484,30 @@ class BrowserWindowBase(ABC):
 
             success_colors = get_ctk_button_colors(self.theme, "success")
             ctk.CTkButton(
-                btn_frame, text="Save",
+                btn_frame,
+                text="Save",
                 font=get_ctk_font(size=12),
-                width=70, height=32, corner_radius=8,
+                width=70,
+                height=32,
+                corner_radius=8,
                 command=do_save,
-                **success_colors
+                **success_colors,
             ).pack(side="right", padx=(5, 0))
 
             sec_colors = get_ctk_button_colors(self.theme, "secondary")
             ctk.CTkButton(
-                btn_frame, text="Cancel",
+                btn_frame,
+                text="Cancel",
                 font=get_ctk_font(size=12),
-                width=70, height=32, corner_radius=8,
+                width=70,
+                height=32,
+                corner_radius=8,
                 command=do_cancel,
-                **sec_colors
+                **sec_colors,
             ).pack(side="right")
         else:
             tk.Label(
-                dialog, text="Session Title:",
-                font=("Segoe UI", 10),
-                bg=self.colors["bg"], fg=self.colors["fg"]
+                dialog, text="Session Title:", font=("Segoe UI", 10), bg=self.colors["bg"], fg=self.colors["fg"]
             ).pack(anchor="w", padx=20, pady=(15, 5))
 
             entry = tk.Entry(
@@ -539,7 +519,7 @@ class BrowserWindowBase(ABC):
                 insertbackground=self.colors["fg"],
                 relief=tk.FLAT,
                 highlightthickness=1,
-                highlightbackground=self.colors["border"]
+                highlightbackground=self.colors["border"],
             )
             entry.pack(fill="x", padx=20, pady=(0, 10))
 
@@ -547,19 +527,29 @@ class BrowserWindowBase(ABC):
             btn_frame.pack(fill="x", padx=20, pady=(0, 15))
 
             tk.Button(
-                btn_frame, text="Save",
+                btn_frame,
+                text="Save",
                 font=("Segoe UI", 10),
-                bg=self.colors["accent"], fg=self.colors["accent_fg"],
-                relief=tk.FLAT, padx=10, pady=6,
-                command=do_save, cursor="hand2"
+                bg=self.colors["accent"],
+                fg=self.colors["accent_fg"],
+                relief=tk.FLAT,
+                padx=10,
+                pady=6,
+                command=do_save,
+                cursor="hand2",
             ).pack(side="right", padx=(5, 0))
 
             tk.Button(
-                btn_frame, text="Cancel",
+                btn_frame,
+                text="Cancel",
                 font=("Segoe UI", 10),
-                bg=self.colors["button_bg"], fg=self.colors["fg"],
-                relief=tk.FLAT, padx=10, pady=6,
-                command=do_cancel, cursor="hand2"
+                bg=self.colors["button_bg"],
+                fg=self.colors["fg"],
+                relief=tk.FLAT,
+                padx=10,
+                pady=6,
+                command=do_cancel,
+                cursor="hand2",
             ).pack(side="right")
 
         # Select all text in entry
@@ -610,6 +600,7 @@ class BrowserWindowBase(ABC):
 # =============================================================================
 # Standalone Session Browser Window
 # =============================================================================
+
 
 class StandaloneSessionBrowserWindow(BrowserWindowBase):
     """
@@ -688,6 +679,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
 
             try:
                 from ..emoji_renderer import HAVE_PIL, get_emoji_renderer
+
                 if HAVE_PIL:
                     renderer = get_emoji_renderer()
                     title_emoji_img = renderer.get_ctk_image("📋", size=22)
@@ -699,7 +691,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             title_label_kwargs = {
                 "text": title_text,
                 "font": get_ctk_font(size=16, weight="bold"),
-                "text_color": self.theme.accent
+                "text_color": self.theme.accent,
             }
             if title_emoji_img:
                 title_label_kwargs["image"] = title_emoji_img
@@ -708,20 +700,18 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             ctk.CTkLabel(self.root, **title_label_kwargs).grid(row=0, column=0, sticky="w", padx=15, pady=(15, 10))
         else:
             tk.Label(
-                self.root, text="📋 Saved Chat Sessions",
+                self.root,
+                text="📋 Saved Chat Sessions",
                 font=("Segoe UI", 14, "bold"),
-                bg=self.colors["bg"], fg=self.colors["accent"]
+                bg=self.colors["bg"],
+                fg=self.colors["accent"],
             ).grid(row=0, column=0, sticky=tk.W, padx=15, pady=(15, 10))
 
     def _create_session_list(self):
         """Create the scrollable session list."""
         if HAVE_CTK:
             list_container = ctk.CTkFrame(
-                self.root,
-                corner_radius=10,
-                fg_color=self.theme.text_bg,
-                border_color=self.theme.border,
-                border_width=1
+                self.root, corner_radius=10, fg_color=self.theme.text_bg, border_color=self.theme.border, border_width=1
             )
             list_container.grid(row=1, column=0, sticky="nsew", padx=15, pady=5)
             list_container.columnconfigure(0, weight=1)
@@ -732,23 +722,18 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
                 self.theme,
                 on_sort=self._sort_by_column,
                 current_sort=self.sort_column,
-                descending=self.sort_descending
+                descending=self.sort_descending,
             )
             self.list_header.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
 
-            self.session_list = ctk.CTkScrollableFrame(
-                list_container,
-                corner_radius=0,
-                fg_color="transparent"
-            )
+            self.session_list = ctk.CTkScrollableFrame(list_container, corner_radius=0, fg_color="transparent")
             self.session_list.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
             self.session_list.columnconfigure(0, weight=1)
         else:
             from tkinter import ttk
+
             list_container = tk.Frame(
-                self.root, bg=self.colors["text_bg"],
-                highlightbackground=self.colors["border"],
-                highlightthickness=1
+                self.root, bg=self.colors["text_bg"], highlightbackground=self.colors["border"], highlightthickness=1
             )
             list_container.grid(row=1, column=0, sticky=tk.NSEW, padx=15, pady=5)
             list_container.columnconfigure(0, weight=1)
@@ -759,7 +744,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
                 self.theme,
                 on_sort=self._sort_by_column,
                 current_sort=self.sort_column,
-                descending=self.sort_descending
+                descending=self.sort_descending,
             )
             self.list_header.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
 
@@ -769,10 +754,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             canvas_frame.columnconfigure(0, weight=1)
             canvas_frame.rowconfigure(0, weight=1)
 
-            self._list_canvas = tk.Canvas(
-                canvas_frame, bg=self.colors["text_bg"],
-                highlightthickness=0, bd=0
-            )
+            self._list_canvas = tk.Canvas(canvas_frame, bg=self.colors["text_bg"], highlightthickness=0, bd=0)
             self._list_canvas.grid(row=0, column=0, sticky=tk.NSEW)
 
             scrollbar = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=self._list_canvas.yview)
@@ -788,8 +770,8 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             def on_canvas_configure(event):
                 self._list_canvas.itemconfig(self._canvas_window, width=event.width)
 
-            self.session_list.bind('<Configure>', on_frame_configure)
-            self._list_canvas.bind('<Configure>', on_canvas_configure)
+            self.session_list.bind("<Configure>", on_frame_configure)
+            self._list_canvas.bind("<Configure>", on_canvas_configure)
 
             # Mouse wheel scrolling
             def on_mousewheel(event):
@@ -798,7 +780,9 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
                 try:
                     x, y = self.root.winfo_pointerxy()
                     widget = self.root.winfo_containing(x, y)
-                    if widget and (str(widget) == str(self._list_canvas) or str(widget).startswith(str(self._list_canvas) + ".")):
+                    if widget and (
+                        str(widget) == str(self._list_canvas) or str(widget).startswith(str(self._list_canvas) + ".")
+                    ):
                         self._list_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
                 except Exception:
                     pass
@@ -817,35 +801,35 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             btn_frame = ctk.CTkFrame(self.root, fg_color="transparent")
             btn_frame.grid(row=2, column=0, sticky="ew", padx=15, pady=(10, 15))
 
-            create_emoji_button(
-                btn_frame, "New Session", "➕", self.theme, "success", 120, 32, self._new_session
-            ).pack(side="left", padx=2)
+            create_emoji_button(btn_frame, "New Session", "➕", self.theme, "success", 120, 32, self._new_session).pack(
+                side="left", padx=2
+            )
 
-            create_emoji_button(
-                btn_frame, "Open Chat", "💬", self.theme, "primary", 110, 32, self._open_session
-            ).pack(side="left", padx=2)
+            create_emoji_button(btn_frame, "Open Chat", "💬", self.theme, "primary", 110, 32, self._open_session).pack(
+                side="left", padx=2
+            )
 
-            create_emoji_button(
-                btn_frame, "Rename", "✏️", self.theme, "warning", 100, 32, self._rename_session
-            ).pack(side="left", padx=2)
+            create_emoji_button(btn_frame, "Rename", "✏️", self.theme, "warning", 100, 32, self._rename_session).pack(
+                side="left", padx=2
+            )
 
-            create_emoji_button(
-                btn_frame, "Delete", "🗑️", self.theme, "danger", 90, 32, self._delete_session
-            ).pack(side="left", padx=2)
+            create_emoji_button(btn_frame, "Delete", "🗑️", self.theme, "danger", 90, 32, self._delete_session).pack(
+                side="left", padx=2
+            )
 
-            create_emoji_button(
-                btn_frame, "Refresh", "🔄", self.theme, "secondary", 90, 32, self._refresh
-            ).pack(side="left", padx=2)
+            create_emoji_button(btn_frame, "Refresh", "🔄", self.theme, "secondary", 90, 32, self._refresh).pack(
+                side="left", padx=2
+            )
 
-            create_emoji_button(
-                btn_frame, "Close", "", self.theme, "secondary", 70, 32, self._close
-            ).pack(side="left", padx=2)
+            create_emoji_button(btn_frame, "Close", "", self.theme, "secondary", 70, 32, self._close).pack(
+                side="left", padx=2
+            )
 
             self.status_label = ctk.CTkLabel(
                 btn_frame,
                 text="Click on a session to select it",
                 font=get_ctk_font(size=11),
-                text_color=self.theme.overlay0
+                text_color=self.theme.overlay0,
             )
             self.status_label.pack(side="left", padx=15)
         else:
@@ -858,7 +842,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
                 ("✏️ Rename", self._rename_session, self.colors.get("accent_yellow", "#f9e2af")),
                 ("🗑️ Delete", self._delete_session, self.colors["button_bg"]),
                 ("🔄 Refresh", self._refresh, self.colors["button_bg"]),
-                ("Close", self._close, self.colors["button_bg"])
+                ("Close", self._close, self.colors["button_bg"]),
             ]:
                 accent_yellow = self.colors.get("accent_yellow", "#f9e2af")
                 if bg_color == self.colors["accent"]:
@@ -868,17 +852,25 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
                 else:
                     fg_color = self.colors["fg"]
                 btn = tk.Button(
-                    btn_frame, text=text, font=("Segoe UI", 9),
-                    bg=bg_color, fg=fg_color,
-                    relief=tk.FLAT, padx=10, pady=6,
-                    command=cmd, cursor="hand2"
+                    btn_frame,
+                    text=text,
+                    font=("Segoe UI", 9),
+                    bg=bg_color,
+                    fg=fg_color,
+                    relief=tk.FLAT,
+                    padx=10,
+                    pady=6,
+                    command=cmd,
+                    cursor="hand2",
                 )
                 btn.pack(side=tk.LEFT, padx=2)
 
             self.status_label = tk.Label(
-                btn_frame, text="Click on a session to select it",
+                btn_frame,
+                text="Click on a session to select it",
                 font=("Segoe UI", 9),
-                bg=self.colors["bg"], fg=self.colors["blockquote"]
+                bg=self.colors["bg"],
+                fg=self.colors["blockquote"],
             )
             self.status_label.pack(side=tk.LEFT, padx=15)
 
@@ -908,6 +900,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
         def open_chat():
             chat = StandaloneChatWindow(session)
             chat.show()
+
         threading.Thread(target=open_chat, daemon=True).start()
 
         self._refresh()
@@ -927,6 +920,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             # Resolve system instruction from origin when config enabled
             prompts = get_prompts_config()
             from ... import web_server
+
             use_origin = web_server.CONFIG.get("chat_use_origin_system_prompt", True)
             if use_origin:
                 resolved = prompts.get_system_prompt_for_origin(session.origin)
@@ -937,6 +931,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             def open_chat():
                 chat = StandaloneChatWindow(session)
                 chat.show()
+
             threading.Thread(target=open_chat, daemon=True).start()
             self._update_status(f"Opened session {self.selected_session_id}")
         else:
@@ -946,6 +941,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
 # =============================================================================
 # Attached Session Browser Window
 # =============================================================================
+
 
 class AttachedBrowserWindow(BrowserWindowBase):
     """
@@ -1014,6 +1010,7 @@ class AttachedBrowserWindow(BrowserWindowBase):
 
             try:
                 from ..emoji_renderer import HAVE_PIL, get_emoji_renderer
+
                 if HAVE_PIL:
                     renderer = get_emoji_renderer()
                     title_emoji_img = renderer.get_ctk_image("📋", size=22)
@@ -1025,7 +1022,7 @@ class AttachedBrowserWindow(BrowserWindowBase):
             title_label_kwargs = {
                 "text": title_text,
                 "font": get_ctk_font(size=16, weight="bold"),
-                "text_color": self.theme.accent
+                "text_color": self.theme.accent,
             }
             if title_emoji_img:
                 title_label_kwargs["image"] = title_emoji_img
@@ -1034,51 +1031,51 @@ class AttachedBrowserWindow(BrowserWindowBase):
             ctk.CTkLabel(self.root, **title_label_kwargs).grid(row=0, column=0, sticky="w", padx=15, pady=(15, 10))
         else:
             tk.Label(
-                self.root, text="📋 Saved Chat Sessions",
+                self.root,
+                text="📋 Saved Chat Sessions",
                 font=("Segoe UI", 14, "bold"),
-                bg=self.colors["bg"], fg=self.colors["accent"]
+                bg=self.colors["bg"],
+                fg=self.colors["accent"],
             ).grid(row=0, column=0, sticky=tk.W, padx=15, pady=(15, 10))
 
     def _create_session_list(self):
         """Create the scrollable session list."""
         if HAVE_CTK:
             list_container = ctk.CTkFrame(
-                self.root, corner_radius=10, fg_color=self.theme.text_bg,
-                border_color=self.theme.border, border_width=1
+                self.root, corner_radius=10, fg_color=self.theme.text_bg, border_color=self.theme.border, border_width=1
             )
             list_container.grid(row=1, column=0, sticky="nsew", padx=15, pady=5)
             list_container.columnconfigure(0, weight=1)
             list_container.rowconfigure(1, weight=1)
 
             self.list_header = SessionListHeader(
-                list_container, self.theme,
+                list_container,
+                self.theme,
                 on_sort=self._sort_by_column,
                 current_sort=self.sort_column,
-                descending=self.sort_descending
+                descending=self.sort_descending,
             )
             self.list_header.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
 
-            self.session_list = ctk.CTkScrollableFrame(
-                list_container, corner_radius=0, fg_color="transparent"
-            )
+            self.session_list = ctk.CTkScrollableFrame(list_container, corner_radius=0, fg_color="transparent")
             self.session_list.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
             self.session_list.columnconfigure(0, weight=1)
         else:
             from tkinter import ttk
+
             list_container = tk.Frame(
-                self.root, bg=self.colors["text_bg"],
-                highlightbackground=self.colors["border"],
-                highlightthickness=1
+                self.root, bg=self.colors["text_bg"], highlightbackground=self.colors["border"], highlightthickness=1
             )
             list_container.grid(row=1, column=0, sticky=tk.NSEW, padx=15, pady=5)
             list_container.columnconfigure(0, weight=1)
             list_container.rowconfigure(1, weight=1)
 
             self.list_header = SessionListHeader(
-                list_container, self.theme,
+                list_container,
+                self.theme,
                 on_sort=self._sort_by_column,
                 current_sort=self.sort_column,
-                descending=self.sort_descending
+                descending=self.sort_descending,
             )
             self.list_header.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
 
@@ -1087,10 +1084,7 @@ class AttachedBrowserWindow(BrowserWindowBase):
             canvas_frame.columnconfigure(0, weight=1)
             canvas_frame.rowconfigure(0, weight=1)
 
-            self._list_canvas = tk.Canvas(
-                canvas_frame, bg=self.colors["text_bg"],
-                highlightthickness=0, bd=0
-            )
+            self._list_canvas = tk.Canvas(canvas_frame, bg=self.colors["text_bg"], highlightthickness=0, bd=0)
             self._list_canvas.grid(row=0, column=0, sticky=tk.NSEW)
 
             scrollbar = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=self._list_canvas.yview)
@@ -1106,8 +1100,8 @@ class AttachedBrowserWindow(BrowserWindowBase):
             def on_canvas_configure(event):
                 self._list_canvas.itemconfig(self._canvas_window, width=event.width)
 
-            self.session_list.bind('<Configure>', on_frame_configure)
-            self._list_canvas.bind('<Configure>', on_canvas_configure)
+            self.session_list.bind("<Configure>", on_frame_configure)
+            self._list_canvas.bind("<Configure>", on_canvas_configure)
 
             def on_mousewheel(event):
                 if not self.root or not self.root.winfo_exists():
@@ -1115,7 +1109,9 @@ class AttachedBrowserWindow(BrowserWindowBase):
                 try:
                     x, y = self.root.winfo_pointerxy()
                     widget = self.root.winfo_containing(x, y)
-                    if widget and (str(widget) == str(self._list_canvas) or str(widget).startswith(str(self._list_canvas) + ".")):
+                    if widget and (
+                        str(widget) == str(self._list_canvas) or str(widget).startswith(str(self._list_canvas) + ".")
+                    ):
                         self._list_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
                 except Exception:
                     pass
@@ -1134,33 +1130,35 @@ class AttachedBrowserWindow(BrowserWindowBase):
             btn_frame = ctk.CTkFrame(self.root, fg_color="transparent")
             btn_frame.grid(row=2, column=0, sticky="ew", padx=15, pady=(10, 15))
 
-            create_emoji_button(
-                btn_frame, "New Session", "➕", self.theme, "success", 120, 32, self._new_session
-            ).pack(side="left", padx=2)
+            create_emoji_button(btn_frame, "New Session", "➕", self.theme, "success", 120, 32, self._new_session).pack(
+                side="left", padx=2
+            )
 
-            create_emoji_button(
-                btn_frame, "Open Chat", "💬", self.theme, "primary", 110, 32, self._open_session
-            ).pack(side="left", padx=2)
+            create_emoji_button(btn_frame, "Open Chat", "💬", self.theme, "primary", 110, 32, self._open_session).pack(
+                side="left", padx=2
+            )
 
-            create_emoji_button(
-                btn_frame, "Rename", "✏️", self.theme, "warning", 100, 32, self._rename_session
-            ).pack(side="left", padx=2)
+            create_emoji_button(btn_frame, "Rename", "✏️", self.theme, "warning", 100, 32, self._rename_session).pack(
+                side="left", padx=2
+            )
 
-            create_emoji_button(
-                btn_frame, "Delete", "🗑️", self.theme, "danger", 90, 32, self._delete_session
-            ).pack(side="left", padx=2)
+            create_emoji_button(btn_frame, "Delete", "🗑️", self.theme, "danger", 90, 32, self._delete_session).pack(
+                side="left", padx=2
+            )
 
-            create_emoji_button(
-                btn_frame, "Refresh", "🔄", self.theme, "secondary", 90, 32, self._refresh
-            ).pack(side="left", padx=2)
+            create_emoji_button(btn_frame, "Refresh", "🔄", self.theme, "secondary", 90, 32, self._refresh).pack(
+                side="left", padx=2
+            )
 
-            create_emoji_button(
-                btn_frame, "Close", "", self.theme, "secondary", 70, 32, self._close
-            ).pack(side="left", padx=2)
+            create_emoji_button(btn_frame, "Close", "", self.theme, "secondary", 70, 32, self._close).pack(
+                side="left", padx=2
+            )
 
             self.status_label = ctk.CTkLabel(
-                btn_frame, text="Click on a session to select it",
-                font=get_ctk_font(size=11), text_color=self.theme.overlay0
+                btn_frame,
+                text="Click on a session to select it",
+                font=get_ctk_font(size=11),
+                text_color=self.theme.overlay0,
             )
             self.status_label.pack(side="left", padx=15)
         else:
@@ -1173,7 +1171,7 @@ class AttachedBrowserWindow(BrowserWindowBase):
                 ("✏️ Rename", self._rename_session, self.colors.get("accent_yellow", "#f9e2af")),
                 ("🗑️ Delete", self._delete_session, self.colors["button_bg"]),
                 ("🔄 Refresh", self._refresh, self.colors["button_bg"]),
-                ("Close", self._close, self.colors["button_bg"])
+                ("Close", self._close, self.colors["button_bg"]),
             ]:
                 accent_yellow = self.colors.get("accent_yellow", "#f9e2af")
                 if bg_color == self.colors["accent"]:
@@ -1183,17 +1181,25 @@ class AttachedBrowserWindow(BrowserWindowBase):
                 else:
                     fg_color = self.colors["fg"]
                 btn = tk.Button(
-                    btn_frame, text=text, font=("Segoe UI", 9),
-                    bg=bg_color, fg=fg_color,
-                    relief=tk.FLAT, padx=10, pady=6,
-                    command=cmd, cursor="hand2"
+                    btn_frame,
+                    text=text,
+                    font=("Segoe UI", 9),
+                    bg=bg_color,
+                    fg=fg_color,
+                    relief=tk.FLAT,
+                    padx=10,
+                    pady=6,
+                    command=cmd,
+                    cursor="hand2",
                 )
                 btn.pack(side=tk.LEFT, padx=2)
 
             self.status_label = tk.Label(
-                btn_frame, text="Click on a session to select it",
+                btn_frame,
+                text="Click on a session to select it",
                 font=("Segoe UI", 9),
-                bg=self.colors["bg"], fg=self.colors["blockquote"]
+                bg=self.colors["bg"],
+                fg=self.colors["blockquote"],
             )
             self.status_label.pack(side=tk.LEFT, padx=15)
 
@@ -1223,6 +1229,7 @@ class AttachedBrowserWindow(BrowserWindowBase):
             # Resolve system instruction from origin when config enabled
             prompts = get_prompts_config()
             from ... import web_server
+
             use_origin = web_server.CONFIG.get("chat_use_origin_system_prompt", True)
             if use_origin:
                 resolved = prompts.get_system_prompt_for_origin(session.origin)

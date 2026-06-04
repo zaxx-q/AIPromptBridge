@@ -82,10 +82,10 @@ class KeyManager:
     def get_key_by_name(self, name: str):
         """
         Get an API key by its display name.
-        
+
         Args:
             name: The display name to search for (from config.ini inline comment).
-            
+
         Returns:
             The API key string if found, None otherwise.
         """

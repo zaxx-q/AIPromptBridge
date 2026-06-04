@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 class ToolStatus(Enum):
     """Status of a tool operation"""
+
     IDLE = "idle"
     RUNNING = "running"
     PAUSED = "paused"
@@ -24,6 +25,7 @@ class ToolStatus(Enum):
 @dataclass
 class ToolResult:
     """Result from a tool operation"""
+
     success: bool
     message: str = ""
     output_path: Optional[str] = None
@@ -43,7 +45,7 @@ class ToolResult:
 class BaseTool(ABC):
     """
     Abstract base class for all tools.
-    
+
     Tools are interactive workflows that process files or data using AI.
     They support:
     - Configuration via tools_config.json
@@ -55,7 +57,7 @@ class BaseTool(ABC):
     def __init__(self, name: str, config: Dict[str, Any] = None):
         """
         Initialize a tool.
-        
+
         Args:
             name: Tool name (used for config lookup)
             config: Tool configuration dictionary
@@ -98,7 +100,7 @@ class BaseTool(ABC):
         """
         Check if pause was requested.
         If paused, blocks until resume or abort.
-        
+
         Returns:
             True if should continue, False if aborted
         """
@@ -118,35 +120,29 @@ class BaseTool(ABC):
     def run_interactive(self) -> ToolResult:
         """
         Run the tool interactively in terminal.
-        
+
         This method should:
         1. Gather input from user
         2. Configure processing options
         3. Execute processing with progress display
         4. Return result
-        
+
         Returns:
             ToolResult with processing outcome
         """
         raise NotImplementedError
 
     @abstractmethod
-    def run_batch(
-        self,
-        input_path: str,
-        prompt: str,
-        output_config: Dict[str, Any],
-        **kwargs
-    ) -> ToolResult:
+    def run_batch(self, input_path: str, prompt: str, output_config: Dict[str, Any], **kwargs) -> ToolResult:
         """
         Run the tool in batch mode (non-interactive).
-        
+
         Args:
             input_path: Path to input file or folder
             prompt: Processing prompt
             output_config: Output configuration
             **kwargs: Additional tool-specific options
-        
+
         Returns:
             ToolResult with processing outcome
         """

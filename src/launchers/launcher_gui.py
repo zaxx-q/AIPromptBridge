@@ -19,6 +19,7 @@ ROOT_UPDATE_ALLOWLIST = [
     "frozen_application_license.txt",
 ]
 
+
 def cleanup_old_files(root_dir):
     """Remove .old files left by a previous update."""
     for name in ROOT_UPDATE_ALLOWLIST:
@@ -31,18 +32,20 @@ def cleanup_old_files(root_dir):
         except OSError:
             pass  # Still locked, will try next launch
 
+
 # Nuitka Configuration:
 # (Moved to .github/workflows/manual_release.yml)
 
+
 def main():
     # 1. Determine Root Directory (where this launcher resides)
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         # In Onefile mode, sys.executable is the temp path, but we need the original location
         # Nuitka provides __compiled__.containing_dir for this
         try:
             root_dir = __compiled__.containing_dir
         except NameError:
-             # Fallback if __compiled__ is not available (e.g. PyInstaller)
+            # Fallback if __compiled__ is not available (e.g. PyInstaller)
             root_dir = os.path.dirname(sys.argv[0])
     else:
         # Development mode
@@ -90,11 +93,12 @@ def main():
             creationflags=creation_flags,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
         )
     except Exception as e:
         # Simple exit on error to avoid ctypes dependency
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

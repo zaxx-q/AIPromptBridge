@@ -25,19 +25,19 @@ APP_NAME = "AIPromptBridge"
 def get_launcher_path() -> Optional[str]:
     """
     Get the absolute path to the appropriate launcher executable.
-    
+
     This handles the deployment structure where:
     - Root/
       - AIPromptBridge.exe (Console Launcher)
       - AIPromptBridge-NoConsole.exe (GUI Launcher)
       - bin/
         - AIPromptBridge_Internal.exe (This process, sys.executable)
-        
+
     Returns:
         Path to the launcher executable (str) or None if not found.
     """
     # 1. Identify which launcher variant we prefer based on current mode
-    preferred_launcher = "AIPromptBridge.exe" # Default
+    preferred_launcher = "AIPromptBridge.exe"  # Default
     for arg in sys.argv:
         if arg.startswith("--launched-mode="):
             mode = arg.split("=")[1].strip().lower()
@@ -112,7 +112,7 @@ def get_launcher_path() -> Optional[str]:
 def is_startup_enabled() -> bool:
     """
     Check if the application is set to run at Windows startup.
-    
+
     Returns:
         True if startup is enabled in registry, False otherwise.
     """
@@ -129,14 +129,14 @@ def is_startup_enabled() -> bool:
 def set_startup(enabled: bool) -> Tuple[bool, str]:
     """
     Enable or disable startup for the application.
-    
+
     Args:
         enabled: True to enable startup, False to disable.
-    
+
     Returns:
         Tuple of (success: bool, message: str)
     """
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
         return False, "Startup management is only available on Windows."
 
     try:
@@ -144,7 +144,10 @@ def set_startup(enabled: bool) -> Tuple[bool, str]:
             launcher_path = get_launcher_path()
 
             if not launcher_path:
-                return False, "Could not determine launcher path. This feature requires the application to be installed/compiled."
+                return (
+                    False,
+                    "Could not determine launcher path. This feature requires the application to be installed/compiled.",
+                )
 
             # Use abspath to strictly ensure full path
             launcher_path = str(Path(launcher_path).resolve())
@@ -178,15 +181,11 @@ def set_startup(enabled: bool) -> Tuple[bool, str]:
 def get_startup_info() -> dict:
     """
     Get current startup configuration info.
-    
+
     Returns:
         Dict with 'enabled' (bool), 'path' (str or None), 'mode' (str or None)
     """
-    info = {
-        "enabled": is_startup_enabled(),
-        "path": None,
-        "mode": "unknown"
-    }
+    info = {"enabled": is_startup_enabled(), "path": None, "mode": "unknown"}
 
     # Determine current mode
     for arg in sys.argv:

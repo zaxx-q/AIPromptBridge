@@ -12,7 +12,7 @@ Architecture:
     - All window creation requests go through a queue
     - The GUI thread processes the queue and creates windows as CTkToplevel
     - Background threads can safely request window creation without conflicts
-    
+
 CustomTkinter Migration Notes:
     - CTk() replaces tk.Tk() for modern appearance
     - CTkToplevel replaces tk.Toplevel
@@ -44,10 +44,11 @@ WINDOW_COUNTER_LOCK = threading.Lock()
 class StreamingChatCallbacks:
     """
     Container for streaming chat window callbacks.
-    
+
     Used to pass callbacks from GUI thread back to caller thread
     for real-time streaming updates to chat window.
     """
+
     on_text: Optional[Callable[[str], None]] = None
     on_thinking: Optional[Callable[[str], None]] = None
     on_done: Optional[Callable[[], None]] = None
@@ -60,6 +61,7 @@ class StreamingChatCallbacks:
         Call this when streaming is complete to persist the message.
         """
         if self.window and not self.window._destroyed:
+
             def do_finalize():
                 if self.window._destroyed:
                     return
@@ -135,7 +137,7 @@ def has_open_windows():
 class GUICoordinator:
     """
     Centralized coordinator for all GUI operations.
-    
+
     Ensures all Tkinter operations happen on a single dedicated thread,
     avoiding the threading issues that occur with multiple Tk() instances.
     """
@@ -151,7 +153,7 @@ class GUICoordinator:
         self._started = threading.Event()
 
     @classmethod
-    def get_instance(cls) -> 'GUICoordinator':
+    def get_instance(cls) -> "GUICoordinator":
         """Get singleton instance"""
         if cls._instance is None:
             with cls._lock:
@@ -170,6 +172,7 @@ class GUICoordinator:
 
     def _start_gui_thread(self):
         """Start the dedicated GUI thread"""
+
         def run_gui():
             try:
                 # Initialize CustomTkinter appearance mode from config
@@ -212,6 +215,7 @@ class GUICoordinator:
 
         try:
             from .. import web_server
+
             mode = web_server.CONFIG.get("ui_theme_mode", "auto")
 
             if mode == "auto":
@@ -229,47 +233,47 @@ class GUICoordinator:
         while not self._request_queue.empty():
             try:
                 request = self._request_queue.get_nowait()
-                request_type = request.get('type')
+                request_type = request.get("type")
 
-                if request_type == 'chat':
+                if request_type == "chat":
                     self._create_chat_window(request)
-                elif request_type == 'browser':
+                elif request_type == "browser":
                     self._create_browser_window(request)
-                elif request_type == 'popup_input':
+                elif request_type == "popup_input":
                     self._create_input_popup(request)
-                elif request_type == 'popup_prompt':
+                elif request_type == "popup_prompt":
                     self._create_prompt_popup(request)
-                elif request_type == 'typing_indicator':
+                elif request_type == "typing_indicator":
                     self._create_typing_indicator(request)
-                elif request_type == 'dismiss_typing_indicator':
+                elif request_type == "dismiss_typing_indicator":
                     self._dismiss_typing_indicator()
-                elif request_type == 'toast_notification':
+                elif request_type == "toast_notification":
                     self._create_toast_notification(request)
-                elif request_type == 'dismiss_toast_notification':
+                elif request_type == "dismiss_toast_notification":
                     self._dismiss_toast_notification()
-                elif request_type == 'settings':
+                elif request_type == "settings":
                     self._create_settings_window(request)
-                elif request_type == 'prompt_editor':
+                elif request_type == "prompt_editor":
                     self._create_prompt_editor_window(request)
-                elif request_type == 'connection_manager':
+                elif request_type == "connection_manager":
                     self._create_connection_manager(request)
-                elif request_type == 'error_popup':
+                elif request_type == "error_popup":
                     self._create_error_popup(request)
-                elif request_type == 'streaming_chat':
+                elif request_type == "streaming_chat":
                     self._create_streaming_chat_window(request)
-                elif request_type == 'snip_overlay':
+                elif request_type == "snip_overlay":
                     self._create_snip_overlay(request)
-                elif request_type == 'snip_popup':
+                elif request_type == "snip_popup":
                     self._create_snip_popup(request)
-                elif request_type == 'audio_analyzer':
+                elif request_type == "audio_analyzer":
                     self._create_audio_analyzer_window(request)
-                elif request_type == 'tts_window':
+                elif request_type == "tts_window":
                     self._create_tts_window(request)
-                elif request_type == 'onboarding':
+                elif request_type == "onboarding":
                     self._create_onboarding_window(request)
-                elif request_type == 'callback':
+                elif request_type == "callback":
                     # Generic callback execution on GUI thread
-                    callback = request.get('callback')
+                    callback = request.get("callback")
                     if callback:
                         try:
                             callback()
@@ -284,96 +288,110 @@ class GUICoordinator:
     def _create_chat_window(self, request):
         """Create a chat window on the GUI thread"""
         from .windows import create_attached_chat_window
-        session = request.get('session')
-        initial_response = request.get('initial_response')
+
+        session = request.get("session")
+        initial_response = request.get("initial_response")
         if session:
             create_attached_chat_window(self._root, session, initial_response)
 
     def _create_browser_window(self, request):
         """Create a session browser window on the GUI thread"""
         from .windows import create_attached_browser_window
+
         create_attached_browser_window(self._root)
 
     def _create_input_popup(self, request):
         """Create an input popup on the GUI thread"""
         from .popups import create_attached_input_popup
-        on_submit = request.get('on_submit')
-        on_close = request.get('on_close')
-        x = request.get('x')
-        y = request.get('y')
-        on_tts = request.get('on_tts')
+
+        on_submit = request.get("on_submit")
+        on_close = request.get("on_close")
+        x = request.get("x")
+        y = request.get("y")
+        on_tts = request.get("on_tts")
         create_attached_input_popup(self._root, on_submit, on_close, x, y, on_tts)
 
     def _create_prompt_popup(self, request):
         """Create a prompt selection popup on the GUI thread"""
         from .popups import create_attached_prompt_popup
-        options = request.get('options')
-        on_option_selected = request.get('on_option_selected')
-        on_close = request.get('on_close')
-        selected_text = request.get('selected_text')
-        x = request.get('x')
-        y = request.get('y')
-        on_tts = request.get('on_tts')
-        on_request_compare_text = request.get('on_request_compare_text')
-        create_attached_prompt_popup(self._root, options, on_option_selected, on_close, selected_text, x, y, on_tts, on_request_compare_text)
+
+        options = request.get("options")
+        on_option_selected = request.get("on_option_selected")
+        on_close = request.get("on_close")
+        selected_text = request.get("selected_text")
+        x = request.get("x")
+        y = request.get("y")
+        on_tts = request.get("on_tts")
+        on_request_compare_text = request.get("on_request_compare_text")
+        create_attached_prompt_popup(
+            self._root, options, on_option_selected, on_close, selected_text, x, y, on_tts, on_request_compare_text
+        )
 
     def _create_typing_indicator(self, request):
         """Create a typing indicator on the GUI thread"""
         from .popups import create_typing_indicator
-        abort_hotkey = request.get('abort_hotkey', 'Escape')
-        on_dismiss = request.get('on_dismiss')
+
+        abort_hotkey = request.get("abort_hotkey", "Escape")
+        on_dismiss = request.get("on_dismiss")
         create_typing_indicator(self._root, abort_hotkey, on_dismiss)
 
     def _dismiss_typing_indicator(self):
         """Dismiss the typing indicator on the GUI thread"""
         from .popups import dismiss_typing_indicator
+
         dismiss_typing_indicator()
 
     def _create_toast_notification(self, request):
         """Create a toast notification on the GUI thread"""
         from .popups import create_toast_notification
-        title = request.get('title')
-        message = request.get('message')
-        timeout_ms = request.get('timeout_ms', 3000)
+
+        title = request.get("title")
+        message = request.get("message")
+        timeout_ms = request.get("timeout_ms", 3000)
         create_toast_notification(self._root, title, message, timeout_ms)
 
     def _dismiss_toast_notification(self):
         """Dismiss the toast notification on the GUI thread"""
         from .popups import dismiss_toast_notification
+
         dismiss_toast_notification()
 
     def _create_settings_window(self, request):
         """Create a settings window on the GUI thread"""
         from .windows import create_attached_settings_window
-        on_close = request.get('on_close')
-        initial_tab = request.get('initial_tab')
+
+        on_close = request.get("on_close")
+        initial_tab = request.get("initial_tab")
         create_attached_settings_window(self._root, on_close, initial_tab)
 
     def _create_prompt_editor_window(self, request):
         """Create a prompt editor window on the GUI thread"""
         from .windows import create_attached_prompt_editor_window
+
         create_attached_prompt_editor_window(self._root)
 
     def _create_connection_manager(self, request):
         """Create a connection profile manager window on the GUI thread"""
         from .windows.connection_manager import create_attached_connection_manager
-        on_close = request.get('on_close')
+
+        on_close = request.get("on_close")
         create_attached_connection_manager(self._root, on_close)
 
     def _create_error_popup(self, request):
         """Create an error popup on the GUI thread"""
         from .popups import create_error_popup
-        title = request.get('title', 'Error')
-        message = request.get('message', 'An error occurred')
-        details = request.get('details')
+
+        title = request.get("title", "Error")
+        message = request.get("message", "An error occurred")
+        details = request.get("details")
         create_error_popup(self._root, title, message, details)
 
     def _create_streaming_chat_window(self, request):
         """Create a chat window in streaming mode on the GUI thread"""
         from .windows import AttachedChatWindow
 
-        session = request.get('session')
-        callbacks = request.get('callbacks')
+        session = request.get("session")
+        callbacks = request.get("callbacks")
 
         if not session or not callbacks:
             if callbacks:
@@ -427,8 +445,8 @@ class GUICoordinator:
         """Create a screen snip overlay on the GUI thread"""
         from .screen_snip import ScreenSnipOverlay
 
-        on_capture = request.get('on_capture')
-        on_cancel = request.get('on_cancel')
+        on_capture = request.get("on_capture")
+        on_cancel = request.get("on_cancel")
 
         if on_capture and on_cancel:
             ScreenSnipOverlay(self._root, on_capture, on_cancel)
@@ -437,62 +455,55 @@ class GUICoordinator:
         """Create a snip popup on the GUI thread"""
         from .snip_popup import create_attached_snip_popup
 
-        capture_result = request.get('capture_result')
-        prompts_config = request.get('prompts_config')
-        on_action = request.get('on_action')
-        on_close = request.get('on_close')
-        on_request_compare_capture = request.get('on_request_compare_capture')
-        x = request.get('x')
-        y = request.get('y')
+        capture_result = request.get("capture_result")
+        prompts_config = request.get("prompts_config")
+        on_action = request.get("on_action")
+        on_close = request.get("on_close")
+        on_request_compare_capture = request.get("on_request_compare_capture")
+        x = request.get("x")
+        y = request.get("y")
 
         if capture_result and prompts_config and on_action:
             create_attached_snip_popup(
-                self._root, capture_result, prompts_config,
-                on_action, on_close, on_request_compare_capture, x, y
+                self._root, capture_result, prompts_config, on_action, on_close, on_request_compare_capture, x, y
             )
 
     def _create_audio_analyzer_window(self, request):
         """Create an audio analyzer window on the GUI thread"""
         from .windows import create_audio_analyzer_window
 
-        prompts_config = request.get('prompts_config')  # Actually 'config' from AudioToolApp
-        on_action = request.get('on_action')  # Actually 'ai_params'
-        on_close = request.get('on_close')    # Actually 'key_managers'
+        prompts_config = request.get("prompts_config")  # Actually 'config' from AudioToolApp
+        on_action = request.get("on_action")  # Actually 'ai_params'
+        on_close = request.get("on_close")  # Actually 'key_managers'
 
         # Proper parameter extraction
-        config = request.get('config')
-        ai_params = request.get('ai_params')
-        key_managers = request.get('key_managers')
+        config = request.get("config")
+        ai_params = request.get("ai_params")
+        key_managers = request.get("key_managers")
 
-        real_on_action = request.get('real_on_action')
-        real_on_close = request.get('real_on_close')
+        real_on_action = request.get("real_on_action")
+        real_on_close = request.get("real_on_close")
 
         # ai_params might be empty dict, so check for None explicitly
         if config is not None and ai_params is not None and key_managers is not None:
-            create_audio_analyzer_window(
-                self._root, config, ai_params, key_managers, real_on_close, real_on_action
-            )
+            create_audio_analyzer_window(self._root, config, ai_params, key_managers, real_on_close, real_on_action)
 
     def request_chat_window(self, session, initial_response=None):
         """Request creation of a chat window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'chat',
-            'session': session,
-            'initial_response': initial_response
-        })
+        self._request_queue.put({"type": "chat", "session": session, "initial_response": initial_response})
 
     def request_streaming_chat_window(self, session, timeout: float = 5.0) -> StreamingChatCallbacks:
         """
         Request creation of a streaming chat window (thread-safe).
-        
+
         Opens the chat window immediately and returns callbacks for
         streaming content into it.
-        
+
         Args:
             session: ChatSession to display (should have user message already)
             timeout: Max time to wait for window creation
-            
+
         Returns:
             StreamingChatCallbacks with on_text, on_thinking callbacks
         """
@@ -500,11 +511,7 @@ class GUICoordinator:
 
         callbacks = StreamingChatCallbacks()
 
-        self._request_queue.put({
-            'type': 'streaming_chat',
-            'session': session,
-            'callbacks': callbacks
-        })
+        self._request_queue.put({"type": "streaming_chat", "session": session, "callbacks": callbacks})
 
         # Wait for window to be created on GUI thread
         callbacks.ready.wait(timeout=timeout)
@@ -514,187 +521,142 @@ class GUICoordinator:
     def request_browser_window(self):
         """Request creation of a session browser window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'browser'
-        })
+        self._request_queue.put({"type": "browser"})
 
-    def request_input_popup(self, on_submit: Callable, on_close: Optional[Callable] = None,
-                           x: Optional[int] = None, y: Optional[int] = None,
-                           on_tts: Optional[Callable] = None):
+    def request_input_popup(
+        self,
+        on_submit: Callable,
+        on_close: Optional[Callable] = None,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+        on_tts: Optional[Callable] = None,
+    ):
         """Request creation of an input popup (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'popup_input',
-            'on_submit': on_submit,
-            'on_close': on_close,
-            'x': x,
-            'y': y,
-            'on_tts': on_tts
-        })
+        self._request_queue.put(
+            {"type": "popup_input", "on_submit": on_submit, "on_close": on_close, "x": x, "y": y, "on_tts": on_tts}
+        )
 
-    def request_prompt_popup(self, options: dict, on_option_selected: Callable,
-                            on_close: Optional[Callable], selected_text: str,
-                            x: Optional[int] = None, y: Optional[int] = None,
-                            on_tts: Optional[Callable] = None,
-                            on_request_compare_text: Optional[Callable] = None):
+    def request_prompt_popup(
+        self,
+        options: dict,
+        on_option_selected: Callable,
+        on_close: Optional[Callable],
+        selected_text: str,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+        on_tts: Optional[Callable] = None,
+        on_request_compare_text: Optional[Callable] = None,
+    ):
         """Request creation of a prompt selection popup (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'popup_prompt',
-            'options': options,
-            'on_option_selected': on_option_selected,
-            'on_close': on_close,
-            'selected_text': selected_text,
-            'x': x,
-            'y': y,
-            'on_tts': on_tts,
-            'on_request_compare_text': on_request_compare_text
-        })
+        self._request_queue.put(
+            {
+                "type": "popup_prompt",
+                "options": options,
+                "on_option_selected": on_option_selected,
+                "on_close": on_close,
+                "selected_text": selected_text,
+                "x": x,
+                "y": y,
+                "on_tts": on_tts,
+                "on_request_compare_text": on_request_compare_text,
+            }
+        )
 
     def run_on_gui_thread(self, callback: Callable):
         """Run a callback on the GUI thread (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'callback',
-            'callback': callback
-        })
+        self._request_queue.put({"type": "callback", "callback": callback})
 
-    def request_typing_indicator(self, abort_hotkey: str = "Escape",
-                                  on_dismiss: Optional[Callable] = None):
+    def request_typing_indicator(self, abort_hotkey: str = "Escape", on_dismiss: Optional[Callable] = None):
         """Request showing a typing indicator (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'typing_indicator',
-            'abort_hotkey': abort_hotkey,
-            'on_dismiss': on_dismiss
-        })
+        self._request_queue.put({"type": "typing_indicator", "abort_hotkey": abort_hotkey, "on_dismiss": on_dismiss})
 
     def request_dismiss_typing_indicator(self):
         """Request dismissing the typing indicator (thread-safe)"""
         if self._running:
-            self._request_queue.put({
-                'type': 'dismiss_typing_indicator'
-            })
+            self._request_queue.put({"type": "dismiss_typing_indicator"})
 
     def request_toast_notification(self, title: str, message: str, timeout_ms: int = 3000):
         """Request a toast notification (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'toast_notification',
-            'title': title,
-            'message': message,
-            'timeout_ms': timeout_ms
-        })
+        self._request_queue.put(
+            {"type": "toast_notification", "title": title, "message": message, "timeout_ms": timeout_ms}
+        )
 
     def request_dismiss_toast_notification(self):
         """Request dismissing the toast notification (thread-safe)"""
         if self._running:
-            self._request_queue.put({
-                'type': 'dismiss_toast_notification'
-            })
+            self._request_queue.put({"type": "dismiss_toast_notification"})
 
     def request_settings_window(self, on_close: Optional[Callable] = None, initial_tab: str = None):
         """Request creation of a settings window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'settings',
-            'on_close': on_close,
-            'initial_tab': initial_tab
-        })
+        self._request_queue.put({"type": "settings", "on_close": on_close, "initial_tab": initial_tab})
 
     def request_prompt_editor_window(self):
         """Request creation of a prompt editor window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'prompt_editor'
-        })
+        self._request_queue.put({"type": "prompt_editor"})
 
     def request_connection_manager(self, on_close=None):
         """Request creation of a connection profile manager window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'connection_manager',
-            'on_close': on_close
-        })
+        self._request_queue.put({"type": "connection_manager", "on_close": on_close})
 
-    def request_snip_overlay(
-        self,
-        on_capture,
-        on_cancel
-    ):
+    def request_snip_overlay(self, on_capture, on_cancel):
         """Request creation of a screen snip overlay (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'snip_overlay',
-            'on_capture': on_capture,
-            'on_cancel': on_cancel
-        })
+        self._request_queue.put({"type": "snip_overlay", "on_capture": on_capture, "on_cancel": on_cancel})
 
     def request_snip_popup(
-        self,
-        capture_result,
-        prompts_config,
-        on_action,
-        on_close=None,
-        on_request_compare_capture=None,
-        x=None,
-        y=None
+        self, capture_result, prompts_config, on_action, on_close=None, on_request_compare_capture=None, x=None, y=None
     ):
         """Request creation of a snip popup (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'snip_popup',
-            'capture_result': capture_result,
-            'prompts_config': prompts_config,
-            'on_action': on_action,
-            'on_close': on_close,
-            'on_request_compare_capture': on_request_compare_capture,
-            'x': x,
-            'y': y
-        })
+        self._request_queue.put(
+            {
+                "type": "snip_popup",
+                "capture_result": capture_result,
+                "prompts_config": prompts_config,
+                "on_action": on_action,
+                "on_close": on_close,
+                "on_request_compare_capture": on_request_compare_capture,
+                "x": x,
+                "y": y,
+            }
+        )
 
-    def request_audio_analyzer_window(
-        self,
-        config,
-        ai_params,
-        key_managers,
-        on_action=None,
-        on_close=None
-    ):
+    def request_audio_analyzer_window(self, config, ai_params, key_managers, on_action=None, on_close=None):
         """Request creation of an audio analyzer window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'audio_analyzer',
-            'config': config,
-            'ai_params': ai_params,
-            'key_managers': key_managers,
-            'real_on_action': on_action,
-            'real_on_close': on_close
-        })
+        self._request_queue.put(
+            {
+                "type": "audio_analyzer",
+                "config": config,
+                "ai_params": ai_params,
+                "key_managers": key_managers,
+                "real_on_action": on_action,
+                "real_on_close": on_close,
+            }
+        )
 
     def _create_tts_window(self, request):
         """Create a TTS window on the GUI thread"""
         from .windows import create_tts_window
 
-        config = request.get('config')
-        ai_params = request.get('ai_params')
-        key_managers = request.get('key_managers')
-        initial_text = request.get('initial_text', '')
-        on_close = request.get('on_close')
+        config = request.get("config")
+        ai_params = request.get("ai_params")
+        key_managers = request.get("key_managers")
+        initial_text = request.get("initial_text", "")
+        on_close = request.get("on_close")
 
         if config is not None and ai_params is not None and key_managers is not None:
-            create_tts_window(
-                self._root, config, ai_params, key_managers, initial_text, on_close
-            )
+            create_tts_window(self._root, config, ai_params, key_managers, initial_text, on_close)
 
-    def request_tts_window(
-        self,
-        config=None,
-        ai_params=None,
-        key_managers=None,
-        initial_text: str = "",
-        on_close=None
-    ):
+    def request_tts_window(self, config=None, ai_params=None, key_managers=None, initial_text: str = "", on_close=None):
         """Request creation of a TTS window (thread-safe)"""
         self.ensure_running()
 
@@ -702,34 +664,35 @@ class GUICoordinator:
         if config is None or ai_params is None or key_managers is None:
             try:
                 from .. import web_server
+
                 config = config or web_server.CONFIG
                 ai_params = ai_params or web_server.AI_PARAMS
                 key_managers = key_managers or web_server.KEY_MANAGERS
             except ImportError:
                 pass
 
-        self._request_queue.put({
-            'type': 'tts_window',
-            'config': config,
-            'ai_params': ai_params,
-            'key_managers': key_managers,
-            'initial_text': initial_text,
-            'on_close': on_close
-        })
+        self._request_queue.put(
+            {
+                "type": "tts_window",
+                "config": config,
+                "ai_params": ai_params,
+                "key_managers": key_managers,
+                "initial_text": initial_text,
+                "on_close": on_close,
+            }
+        )
 
     def _create_onboarding_window(self, request):
         """Create an onboarding wizard window on the GUI thread"""
         from .windows import create_attached_onboarding_window
-        on_close = request.get('on_close')
+
+        on_close = request.get("on_close")
         create_attached_onboarding_window(self._root, on_close)
 
     def request_onboarding_window(self, on_close: Optional[Callable] = None):
         """Request creation of an onboarding window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({
-            'type': 'onboarding',
-            'on_close': on_close
-        })
+        self._request_queue.put({"type": "onboarding", "on_close": on_close})
 
     def get_root(self):
         """Get the root CTk/Tk instance (only safe to use from GUI thread!)"""
@@ -766,11 +729,7 @@ def show_session_browser():
 def get_gui_status():
     """Get current GUI status"""
     coordinator = GUICoordinator.get_instance()
-    return {
-        "available": HAVE_GUI,
-        "running": coordinator.is_running(),
-        "open_windows": len(OPEN_WINDOWS)
-    }
+    return {"available": HAVE_GUI, "running": coordinator.is_running(), "open_windows": len(OPEN_WINDOWS)}
 
 
 def show_typing_indicator(abort_hotkey: str = "Escape", on_dismiss: Optional[Callable] = None):
@@ -796,7 +755,7 @@ def show_settings_window_blocking(initial_tab: str = None):
     """
     Show settings window and block until it is closed.
     Uses the GUICoordinator to ensure thread safety and keep the GUI root alive.
-    
+
     Args:
         initial_tab: Name of the tab to select initially
     """

@@ -22,6 +22,7 @@ from typing import Any, Dict, Optional
 @dataclass
 class ResolvedProfile:
     """Result of profile resolution with all effective settings."""
+
     provider: str
     model: str
     streaming: bool
@@ -69,9 +70,7 @@ def resolve_profile(
         if profile_name:
             profile = _get_profile(profile_name)
             if not profile:
-                logging.warning(
-                    f"[ProfileResolver] Profile '{profile_name}' not found, using defaults"
-                )
+                logging.warning(f"[ProfileResolver] Profile '{profile_name}' not found, using defaults")
 
     # Effective profile to extract configuration parameters from
     effective_profile = profile if profile else active
@@ -197,6 +196,7 @@ def _get_profile(name: str):
     """Look up a connection profile by name from ProfileStore."""
     try:
         from .connection_profiles import ProfileStore
+
         store = ProfileStore.get_instance()
         return store.get_profile(name)
     except Exception as e:
@@ -220,6 +220,7 @@ def _resolve_key_override(
     """
     try:
         from .key_store import KeyStore
+
         key_store = KeyStore.get_instance()
     except Exception:
         if key_name:
@@ -233,10 +234,9 @@ def _resolve_key_override(
             for kd in keys_data:
                 if kd.get("name", "").lower().strip() == name_lower:
                     from .key_manager import KeyManager
+
                     return KeyManager([kd["key"]], provider, key_names=[kd.get("name", "")])
-            logging.warning(
-                f"[ProfileResolver] Key '{key_name}' not found in pool '{pool_id}'"
-            )
+            logging.warning(f"[ProfileResolver] Key '{key_name}' not found in pool '{pool_id}'")
         return key_store.build_key_manager_for_pool(pool_id, provider)
 
     if key_name:
@@ -246,6 +246,7 @@ def _resolve_key_override(
         for kd in keys_data:
             if kd.get("name", "").lower().strip() == name_lower:
                 from .key_manager import KeyManager
+
                 return KeyManager([kd["key"]], provider, key_names=[kd.get("name", "")])
         logging.warning(
             f"[ProfileResolver] Key '{key_name}' not found in pool '{pool_for_provider}' for provider '{provider}'"
@@ -266,8 +267,7 @@ def _legacy_resolve_by_name(
     named_key = km.get_key_by_name(key_name)
     if named_key:
         from .key_manager import KeyManager
+
         return KeyManager([named_key], provider, key_names=[key_name])
-    logging.warning(
-        f"[ProfileResolver] API key named '{key_name}' not found for provider '{provider}'"
-    )
+    logging.warning(f"[ProfileResolver] API key named '{key_name}' not found for provider '{provider}'")
     return None

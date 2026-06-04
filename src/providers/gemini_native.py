@@ -67,17 +67,11 @@ class GeminiNativeProvider(BaseProvider):
         """
         super().__init__("Gemini-Native", key_manager, config)
 
-        self.base_url = (
-            base_url
-            or self.config.get("base_url")
-            or self.config.get("gemini_endpoint")
-        )
+        self.base_url = base_url or self.config.get("base_url") or self.config.get("gemini_endpoint")
         if not self.base_url:
             self.base_url = GEMINI_BASE_URL
 
-        self._uploaded_files: Dict[
-            str, gemini_services.UploadedFile
-        ] = {}  # Cache of uploaded files
+        self._uploaded_files: Dict[str, gemini_services.UploadedFile] = {}  # Cache of uploaded files
 
     # =========================================================================
     # DELEGATED GOOGLE SERVICES (Files, Batch, and TTS APIs)
@@ -94,9 +88,7 @@ class GeminiNativeProvider(BaseProvider):
     def delete_file(self, file_name: str) -> Tuple[bool, Optional[str]]:
         return gemini_services.delete_file(self, file_name)
 
-    def list_files(
-        self, page_size: int = 100
-    ) -> Tuple[Optional[List[Dict]], Optional[str]]:
+    def list_files(self, page_size: int = 100) -> Tuple[Optional[List[Dict]], Optional[str]]:
         return gemini_services.list_files(self, page_size)
 
     @staticmethod
@@ -119,9 +111,7 @@ class GeminiNativeProvider(BaseProvider):
     def get_batch(self, batch_name: str) -> Tuple[Optional[Dict], Optional[str]]:
         return gemini_services.get_batch(self, batch_name)
 
-    def list_batches(
-        self, page_size: int = 50
-    ) -> Tuple[Optional[List[Dict]], Optional[str]]:
+    def list_batches(self, page_size: int = 50) -> Tuple[Optional[List[Dict]], Optional[str]]:
         return gemini_services.list_batches(self, page_size)
 
     def cancel_batch(self, batch_name: str) -> Tuple[bool, Optional[str]]:
@@ -135,9 +125,7 @@ class GeminiNativeProvider(BaseProvider):
         multi_speaker_config: Optional[List[Dict]] = None,
         retry_count: int = 0,
     ) -> Tuple[Optional[bytes], Optional[str]]:
-        return gemini_services.generate_tts(
-            self, text, model, voice_name, multi_speaker_config, retry_count
-        )
+        return gemini_services.generate_tts(self, text, model, voice_name, multi_speaker_config, retry_count)
 
     # =========================================================================
     # CORE GENERATION PIPELINE (TEMPLATE METHOD IMPLEMENTATIONS)
@@ -165,32 +153,24 @@ class GeminiNativeProvider(BaseProvider):
         usage_data = None
         last_signature = None
 
-        response = requests.post(
-            url, headers=headers, json=body, timeout=timeout, stream=True
-        )
+        response = requests.post(url, headers=headers, json=body, timeout=timeout, stream=True)
 
         # Handle error responses
         if response.status_code != 200:
             error_text = response.text
-            return ProviderResult(
-                success=False, error=error_text, status_code=response.status_code
-            )
+            return ProviderResult(success=False, error=error_text, status_code=response.status_code)
 
         # Process streaming response
         response.encoding = "utf-8"
 
-        last_content_time = (
-            time.time()
-        )  # Track last meaningful content for idle timeout
+        last_content_time = time.time()  # Track last meaningful content for idle timeout
         for line in response.iter_lines(decode_unicode=True):
             self._check_abort(abort_event)
 
             # Content-idle timeout: detect hangs masked by SSE heartbeats
             if time.time() - last_content_time > timeout:
                 response.close()
-                raise requests.exceptions.Timeout(
-                    f"No content received for {timeout}s (content-idle timeout)"
-                )
+                raise requests.exceptions.Timeout(f"No content received for {timeout}s (content-idle timeout)")
 
             if not line:
                 continue
@@ -209,15 +189,9 @@ class GeminiNativeProvider(BaseProvider):
                         error_status = error_obj.get("status", "")
                         error_message = error_obj.get("message", str(error_obj))
                         prefix = (
-                            f"{error_code} {error_status}"
-                            if error_status
-                            else str(error_code)
-                            if error_code
-                            else ""
+                            f"{error_code} {error_status}" if error_status else str(error_code) if error_code else ""
                         )
-                        error_text = (
-                            f"{prefix}: {error_message}" if prefix else error_message
-                        )
+                        error_text = f"{prefix}: {error_message}" if prefix else error_message
                     else:
                         error_text = str(error_obj)
                     return ProviderResult(success=False, error=error_text)
@@ -269,10 +243,7 @@ class GeminiNativeProvider(BaseProvider):
                         "BLOCKED",
                         "PROHIBITED",
                     ):
-                        if (
-                            not accumulated_content.strip()
-                            and not accumulated_tool_calls
-                        ):
+                        if not accumulated_content.strip() and not accumulated_tool_calls:
                             block_msg = f"Response blocked: {finish_reason}"
                             return ProviderResult(success=False, error=block_msg)
 
@@ -326,15 +297,9 @@ class GeminiNativeProvider(BaseProvider):
             accumulated_tool_calls,
             output_tokens,
         ):
-            thinking_note = (
-                f", thinking: {len(accumulated_thinking)} chars"
-                if accumulated_thinking
-                else ""
-            )
+            thinking_note = f", thinking: {len(accumulated_thinking)} chars" if accumulated_thinking else ""
             self.log("warn", f"Empty response detected (no content{thinking_note})")
-            return ProviderResult(
-                success=False, error="Empty response (0 output tokens, no content)"
-            )
+            return ProviderResult(success=False, error="Empty response (0 output tokens, no content)")
 
         # Estimate usage if not provided
         if not usage_data:
@@ -378,9 +343,7 @@ class GeminiNativeProvider(BaseProvider):
         # Handle error responses
         if response.status_code != 200:
             error_text = response.text
-            return ProviderResult(
-                success=False, error=error_text, status_code=response.status_code
-            )
+            return ProviderResult(success=False, error=error_text, status_code=response.status_code)
 
         # Parse response
         data = response.json()
@@ -393,13 +356,7 @@ class GeminiNativeProvider(BaseProvider):
                 error_code = error_obj.get("code", 0)
                 error_status = error_obj.get("status", "")
                 error_message = error_obj.get("message", str(error_obj))
-                prefix = (
-                    f"{error_code} {error_status}"
-                    if error_status
-                    else str(error_code)
-                    if error_code
-                    else ""
-                )
+                prefix = f"{error_code} {error_status}" if error_status else str(error_code) if error_code else ""
                 error_text = f"{prefix}: {error_message}" if prefix else error_message
             else:
                 error_text = str(error_obj)
@@ -411,9 +368,7 @@ class GeminiNativeProvider(BaseProvider):
             if finish_reason in ("SAFETY", "RECITATION", "BLOCKED", "PROHIBITED"):
                 content_parts_check = candidate.get("content", {}).get("parts", [])
                 has_content = any(
-                    "text" in p and not p.get("thought")
-                    for p in content_parts_check
-                    if isinstance(p, dict)
+                    "text" in p and not p.get("thought") for p in content_parts_check if isinstance(p, dict)
                 )
                 if not has_content:
                     block_msg = f"Response blocked: {finish_reason}"
@@ -458,15 +413,9 @@ class GeminiNativeProvider(BaseProvider):
             tool_calls,
             usage_data.completion_tokens,
         ):
-            thinking_note = (
-                f", thinking: {len(accumulated_thinking)} chars"
-                if accumulated_thinking
-                else ""
-            )
+            thinking_note = f", thinking: {len(accumulated_thinking)} chars" if accumulated_thinking else ""
             self.log("warn", f"Empty response detected (no content{thinking_note})")
-            return ProviderResult(
-                success=False, error="Empty response (0 output tokens, no content)"
-            )
+            return ProviderResult(success=False, error="Empty response (0 output tokens, no content)")
 
         # Normalize keys in content_parts for consistency
         normalized_parts = []
@@ -498,9 +447,7 @@ class GeminiNativeProvider(BaseProvider):
                 return RetryReason.AUTH_ERROR
         return super().get_retry_reason(status_code, error_text)
 
-    def detect_empty_response(
-        self, content: str, thinking: str, tool_calls: List, output_tokens: int
-    ) -> bool:
+    def detect_empty_response(self, content: str, thinking: str, tool_calls: List, output_tokens: int) -> bool:
         """
         Detect an empty response.
         Overridden for Gemini to treat "Thinking only" responses as empty/failed.
@@ -601,9 +548,7 @@ class GeminiNativeProvider(BaseProvider):
                     match = re.match(r"data:([^;]+);base64,(.+)", image_url)
                     if match:
                         mime_type, b64_data = match.groups()
-                        part = {
-                            "inline_data": {"mime_type": mime_type, "data": b64_data}
-                        }
+                        part = {"inline_data": {"mime_type": mime_type, "data": b64_data}}
                         is_media = True
                 elif item.get("type") == "inline_data":
                     inline = item.get("inline_data", {})
@@ -620,9 +565,7 @@ class GeminiNativeProvider(BaseProvider):
                     match = re.match(r"data:([^;]+);base64,(.+)", url)
                     if match:
                         mime_type, b64_data = match.groups()
-                        part = {
-                            "inline_data": {"mime_type": mime_type, "data": b64_data}
-                        }
+                        part = {"inline_data": {"mime_type": mime_type, "data": b64_data}}
                         is_media = True
                 elif item.get("type") == "file_data":
                     file_data = item.get("file_data", {})
@@ -649,9 +592,7 @@ class GeminiNativeProvider(BaseProvider):
 
         return [{"text": str(content)}]
 
-    def _build_generation_config(
-        self, params: Dict, thinking_enabled: bool, model: str
-    ) -> Dict:
+    def _build_generation_config(self, params: Dict, thinking_enabled: bool, model: str) -> Dict:
         """Build generationConfig with thinking settings."""
         config = {
             "temperature": params.get("temperature", 1.0),
@@ -677,21 +618,15 @@ class GeminiNativeProvider(BaseProvider):
 
         return config
 
-    def _build_request_body(
-        self, messages: List[Dict], model: str, params: Dict, thinking_enabled: bool
-    ) -> Dict:
+    def _build_request_body(self, messages: List[Dict], model: str, params: Dict, thinking_enabled: bool) -> Dict:
         """Build the full request body"""
         is_old_gemma = self._is_legacy_gemma(model)
 
-        contents, system_instruction = self._convert_messages_to_contents(
-            messages, prepend_system_to_user=is_old_gemma
-        )
+        contents, system_instruction = self._convert_messages_to_contents(messages, prepend_system_to_user=is_old_gemma)
 
         body = {
             "contents": contents,
-            "generationConfig": self._build_generation_config(
-                params, thinking_enabled, model
-            ),
+            "generationConfig": self._build_generation_config(params, thinking_enabled, model),
             "safetySettings": SAFETY_SETTINGS,
         }
 
@@ -725,11 +660,7 @@ class GeminiNativeProvider(BaseProvider):
                 models = []
                 for model in data["models"]:
                     model_name = model.get("name", "")
-                    model_id = (
-                        model_name.replace("models/", "")
-                        if model_name.startswith("models/")
-                        else model_name
-                    )
+                    model_id = model_name.replace("models/", "") if model_name.startswith("models/") else model_name
                     display_name = model.get("displayName", model_id)
 
                     supported_methods = model.get("supportedGenerationMethods", [])

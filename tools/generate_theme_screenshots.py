@@ -9,7 +9,7 @@ import sys
 import time
 
 # Add project root to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import customtkinter as ctk
 from PIL import ImageGrab
@@ -20,7 +20,7 @@ import src.web_server
 src.web_server.CONFIG = {
     "text_edit_tool_enabled": True,
     "ui_theme_mode": "dark",  # Default to dark for screenshots
-    "ui_force_standard_tk": False
+    "ui_force_standard_tk": False,
 }
 
 from src.gui.popups import AttachedPromptPopup
@@ -28,36 +28,21 @@ from src.gui.themes import ThemeRegistry, sync_ctk_appearance
 
 # Dummy options for the popup
 MOCK_OPTIONS = {
-    "_settings": {
-        "popup_items_per_page": 4
-    },
-    "Proofread": {
-        "icon": "✏️",
-        "task": "Fix grammar and spelling"
-    },
-    "Rewrite": {
-        "icon": "📝",
-        "task": "Rewrite for better clarity"
-    },
-    "Summarize": {
-        "icon": "📋",
-        "task": "Create a brief summary"
-    },
-    "Explain": {
-        "icon": "💡",
-        "task": "Explain this text"
-    },
-    "Casual": {
-        "icon": "😎",
-        "task": "Make it sound casual"
-    }
+    "_settings": {"popup_items_per_page": 4},
+    "Proofread": {"icon": "✏️", "task": "Fix grammar and spelling"},
+    "Rewrite": {"icon": "📝", "task": "Rewrite for better clarity"},
+    "Summarize": {"icon": "📋", "task": "Create a brief summary"},
+    "Explain": {"icon": "💡", "task": "Explain this text"},
+    "Casual": {"icon": "😎", "task": "Make it sound casual"},
 }
 
 OUTPUT_DIR = "docs/images/themes"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+
 def mock_callback(*args):
     pass
+
 
 def take_screenshot_of_window(window, filename):
     """Capture screenshot of a specific window"""
@@ -82,6 +67,7 @@ def take_screenshot_of_window(window, filename):
     screenshot.save(filename)
     print(f"Saved {filename}")
 
+
 def main():
     print("Starting theme screenshot generator...")
 
@@ -105,7 +91,7 @@ def main():
 
             # Update config
             src.web_server.CONFIG["ui_theme"] = theme
-            src.web_server.CONFIG["ui_theme_mode"] = "dark" # Capture dark mode
+            src.web_server.CONFIG["ui_theme_mode"] = "dark"  # Capture dark mode
 
             # Sync appearance
             sync_ctk_appearance(src.web_server.CONFIG)
@@ -119,7 +105,7 @@ def main():
                 on_close=mock_callback,
                 selected_text=selected_text,
                 x=popup_x,
-                y=popup_y
+                y=popup_y,
             )
 
             # Wait for window to be ready
@@ -146,10 +132,12 @@ def main():
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         root.destroy()
         print("Done.")
+
 
 if __name__ == "__main__":
     main()

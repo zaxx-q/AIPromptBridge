@@ -14,6 +14,7 @@ from typing import List, Optional, Set
 
 try:
     from pypdf import PdfReader, PdfWriter
+
     HAVE_PYPDF = True
 except ImportError:
     HAVE_PYPDF = False

@@ -102,7 +102,7 @@ DEFAULT_CONFIG = {
     # false = Always show model list in dropdowns
     "profile_selector_enabled": True,
     # Update settings
-    "update_check_enabled": True,       # Auto-check on startup
+    "update_check_enabled": True,  # Auto-check on startup
     # Onboarding settings
     "onboarding_completed": False,
 }
@@ -114,28 +114,29 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 def parse_config_value(value_str):
     """Parse a configuration value from string to appropriate type"""
     value_str = value_str.strip()
-    if value_str.lower() in ['none', 'null', '']:
+    if value_str.lower() in ["none", "null", ""]:
         return None
     # Use 'true'/'false' for boolean values in config.
-    if value_str.lower() in ['true', 'yes', 'on']:
+    if value_str.lower() in ["true", "yes", "on"]:
         return True
-    if value_str.lower() in ['false', 'no', 'off']:
+    if value_str.lower() in ["false", "no", "off"]:
         return False
     try:
-        if '.' not in value_str:
+        if "." not in value_str:
             return int(value_str)
         return float(value_str)
     except ValueError:
         pass
-    if (value_str.startswith('"') and value_str.endswith('"')) or \
-       (value_str.startswith("'") and value_str.endswith("'")):
+    if (value_str.startswith('"') and value_str.endswith('"')) or (
+        value_str.startswith("'") and value_str.endswith("'")
+    ):
         return value_str[1:-1]
     return value_str
 
 
 def load_config(filepath=CONFIG_FILE):
     """Load configuration from .ini file.
-    
+
     Returns:
         config dict. AI parameters are managed by Connection Profiles
         (profiles.json). Endpoints are loaded from prompts.json via PromptsConfig.
@@ -148,26 +149,26 @@ def load_config(filepath=CONFIG_FILE):
         return config
 
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         current_section = None
         seen_config_keys = set()
 
         for line in lines:
-            raw_line = line.rstrip('\n\r')
+            raw_line = line.rstrip("\n\r")
             stripped = raw_line.strip()
 
-            if not stripped or stripped.startswith('#'):
+            if not stripped or stripped.startswith("#"):
                 continue
 
-            if stripped.startswith('[') and stripped.endswith(']'):
+            if stripped.startswith("[") and stripped.endswith("]"):
                 current_section = stripped[1:-1].lower()
                 continue
 
-            if current_section == 'config':
-                if '=' in stripped:
-                    key, value = stripped.split('=', 1)
+            if current_section == "config":
+                if "=" in stripped:
+                    key, value = stripped.split("=", 1)
                     key = key.strip().lower()
                     value = parse_config_value(value)
                     if key in DEFAULT_CONFIG:
@@ -193,13 +194,13 @@ def load_config(filepath=CONFIG_FILE):
 def load_key_names(filepath=CONFIG_FILE):
     """
     Load API key display names from config.ini inline comments.
-    
+
     Parses lines like:
         sk-abc123   # My Key Name
     and returns the name part for each key, in order.
-    
+
     This is separate from load_config() to keep concerns distinct.
-    
+
     Returns:
         Dict[str, List[str]]: Mapping of provider -> list of key names.
         Names are empty strings for keys without inline comments.
@@ -210,7 +211,7 @@ def load_key_names(filepath=CONFIG_FILE):
         return key_names
 
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         current_section = None
@@ -218,24 +219,24 @@ def load_key_names(filepath=CONFIG_FILE):
         for line in lines:
             stripped = line.strip()
 
-            if not stripped or stripped.startswith('#'):
+            if not stripped or stripped.startswith("#"):
                 continue
 
-            if stripped.startswith('[') and stripped.endswith(']'):
+            if stripped.startswith("[") and stripped.endswith("]"):
                 current_section = stripped[1:-1].lower()
                 continue
 
             if current_section in key_names:
-                if stripped and not stripped.startswith('#'):
-                    match = re.search(r'\s+#\s*(.+)$', stripped)
+                if stripped and not stripped.startswith("#"):
+                    match = re.search(r"\s+#\s*(.+)$", stripped)
                     if match:
                         name = match.group(1).strip()
                     else:
                         name = ""
                     # Only append if there's an actual key part
-                    key_match = re.search(r'\s+#', stripped)
+                    key_match = re.search(r"\s+#", stripped)
                     if key_match:
-                        key_part = stripped[:key_match.start()].strip()
+                        key_part = stripped[: key_match.start()].strip()
                     else:
                         key_part = stripped.strip()
                     if key_part:
@@ -255,7 +256,7 @@ _config_listeners_lock = threading.Lock()
 
 def subscribe_config_change(callback):
     """Register a callback for config value changes.
-    
+
     Callback signature: callback(key: str, value: Any)
     Called whenever a config value is saved via save_config_value() or
     explicitly via notify_config_change().
@@ -276,7 +277,7 @@ def unsubscribe_config_change(callback):
 
 def notify_config_change(key: str, value=None):
     """Fire all registered config change callbacks.
-    
+
     Safe to call from any thread. Callbacks are invoked synchronously
     on the caller's thread — GUI-bound listeners must marshal to the
     main thread themselves.
@@ -296,7 +297,7 @@ def save_config_value(key: str, value, filepath=CONFIG_FILE):
         if not Path(filepath).exists():
             return False
 
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         # Convert value to string
@@ -316,8 +317,8 @@ def save_config_value(key: str, value, filepath=CONFIG_FILE):
             stripped = line.strip()
 
             # Track section
-            if stripped.startswith('[') and stripped.endswith(']'):
-                in_config_section = stripped.lower() == '[config]'
+            if stripped.startswith("[") and stripped.endswith("]"):
+                in_config_section = stripped.lower() == "[config]"
 
             # Update key if in config section
             if (in_config_section and stripped.startswith(f"{key} =")) or stripped.startswith(f"{key}="):
@@ -332,12 +333,12 @@ def save_config_value(key: str, value, filepath=CONFIG_FILE):
             added = False
             for line in new_lines:
                 final_lines.append(line)
-                if not added and line.strip().lower() == '[config]':
+                if not added and line.strip().lower() == "[config]":
                     final_lines.append(f"{key} = {value_str}\n")
                     added = True
             new_lines = final_lines
 
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             f.writelines(new_lines)
 
         notify_config_change(key, value)
@@ -349,7 +350,7 @@ def save_config_value(key: str, value, filepath=CONFIG_FILE):
 
 def generate_example_config():
     """Generate example configuration file content"""
-    return '''# ============================================================
+    return """# ============================================================
 # AIPromptBridge - AI Desktop Tools & Integration Bridge
 # ============================================================
 
@@ -565,5 +566,4 @@ update_check_enabled = true
 # API keys have moved to keys.json for better security.
 # Run the app once to auto-migrate existing keys from config.ini.
 # Use Settings > API Keys to manage key pools.
-'''
-
+"""

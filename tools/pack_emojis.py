@@ -30,16 +30,17 @@ def pack_emojis():
     print(f"Output: {output_zip}")
 
     count = 0
-    with zipfile.ZipFile(output_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(output_zip, "w", zipfile.ZIP_DEFLATED) as zf:
         for file_path in source_dir.glob("*.png"):
             # Store just the filename in the zip (flattened structure)
             zf.write(file_path, arcname=file_path.name)
             count += 1
             if count % 100 == 0:
-                print(f"Packed {count} files...", end='\r')
+                print(f"Packed {count} files...", end="\r")
 
     print(f"\nSuccess! Packed {count} emoji files into {output_zip}")
     print(f"Zip size: {output_zip.stat().st_size / 1024 / 1024:.2f} MB")
+
 
 if __name__ == "__main__":
     pack_emojis()

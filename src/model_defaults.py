@@ -23,7 +23,6 @@ FALLBACK_MODELS: dict[str, list[str]] = {
         "gemini-2.5-flash-lite",
         "gemini-2.0-flash",
     ],
-
     "anthropic": [
         "claude-opus-4-7",
         "claude-opus-4-6",
@@ -34,7 +33,6 @@ FALLBACK_MODELS: dict[str, list[str]] = {
         "claude-3-7-sonnet-latest",
         "claude-3-5-sonnet-latest",
     ],
-
     "openai": [
         "gpt-5.5",
         "gpt-5.4",
@@ -53,13 +51,11 @@ FALLBACK_MODELS: dict[str, list[str]] = {
         "o1",
         "o1-pro",
     ],
-
     "xai": [
         "grok-4.3",
         "grok-4-1-fast",
         "grok-4.20-multi-agent",
     ],
-
     "mistral": [
         "mistral-large-latest",
         "mistral-medium-latest",
@@ -67,14 +63,12 @@ FALLBACK_MODELS: dict[str, list[str]] = {
         "open-mixtral-8x22b",
         "open-mistral-nemo",
     ],
-
     "cohere": [
         "command-a-03-2025",
         "command-a-vision-07-2025",
         "command-r-plus",
         "command-r",
     ],
-
     "openrouter": [
         "nvidia/nemotron-3-super-120b-a12b:free",
         "openai/gpt-oss-120b:free",
@@ -86,9 +80,8 @@ FALLBACK_MODELS: dict[str, list[str]] = {
         "google/gemma-4-26b-a4b-it:free",
         "qwen/qwen3-next-80b-a3b-instruct:free",
         "openrouter/free",
-        "openrouter/auto"
+        "openrouter/auto",
     ],
-
     # Custom OAI-Compatible — placeholder only (unknown models)
     "custom": [
         "local-model",

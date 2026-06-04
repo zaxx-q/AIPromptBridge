@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 try:
     import msvcrt
+
     HAVE_MSVCRT = True
 except ImportError:
     HAVE_MSVCRT = False
@@ -22,6 +23,7 @@ from .checkpoint import TTSCheckpoint, TTSCheckpointManager
 
 # ── Text splitting utilities ──────────────────────────────────────────────────
 
+
 def split_text_lines(text: str) -> List[str]:
     """Split text into non-empty lines."""
     return [ln.strip() for ln in text.splitlines() if ln.strip()]
@@ -29,17 +31,18 @@ def split_text_lines(text: str) -> List[str]:
 
 def split_text_paragraphs(text: str) -> List[str]:
     """Split on blank lines."""
-    paras = re.split(r'\n\s*\n', text.strip())
+    paras = re.split(r"\n\s*\n", text.strip())
     return [p.strip() for p in paras if p.strip()]
 
 
 def split_text_sentences(text: str) -> List[str]:
     """Simple sentence splitter (no NLTK dependency)."""
-    raw = re.split(r'(?<=[.!?])\s+', text.strip())
+    raw = re.split(r"(?<=[.!?])\s+", text.strip())
     return [s.strip() for s in raw if s.strip()]
 
 
 # ── Main class ────────────────────────────────────────────────────────────────
+
 
 class TTSProcessor(BaseTool):
     """Batch TTS Processor — convert text segments to WAV audio via Gemini TTS."""
@@ -144,7 +147,7 @@ class TTSProcessor(BaseTool):
             except (EOFError, KeyboardInterrupt):
                 return None
 
-            if path_str.lower() == 'q':
+            if path_str.lower() == "q":
                 return None
             if not path_str:
                 continue
@@ -197,7 +200,7 @@ class TTSProcessor(BaseTool):
             print(f"\n📊 {len(segments)} segment(s) found ({split_mode} mode)")
             # Preview first 3 segments
             for i, seg in enumerate(segments[:3]):
-                preview = seg[:80].replace('\n', ' ')
+                preview = seg[:80].replace("\n", " ")
                 print(f"  [{i + 1}] {preview}{'...' if len(seg) > 80 else ''}")
             if len(segments) > 3:
                 print(f"  ... and {len(segments) - 3} more")
@@ -207,7 +210,7 @@ class TTSProcessor(BaseTool):
             except (EOFError, KeyboardInterrupt):
                 return None
 
-            if confirm == 'n':
+            if confirm == "n":
                 continue
 
             return {"input_path": str(path), "segments": segments, "split_mode": split_mode}
@@ -320,7 +323,7 @@ class TTSProcessor(BaseTool):
     def _step3_style_instructions(self, segments: List[str]) -> Optional[Dict[str, Any]]:
         """
         Step 3: Choose style instructions (manual, default, or AI Director).
-        
+
         Returns:
             Dict with:
                 - style_instructions: str (the base style, without embedded transcript)
@@ -350,10 +353,10 @@ class TTSProcessor(BaseTool):
         except (EOFError, KeyboardInterrupt):
             return None
 
-        if choice == 'q':
+        if choice == "q":
             return None
 
-        if choice == '1':
+        if choice == "1":
             print("\nEnter style instructions:")
             try:
                 style = input("> ").strip()
@@ -364,16 +367,16 @@ class TTSProcessor(BaseTool):
             print(f"✅ Style: {style}")
             return {"style_instructions": style, "per_segment_styles": None}
 
-        if choice == '3':
+        if choice == "3":
             # No style - send text directly
             print("✅ No style - text will be sent directly to TTS")
             return {"style_instructions": "", "per_segment_styles": None}
 
-        if choice == '4' and director_enabled:
+        if choice == "4" and director_enabled:
             # Single style for all segments (aggregate analysis)
             return self._run_director_single_style(segments, default_style)
 
-        if choice == '5' and director_enabled:
+        if choice == "5" and director_enabled:
             # Per-segment style (unique for each)
             return self._run_director_per_segment(segments, default_style)
 
@@ -384,7 +387,7 @@ class TTSProcessor(BaseTool):
     def _run_director_single_style(self, segments: List[str], default_style: str) -> Optional[Dict[str, Any]]:
         """
         Run AI Director once on a sample of segments to generate a single style.
-        
+
         Uses first few segments as context for better style matching.
         Strips embedded transcript from Director output.
         """
@@ -426,10 +429,10 @@ class TTSProcessor(BaseTool):
             except (EOFError, KeyboardInterrupt):
                 return None
 
-            if keep == 'r':
+            if keep == "r":
                 # Regenerate
                 return self._run_director_single_style(segments, default_style)
-            if keep != 'n':
+            if keep != "n":
                 return {"style_instructions": style, "per_segment_styles": None}
         else:
             print_warning("Director failed, using default")
@@ -439,7 +442,7 @@ class TTSProcessor(BaseTool):
     def _run_director_per_segment(self, segments: List[str], default_style: str) -> Optional[Dict[str, Any]]:
         """
         Run AI Director on each segment individually for unique styles.
-        
+
         More API calls but better style matching per segment.
         """
         n_segments = len(segments)
@@ -453,13 +456,13 @@ class TTSProcessor(BaseTool):
         except (EOFError, KeyboardInterrupt):
             return None
 
-        if confirm == 'n':
+        if confirm == "n":
             return None
 
         per_segment_styles: Dict[int, str] = {}
 
         for i, segment in enumerate(segments):
-            print(f"\n   [{i+1}/{n_segments}] Analyzing segment {i+1}...")
+            print(f"\n   [{i + 1}/{n_segments}] Analyzing segment {i + 1}...")
             raw_style = self._generate_style_with_director(segment)
 
             if raw_style:
@@ -481,7 +484,7 @@ class TTSProcessor(BaseTool):
     def _strip_transcript_from_style(self, style: str) -> str:
         """
         Strip embedded transcript from AI Director output.
-        
+
         The Director prompt instructs it to include '#### TRANSCRIPT' section.
         We strip this because each segment needs its own transcript appended.
         """
@@ -526,7 +529,7 @@ class TTSProcessor(BaseTool):
                 create = input("Directory doesn't exist. Create? [Y/n]: ").strip().lower()
             except (EOFError, KeyboardInterrupt):
                 return None
-            if create != 'n':
+            if create != "n":
                 out_path.mkdir(parents=True, exist_ok=True)
             else:
                 return None
@@ -646,7 +649,7 @@ class TTSProcessor(BaseTool):
             # Pause/stop check
             if not self.check_pause():
                 self.checkpoint_manager.save(cp)
-                if getattr(self, '_stop_requested', False):
+                if getattr(self, "_stop_requested", False):
                     print("\n⏹️  Stopped. Progress saved.")
                     result.message = "Stopped by user"
                     return
@@ -654,7 +657,7 @@ class TTSProcessor(BaseTool):
                 print("\n⏸️  Paused. Press Enter to resume, 'q' to stop...")
                 try:
                     resume_input = input().strip().lower()
-                    if resume_input == 'q':
+                    if resume_input == "q":
                         result.message = "Stopped by user"
                         return
                     self.request_resume()
@@ -667,8 +670,8 @@ class TTSProcessor(BaseTool):
             seg_text = cp.segments[seg_idx]
             done_so_far = len(cp.completed_segments) + len(cp.failed_segments) + 1
             print(f"\n[{done_so_far}/{cp.total_segments}] Segment {seg_idx + 1}")
-            preview = seg_text[:60].replace('\n', ' ')
-            print(f"   \"{preview}{'...' if len(seg_text) > 60 else ''}\"")
+            preview = seg_text[:60].replace("\n", " ")
+            print(f'   "{preview}{"..." if len(seg_text) > 60 else ""}"')
 
             output_file = self._process_single_segment(seg_idx, seg_text, cp)
             if output_file:
@@ -695,11 +698,7 @@ class TTSProcessor(BaseTool):
                 return None
 
             # Per-segment style override (dict keys may be int or str after JSON load)
-            style = (
-                cp.per_segment_styles.get(idx)
-                or cp.per_segment_styles.get(str(idx))
-                or cp.style_instructions
-            )
+            style = cp.per_segment_styles.get(idx) or cp.per_segment_styles.get(str(idx)) or cp.style_instructions
 
             # Combine style instructions with text (TTS API expects single text field)
             if style:
@@ -772,7 +771,7 @@ class TTSProcessor(BaseTool):
                 wav_data=result["wav"],
                 directory=str(output_path.parent),
                 voice_name=cp.voice_name,
-                format_ext="wav"
+                format_ext="wav",
             )
 
             if save_error:
@@ -835,7 +834,7 @@ class TTSProcessor(BaseTool):
 
     def _merge_wav_files(self, wav_paths: List[str], output_path: str):
         """Concatenate multiple WAV files into one (all must be 24kHz/16-bit/mono)."""
-        output = wave.open(output_path, 'wb')
+        output = wave.open(output_path, "wb")
         try:
             params_set = False
 
@@ -843,7 +842,7 @@ class TTSProcessor(BaseTool):
                 p = Path(path)
                 if not p.exists():
                     continue
-                with wave.open(str(p), 'rb') as wf:
+                with wave.open(str(p), "rb") as wf:
                     if not params_set:
                         output.setparams(wf.getparams())
                         params_set = True
@@ -872,9 +871,9 @@ class TTSProcessor(BaseTool):
             choice = input("\nChoice: ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             return None
-        if choice == 'r':
+        if choice == "r":
             return True
-        if choice == 'n':
+        if choice == "n":
             return False
         return None
 
@@ -897,9 +896,9 @@ class TTSProcessor(BaseTool):
             choice = input("\nChoice: ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             return None
-        if choice == 'r':
+        if choice == "r":
             return True
-        if choice == 'n':
+        if choice == "n":
             return False
         return None
 
@@ -931,14 +930,14 @@ class TTSProcessor(BaseTool):
                     if msvcrt.kbhit():
                         key = msvcrt.getch()
                         # Skip extended key codes
-                        if key in (b'\x00', b'\xe0'):
+                        if key in (b"\x00", b"\xe0"):
                             msvcrt.getch()
                             continue
                         key_lower = key.lower()
-                        if key_lower == b'p':
+                        if key_lower == b"p":
                             self.request_pause()
                             print("\n⏸️  Pause requested (press Enter in console to resume)...")
-                        elif key_lower == b's':
+                        elif key_lower == b"s":
                             self.request_pause()
                             self._stop_requested = True
                             print("\n⏹️  Stop requested...")

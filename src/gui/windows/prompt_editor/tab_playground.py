@@ -31,6 +31,7 @@ from .dialogs import TestResultDialog
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
 try:
     from ...emoji_renderer import HAVE_PIL, get_emoji_renderer
+
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
@@ -46,7 +47,11 @@ class PlaygroundTabMixin:
         container.pack(fill="both", expand=True, padx=15, pady=15)
 
         # Left panel: Configuration
-        left_panel = ctk.CTkFrame(container, fg_color="transparent", width=450) if self.use_ctk else tk.Frame(container, bg=self.colors.bg, width=450)
+        left_panel = (
+            ctk.CTkFrame(container, fg_color="transparent", width=450)
+            if self.use_ctk
+            else tk.Frame(container, bg=self.colors.bg, width=450)
+        )
         left_panel.pack(side="left", fill="y", padx=(0, 15))
         left_panel.pack_propagate(False)
 
@@ -62,111 +67,192 @@ class PlaygroundTabMixin:
         create_section_header(scroll_left, "Mode", self.colors, "🎯")
 
         self.playground_mode_var = tk.StringVar(master=self.root, value="action_text")
-        mode_frame = ctk.CTkFrame(scroll_left, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_left, bg=self.colors.bg)
+        mode_frame = (
+            ctk.CTkFrame(scroll_left, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(scroll_left, bg=self.colors.bg)
+        )
         mode_frame.pack(anchor="w", pady=(0, 15))
 
         if self.use_ctk:
-            ctk.CTkRadioButton(mode_frame, text="Text Action",
-                              variable=self.playground_mode_var, value="action_text",
-                              font=get_ctk_font(13), text_color=self.colors.fg,
-                              fg_color=self.colors.accent,
-                              command=self._on_playground_mode_change).pack(side="left", padx=(0, 15))
-            ctk.CTkRadioButton(mode_frame, text="Snip Action",
-                              variable=self.playground_mode_var, value="action_snip",
-                              font=get_ctk_font(13), text_color=self.colors.fg,
-                              fg_color=self.colors.accent,
-                              command=self._on_playground_mode_change).pack(side="left", padx=(0, 15))
-            ctk.CTkRadioButton(mode_frame, text="Audio Action",
-                              variable=self.playground_mode_var, value="action_audio",
-                              font=get_ctk_font(13), text_color=self.colors.fg,
-                              fg_color=self.colors.accent,
-                              command=self._on_playground_mode_change).pack(side="left", padx=(0, 15))
-            ctk.CTkRadioButton(mode_frame, text="🔊 TTS",
-                              variable=self.playground_mode_var, value="tts",
-                              font=get_ctk_font(13), text_color=self.colors.fg,
-                              fg_color=self.colors.accent,
-                              command=self._on_playground_mode_change).pack(side="left")
+            ctk.CTkRadioButton(
+                mode_frame,
+                text="Text Action",
+                variable=self.playground_mode_var,
+                value="action_text",
+                font=get_ctk_font(13),
+                text_color=self.colors.fg,
+                fg_color=self.colors.accent,
+                command=self._on_playground_mode_change,
+            ).pack(side="left", padx=(0, 15))
+            ctk.CTkRadioButton(
+                mode_frame,
+                text="Snip Action",
+                variable=self.playground_mode_var,
+                value="action_snip",
+                font=get_ctk_font(13),
+                text_color=self.colors.fg,
+                fg_color=self.colors.accent,
+                command=self._on_playground_mode_change,
+            ).pack(side="left", padx=(0, 15))
+            ctk.CTkRadioButton(
+                mode_frame,
+                text="Audio Action",
+                variable=self.playground_mode_var,
+                value="action_audio",
+                font=get_ctk_font(13),
+                text_color=self.colors.fg,
+                fg_color=self.colors.accent,
+                command=self._on_playground_mode_change,
+            ).pack(side="left", padx=(0, 15))
+            ctk.CTkRadioButton(
+                mode_frame,
+                text="🔊 TTS",
+                variable=self.playground_mode_var,
+                value="tts",
+                font=get_ctk_font(13),
+                text_color=self.colors.fg,
+                fg_color=self.colors.accent,
+                command=self._on_playground_mode_change,
+            ).pack(side="left")
         else:
-            tk.Radiobutton(mode_frame, text="Text Action",
-                          variable=self.playground_mode_var, value="action_text",
-                          font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
-                          command=self._on_playground_mode_change).pack(side="left", padx=(0, 15))
-            tk.Radiobutton(mode_frame, text="Snip Action",
-                          variable=self.playground_mode_var, value="action_snip",
-                          font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
-                          command=self._on_playground_mode_change).pack(side="left", padx=(0, 15))
-            tk.Radiobutton(mode_frame, text="Audio Action",
-                          variable=self.playground_mode_var, value="action_audio",
-                          font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
-                          command=self._on_playground_mode_change).pack(side="left", padx=(0, 15))
-            tk.Radiobutton(mode_frame, text="🔊 TTS",
-                          variable=self.playground_mode_var, value="tts",
-                          font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
-                          command=self._on_playground_mode_change).pack(side="left")
+            tk.Radiobutton(
+                mode_frame,
+                text="Text Action",
+                variable=self.playground_mode_var,
+                value="action_text",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+                command=self._on_playground_mode_change,
+            ).pack(side="left", padx=(0, 15))
+            tk.Radiobutton(
+                mode_frame,
+                text="Snip Action",
+                variable=self.playground_mode_var,
+                value="action_snip",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+                command=self._on_playground_mode_change,
+            ).pack(side="left", padx=(0, 15))
+            tk.Radiobutton(
+                mode_frame,
+                text="Audio Action",
+                variable=self.playground_mode_var,
+                value="action_audio",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+                command=self._on_playground_mode_change,
+            ).pack(side="left", padx=(0, 15))
+            tk.Radiobutton(
+                mode_frame,
+                text="🔊 TTS",
+                variable=self.playground_mode_var,
+                value="tts",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+                command=self._on_playground_mode_change,
+            ).pack(side="left")
 
         # Action config frame
-        self.action_config_frame = ctk.CTkFrame(scroll_left, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_left, bg=self.colors.bg)
+        self.action_config_frame = (
+            ctk.CTkFrame(scroll_left, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(scroll_left, bg=self.colors.bg)
+        )
         self.action_config_frame.pack(fill="x", pady=(0, 10))
 
         if self.use_ctk:
-            ctk.CTkLabel(self.action_config_frame, text="Select Action:", font=get_ctk_font(13),
-                        **get_ctk_label_colors(self.colors)).pack(anchor="w", pady=(0, 8))
+            ctk.CTkLabel(
+                self.action_config_frame,
+                text="Select Action:",
+                font=get_ctk_font(13),
+                **get_ctk_label_colors(self.colors),
+            ).pack(anchor="w", pady=(0, 8))
         else:
-            tk.Label(self.action_config_frame, text="Select Action:", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w", pady=(0, 5))
+            tk.Label(
+                self.action_config_frame,
+                text="Select Action:",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(anchor="w", pady=(0, 5))
 
         self.playground_action_var = tk.StringVar()
         # Populated dynamically
 
         if self.use_ctk:
             self.playground_action_combo = ctk.CTkComboBox(
-                self.action_config_frame, variable=self.playground_action_var,
-                values=[], width=340, height=34, state="readonly", font=get_ctk_font(13),
+                self.action_config_frame,
+                variable=self.playground_action_var,
+                values=[],
+                width=340,
+                height=34,
+                state="readonly",
+                font=get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors),
-                command=lambda x: self._on_playground_action_change()
+                command=lambda x: self._on_playground_action_change(),
             )
         else:
             from tkinter import ttk
+
             self.playground_action_combo = ttk.Combobox(
-                self.action_config_frame, textvariable=self.playground_action_var,
-                values=[], state="readonly", width=35
+                self.action_config_frame, textvariable=self.playground_action_var, values=[], state="readonly", width=35
             )
-            self.playground_action_combo.bind('<<ComboboxSelected>>', self._on_playground_action_change)
+            self.playground_action_combo.bind("<<ComboboxSelected>>", self._on_playground_action_change)
         self.playground_action_combo.pack(anchor="w", pady=(0, 10))
 
         # Custom input (for custom actions)
-        self.custom_input_frame = ctk.CTkFrame(self.action_config_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.action_config_frame, bg=self.colors.bg)
+        self.custom_input_frame = (
+            ctk.CTkFrame(self.action_config_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self.action_config_frame, bg=self.colors.bg)
+        )
         # Initially hidden
 
         if self.use_ctk:
-            ctk.CTkLabel(self.custom_input_frame, text="Custom Prompt:", font=get_ctk_font(12),
-                        **get_ctk_label_colors(self.colors)).pack(anchor="w", pady=(0, 2))
+            ctk.CTkLabel(
+                self.custom_input_frame,
+                text="Custom Prompt:",
+                font=get_ctk_font(12),
+                **get_ctk_label_colors(self.colors),
+            ).pack(anchor="w", pady=(0, 2))
             self.playground_custom_var = tk.StringVar()
             self.playground_custom_entry = ctk.CTkEntry(
-                self.custom_input_frame, textvariable=self.playground_custom_var,
-                font=get_ctk_font(12), height=32, **get_ctk_entry_colors(self.colors)
+                self.custom_input_frame,
+                textvariable=self.playground_custom_var,
+                font=get_ctk_font(12),
+                height=32,
+                **get_ctk_entry_colors(self.colors),
             )
             self.playground_custom_entry.pack(fill="x")
-            self.playground_custom_entry.bind('<KeyRelease>', lambda e: self._update_playground_preview())
+            self.playground_custom_entry.bind("<KeyRelease>", lambda e: self._update_playground_preview())
         else:
-            tk.Label(self.custom_input_frame, text="Custom Prompt:", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w", pady=(0, 2))
+            tk.Label(
+                self.custom_input_frame,
+                text="Custom Prompt:",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(anchor="w", pady=(0, 2))
             self.playground_custom_var = tk.StringVar()
             self.playground_custom_entry = tk.Entry(
-                self.custom_input_frame, textvariable=self.playground_custom_var,
-                font=("Segoe UI", 10), bg=self.colors.input_bg, fg=self.colors.fg
+                self.custom_input_frame,
+                textvariable=self.playground_custom_var,
+                font=("Segoe UI", 10),
+                bg=self.colors.input_bg,
+                fg=self.colors.fg,
             )
             self.playground_custom_entry.pack(fill="x")
-            self.playground_custom_entry.bind('<KeyRelease>', lambda e: self._update_playground_preview())
+            self.playground_custom_entry.bind("<KeyRelease>", lambda e: self._update_playground_preview())
 
         # Modifiers section
         if self.use_ctk:
             # Header with emoji image
-            kwargs = {
-                "text": " Modifiers:",
-                "font": get_ctk_font(13),
-                **get_ctk_label_colors(self.colors)
-            }
+            kwargs = {"text": " Modifiers:", "font": get_ctk_font(13), **get_ctk_label_colors(self.colors)}
             if HAVE_EMOJI:
                 renderer = get_emoji_renderer()
                 img = renderer.get_ctk_image("🎛️", size=18)
@@ -181,8 +267,13 @@ class PlaygroundTabMixin:
             )
             mod_scroll_target = self.playground_mod_scroll
         else:
-            tk.Label(self.action_config_frame, text="🎛️ Modifiers:", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w", pady=(8, 5))
+            tk.Label(
+                self.action_config_frame,
+                text="🎛️ Modifiers:",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(anchor="w", pady=(8, 5))
             self.playground_mod_scroll = TkScrollableFrame(self.action_config_frame, bg_color=self.colors.bg)
             self.playground_mod_scroll.canvas.configure(height=120)
             mod_scroll_target = self.playground_mod_scroll.scrollable_frame
@@ -203,21 +294,32 @@ class PlaygroundTabMixin:
 
                 if self.use_ctk:
                     ctk.CTkCheckBox(
-                        mod_scroll_target, text=label, variable=var,
-                        font=get_ctk_font(12), text_color=self.colors.fg,
+                        mod_scroll_target,
+                        text=label,
+                        variable=var,
+                        font=get_ctk_font(12),
+                        text_color=self.colors.fg,
                         fg_color=self.colors.accent,
-                        command=self._update_playground_preview
+                        command=self._update_playground_preview,
                     ).pack(anchor="w", pady=3)
                 else:
                     tk.Checkbutton(
-                        mod_scroll_target, text=label, variable=var,
-                        font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
+                        mod_scroll_target,
+                        text=label,
+                        variable=var,
+                        font=("Segoe UI", 10),
+                        bg=self.colors.bg,
+                        fg=self.colors.fg,
                         selectcolor=self.colors.input_bg,
-                        command=self._update_playground_preview
+                        command=self._update_playground_preview,
                     ).pack(anchor="w")
 
         # Snip Image Frame (inside action_config_frame, shown only for Snip mode)
-        self.snip_image_frame = ctk.CTkFrame(self.action_config_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.action_config_frame, bg=self.colors.bg)
+        self.snip_image_frame = (
+            ctk.CTkFrame(self.action_config_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self.action_config_frame, bg=self.colors.bg)
+        )
         # Initially hidden - shown only for action_snip mode
 
         if self.use_ctk:
@@ -225,22 +327,38 @@ class PlaygroundTabMixin:
             if HAVE_EMOJI:
                 renderer = get_emoji_renderer()
                 snip_img_header = renderer.get_ctk_image("🖼️", size=18)
-            ctk.CTkLabel(self.snip_image_frame, text=" Image for Snip Test:", image=snip_img_header, compound="left",
-                        font=get_ctk_font(13), **get_ctk_label_colors(self.colors)).pack(anchor="w", pady=(8, 8))
+            ctk.CTkLabel(
+                self.snip_image_frame,
+                text=" Image for Snip Test:",
+                image=snip_img_header,
+                compound="left",
+                font=get_ctk_font(13),
+                **get_ctk_label_colors(self.colors),
+            ).pack(anchor="w", pady=(8, 8))
         else:
-            tk.Label(self.snip_image_frame, text="🖼️ Image for Snip Test:", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w", pady=(5, 5))
+            tk.Label(
+                self.snip_image_frame,
+                text="🖼️ Image for Snip Test:",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(anchor="w", pady=(5, 5))
 
         # Image container
         if self.use_ctk:
             self.image_container_frame = ctk.CTkFrame(
-                self.snip_image_frame, fg_color=self.colors.surface0,
-                corner_radius=6, border_width=1, border_color=self.colors.border
+                self.snip_image_frame,
+                fg_color=self.colors.surface0,
+                corner_radius=6,
+                border_width=1,
+                border_color=self.colors.border,
             )
         else:
             self.image_container_frame = tk.Frame(
-                self.snip_image_frame, bg=self.colors.surface0,
-                highlightbackground=self.colors.border, highlightthickness=1
+                self.snip_image_frame,
+                bg=self.colors.surface0,
+                highlightbackground=self.colors.border,
+                highlightthickness=1,
             )
         self.image_container_frame.pack(fill="x", pady=(0, 10))
 
@@ -251,28 +369,50 @@ class PlaygroundTabMixin:
                 self.playground_camera_icon = renderer.get_ctk_image("📷", size=48)
 
             self.image_drop_zone = ctk.CTkLabel(
-                self.image_container_frame, text=" No image selected",
-                image=self.playground_camera_icon, compound="top",
-                font=get_ctk_font(13), text_color=self.colors.blockquote
+                self.image_container_frame,
+                text=" No image selected",
+                image=self.playground_camera_icon,
+                compound="top",
+                font=get_ctk_font(13),
+                text_color=self.colors.blockquote,
             )
         else:
             self.image_drop_zone = tk.Label(
-                self.image_container_frame, text="📷 No image selected",
-                font=("Segoe UI", 10), bg=self.colors.surface0, fg=self.colors.blockquote
+                self.image_container_frame,
+                text="📷 No image selected",
+                font=("Segoe UI", 10),
+                bg=self.colors.surface0,
+                fg=self.colors.blockquote,
             )
         self.image_drop_zone.pack(fill="both", expand=True, padx=10, pady=20)
 
         # Image buttons
-        btn_row = ctk.CTkFrame(self.snip_image_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.snip_image_frame, bg=self.colors.bg)
+        btn_row = (
+            ctk.CTkFrame(self.snip_image_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self.snip_image_frame, bg=self.colors.bg)
+        )
         btn_row.pack(fill="x", pady=(0, 10))
 
-        create_emoji_button(btn_row, "Select", "📁", self.colors, "secondary", 90, 34, self._select_playground_image).pack(side="left", padx=3)
-        create_emoji_button(btn_row, "Snip", "✂️", self.colors, "primary", 90, 34, self._snip_playground_image).pack(side="left", padx=3)
-        create_emoji_button(btn_row, "Paste", "📋", self.colors, "secondary", 90, 34, self._paste_playground_image).pack(side="left", padx=3)
-        create_emoji_button(btn_row, "Clear", "🗑️", self.colors, "danger", 80, 34, self._clear_playground_image).pack(side="left", padx=3)
+        create_emoji_button(
+            btn_row, "Select", "📁", self.colors, "secondary", 90, 34, self._select_playground_image
+        ).pack(side="left", padx=3)
+        create_emoji_button(btn_row, "Snip", "✂️", self.colors, "primary", 90, 34, self._snip_playground_image).pack(
+            side="left", padx=3
+        )
+        create_emoji_button(
+            btn_row, "Paste", "📋", self.colors, "secondary", 90, 34, self._paste_playground_image
+        ).pack(side="left", padx=3)
+        create_emoji_button(btn_row, "Clear", "🗑️", self.colors, "danger", 80, 34, self._clear_playground_image).pack(
+            side="left", padx=3
+        )
 
         # Audio Recording Frame (inside action_config_frame, shown only for Audio mode)
-        self.audio_record_frame = ctk.CTkFrame(self.action_config_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.action_config_frame, bg=self.colors.bg)
+        self.audio_record_frame = (
+            ctk.CTkFrame(self.action_config_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self.action_config_frame, bg=self.colors.bg)
+        )
         # Initially hidden - shown only for action_audio mode
 
         if self.use_ctk:
@@ -280,24 +420,45 @@ class PlaygroundTabMixin:
             if HAVE_EMOJI:
                 renderer = get_emoji_renderer()
                 audio_header_img = renderer.get_ctk_image("🎙️", size=18)
-            ctk.CTkLabel(self.audio_record_frame, text=" Audio Recording:", image=audio_header_img, compound="left",
-                        font=get_ctk_font(13), **get_ctk_label_colors(self.colors)).pack(anchor="w", pady=(8, 8))
+            ctk.CTkLabel(
+                self.audio_record_frame,
+                text=" Audio Recording:",
+                image=audio_header_img,
+                compound="left",
+                font=get_ctk_font(13),
+                **get_ctk_label_colors(self.colors),
+            ).pack(anchor="w", pady=(8, 8))
         else:
-            tk.Label(self.audio_record_frame, text="🎙️ Audio Recording:", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w", pady=(5, 5))
+            tk.Label(
+                self.audio_record_frame,
+                text="🎙️ Audio Recording:",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(anchor="w", pady=(5, 5))
 
         # Device selection row
-        device_row = ctk.CTkFrame(self.audio_record_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.audio_record_frame, bg=self.colors.bg)
+        device_row = (
+            ctk.CTkFrame(self.audio_record_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self.audio_record_frame, bg=self.colors.bg)
+        )
         device_row.pack(fill="x", pady=(0, 8))
 
         if self.use_ctk:
-            ctk.CTkLabel(device_row, text="Device:", font=get_ctk_font(12), width=60,
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                device_row, text="Device:", font=get_ctk_font(12), width=60, **get_ctk_label_colors(self.colors)
+            ).pack(side="left")
             self.playground_audio_device_var = tk.StringVar()
             self.playground_audio_device_combo = ctk.CTkComboBox(
-                device_row, variable=self.playground_audio_device_var,
-                values=["(Loading...)"], width=280, height=32, state="readonly",
-                font=get_ctk_font(12), **get_ctk_combobox_colors(self.colors)
+                device_row,
+                variable=self.playground_audio_device_var,
+                values=["(Loading...)"],
+                width=280,
+                height=32,
+                state="readonly",
+                font=get_ctk_font(12),
+                **get_ctk_combobox_colors(self.colors),
             )
             self.playground_audio_device_combo.pack(side="left", padx=(8, 8), fill="x", expand=True)
 
@@ -306,51 +467,84 @@ class PlaygroundTabMixin:
             if HAVE_EMOJI:
                 renderer = get_emoji_renderer()
                 refresh_img = renderer.get_ctk_image("🔄", size=16)
-            ctk.CTkButton(device_row, text="", image=refresh_img, width=32, height=32,
-                         **get_ctk_button_colors(self.colors, "secondary"),
-                         command=self._refresh_audio_devices).pack(side="left")
+            ctk.CTkButton(
+                device_row,
+                text="",
+                image=refresh_img,
+                width=32,
+                height=32,
+                **get_ctk_button_colors(self.colors, "secondary"),
+                command=self._refresh_audio_devices,
+            ).pack(side="left")
         else:
-            tk.Label(device_row, text="Device:", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            tk.Label(device_row, text="Device:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(
+                side="left"
+            )
             self.playground_audio_device_var = tk.StringVar()
             from tkinter import ttk
+
             self.playground_audio_device_combo = ttk.Combobox(
-                device_row, textvariable=self.playground_audio_device_var,
-                values=["(Loading...)"], state="readonly", width=35
+                device_row,
+                textvariable=self.playground_audio_device_var,
+                values=["(Loading...)"],
+                state="readonly",
+                width=35,
             )
             self.playground_audio_device_combo.pack(side="left", padx=(8, 8), fill="x", expand=True)
-            tk.Button(device_row, text="🔄", command=self._refresh_audio_devices,
-                     bg=self.colors.surface1, fg=self.colors.fg).pack(side="left")
+            tk.Button(
+                device_row, text="🔄", command=self._refresh_audio_devices, bg=self.colors.surface1, fg=self.colors.fg
+            ).pack(side="left")
 
         # Recording controls row
-        record_row = ctk.CTkFrame(self.audio_record_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.audio_record_frame, bg=self.colors.bg)
+        record_row = (
+            ctk.CTkFrame(self.audio_record_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self.audio_record_frame, bg=self.colors.bg)
+        )
         record_row.pack(fill="x", pady=(0, 8))
 
-        self.playground_record_btn = create_emoji_button(record_row, "Record", "🔴", self.colors, "primary", 100, 36, self._toggle_playground_recording)
+        self.playground_record_btn = create_emoji_button(
+            record_row, "Record", "🔴", self.colors, "primary", 100, 36, self._toggle_playground_recording
+        )
         self.playground_record_btn.pack(side="left", padx=(0, 8))
 
-        create_emoji_button(record_row, "Upload", "📁", self.colors, "secondary", 100, 36, self._select_playground_audio_file).pack(side="left", padx=(0, 8))
+        create_emoji_button(
+            record_row, "Upload", "📁", self.colors, "secondary", 100, 36, self._select_playground_audio_file
+        ).pack(side="left", padx=(0, 8))
 
         # Duration label
         if self.use_ctk:
-            self.playground_audio_duration = ctk.CTkLabel(record_row, text="00:00", font=get_ctk_font(14, "bold"),
-                                                          text_color=self.colors.fg)
+            self.playground_audio_duration = ctk.CTkLabel(
+                record_row, text="00:00", font=get_ctk_font(14, "bold"), text_color=self.colors.fg
+            )
         else:
-            self.playground_audio_duration = tk.Label(record_row, text="00:00", font=("Segoe UI", 12, "bold"),
-                                                      bg=self.colors.bg, fg=self.colors.fg)
+            self.playground_audio_duration = tk.Label(
+                record_row, text="00:00", font=("Segoe UI", 12, "bold"), bg=self.colors.bg, fg=self.colors.fg
+            )
         self.playground_audio_duration.pack(side="left", padx=(0, 15))
 
         # Clear button
-        self.playground_audio_clear_btn = create_emoji_button(record_row, "Clear", "🗑️", self.colors, "danger", 80, 36, self._clear_playground_audio)
+        self.playground_audio_clear_btn = create_emoji_button(
+            record_row, "Clear", "🗑️", self.colors, "danger", 80, 36, self._clear_playground_audio
+        )
         self.playground_audio_clear_btn.pack(side="left")
 
         # Audio status label
         if self.use_ctk:
-            self.playground_audio_status = ctk.CTkLabel(self.audio_record_frame, text="No audio recorded",
-                                                        font=get_ctk_font(12), text_color=self.colors.blockquote)
+            self.playground_audio_status = ctk.CTkLabel(
+                self.audio_record_frame,
+                text="No audio recorded",
+                font=get_ctk_font(12),
+                text_color=self.colors.blockquote,
+            )
         else:
-            self.playground_audio_status = tk.Label(self.audio_record_frame, text="No audio recorded",
-                                                    font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.blockquote)
+            self.playground_audio_status = tk.Label(
+                self.audio_record_frame,
+                text="No audio recorded",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.blockquote,
+            )
         self.playground_audio_status.pack(anchor="w", pady=(0, 5))
 
         # Initialize audio state
@@ -362,7 +556,11 @@ class PlaygroundTabMixin:
         self.playground_audio_devices = []
 
         # Sample text container (for hiding/showing)
-        self.sample_text_container = ctk.CTkFrame(scroll_left, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_left, bg=self.colors.bg)
+        self.sample_text_container = (
+            ctk.CTkFrame(scroll_left, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(scroll_left, bg=self.colors.bg)
+        )
         self.sample_text_container.pack(fill="x")
 
         if self.use_ctk:
@@ -371,82 +569,131 @@ class PlaygroundTabMixin:
                 renderer = get_emoji_renderer()
                 sample_img = renderer.get_ctk_image("📄", size=18)
 
-            ctk.CTkLabel(self.sample_text_container, text=" Sample Text:", image=sample_img, compound="left",
-                        font=get_ctk_font(13), **get_ctk_label_colors(self.colors)).pack(anchor="w", pady=(12, 8))
+            ctk.CTkLabel(
+                self.sample_text_container,
+                text=" Sample Text:",
+                image=sample_img,
+                compound="left",
+                font=get_ctk_font(13),
+                **get_ctk_label_colors(self.colors),
+            ).pack(anchor="w", pady=(12, 8))
             self.playground_sample_text = ctk.CTkTextbox(
-                self.sample_text_container, height=120, font=get_ctk_font(12),
-                **get_ctk_textbox_colors(self.colors)
+                self.sample_text_container, height=120, font=get_ctk_font(12), **get_ctk_textbox_colors(self.colors)
             )
         else:
-            tk.Label(self.sample_text_container, text="📄 Sample Text:", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w", pady=(10, 5))
+            tk.Label(
+                self.sample_text_container,
+                text="📄 Sample Text:",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(anchor="w", pady=(10, 5))
             self.playground_sample_text = tk.Text(
-                self.sample_text_container, height=5, font=("Segoe UI", 10),
-                bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
+                self.sample_text_container,
+                height=5,
+                font=("Segoe UI", 10),
+                bg=self.colors.input_bg,
+                fg=self.colors.fg,
+                wrap="word",
             )
         self.playground_sample_text.pack(fill="x", pady=(0, 10))
 
         # Bind sample text changes
         if self.use_ctk:
             self.playground_sample_text.insert("0.0", "The quick brown fox jumps over the lazy dog.")
-            self.playground_sample_text.bind('<KeyRelease>', lambda e: self._update_playground_preview())
+            self.playground_sample_text.bind("<KeyRelease>", lambda e: self._update_playground_preview())
         else:
             self.playground_sample_text.insert("1.0", "The quick brown fox jumps over the lazy dog.")
-            self.playground_sample_text.bind('<KeyRelease>', lambda e: self._update_playground_preview())
-
-
+            self.playground_sample_text.bind("<KeyRelease>", lambda e: self._update_playground_preview())
 
         # Standard API Settings container (hidden in TTS mode)
-        self.standard_api_container = ctk.CTkFrame(scroll_left, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_left, bg=self.colors.bg)
+        self.standard_api_container = (
+            ctk.CTkFrame(scroll_left, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(scroll_left, bg=self.colors.bg)
+        )
         self.standard_api_container.pack(fill="x")
 
         # API Settings section (below sample text)
         create_section_header(self.standard_api_container, "API Settings", self.colors, "⚙️")
 
-        api_frame = ctk.CTkFrame(self.standard_api_container, fg_color="transparent") if self.use_ctk else tk.Frame(self.standard_api_container, bg=self.colors.bg)
+        api_frame = (
+            ctk.CTkFrame(self.standard_api_container, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self.standard_api_container, bg=self.colors.bg)
+        )
         api_frame.pack(fill="x", pady=(0, 10))
 
         # Provider & Model
         if self.use_ctk:
-            ctk.CTkLabel(api_frame, text="Provider:", font=get_ctk_font(12), width=80, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                api_frame,
+                text="Provider:",
+                font=get_ctk_font(12),
+                width=80,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
             self.playground_provider_var = tk.StringVar(value="google")
             ctk.CTkComboBox(
-                api_frame, variable=self.playground_provider_var,
+                api_frame,
+                variable=self.playground_provider_var,
                 values=["google", "openrouter", "custom"],
-                width=130, height=32, state="readonly", font=get_ctk_font(12),
-                **get_ctk_combobox_colors(self.colors)
+                width=130,
+                height=32,
+                state="readonly",
+                font=get_ctk_font(12),
+                **get_ctk_combobox_colors(self.colors),
             ).pack(side="left", padx=(8, 15))
 
-            ctk.CTkLabel(api_frame, text="Model:", font=get_ctk_font(12), width=60, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                api_frame,
+                text="Model:",
+                font=get_ctk_font(12),
+                width=60,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
             self.playground_model_var = tk.StringVar()
             ctk.CTkEntry(
-                api_frame, textvariable=self.playground_model_var,
-                font=get_ctk_font(12), height=32, **get_ctk_entry_colors(self.colors)
+                api_frame,
+                textvariable=self.playground_model_var,
+                font=get_ctk_font(12),
+                height=32,
+                **get_ctk_entry_colors(self.colors),
             ).pack(side="left", padx=(8, 0), fill="x", expand=True)
         else:
             from tkinter import ttk
-            tk.Label(api_frame, text="Provider:", font=("Segoe UI", 9),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+
+            tk.Label(api_frame, text="Provider:", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.fg).pack(
+                side="left"
+            )
             self.playground_provider_var = tk.StringVar(value="google")
             ttk.Combobox(
-                api_frame, textvariable=self.playground_provider_var,
+                api_frame,
+                textvariable=self.playground_provider_var,
                 values=["google", "openrouter", "custom"],
-                state="readonly", width=12
+                state="readonly",
+                width=12,
             ).pack(side="left", padx=(5, 10))
 
-            tk.Label(api_frame, text="Model:", font=("Segoe UI", 9),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            tk.Label(api_frame, text="Model:", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.fg).pack(
+                side="left"
+            )
             self.playground_model_var = tk.StringVar()
             tk.Entry(
-                api_frame, textvariable=self.playground_model_var,
-                font=("Segoe UI", 9), bg=self.colors.input_bg, fg=self.colors.fg, width=15
+                api_frame,
+                textvariable=self.playground_model_var,
+                font=("Segoe UI", 9),
+                bg=self.colors.input_bg,
+                fg=self.colors.fg,
+                width=15,
             ).pack(side="left", padx=(5, 0), fill="x", expand=True)
 
         # Load defaults from active profile
         try:
             from .... import web_server as _ws
+
             default_provider = _ws.get_active_setting("provider", "google")
             self.playground_provider_var.set(default_provider)
             self.playground_model_var.set(_ws.get_active_setting("model", ""))
@@ -454,7 +701,11 @@ class PlaygroundTabMixin:
             pass
 
         # Test button
-        btn_frame = ctk.CTkFrame(self.standard_api_container, fg_color="transparent") if self.use_ctk else tk.Frame(self.standard_api_container, bg=self.colors.bg)
+        btn_frame = (
+            ctk.CTkFrame(self.standard_api_container, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self.standard_api_container, bg=self.colors.bg)
+        )
         btn_frame.pack(fill="x", pady=(10, 0))
 
         if self.use_ctk:
@@ -474,29 +725,46 @@ class PlaygroundTabMixin:
                 self.status_icons["loading"] = renderer.get_ctk_image("⏳", size=16)
                 self.status_icons["success"] = renderer.get_ctk_image("✅", size=16)
 
-            ctk.CTkButton(btn_frame, text=test_text, image=test_img,
-                         compound="left" if test_img else None,
-                         font=get_ctk_font(14),
-                         width=160, height=42, **get_ctk_button_colors(self.colors, "primary"),
-                         command=self._test_playground_with_api).pack(side="left", padx=(0, 15))
-            self.playground_test_status = ctk.CTkLabel(btn_frame, text="", font=get_ctk_font(12),
-                                                       text_color=self.colors.fg)
+            ctk.CTkButton(
+                btn_frame,
+                text=test_text,
+                image=test_img,
+                compound="left" if test_img else None,
+                font=get_ctk_font(14),
+                width=160,
+                height=42,
+                **get_ctk_button_colors(self.colors, "primary"),
+                command=self._test_playground_with_api,
+            ).pack(side="left", padx=(0, 15))
+            self.playground_test_status = ctk.CTkLabel(
+                btn_frame, text="", font=get_ctk_font(12), text_color=self.colors.fg
+            )
         else:
-            tk.Button(btn_frame, text="🧪 Test with API", font=("Segoe UI", 10),
-                     bg=self.colors.accent, fg=self.colors.accent_fg,
-                     command=self._test_playground_with_api).pack(side="left", padx=(0, 10))
-            self.playground_test_status = tk.Label(btn_frame, text="", font=("Segoe UI", 9),
-                                                   bg=self.colors.bg, fg=self.colors.fg)
+            tk.Button(
+                btn_frame,
+                text="🧪 Test with API",
+                font=("Segoe UI", 10),
+                bg=self.colors.accent,
+                fg=self.colors.accent_fg,
+                command=self._test_playground_with_api,
+            ).pack(side="left", padx=(0, 10))
+            self.playground_test_status = tk.Label(
+                btn_frame, text="", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.fg
+            )
         self.playground_test_status.pack(side="left")
 
         # TTS Playground container (hidden by default, shown only in TTS mode)
-        self.tts_playground_frame = ctk.CTkFrame(scroll_left, fg_color="transparent") if self.use_ctk else tk.Frame(scroll_left, bg=self.colors.bg)
+        self.tts_playground_frame = (
+            ctk.CTkFrame(scroll_left, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(scroll_left, bg=self.colors.bg)
+        )
         # Initially hidden - shown only when TTS mode is selected
         self._create_tts_playground_controls(self.tts_playground_frame)
 
         # TTS state initialization
-        self.tts_pg_audio_data = None   # WAV audio bytes
-        self.tts_pg_pcm_data = None     # PCM audio bytes
+        self.tts_pg_audio_data = None  # WAV audio bytes
+        self.tts_pg_pcm_data = None  # PCM audio bytes
         self.tts_pg_audio_duration = 0.0
         self.tts_pg_is_playing = False
         self.tts_pg_playback_position = 0.0
@@ -505,11 +773,17 @@ class PlaygroundTabMixin:
         self.tts_pg_recorder = None
 
         # Right panel: Preview
-        right_panel = ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
+        right_panel = (
+            ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
+        )
         right_panel.pack(side="left", fill="both", expand=True)
 
         # System prompt preview
-        sys_header = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
+        sys_header = (
+            ctk.CTkFrame(right_panel, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(right_panel, bg=self.colors.bg)
+        )
         sys_header.pack(fill="x", pady=(0, 5))
 
         if self.use_ctk:
@@ -517,7 +791,7 @@ class PlaygroundTabMixin:
             kwargs = {
                 "text": " System Prompt Preview",
                 "font": get_ctk_font(14, "bold"),
-                "text_color": self.colors.accent
+                "text_color": self.colors.accent,
             }
             if HAVE_EMOJI:
                 renderer = get_emoji_renderer()
@@ -527,34 +801,53 @@ class PlaygroundTabMixin:
                     kwargs["compound"] = "left"
 
             ctk.CTkLabel(sys_header, **kwargs).pack(side="left")
-            ctk.CTkButton(sys_header, text="Copy", font=get_ctk_font(12), width=80, height=30,
-                         **get_ctk_button_colors(self.colors, "secondary"),
-                         command=lambda: self._copy_preview("system")).pack(side="right")
+            ctk.CTkButton(
+                sys_header,
+                text="Copy",
+                font=get_ctk_font(12),
+                width=80,
+                height=30,
+                **get_ctk_button_colors(self.colors, "secondary"),
+                command=lambda: self._copy_preview("system"),
+            ).pack(side="right")
             self.playground_system_preview = ctk.CTkTextbox(
-                right_panel, font=get_ctk_font(12),
-                state="disabled", **get_ctk_textbox_colors(self.colors)
+                right_panel, font=get_ctk_font(12), state="disabled", **get_ctk_textbox_colors(self.colors)
             )
         else:
-            tk.Label(sys_header, text="📝 System Prompt Preview", font=("Segoe UI", 11, "bold"),
-                    bg=self.colors.bg, fg=self.colors.accent).pack(side="left")
-            tk.Button(sys_header, text="📋 Copy", font=("Segoe UI", 8),
-                     command=lambda: self._copy_preview("system")).pack(side="right")
+            tk.Label(
+                sys_header,
+                text="📝 System Prompt Preview",
+                font=("Segoe UI", 11, "bold"),
+                bg=self.colors.bg,
+                fg=self.colors.accent,
+            ).pack(side="left")
+            tk.Button(
+                sys_header, text="📋 Copy", font=("Segoe UI", 8), command=lambda: self._copy_preview("system")
+            ).pack(side="right")
             self.playground_system_preview = tk.Text(
-                right_panel, font=("Consolas", 10),
-                bg=self.colors.surface0, fg=self.colors.fg, wrap="word", state="disabled"
+                right_panel,
+                font=("Consolas", 10),
+                bg=self.colors.surface0,
+                fg=self.colors.fg,
+                wrap="word",
+                state="disabled",
             )
         self.playground_system_preview.pack(fill="both", expand=True, pady=(0, 10))
 
         # User message preview
-        user_header = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
+        user_header = (
+            ctk.CTkFrame(right_panel, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(right_panel, bg=self.colors.bg)
+        )
         user_header.pack(fill="x", pady=(0, 5))
 
         if self.use_ctk:
-             # Header with emoji image
+            # Header with emoji image
             kwargs = {
                 "text": " User Message Preview",
                 "font": get_ctk_font(14, "bold"),
-                "text_color": self.colors.accent
+                "text_color": self.colors.accent,
             }
             if HAVE_EMOJI:
                 renderer = get_emoji_renderer()
@@ -564,26 +857,45 @@ class PlaygroundTabMixin:
                     kwargs["compound"] = "left"
 
             ctk.CTkLabel(user_header, **kwargs).pack(side="left")
-            ctk.CTkButton(user_header, text="Copy", font=get_ctk_font(12), width=80, height=30,
-                         **get_ctk_button_colors(self.colors, "secondary"),
-                         command=lambda: self._copy_preview("user")).pack(side="right")
+            ctk.CTkButton(
+                user_header,
+                text="Copy",
+                font=get_ctk_font(12),
+                width=80,
+                height=30,
+                **get_ctk_button_colors(self.colors, "secondary"),
+                command=lambda: self._copy_preview("user"),
+            ).pack(side="right")
             self.playground_user_preview = ctk.CTkTextbox(
-                right_panel, font=get_ctk_font(12),
-                state="disabled", **get_ctk_textbox_colors(self.colors)
+                right_panel, font=get_ctk_font(12), state="disabled", **get_ctk_textbox_colors(self.colors)
             )
         else:
-            tk.Label(user_header, text="💬 User Message Preview", font=("Segoe UI", 11, "bold"),
-                    bg=self.colors.bg, fg=self.colors.accent).pack(side="left")
-            tk.Button(user_header, text="📋 Copy", font=("Segoe UI", 8),
-                     command=lambda: self._copy_preview("user")).pack(side="right")
+            tk.Label(
+                user_header,
+                text="💬 User Message Preview",
+                font=("Segoe UI", 11, "bold"),
+                bg=self.colors.bg,
+                fg=self.colors.accent,
+            ).pack(side="left")
+            tk.Button(
+                user_header, text="📋 Copy", font=("Segoe UI", 8), command=lambda: self._copy_preview("user")
+            ).pack(side="right")
             self.playground_user_preview = tk.Text(
-                right_panel, font=("Consolas", 10),
-                bg=self.colors.surface0, fg=self.colors.fg, wrap="word", state="disabled"
+                right_panel,
+                font=("Consolas", 10),
+                bg=self.colors.surface0,
+                fg=self.colors.fg,
+                wrap="word",
+                state="disabled",
             )
         self.playground_user_preview.pack(fill="both", expand=True)
 
         # Metadata Footer
-        meta_frame = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
+        meta_frame = (
+            ctk.CTkFrame(right_panel, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(right_panel, bg=self.colors.bg)
+        )
         meta_frame.pack(fill="x", pady=(10, 0))
 
         if self.use_ctk:
@@ -598,14 +910,15 @@ class PlaygroundTabMixin:
                 image=meta_img,
                 compound="left",
                 font=get_ctk_font(12),
-                text_color=self.colors.blockquote
+                text_color=self.colors.blockquote,
             )
         else:
             self.playground_meta_label = tk.Label(
                 meta_frame,
                 text="📊 Tokens: ~0 | Type: edit | Mode: Replace",
                 font=("Segoe UI", 9),
-                bg=self.colors.bg, fg=self.colors.blockquote
+                bg=self.colors.bg,
+                fg=self.colors.blockquote,
             )
         self.playground_meta_label.pack(anchor="w")
 
@@ -635,7 +948,7 @@ class PlaygroundTabMixin:
                 self.playground_action_combo.set("")
                 self.playground_action_var.set("")
         else:
-            self.playground_action_combo['values'] = actions
+            self.playground_action_combo["values"] = actions
             if actions:
                 self.playground_action_combo.current(0)
             else:
@@ -700,7 +1013,7 @@ class PlaygroundTabMixin:
         Matches logic in text_edit_tool.py _process_option.
         """
         # Guard: Playground tab may not be loaded yet (lazy loading)
-        if not hasattr(self, 'playground_mode_var'):
+        if not hasattr(self, "playground_mode_var"):
             return
 
         mode = self.playground_mode_var.get()
@@ -729,7 +1042,7 @@ class PlaygroundTabMixin:
 
         # Get base system prompt from action
         if self.current_action == action_name:
-             # Use live editor value
+            # Use live editor value
             if self.use_ctk:
                 sys_prompt = self.editor_widgets["system_prompt"].get("0.0", "end").strip()
             else:
@@ -763,10 +1076,14 @@ class PlaygroundTabMixin:
         task = ""
 
         if action_name == "_Custom" and custom_input:
-            template = self._get_current_setting(tool_key, "custom_task_template", "Apply the following change to the text: {custom_input}")
+            template = self._get_current_setting(
+                tool_key, "custom_task_template", "Apply the following change to the text: {custom_input}"
+            )
             task = template.format(custom_input=custom_input)
         elif action_name == "_Ask" and custom_input:
-            template = self._get_current_setting(tool_key, "ask_task_template", "Answer the following question about the text: {custom_input}")
+            template = self._get_current_setting(
+                tool_key, "ask_task_template", "Answer the following question about the text: {custom_input}"
+            )
             task = template.format(custom_input=custom_input)
         else:
             if self.current_action == action_name:
@@ -783,9 +1100,9 @@ class PlaygroundTabMixin:
 
         # Add output rules based on type
         if self.current_action == action_name:
-             prompt_type = self.editor_widgets["prompt_type_var"].get()
+            prompt_type = self.editor_widgets["prompt_type_var"].get()
         else:
-             prompt_type = action_data.get("prompt_type", "edit")
+            prompt_type = action_data.get("prompt_type", "edit")
 
         if prompt_type == "general":
             output_rules = self._get_current_setting(tool_key, "base_output_rules_general", "")
@@ -871,7 +1188,9 @@ class PlaygroundTabMixin:
             pyperclip.copy(content)
             if self.use_ctk:
                 ok_img = self.status_icons.get("success") if hasattr(self, "status_icons") else None
-                self.playground_test_status.configure(text=" Copied!", image=ok_img, compound="left", text_color=self.colors.accent_green)
+                self.playground_test_status.configure(
+                    text=" Copied!", image=ok_img, compound="left", text_color=self.colors.accent_green
+                )
             else:
                 self.playground_test_status.configure(text="✅ Copied!", fg=self.colors.accent_green)
             self.root.after(2000, lambda: self._clear_test_status())
@@ -885,9 +1204,7 @@ class PlaygroundTabMixin:
 
     def _select_playground_image(self):
         """Select an image file for playground testing."""
-        path = filedialog.askopenfilename(
-            filetypes=[("Images", "*.png;*.jpg;*.jpeg;*.webp")]
-        )
+        path = filedialog.askopenfilename(filetypes=[("Images", "*.png;*.jpg;*.jpeg;*.webp")])
         if path:
             self._load_playground_image(path)
 
@@ -898,12 +1215,13 @@ class PlaygroundTabMixin:
 
             img = ImageGrab.grabclipboard()
             if img:
-                if img.mode == 'RGBA':
-                    bg = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == "RGBA":
+                    bg = Image.new("RGB", img.size, (255, 255, 255))
                     bg.paste(img, mask=img.split()[3])
                     img = bg
 
                 from io import BytesIO
+
                 buffered = BytesIO()
                 img.save(buffered, format="JPEG")
                 img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
@@ -927,8 +1245,8 @@ class PlaygroundTabMixin:
             from PIL import Image
 
             img = Image.open(filepath)
-            if img.mode in ('RGBA', 'P'):
-                img = img.convert('RGB')
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
 
             buffered = BytesIO()
             img.save(buffered, format="JPEG")
@@ -946,7 +1264,7 @@ class PlaygroundTabMixin:
                 self.playground_image_base64 = base64.b64encode(img_bytes).decode("utf-8")
                 self.playground_image_mime = "image/jpeg"
                 self.playground_image_name = os.path.basename(filepath)
-                self._show_image_preview_text_only(os.path.basename(filepath), f"{len(img_bytes)//1024} KB")
+                self._show_image_preview_text_only(os.path.basename(filepath), f"{len(img_bytes) // 1024} KB")
                 self._update_playground_preview()
         except Exception as e:
             messagebox.showerror("Image Error", f"Failed to load image: {e}", parent=self.root)
@@ -960,6 +1278,7 @@ class PlaygroundTabMixin:
                 self.image_drop_zone._image = ctk_img  # Keep reference
             else:
                 from PIL import ImageTk
+
                 pil_image.thumbnail((100, 100))
                 tk_img = ImageTk.PhotoImage(pil_image)
                 self.image_drop_zone.configure(image=tk_img, text="")
@@ -980,8 +1299,8 @@ class PlaygroundTabMixin:
             # Restore camera icon
             self.image_drop_zone.configure(image=self.playground_camera_icon, text=" No image selected")
         else:
-            self.image_drop_zone.configure(image='', text="📷 No image selected")
-            if hasattr(self.image_drop_zone, 'image'):
+            self.image_drop_zone.configure(image="", text="📷 No image selected")
+            if hasattr(self.image_drop_zone, "image"):
                 self.image_drop_zone.image = None
         self._update_playground_preview()
 
@@ -992,9 +1311,9 @@ class PlaygroundTabMixin:
 
         try:
             from ...core import GUICoordinator
+
             GUICoordinator.get_instance().request_snip_overlay(
-                on_capture=self._on_playground_snip_image_captured,
-                on_cancel=self._on_playground_snip_image_cancelled
+                on_capture=self._on_playground_snip_image_captured, on_cancel=self._on_playground_snip_image_cancelled
             )
         except Exception as e:
             self.root.deiconify()
@@ -1023,6 +1342,7 @@ class PlaygroundTabMixin:
             from io import BytesIO
 
             from PIL import Image
+
             img_data = base64.b64decode(result.image_base64)
             pil_image = Image.open(BytesIO(img_data))
             self._show_image_preview(pil_image)
@@ -1035,7 +1355,9 @@ class PlaygroundTabMixin:
 
         # Update status
         if self.use_ctk:
-            self.playground_test_status.configure(text="✅ Image captured", image=None, text_color=self.colors.accent_green)
+            self.playground_test_status.configure(
+                text="✅ Image captured", image=None, text_color=self.colors.accent_green
+            )
         else:
             self.playground_test_status.configure(text="✅ Image captured", fg=self.colors.accent_green)
         self.root.after(2000, self._clear_test_status)
@@ -1057,7 +1379,9 @@ class PlaygroundTabMixin:
         """Handle snip cancellation."""
         self.root.deiconify()
         if self.use_ctk:
-            self.playground_test_status.configure(text="❌ Snipping cancelled", image=None, text_color=self.colors.surface2)
+            self.playground_test_status.configure(
+                text="❌ Snipping cancelled", image=None, text_color=self.colors.surface2
+            )
         else:
             self.playground_test_status.configure(text="❌ Snipping cancelled", fg=self.colors.surface2)
 
@@ -1066,8 +1390,7 @@ class PlaygroundTabMixin:
     def _select_playground_audio_file(self):
         """Open file dialog to upload an audio file."""
         file_path = filedialog.askopenfilename(
-            title="Select Audio File",
-            filetypes=[("Audio Files", "*.wav *.mp3 *.ogg *.m4a *.aac *.flac")]
+            title="Select Audio File", filetypes=[("Audio Files", "*.wav *.mp3 *.ogg *.m4a *.aac *.flac")]
         )
         if file_path:
             self._load_playground_audio(file_path)
@@ -1082,8 +1405,12 @@ class PlaygroundTabMixin:
 
             ext = os.path.splitext(filepath)[1].lower()
             mime_map = {
-                '.wav': "audio/wav", '.mp3': "audio/mp3", '.ogg': "audio/ogg",
-                '.m4a': "audio/m4a", '.aac': "audio/aac", '.flac': "audio/flac"
+                ".wav": "audio/wav",
+                ".mp3": "audio/mp3",
+                ".ogg": "audio/ogg",
+                ".m4a": "audio/m4a",
+                ".aac": "audio/aac",
+                ".flac": "audio/flac",
             }
             self.playground_audio_mime = mime_map.get(ext, "audio/wav")
 
@@ -1114,9 +1441,11 @@ class PlaygroundTabMixin:
             device_names = [d.get_display_name() for d in devices]
 
             if self.use_ctk:
-                self.playground_audio_device_combo.configure(values=device_names if device_names else ["(No devices found)"])
+                self.playground_audio_device_combo.configure(
+                    values=device_names if device_names else ["(No devices found)"]
+                )
             else:
-                self.playground_audio_device_combo['values'] = device_names if device_names else ["(No devices found)"]
+                self.playground_audio_device_combo["values"] = device_names if device_names else ["(No devices found)"]
 
             # Try to set default device
             if devices:
@@ -1139,14 +1468,14 @@ class PlaygroundTabMixin:
             if self.use_ctk:
                 self.playground_audio_device_combo.configure(values=["(Audio module not available)"])
             else:
-                self.playground_audio_device_combo['values'] = ["(Audio module not available)"]
+                self.playground_audio_device_combo["values"] = ["(Audio module not available)"]
             self.playground_audio_device_var.set("(Audio module not available)")
         except Exception as e:
             print(f"[PromptEditor] Error loading audio devices: {e}")
             if self.use_ctk:
                 self.playground_audio_device_combo.configure(values=[f"(Error: {str(e)[:30]})"])
             else:
-                self.playground_audio_device_combo['values'] = [f"(Error: {str(e)[:30]})"]
+                self.playground_audio_device_combo["values"] = [f"(Error: {str(e)[:30]})"]
 
     def _toggle_playground_recording(self):
         """Toggle audio recording on/off."""
@@ -1228,10 +1557,14 @@ class PlaygroundTabMixin:
             else:
                 if self.use_ctk:
                     self.playground_record_btn.configure(text="🔴 Record")
-                    self.playground_audio_status.configure(text="Recording failed - no audio data", text_color=self.colors.accent_red)
+                    self.playground_audio_status.configure(
+                        text="Recording failed - no audio data", text_color=self.colors.accent_red
+                    )
                 else:
                     self.playground_record_btn.configure(text="🔴 Record")
-                    self.playground_audio_status.configure(text="Recording failed - no audio data", fg=self.colors.accent_red)
+                    self.playground_audio_status.configure(
+                        text="Recording failed - no audio data", fg=self.colors.accent_red
+                    )
 
         except Exception as e:
             print(f"[PromptEditor] Error stopping recording: {e}")
@@ -1300,7 +1633,9 @@ class PlaygroundTabMixin:
         # Snip mode: Use existing image (don't auto-snip)
         if mode == "action_snip":
             if not self.playground_image_base64:
-                messagebox.showinfo("Image Required", "Please select or snip an image before testing.", parent=self.root)
+                messagebox.showinfo(
+                    "Image Required", "Please select or snip an image before testing.", parent=self.root
+                )
                 return
             # Proceed directly to test with existing image
             self._continue_snip_test()
@@ -1314,11 +1649,15 @@ class PlaygroundTabMixin:
         if self.use_ctk:
             try:
                 status_img = self.status_icons.get("loading") if hasattr(self, "status_icons") else None
-                self.playground_test_status.configure(text=" Sending request...", image=status_img, compound="left", text_color=self.colors.fg)
+                self.playground_test_status.configure(
+                    text=" Sending request...", image=status_img, compound="left", text_color=self.colors.fg
+                )
             except Exception:
-                 try:
-                    self.playground_test_status.configure(text="⏳ Sending request...", image=None, compound="left", text_color=self.colors.fg)
-                 except:
+                try:
+                    self.playground_test_status.configure(
+                        text="⏳ Sending request...", image=None, compound="left", text_color=self.colors.fg
+                    )
+                except:
                     pass
         else:
             self.playground_test_status.configure(text="⏳ Sending request...", fg=self.colors.fg)
@@ -1347,7 +1686,9 @@ class PlaygroundTabMixin:
         """Continue with API test after snip capture."""
         try:
             if self.use_ctk:
-                self.playground_test_status.configure(text="⏳ Sending request...", image=None, text_color=self.colors.fg)
+                self.playground_test_status.configure(
+                    text="⏳ Sending request...", image=None, text_color=self.colors.fg
+                )
             else:
                 self.playground_test_status.configure(text="⏳ Sending request...", fg=self.colors.fg)
             self.root.update()
@@ -1377,6 +1718,7 @@ class PlaygroundTabMixin:
             user_message = self.playground_user_preview.get("1.0", "end").strip()
 
         from ....messages import build_text_message
+
         messages = build_text_message(user_message, system_prompt)
 
         return self._get_request_config(messages)
@@ -1394,11 +1736,12 @@ class PlaygroundTabMixin:
             user_message = self.playground_user_preview.get("1.0", "end").strip()
 
         from ....messages import build_image_message
+
         messages = build_image_message(
             image_b64=self.playground_image_base64,
             mime_type=self.playground_image_mime,
             task=user_message,
-            system_prompt=system_prompt
+            system_prompt=system_prompt,
         )
 
         return self._get_request_config(messages)
@@ -1416,14 +1759,15 @@ class PlaygroundTabMixin:
             user_message = self.playground_user_preview.get("1.0", "end").strip()
 
         # Convert raw audio bytes to base64 string for the API
-        audio_b64 = base64.b64encode(self.playground_audio_data).decode('utf-8')
+        audio_b64 = base64.b64encode(self.playground_audio_data).decode("utf-8")
 
         from ....messages import build_audio_message
+
         messages = build_audio_message(
             audio_b64=audio_b64,
             mime_type=self.playground_audio_mime or "audio/wav",
             task=user_message,
-            system_prompt=system_prompt
+            system_prompt=system_prompt,
         )
 
         return self._get_request_config(messages)
@@ -1449,7 +1793,7 @@ class PlaygroundTabMixin:
             "model": model,
             "config": resolved.config,
             "ai_params": resolved.ai_params,
-            "key_managers": resolved.key_managers
+            "key_managers": resolved.key_managers,
         }
 
     def _run_streaming_test(self, params):
@@ -1493,12 +1837,16 @@ class PlaygroundTabMixin:
                 if ctx.error:
                     dialog.append_error(ctx.error)
 
-                final_usage = {
-                    "prompt_tokens": ctx.input_tokens,
-                    "completion_tokens": ctx.output_tokens,
-                    "total_tokens": ctx.total_tokens,
-                    "estimated": ctx.estimated,
-                } if ctx.input_tokens or ctx.output_tokens else (usage_data or None)
+                final_usage = (
+                    {
+                        "prompt_tokens": ctx.input_tokens,
+                        "completion_tokens": ctx.output_tokens,
+                        "total_tokens": ctx.total_tokens,
+                        "estimated": ctx.estimated,
+                    }
+                    if ctx.input_tokens or ctx.output_tokens
+                    else (usage_data or None)
+                )
                 dialog.mark_done(usage=final_usage)
 
                 # Update main window status
@@ -1516,7 +1864,9 @@ class PlaygroundTabMixin:
         renderer = get_emoji_renderer() if HAVE_EMOJI else None
         if self.use_ctk:
             ok_img = renderer.get_ctk_image("✅", size=16) if renderer else None
-            self.playground_test_status.configure(text=" Success!", image=ok_img, compound="left", text_color=self.colors.accent_green)
+            self.playground_test_status.configure(
+                text=" Success!", image=ok_img, compound="left", text_color=self.colors.accent_green
+            )
         else:
             self.playground_test_status.configure(text="✅ Success!", fg=self.colors.accent_green)
         self.root.after(3000, lambda: self._clear_test_status())
@@ -1524,9 +1874,9 @@ class PlaygroundTabMixin:
     def _update_status_error(self, error):
         """Update test button status to error."""
         if self.use_ctk:
-             self.playground_test_status.configure(text=f"❌ Error: {error[:30]}...", text_color=self.colors.accent_red)
+            self.playground_test_status.configure(text=f"❌ Error: {error[:30]}...", text_color=self.colors.accent_red)
         else:
-             self.playground_test_status.configure(text=f"❌ Error: {error[:30]}...", fg=self.colors.accent_red)
+            self.playground_test_status.configure(text=f"❌ Error: {error[:30]}...", fg=self.colors.accent_red)
 
     def _clear_test_status(self):
         """Clear the test status label."""

@@ -26,15 +26,10 @@ class TextEditToolApp:
     Coordinates hotkey listening, text handling, UI, and AI requests.
     """
 
-    def __init__(
-        self,
-        config: Dict,
-        ai_params: Dict,
-        key_managers: Dict
-    ):
+    def __init__(self, config: Dict, ai_params: Dict, key_managers: Dict):
         """
         Initialize the TextEditTool application.
-        
+
         Args:
             config: Main configuration dictionary
             ai_params: AI parameters dictionary
@@ -73,7 +68,7 @@ class TextEditToolApp:
         self.streaming_aborted = False
         self._abort_listener = None
 
-        logging.debug('TextEditToolApp initialized')
+        logging.debug("TextEditToolApp initialized")
 
     def _begin_task(self):
         """Increment active task counter (thread-safe)."""
@@ -93,14 +88,14 @@ class TextEditToolApp:
 
     def _get_setting(self, key: str, default=None):
         """Get a setting from the _settings section of options.
-        
+
         Reads live from PromptsConfig singleton - no stale snapshots.
         """
         return self.prompts.get_text_edit_setting(key, default)
 
     def _get_action_options(self) -> Dict:
         """Get action options (excluding _settings).
-        
+
         Reads live from PromptsConfig singleton - no stale snapshots.
         """
         return self.prompts.get_text_edit_actions()
@@ -108,23 +103,20 @@ class TextEditToolApp:
     def start(self):
         """Start the TextEditTool application."""
         if not self.enabled:
-            logging.info('TextEditTool is disabled')
+            logging.info("TextEditTool is disabled")
             return
 
-        logging.info(f'Starting TextEditTool with hotkey: {self.hotkey}')
+        logging.info(f"Starting TextEditTool with hotkey: {self.hotkey}")
 
         # Create and start hotkey listener
-        self.hotkey_listener = HotkeyListener(
-            shortcut=self.hotkey,
-            callback=self._on_hotkey_pressed
-        )
+        self.hotkey_listener = HotkeyListener(shortcut=self.hotkey, callback=self._on_hotkey_pressed)
         self.hotkey_listener.start()
 
         print(f"  ✅ TextEditTool: Hotkey '{self.hotkey}' registered")
 
     def stop(self):
         """Stop the TextEditTool application."""
-        logging.info('Stopping TextEditTool')
+        logging.info("Stopping TextEditTool")
 
         if self.hotkey_listener:
             self.hotkey_listener.stop()
@@ -144,7 +136,7 @@ class TextEditToolApp:
 
     def _on_hotkey_pressed(self):
         """Handle hotkey press event."""
-        logging.debug('Hotkey pressed')
+        logging.debug("Hotkey pressed")
 
         # Show popup immediately in a new thread
         # Multiple concurrent invocations are allowed - each operates independently
@@ -152,7 +144,7 @@ class TextEditToolApp:
 
     def _show_popup(self):
         """Show the appropriate popup window via GUICoordinator."""
-        logging.debug('Showing popup window via GUICoordinator')
+        logging.debug("Showing popup window via GUICoordinator")
 
         from .core import GUICoordinator
 
@@ -170,69 +162,63 @@ class TextEditToolApp:
                 on_close=self._on_popup_closed,
                 selected_text=selected_text,
                 on_tts=self._on_tts_requested,
-                on_request_compare_text=self._on_request_compare_text
+                on_request_compare_text=self._on_request_compare_text,
             )
         else:
             # No text selected - show simple input popup via coordinator
-            logging.debug('No text selected, showing input popup')
+            logging.debug("No text selected, showing input popup")
             GUICoordinator.get_instance().request_input_popup(
-                on_submit=self._on_direct_chat,
-                on_close=self._on_popup_closed,
-                on_tts=self._on_tts_requested
+                on_submit=self._on_direct_chat, on_close=self._on_popup_closed, on_tts=self._on_tts_requested
             )
 
     def _on_popup_closed(self):
         """Handle popup window close."""
-        logging.debug('Popup window closed')
+        logging.debug("Popup window closed")
         self.popup = None
 
     def _on_tts_requested(self, text: str):
         """Handle TTS request from popup.
-        
+
         Opens the TTS Window with the provided text for speech synthesis.
-        
+
         Args:
             text: Text to convert to speech (from input field or selected text)
         """
         logging.debug(f'TTS requested for text: "{text[:50]}..."')
 
         from .core import GUICoordinator
+
         GUICoordinator.get_instance().request_tts_window(
-            config=self.config,
-            ai_params=self.ai_params,
-            key_managers=self.key_managers,
-            initial_text=text
+            config=self.config, ai_params=self.ai_params, key_managers=self.key_managers, initial_text=text
         )
 
     def _on_direct_chat(self, user_input: str, response_mode: str = "default", profile_override: Optional[str] = None):
         """
         Handle direct chat input (no selected text).
-        
+
         Args:
             user_input: The user's chat input
             response_mode: Response mode ("default", "copy", "replace", or "show")
             profile_override: Optional model profile name to override for this request
         """
-        logging.debug(f'Direct chat input: {user_input[:50]}..., mode: {response_mode}, profile: {profile_override}')
+        logging.debug(f"Direct chat input: {user_input[:50]}..., mode: {response_mode}, profile: {profile_override}")
 
         self._begin_task()
 
         threading.Thread(
-            target=self._process_direct_chat,
-            args=(user_input, response_mode, profile_override),
-            daemon=True
+            target=self._process_direct_chat, args=(user_input, response_mode, profile_override), daemon=True
         ).start()
 
     def _on_request_compare_text(self, on_captured, on_cancelled):
         """
         Handle request for a second text selection (compare mode).
-        
+
         Shows a toast notification instructing the user to select text and
         press Ctrl+C. Listens for Ctrl+C via pynput, reads the clipboard
         after a short delay, then invokes on_captured/on_cancelled on the
         GUI thread (via GUICoordinator.run_on_gui_thread) to avoid the
         "main thread is not in main loop" Tkinter error.
-        
+
         Args:
             on_captured: Callable[[str], None] - called with the second text
             on_cancelled: Callable[[], None] - called if no text was captured
@@ -244,13 +230,13 @@ class TextEditToolApp:
 
         TIMEOUT_SECS = 20
 
-        logging.debug('[TextEditTool] Compare mode: waiting for Ctrl+C with second text...')
+        logging.debug("[TextEditTool] Compare mode: waiting for Ctrl+C with second text...")
 
         # Show user instruction via toast notification
         GUICoordinator.get_instance().request_toast_notification(
             title="Compare Mode — Select 2nd text",
             message=f"Select text, press Ctrl+C to confirm  •  Esc to cancel  •  ({TIMEOUT_SECS}s timeout)",
-            timeout_ms=TIMEOUT_SECS * 1000
+            timeout_ms=TIMEOUT_SECS * 1000,
         )
 
         captured = [False]
@@ -276,7 +262,7 @@ class TextEditToolApp:
                 print(f"[TextEditTool] Compare text captured ({len(text_or_none)} chars)")
                 GUICoordinator.get_instance().run_on_gui_thread(lambda: on_captured(text_or_none))
             else:
-                logging.debug('[TextEditTool] Compare mode: cancelled / timed out')
+                logging.debug("[TextEditTool] Compare mode: cancelled / timed out")
                 print("[TextEditTool] Compare mode: cancelled - no second text captured")
                 GUICoordinator.get_instance().run_on_gui_thread(on_cancelled)
 
@@ -284,7 +270,7 @@ class TextEditToolApp:
             try:
                 # Escape cancels the compare mode
                 if key == pykeyboard.Key.esc:
-                    logging.debug('[TextEditTool] Compare mode cancelled by Escape')
+                    logging.debug("[TextEditTool] Compare mode cancelled by Escape")
                     _finish(None)
                     return False  # Stop listener
 
@@ -295,7 +281,7 @@ class TextEditToolApp:
                 # Detect C key (char 'c' or control-char '\x03') while Ctrl held
                 is_c = False
                 try:
-                    if key.char in ('c', '\x03'):
+                    if key.char in ("c", "\x03"):
                         is_c = True
                 except AttributeError:
                     pass
@@ -313,7 +299,7 @@ class TextEditToolApp:
                     threading.Thread(target=_delayed_read, daemon=True).start()
                     return False  # Stop listener
             except Exception as e:
-                logging.error(f'[TextEditTool] Compare key listener error: {e}')
+                logging.error(f"[TextEditTool] Compare key listener error: {e}")
 
         def _on_release(key):
             if key in (pykeyboard.Key.ctrl_l, pykeyboard.Key.ctrl_r):
@@ -330,10 +316,19 @@ class TextEditToolApp:
 
         threading.Thread(target=_timeout, daemon=True).start()
 
-    def _on_option_selected(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None, profile_override: Optional[str] = None):
+    def _on_option_selected(
+        self,
+        option_key: str,
+        selected_text: str,
+        custom_input: Optional[str],
+        response_mode: str = "default",
+        active_modifiers: list = None,
+        compare_text: Optional[str] = None,
+        profile_override: Optional[str] = None,
+    ):
         """
         Handle option selection from popup.
-        
+
         Args:
             option_key: The selected option key
             selected_text: The selected text
@@ -346,20 +341,30 @@ class TextEditToolApp:
         if active_modifiers is None:
             active_modifiers = []
 
-        logging.debug(f'Option selected: {option_key}, mode: {response_mode}, modifiers: {active_modifiers}, compare={bool(compare_text)}, profile: {profile_override}')
+        logging.debug(
+            f"Option selected: {option_key}, mode: {response_mode}, modifiers: {active_modifiers}, compare={bool(compare_text)}, profile: {profile_override}"
+        )
 
         self._begin_task()
 
         threading.Thread(
             target=self._process_option,
-            args=(option_key, selected_text, custom_input, response_mode, active_modifiers, compare_text, profile_override),
-            daemon=True
+            args=(
+                option_key,
+                selected_text,
+                custom_input,
+                response_mode,
+                active_modifiers,
+                compare_text,
+                profile_override,
+            ),
+            daemon=True,
         ).start()
 
     def _call_api(self, messages, provider=None, model=None, on_chunk=None, origin_override=None, action_config=None):
         """
         Call the AI API with streaming support when enabled.
-        
+
         Args:
             messages: API messages
             provider: Optional provider override
@@ -389,14 +394,12 @@ class TextEditToolApp:
             provider=provider,
             model=model or resolved.model,
             streaming=streaming_enabled,
-            thinking_enabled=resolved.thinking_enabled
+            thinking_enabled=resolved.thinking_enabled,
         )
 
         if streaming_enabled:
             # Create a temporary session (uses current config, not stored provider/model)
-            session = ChatSession(
-                origin="textedit"
-            )
+            session = ChatSession(origin="textedit")
             # Add messages directly
             for msg in messages:
                 session.messages.append({"role": msg["role"], "content": msg["content"]})
@@ -413,18 +416,10 @@ class TextEditToolApp:
                 if not on_chunk:
                     print()  # Newline after streaming
 
-            callbacks = StreamCallback(
-                on_text=on_text,
-                on_done=on_done
-            )
+            callbacks = StreamCallback(on_text=on_text, on_done=on_done)
 
             ctx = RequestPipeline.execute_streaming(
-                ctx,
-                session,
-                resolved.config,
-                resolved.ai_params,
-                resolved.key_managers,
-                callbacks
+                ctx, session, resolved.config, resolved.ai_params, resolved.key_managers, callbacks
             )
 
             if self.cancel_requested:
@@ -434,11 +429,7 @@ class TextEditToolApp:
         else:
             # Non-streaming
             ctx = RequestPipeline.execute_simple(
-                ctx,
-                messages,
-                resolved.config,
-                resolved.ai_params,
-                resolved.key_managers
+                ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers
             )
 
             if self.cancel_requested:
@@ -467,6 +458,7 @@ class TextEditToolApp:
 
                 # Provide immediate visual feedback
                 from .core import dismiss_typing_indicator
+
                 dismiss_typing_indicator()
                 print("\n⚠️ Streaming aborted by user")
 
@@ -524,13 +516,13 @@ class TextEditToolApp:
         Used for STREAMING mode only - types character by character.
         Avoids clipboard to prevent filling clipboard managers.
         Uses configurable delay between characters for stability.
-        
+
         Newlines are sent as Shift+Enter to avoid triggering form submissions
         in applications like chat inputs, Discord, etc.
-        
+
         Args:
             text: Text to type
-            
+
         Returns:
             True if successful, False if aborted
         """
@@ -558,12 +550,12 @@ class TextEditToolApp:
                     return False
 
                 # Handle newlines with Shift+Enter to avoid form submissions
-                if char == '\n':
+                if char == "\n":
                     keyboard.press(pykeyboard.Key.shift)
                     keyboard.press(pykeyboard.Key.enter)
                     keyboard.release(pykeyboard.Key.enter)
                     keyboard.release(pykeyboard.Key.shift)
-                elif char == '\r':
+                elif char == "\r":
                     # Skip carriage return (Windows line endings)
                     continue
                 else:
@@ -586,13 +578,13 @@ class TextEditToolApp:
         """
         Paste text instantly using clipboard.
         Used for NON-STREAMING mode - pastes all text at once.
-        
+
         This is faster than character-by-character typing and provides
         a better user experience when streaming is disabled.
-        
+
         Args:
             text: The text to paste
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -612,7 +604,7 @@ class TextEditToolApp:
 
         try:
             # Clean and copy new text to clipboard
-            cleaned_text = text.rstrip('\n')
+            cleaned_text = text.rstrip("\n")
             pyperclip.copy(cleaned_text)
 
             # Small delay to ensure clipboard is updated
@@ -621,8 +613,8 @@ class TextEditToolApp:
             # Paste using Ctrl+V
             keyboard = pykeyboard.Controller()
             keyboard.press(pykeyboard.Key.ctrl)
-            keyboard.press('v')
-            keyboard.release('v')
+            keyboard.press("v")
+            keyboard.release("v")
             keyboard.release(pykeyboard.Key.ctrl)
 
             # Wait for paste to complete
@@ -631,7 +623,7 @@ class TextEditToolApp:
             # Restore original clipboard
             pyperclip.copy(clipboard_backup)
 
-            logging.debug(f'Pasted {len(cleaned_text)} chars instantly')
+            logging.debug(f"Pasted {len(cleaned_text)} chars instantly")
             return True
 
         except Exception as e:
@@ -646,13 +638,13 @@ class TextEditToolApp:
     def _resolve_followup_system_instruction(self, session_origin: str) -> str:
         """
         Resolve the system instruction for follow-up messages based on session origin.
-        
+
         When chat_use_origin_system_prompt is enabled, looks up the action's system_prompt
         from prompts.json. Otherwise falls back to chat_window_system_instruction.
-        
+
         Args:
             session_origin: The session origin string (e.g., "textedit:Explain", "directchat")
-            
+
         Returns:
             The resolved system instruction string
         """
@@ -668,7 +660,7 @@ class TextEditToolApp:
 
     def _copy_to_clipboard_with_notification(self, messages, action_key="AI Response", action_config=None):
         """Execute non-streaming request, copy result to clipboard, show notification.
-        
+
         Args:
             messages: API messages to send
             action_key: Label for logging and notification
@@ -686,21 +678,18 @@ class TextEditToolApp:
             provider=resolved.provider,
             model=resolved.model,
             streaming=False,  # Must be non-streaming for copy mode
-            thinking_enabled=resolved.thinking_enabled
+            thinking_enabled=resolved.thinking_enabled,
         )
 
-        ctx = RequestPipeline.execute_simple(
-            ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers
-        )
+        ctx = RequestPipeline.execute_simple(ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers)
 
         if ctx.error:
-            logging.error(f'Copy mode request failed: {ctx.error}')
+            logging.error(f"Copy mode request failed: {ctx.error}")
             print(f"  [Error] {ctx.error}")
             from .popups import show_error_popup
+
             show_error_popup(
-                title="API Request Failed",
-                message="Failed to get AI response for copy.",
-                details=ctx.error
+                title="API Request Failed", message="Failed to get AI response for copy.", details=ctx.error
             )
             return
 
@@ -711,13 +700,14 @@ class TextEditToolApp:
 
                 # Play sound
                 from ..utils import play_sound
+
                 play_sound("assets/snip.wav")
 
                 # Show toast notification
                 from .core import GUICoordinator
+
                 GUICoordinator.get_instance().request_toast_notification(
-                    title=f"{action_key}",
-                    message=ctx.response_text
+                    title=f"{action_key}", message=ctx.response_text
                 )
 
                 print(f"  \u2705 Copied to clipboard ({len(ctx.response_text)} chars)")
@@ -725,10 +715,12 @@ class TextEditToolApp:
                 logging.error(f"Failed to copy to clipboard: {e}")
                 print(f"  [Error] Failed to copy: {e}")
 
-    def _process_direct_chat(self, user_input: str, response_mode: str = "default", profile_override: Optional[str] = None):
+    def _process_direct_chat(
+        self, user_input: str, response_mode: str = "default", profile_override: Optional[str] = None
+    ):
         """
         Process direct chat input.
-        
+
         Args:
             user_input: The user's chat input
             response_mode: Response mode ("default", "copy", "replace", or "show")
@@ -743,10 +735,7 @@ class TextEditToolApp:
             from ..messages import build_text_message
 
             # Get system instruction from settings
-            chat_system_instruction = self._get_setting(
-                "chat_system_instruction",
-                "You are a helpful AI assistant."
-            )
+            chat_system_instruction = self._get_setting("chat_system_instruction", "You are a helpful AI assistant.")
 
             messages = build_text_message(user_input, chat_system_instruction)
 
@@ -778,18 +767,19 @@ class TextEditToolApp:
 
             if response_mode == "copy":
                 # Copy mode: non-streaming request, copy result to clipboard
-                print(f"\n{'\u2500'*60}")
+                print(f"\n{'\u2500' * 60}")
                 print("[AI Response] Copying to clipboard...")
 
                 self._copy_to_clipboard_with_notification(messages, action_key="AI Chat", action_config=action_config)
 
-                print(f"{'\u2500'*60}\n")
+                print(f"{'\u2500' * 60}\n")
             elif show_gui:
                 # Stream directly into chat window for real-time display
                 from .. import web_server as _ws
+
                 streaming_enabled = _ws.get_active_setting("streaming", True)
 
-                print(f"\n{'─'*60}")
+                print(f"\n{'─' * 60}")
                 print(f"[AI Response] Opening chat window{'...' if streaming_enabled else ' (non-streaming)...'}")
 
                 from ..request_pipeline import RequestOrigin
@@ -801,21 +791,24 @@ class TextEditToolApp:
                         window_title="AI Chat",
                         origin=RequestOrigin.POPUP_INPUT,
                         session_origin=session_origin,
-                        followup_system_instruction=followup_system_instruction
+                        followup_system_instruction=followup_system_instruction,
                     )
                 else:
                     # Non-streaming: wait for response, then show window
-                    response, error = self._call_api(messages, origin_override=RequestOrigin.POPUP_INPUT, action_config=action_config)
+                    response, error = self._call_api(
+                        messages, origin_override=RequestOrigin.POPUP_INPUT, action_config=action_config
+                    )
 
                     if error:
-                        logging.error(f'Direct chat failed: {error}')
+                        logging.error(f"Direct chat failed: {error}")
                         print(f"  [Error] {error}")
 
                         from .popups import show_error_popup
+
                         show_error_popup(
                             title="API Request Failed",
                             message="Failed to get response from AI provider.",
-                            details=error
+                            details=error,
                         )
                         return
 
@@ -825,13 +818,14 @@ class TextEditToolApp:
                             response=response,
                             window_title="AI Chat",
                             session_origin=session_origin,
-                            followup_system_instruction=followup_system_instruction
+                            followup_system_instruction=followup_system_instruction,
                         )
 
-                print(f"{'─'*60}\n")
+                print(f"{'─' * 60}\n")
             else:
                 # Replace mode: type response to active field
                 from .. import web_server as _ws
+
                 streaming_enabled = _ws.get_active_setting("streaming", True)
 
                 if streaming_enabled:
@@ -840,6 +834,7 @@ class TextEditToolApp:
                     # Start abort listener and typing indicator
                     self._start_abort_listener()
                     from .core import dismiss_typing_indicator, show_typing_indicator
+
                     show_typing_indicator(self.abort_hotkey)
 
                     # Buffer to accumulate chunks before typing (helps with Unicode)
@@ -861,7 +856,7 @@ class TextEditToolApp:
 
                         # Type when buffer reaches minimum size
                         if buffer_size >= MIN_BUFFER_CHARS:
-                            text_to_type = ''.join(chunk_buffer)
+                            text_to_type = "".join(chunk_buffer)
                             chunk_buffer.clear()
                             buffer_size = 0
                             if not self._type_text_chunk(text_to_type):
@@ -869,11 +864,17 @@ class TextEditToolApp:
 
                     try:
                         from ..request_pipeline import RequestOrigin
-                        response, error = self._call_api(messages, on_chunk=type_chunk, origin_override=RequestOrigin.POPUP_INPUT, action_config=action_config)
+
+                        response, error = self._call_api(
+                            messages,
+                            on_chunk=type_chunk,
+                            origin_override=RequestOrigin.POPUP_INPUT,
+                            action_config=action_config,
+                        )
 
                         # Type any remaining buffered text (unless aborted)
                         if chunk_buffer and not self.streaming_aborted and not typing_aborted:
-                            self._type_text_chunk(''.join(chunk_buffer))
+                            self._type_text_chunk("".join(chunk_buffer))
                     finally:
                         # Always clean up abort listener and indicator
                         self._stop_abort_listener()
@@ -884,7 +885,10 @@ class TextEditToolApp:
                 else:
                     # Non-streaming: get full response then paste instantly
                     from ..request_pipeline import RequestOrigin
-                    response, error = self._call_api(messages, origin_override=RequestOrigin.POPUP_INPUT, action_config=action_config)
+
+                    response, error = self._call_api(
+                        messages, origin_override=RequestOrigin.POPUP_INPUT, action_config=action_config
+                    )
 
                     # Paste the full response instantly using clipboard
                     if response and not error:
@@ -892,15 +896,14 @@ class TextEditToolApp:
                         self._paste_text_instant(response)
 
                 if error:
-                    logging.error(f'Direct chat failed: {error}')
+                    logging.error(f"Direct chat failed: {error}")
                     print(f"  [Error] {error}")
 
                     # Show error popup to user
                     from .popups import show_error_popup
+
                     show_error_popup(
-                        title="API Request Failed",
-                        message="Failed to get response from AI provider.",
-                        details=error
+                        title="API Request Failed", message="Failed to get response from AI provider.", details=error
                     )
                     return
 
@@ -910,14 +913,23 @@ class TextEditToolApp:
                     print(f"✅ Response pasted ({len(response) if response else 0} chars)")
 
         except Exception as e:
-            logging.error(f'Error in direct chat: {e}')
+            logging.error(f"Error in direct chat: {e}")
         finally:
             self._end_task()
 
-    def _process_option(self, option_key: str, selected_text: str, custom_input: Optional[str], response_mode: str = "default", active_modifiers: list = None, compare_text: Optional[str] = None, profile_override: Optional[str] = None):
+    def _process_option(
+        self,
+        option_key: str,
+        selected_text: str,
+        custom_input: Optional[str],
+        response_mode: str = "default",
+        active_modifiers: list = None,
+        compare_text: Optional[str] = None,
+        profile_override: Optional[str] = None,
+    ):
         """
         Process the selected option.
-        
+
         Args:
             option_key: The selected option key (including "Custom" and "_Ask")
             selected_text: The selected text
@@ -925,13 +937,13 @@ class TextEditToolApp:
             response_mode: Response mode ("default", "copy", "replace", or "show")
             active_modifiers: List of active modifier keys
             compare_text: Optional second text for compare mode
-        
+
         Display Mode Override Hierarchy:
             1. response_mode from popup radio button (if not "default")
             2. Modifiers with forces_chat_window=true
             3. show_chat_window_instead_of_replace per-action setting
             4. Falls back to False (replace mode)
-        
+
         Prompt Structure (single text):
             SYSTEM: {system_prompt}
                     {modifier_injections}
@@ -940,10 +952,10 @@ class TextEditToolApp:
                    {text_delimiter}
                    {selected_text}
                    {text_delimiter_close}
-        
+
         Prompt Structure (compare mode):
             Uses build_text_comparison_message() with both texts.
-        
+
         Both "Custom" and "_Ask" use the same pattern:
             - Get action options from config (system_prompt, prompt_type, show_chat_window_instead_of_replace)
             - Use task template with {custom_input} placeholder
@@ -967,6 +979,7 @@ class TextEditToolApp:
 
             # Resolve profile early for streaming_enabled checks
             from ..profile_resolver import resolve_profile
+
             resolved = resolve_profile(option, self.config, self.ai_params, self.key_managers)
             # Get modifier definitions from global settings
             modifier_defs = self.prompts.get_modifiers()
@@ -1020,16 +1033,14 @@ class TextEditToolApp:
             # Handle _Custom action - use custom_task_template
             if option_key == "_Custom" and custom_input:
                 custom_task_template = self._get_setting(
-                    "custom_task_template",
-                    "Apply the following change to the text: {custom_input}"
+                    "custom_task_template", "Apply the following change to the text: {custom_input}"
                 )
                 task = custom_task_template.format(custom_input=custom_input)
 
             # Handle _Ask action - use ask_task_template (same pattern as Custom)
             elif option_key == "_Ask" and custom_input:
                 ask_task_template = self._get_setting(
-                    "ask_task_template",
-                    "Answer the following question about the text: {custom_input}"
+                    "ask_task_template", "Answer the following question about the text: {custom_input}"
                 )
                 task = ask_task_template.format(custom_input=custom_input)
 
@@ -1043,13 +1054,12 @@ class TextEditToolApp:
                     task_with_rules = task + "\n\n" + base_output_rules
 
                 messages = build_text_comparison_message(
-                    text1=selected_text,
-                    text2=compare_text,
-                    task=task_with_rules,
-                    system_prompt=system_prompt
+                    text1=selected_text, text2=compare_text, task=task_with_rules, system_prompt=system_prompt
                 )
 
-                logging.debug(f'[TextEditTool] Compare mode: {option_key} on {len(selected_text)}+{len(compare_text)} chars')
+                logging.debug(
+                    f"[TextEditTool] Compare mode: {option_key} on {len(selected_text)}+{len(compare_text)} chars"
+                )
                 print(f"[TextEditTool] Compare mode: {len(selected_text)} vs {len(compare_text)} chars")
             else:
                 # Build user message: task + output rules + delimiter + text
@@ -1063,9 +1073,10 @@ class TextEditToolApp:
                 user_message += text_delimiter + selected_text + text_delimiter_close
 
                 from ..messages import build_text_message
+
                 messages = build_text_message(user_message, system_prompt)
 
-            logging.debug(f'Getting AI response for {option_key}')
+            logging.debug(f"Getting AI response for {option_key}")
 
             from ..request_pipeline import RequestOrigin
 
@@ -1077,17 +1088,17 @@ class TextEditToolApp:
 
             if response_mode == "copy":
                 # Copy mode: non-streaming request, copy result to clipboard
-                print(f"\n{'\u2500'*60}")
+                print(f"\n{'\u2500' * 60}")
                 print("[AI Response] Copying to clipboard...")
 
                 self._copy_to_clipboard_with_notification(messages, action_key=option_key, action_config=option)
 
-                print(f"{'\u2500'*60}\n")
+                print(f"{'\u2500' * 60}\n")
             elif show_in_chat_window:
                 # Stream directly into chat window for real-time display
                 streaming_enabled = resolved.config.get("streaming_enabled", True)
 
-                print(f"\n{'─'*60}")
+                print(f"\n{'─' * 60}")
                 print(f"[AI Response] Opening chat window{'...' if streaming_enabled else ' (non-streaming)...'}")
 
                 if streaming_enabled:
@@ -1097,26 +1108,27 @@ class TextEditToolApp:
                         window_title=f"{option_key} Result",
                         origin=RequestOrigin.POPUP_PROMPT,
                         session_origin=session_origin,
-                        followup_system_instruction=followup_system_instruction
+                        followup_system_instruction=followup_system_instruction,
                     )
                 else:
                     # Non-streaming: wait for response, then show window
-                    response, error = self._call_api(messages, origin_override=RequestOrigin.POPUP_PROMPT, action_config=option)
+                    response, error = self._call_api(
+                        messages, origin_override=RequestOrigin.POPUP_PROMPT, action_config=option
+                    )
 
                     if error:
-                        logging.error(f'Option processing failed: {error}')
+                        logging.error(f"Option processing failed: {error}")
                         print(f"  [Error] {error}")
 
                         from .popups import show_error_popup
+
                         show_error_popup(
-                            title=f"'{option_key}' Failed",
-                            message="Failed to process your request.",
-                            details=error
+                            title=f"'{option_key}' Failed", message="Failed to process your request.", details=error
                         )
                         return
 
                     if not response:
-                        logging.error('No response from AI')
+                        logging.error("No response from AI")
                         return
 
                     # Show chat window with response
@@ -1125,10 +1137,10 @@ class TextEditToolApp:
                         response=response,
                         window_title=f"{option_key} Result",
                         session_origin=session_origin,
-                        followup_system_instruction=followup_system_instruction
+                        followup_system_instruction=followup_system_instruction,
                     )
 
-                print(f"{'─'*60}\n")
+                print(f"{'─' * 60}\n")
             else:
                 # Replace mode: type response to active field (same as direct chat)
                 streaming_enabled = resolved.config.get("streaming_enabled", True)
@@ -1139,6 +1151,7 @@ class TextEditToolApp:
                     # Start abort listener and typing indicator
                     self._start_abort_listener()
                     from .core import dismiss_typing_indicator, show_typing_indicator
+
                     show_typing_indicator(self.abort_hotkey)
 
                     # Buffer to accumulate chunks before typing (helps with Unicode)
@@ -1160,18 +1173,23 @@ class TextEditToolApp:
 
                         # Type when buffer reaches minimum size
                         if buffer_size >= MIN_BUFFER_CHARS:
-                            text_to_type = ''.join(chunk_buffer)
+                            text_to_type = "".join(chunk_buffer)
                             chunk_buffer.clear()
                             buffer_size = 0
                             if not self._type_text_chunk(text_to_type):
                                 typing_aborted = True
 
                     try:
-                        response, error = self._call_api(messages, on_chunk=type_chunk, origin_override=RequestOrigin.POPUP_PROMPT, action_config=option)
+                        response, error = self._call_api(
+                            messages,
+                            on_chunk=type_chunk,
+                            origin_override=RequestOrigin.POPUP_PROMPT,
+                            action_config=option,
+                        )
 
                         # Type any remaining buffered text (unless aborted)
                         if chunk_buffer and not self.streaming_aborted and not typing_aborted:
-                            self._type_text_chunk(''.join(chunk_buffer))
+                            self._type_text_chunk("".join(chunk_buffer))
                     finally:
                         # Always clean up abort listener and indicator
                         self._stop_abort_listener()
@@ -1181,7 +1199,9 @@ class TextEditToolApp:
                     # so we don't need to show it again here
                 else:
                     # Non-streaming: get full response then paste instantly
-                    response, error = self._call_api(messages, origin_override=RequestOrigin.POPUP_PROMPT, action_config=option)
+                    response, error = self._call_api(
+                        messages, origin_override=RequestOrigin.POPUP_PROMPT, action_config=option
+                    )
 
                     # Paste the full response instantly using clipboard
                     if response and not error:
@@ -1189,20 +1209,19 @@ class TextEditToolApp:
                         self._paste_text_instant(response)
 
                 if error:
-                    logging.error(f'Option processing failed: {error}')
+                    logging.error(f"Option processing failed: {error}")
                     print(f"  [Error] {error}")
 
                     # Show error popup to user
                     from .popups import show_error_popup
+
                     show_error_popup(
-                        title=f"'{option_key}' Failed",
-                        message="Failed to process your request.",
-                        details=error
+                        title=f"'{option_key}' Failed", message="Failed to process your request.", details=error
                     )
                     return
 
                 if not response:
-                    logging.error('No response from AI')
+                    logging.error("No response from AI")
                     return
 
                 if streaming_enabled and not self.streaming_aborted:
@@ -1211,18 +1230,18 @@ class TextEditToolApp:
                     print(f"✅ Response pasted ({len(response) if response else 0} chars)")
 
         except Exception as e:
-            logging.error(f'Error processing option: {e}')
+            logging.error(f"Error processing option: {e}")
         finally:
             self._end_task()
 
     def _build_modifier_injections(self, active_modifiers: list, modifier_defs: list) -> str:
         """
         Build modifier injection text to append to system prompt.
-        
+
         Args:
             active_modifiers: List of active modifier keys
             modifier_defs: List of modifier definitions from settings
-            
+
         Returns:
             Combined injection text from all active modifiers
         """
@@ -1238,11 +1257,11 @@ class TextEditToolApp:
     def _modifiers_force_chat_window(self, active_modifiers: list, modifier_defs: list) -> bool:
         """
         Check if any active modifier forces chat window display.
-        
+
         Args:
             active_modifiers: List of active modifier keys
             modifier_defs: List of modifier definitions from settings
-            
+
         Returns:
             True if any active modifier has forces_chat_window=True
         """
@@ -1255,13 +1274,13 @@ class TextEditToolApp:
     def _extract_user_content_from_messages(self, messages: list) -> str:
         """
         Extract user text content from API messages.
-        
+
         Handles both string and multimodal (list) content formats.
         Preserves proper formatting for compare mode (<text_1>, <text_2> tags).
-        
+
         Args:
             messages: API messages list (messages[0] is system, messages[1] is user)
-            
+
         Returns:
             Extracted user text content
         """
@@ -1276,12 +1295,17 @@ class TextEditToolApp:
                 return user_content
         return ""
 
-    def _stream_to_chat_window(self, messages: list, window_title: str,
-                                origin, session_origin: str = "textedit",
-                                followup_system_instruction: Optional[str] = None):
+    def _stream_to_chat_window(
+        self,
+        messages: list,
+        window_title: str,
+        origin,
+        session_origin: str = "textedit",
+        followup_system_instruction: Optional[str] = None,
+    ):
         """
         Open a chat window immediately and stream API response into it.
-        
+
         Args:
             messages: API messages to send (with the correct system prompt for initial request)
             window_title: Title for the chat window
@@ -1298,7 +1322,7 @@ class TextEditToolApp:
         session.title = window_title
 
         # Carry over profile override to the chat session
-        action_config = getattr(self, '_current_action_config', None)
+        action_config = getattr(self, "_current_action_config", None)
         if action_config and action_config.get("connection_profile"):
             session.profile_override = action_config["connection_profile"]
 
@@ -1331,9 +1355,9 @@ class TextEditToolApp:
 
         # Resolve profile from action_config if available
         from ..profile_resolver import resolve_profile
+
         resolved = resolve_profile(
-            getattr(self, '_current_action_config', None),
-            self.config, self.ai_params, self.key_managers
+            getattr(self, "_current_action_config", None), self.config, self.ai_params, self.key_managers
         )
 
         provider = resolved.provider
@@ -1344,7 +1368,7 @@ class TextEditToolApp:
             provider=provider,
             model=resolved.model,
             streaming=True,
-            thinking_enabled=resolved.thinking_enabled
+            thinking_enabled=resolved.thinking_enabled,
         )
 
         # Stream callbacks
@@ -1362,11 +1386,7 @@ class TextEditToolApp:
             if callbacks.on_done:
                 callbacks.on_done()
 
-        stream_callbacks = StreamCallback(
-            on_text=on_text,
-            on_thinking=on_thinking,
-            on_done=on_done
-        )
+        stream_callbacks = StreamCallback(on_text=on_text, on_thinking=on_thinking, on_done=on_done)
 
         # Execute streaming request using execute_unified_stream
         # This takes messages directly (with correct system prompt), not from session
@@ -1376,18 +1396,17 @@ class TextEditToolApp:
             resolved.config,
             resolved.ai_params,
             resolved.key_managers,
-            stream_callbacks
+            stream_callbacks,
         )
 
         if ctx.error:
-            logging.error(f'Streaming to chat window failed: {ctx.error}')
+            logging.error(f"Streaming to chat window failed: {ctx.error}")
             print(f"  [Error] {ctx.error}")
 
             from .popups import show_error_popup
+
             show_error_popup(
-                title="Request Failed",
-                message="Failed to get response from AI provider.",
-                details=ctx.error
+                title="Request Failed", message="Failed to get response from AI provider.", details=ctx.error
             )
             return
 
@@ -1399,8 +1418,8 @@ class TextEditToolApp:
             session.system_instruction = self.prompts.get_chat_window_system_instruction()
 
         # Finalize: add the complete message to session
-        response_text = ''.join(full_response) or ctx.response_text or ""
-        thinking_text = ''.join(full_thinking) or ctx.reasoning_text or ""
+        response_text = "".join(full_response) or ctx.response_text or ""
+        thinking_text = "".join(full_thinking) or ctx.reasoning_text or ""
 
         callbacks.finalize(response_text, thinking_text)
 
@@ -1410,12 +1429,17 @@ class TextEditToolApp:
 
         print(f"  ✅ Response streamed to chat window ({len(response_text)} chars)")
 
-    def _show_chat_window(self, messages: list, response: str, window_title: str,
-                          session_origin: str = "textedit",
-                          followup_system_instruction: Optional[str] = None):
+    def _show_chat_window(
+        self,
+        messages: list,
+        response: str,
+        window_title: str,
+        session_origin: str = "textedit",
+        followup_system_instruction: Optional[str] = None,
+    ):
         """
         Show the response in a chat window (non-streaming path).
-        
+
         Args:
             messages: API messages (with the correct system prompt)
             response: AI response text
@@ -1423,7 +1447,7 @@ class TextEditToolApp:
             session_origin: Origin string for session tracking (e.g., "textedit:Explain")
             followup_system_instruction: System instruction to use for follow-up messages.
         """
-        logging.debug('Showing chat window')
+        logging.debug("Showing chat window")
 
         # Import here to avoid circular dependency
         from ..session_manager import ChatSession
@@ -1434,7 +1458,7 @@ class TextEditToolApp:
         session.title = window_title
 
         # Carry over profile override to the chat session
-        action_config = getattr(self, '_current_action_config', None)
+        action_config = getattr(self, "_current_action_config", None)
         if action_config and action_config.get("connection_profile"):
             session.profile_override = action_config["connection_profile"]
 
@@ -1475,6 +1499,7 @@ class TextEditToolApp:
         if should_save:
             # Avoid circular import
             from ..session_manager import add_session
+
             add_session(session, self.config.get("max_sessions", 200))
             logging.debug(f"Auto-saved session {session.session_id} (mode: {auto_save})")
 
@@ -1493,8 +1518,7 @@ class TextEditToolApp:
         """
         # Check active flag OR if we just copied in the last 200ms
         # This prevents race conditions where the thread finishes faster than the signal handler fires
-        return (self.text_handler.is_copying or
-                (time.time() - self.text_handler.last_copy_time < 0.2))
+        return self.text_handler.is_copying or (time.time() - self.text_handler.last_copy_time < 0.2)
 
     def get_status(self) -> Dict:
         """Get current status."""
@@ -1503,14 +1527,14 @@ class TextEditToolApp:
             "running": self.is_running(),
             "paused": self.is_paused(),
             "hotkey": self.hotkey,
-            "processing": self.is_processing
+            "processing": self.is_processing,
         }
 
     def reload_options(self):
         """
         Reload options from file without restart.
         This is called when the prompt editor saves changes.
-        
+
         Note: Since we now read live from PromptsConfig singleton (like SnipTool),
         this just ensures the singleton is refreshed. All subsequent reads via
         _get_setting() and _get_action_options() will automatically return fresh data.

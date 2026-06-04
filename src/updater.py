@@ -41,14 +41,15 @@ RELEASES_URL = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
 @dataclass
 class UpdateInfo:
     """Information about an available update."""
-    version: str           # e.g. "5.5.0"
-    tag_name: str          # e.g. "v5.5.0"
-    download_url: str      # Asset browser_download_url
-    asset_size: int        # Expected file size in bytes
-    asset_name: str        # Filename of the asset
-    release_notes: str     # Release body markdown
-    release_url: str       # HTML URL to release page
-    published_at: str      # ISO timestamp
+
+    version: str  # e.g. "5.5.0"
+    tag_name: str  # e.g. "v5.5.0"
+    download_url: str  # Asset browser_download_url
+    asset_size: int  # Expected file size in bytes
+    asset_name: str  # Filename of the asset
+    release_notes: str  # Release body markdown
+    release_url: str  # HTML URL to release page
+    published_at: str  # ISO timestamp
 
 
 # ─── Module State ──────────────────────────────────────────────────────────────
@@ -226,8 +227,7 @@ def check_for_update() -> Optional[UpdateInfo]:
 
 
 def download_update(
-    update_info: UpdateInfo,
-    progress_callback: Optional[Callable[[int, int], None]] = None
+    update_info: UpdateInfo, progress_callback: Optional[Callable[[int, int], None]] = None
 ) -> Optional[str]:
     """
     Download the update zip file.
@@ -278,8 +278,7 @@ def download_update(
         actual_size = os.path.getsize(zip_path)
         if update_info.asset_size > 0 and actual_size != update_info.asset_size:
             print_warning(
-                f"Download size mismatch: expected {update_info.asset_size}, "
-                f"got {actual_size}. File may be corrupted."
+                f"Download size mismatch: expected {update_info.asset_size}, got {actual_size}. File may be corrupted."
             )
             # Don't fail — size from GitHub API can sometimes be approximate
 
@@ -551,6 +550,7 @@ def background_update_check(config: dict):
 
     def _check():
         import time
+
         # Delay to prevent import lock and GIL contention from blocking tray initialization
         time.sleep(3)
         try:
@@ -561,11 +561,13 @@ def background_update_check(config: dict):
                 # Show the GUI popup if GUI is available and we are not in terminal mode
                 try:
                     from .gui.core import HAVE_GUI, GUICoordinator
+
                     if HAVE_GUI:
                         coordinator = GUICoordinator.get_instance()
 
                         def _show_update_dialog():
                             from .gui.windows.update_dialogs import show_update_available_dialog
+
                             show_update_available_dialog(info, __version__)
 
                         coordinator.run_on_gui_thread(_show_update_dialog)
@@ -582,8 +584,7 @@ def _print_update_notification(info: UpdateInfo):
     if HAVE_RICH:
         console.print()
         console.print(
-            f"[bold green]⬆️  Update available: v{info.version}[/bold green]"
-            f" [dim](current: v{__version__})[/dim]"
+            f"[bold green]⬆️  Update available: v{info.version}[/bold green] [dim](current: v{__version__})[/dim]"
         )
         if info.release_notes:
             # Show first 2 lines of release notes
@@ -591,14 +592,9 @@ def _print_update_notification(info: UpdateInfo):
             for line in lines:
                 console.print(f"   [dim]{line.strip()}[/dim]")
         if is_compiled():
-            console.print(
-                "   [cyan]Press [bold]U[/bold] in the terminal or use "
-                "tray menu to install.[/cyan]"
-            )
+            console.print("   [cyan]Press [bold]U[/bold] in the terminal or use tray menu to install.[/cyan]")
         else:
-            console.print(
-                f"   [cyan]Download: [link={info.release_url}]{info.release_url}[/link][/cyan]"
-            )
+            console.print(f"   [cyan]Download: [link={info.release_url}]{info.release_url}[/link][/cyan]")
         console.print()
     else:
         print()
@@ -629,15 +625,11 @@ def perform_update(
         (success, message) tuple
     """
     if not is_compiled():
-        return False, (
-            f"Update v{update_info.version} is available!\n"
-            f"Download from: {update_info.release_url}"
-        )
+        return False, (f"Update v{update_info.version} is available!\nDownload from: {update_info.release_url}")
 
     if not update_info.download_url:
         return False, (
-            f"Update v{update_info.version} found but no downloadable asset.\n"
-            f"Visit: {update_info.release_url}"
+            f"Update v{update_info.version} found but no downloadable asset.\nVisit: {update_info.release_url}"
         )
 
     # Download
@@ -679,16 +671,16 @@ def check_and_prompt_terminal(config: dict) -> bool:
 
     if not info:
         if HAVE_RICH:
-            console.print("[green]✅ You're up to date![/green] "
-                          f"[dim](v{__version__})[/dim]\n")
+            console.print(f"[green]✅ You're up to date![/green] [dim](v{__version__})[/dim]\n")
         else:
             print(f"✅ You're up to date! (v{__version__})\n")
         return False
 
     # Display update info
     if HAVE_RICH:
-        console.print(f"\n[bold green]New version available: v{info.version}[/bold green]"
-                       f" [dim](current: v{__version__})[/dim]")
+        console.print(
+            f"\n[bold green]New version available: v{info.version}[/bold green] [dim](current: v{__version__})[/dim]"
+        )
         if info.published_at:
             console.print(f"   [dim]Published: {info.published_at[:10]}[/dim]")
         if info.release_notes:
@@ -712,8 +704,9 @@ def check_and_prompt_terminal(config: dict) -> bool:
     if not is_compiled():
         # Source mode — notification only
         if HAVE_RICH:
-            console.print(f"[cyan]📦 Running from source. "
-                           f"Download: [link={info.release_url}]{info.release_url}[/link][/cyan]\n")
+            console.print(
+                f"[cyan]📦 Running from source. Download: [link={info.release_url}]{info.release_url}[/link][/cyan]\n"
+            )
         else:
             print(f"📦 Running from source. Download: {info.release_url}\n")
         return False

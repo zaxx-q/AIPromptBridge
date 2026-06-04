@@ -30,60 +30,59 @@ from ...themes import (
 # Layout Constants — used by all tab mixins for uniform appearance
 # =============================================================================
 
-LABEL_WIDTH = 200        # All labels same width for alignment
-ENTRY_WIDTH_SM = 100     # Small: ports, numbers, short values
-ENTRY_WIDTH_MD = 200     # Medium: hotkeys, colors, short strings
-ENTRY_WIDTH_LG = 350     # Large: URLs, paths, model names
+LABEL_WIDTH = 200  # All labels same width for alignment
+ENTRY_WIDTH_SM = 100  # Small: ports, numbers, short values
+ENTRY_WIDTH_MD = 200  # Medium: hotkeys, colors, short strings
+ENTRY_WIDTH_LG = 350  # Large: URLs, paths, model names
 DROPDOWN_WIDTH_SM = 140  # Small: 2-3 short options
 DROPDOWN_WIDTH_MD = 200  # Medium: provider names, formats
 DROPDOWN_WIDTH_LG = 300  # Large: model names, voices
-HINT_WRAP_LENGTH = 600   # Max hint text width before wrapping
+HINT_WRAP_LENGTH = 600  # Max hint text width before wrapping
 
 
 # =============================================================================
 # Custom Toggle Switch (Tk canvas fallback)
 # =============================================================================
 
+
 class ToggleSwitch(tk.Canvas):
     """Custom toggle switch widget for non-CTk mode."""
 
-    def __init__(self, parent, variable: tk.BooleanVar, colors: ThemeColors,
-                 command: Optional[Callable] = None, **kwargs):
-        self.width = kwargs.pop('width', 50)
-        self.height = kwargs.pop('height', 24)
-        super().__init__(parent, width=self.width, height=self.height,
-                        highlightthickness=0, **kwargs)
+    def __init__(
+        self, parent, variable: tk.BooleanVar, colors: ThemeColors, command: Optional[Callable] = None, **kwargs
+    ):
+        self.width = kwargs.pop("width", 50)
+        self.height = kwargs.pop("height", 24)
+        super().__init__(parent, width=self.width, height=self.height, highlightthickness=0, **kwargs)
 
         self.variable = variable
         self.colors = colors
         self.command = command
 
         self.configure(bg=colors.bg)
-        self.bind('<Button-1>', self._toggle)
-        self.variable.trace_add('write', lambda *args: self._draw())
+        self.bind("<Button-1>", self._toggle)
+        self.variable.trace_add("write", lambda *args: self._draw())
         self._draw()
 
     def _draw(self):
         """Draw the toggle switch."""
-        self.delete('all')
+        self.delete("all")
 
         is_on = self.variable.get()
 
         # Track
         track_color = self.colors.accent_green if is_on else self.colors.surface1
-        self.create_oval(2, 2, self.height - 2, self.height - 2,
-                        fill=track_color, outline=track_color)
-        self.create_oval(self.width - self.height + 2, 2,
-                        self.width - 2, self.height - 2,
-                        fill=track_color, outline=track_color)
-        self.create_rectangle(self.height // 2, 2,
-                             self.width - self.height // 2, self.height - 2,
-                             fill=track_color, outline=track_color)
+        self.create_oval(2, 2, self.height - 2, self.height - 2, fill=track_color, outline=track_color)
+        self.create_oval(
+            self.width - self.height + 2, 2, self.width - 2, self.height - 2, fill=track_color, outline=track_color
+        )
+        self.create_rectangle(
+            self.height // 2, 2, self.width - self.height // 2, self.height - 2, fill=track_color, outline=track_color
+        )
 
         # Knob
         knob_x = self.width - self.height // 2 - 4 if is_on else self.height // 2 + 4
-        self.create_oval(knob_x - 8, 4, knob_x + 8, self.height - 4,
-                        fill='#ffffff', outline='#ffffff')
+        self.create_oval(knob_x - 8, 4, knob_x + 8, self.height - 4, fill="#ffffff", outline="#ffffff")
 
     def _toggle(self, event=None):
         """Toggle the switch."""
@@ -95,6 +94,7 @@ class ToggleSwitch(tk.Canvas):
 # =============================================================================
 # Form Fields Mixin — standardized field creation with uniform layout
 # =============================================================================
+
 
 class FormFieldsMixin:
     """
@@ -108,8 +108,7 @@ class FormFieldsMixin:
         self.widgets: Dict[str, Any]
     """
 
-    def _add_entry_field(self, parent, key: str, label: str, value: str,
-                         size: str = "md", hint: str = None):
+    def _add_entry_field(self, parent, key: str, label: str, value: str, size: str = "md", hint: str = None):
         """
         Add a text entry field with uniform layout.
 
@@ -130,29 +129,49 @@ class FormFieldsMixin:
         self.vars[key] = tk.StringVar(master=self.root, value=value)
 
         if self.use_ctk:
-            ctk.CTkLabel(row, text=label, font=get_ctk_font(13), width=LABEL_WIDTH, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                row,
+                text=label,
+                font=get_ctk_font(13),
+                width=LABEL_WIDTH,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
             entry = ctk.CTkEntry(
-                row, textvariable=self.vars[key],
-                font=get_ctk_font(13), width=width, height=34,
-                **get_ctk_entry_colors(self.colors)
+                row,
+                textvariable=self.vars[key],
+                font=get_ctk_font(13),
+                width=width,
+                height=34,
+                **get_ctk_entry_colors(self.colors),
             )
             entry.pack(side="left", padx=(8, 0))
             self.widgets[key] = entry
         else:
-            tk.Label(row, text=label, font=("Segoe UI", 10), width=LABEL_WIDTH // 8, anchor="w",
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
-            entry = tk.Entry(row, textvariable=self.vars[key],
-                            font=("Segoe UI", 10), width=width // 8,
-                            bg=self.colors.input_bg, fg=self.colors.fg)
+            tk.Label(
+                row,
+                text=label,
+                font=("Segoe UI", 10),
+                width=LABEL_WIDTH // 8,
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(side="left")
+            entry = tk.Entry(
+                row,
+                textvariable=self.vars[key],
+                font=("Segoe UI", 10),
+                width=width // 8,
+                bg=self.colors.input_bg,
+                fg=self.colors.fg,
+            )
             entry.pack(side="left", padx=(8, 0), ipady=4)
             self.widgets[key] = entry
 
         if hint:
             self._add_hint(parent, hint)
 
-    def _add_toggle_field(self, parent, key: str, label: str, value: bool,
-                          hint: str = None, command: Callable = None):
+    def _add_toggle_field(self, parent, key: str, label: str, value: bool, hint: str = None, command: Callable = None):
         """
         Add a toggle switch field with uniform layout.
 
@@ -185,8 +204,7 @@ class FormFieldsMixin:
             self.widgets[key] = ctk.CTkSwitch(row, **switch_kwargs)
             self.widgets[key].pack(side="left")
         else:
-            tk.Label(row, text=label, font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            tk.Label(row, text=label, font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
             toggle = ToggleSwitch(row, self.vars[key], self.colors, command=command)
             toggle.pack(side="left", padx=(10, 0))
             self.widgets[key] = toggle
@@ -198,8 +216,9 @@ class FormFieldsMixin:
             else:
                 self._add_hint(parent, hint)
 
-    def _add_spinbox_field(self, parent, key: str, label: str, value: int,
-                           min_val: int, max_val: int, hint: str = None):
+    def _add_spinbox_field(
+        self, parent, key: str, label: str, value: int, min_val: int, max_val: int, hint: str = None
+    ):
         """
         Add a spinbox/number entry field with uniform layout.
 
@@ -224,30 +243,54 @@ class FormFieldsMixin:
         self.widgets[f"{key}_max"] = max_val
 
         if self.use_ctk:
-            ctk.CTkLabel(row, text=label, font=get_ctk_font(13), width=LABEL_WIDTH, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                row,
+                text=label,
+                font=get_ctk_font(13),
+                width=LABEL_WIDTH,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
             entry = ctk.CTkEntry(
-                row, textvariable=self.vars[key],
-                font=get_ctk_font(13), width=ENTRY_WIDTH_SM, height=34,
-                **get_ctk_entry_colors(self.colors)
+                row,
+                textvariable=self.vars[key],
+                font=get_ctk_font(13),
+                width=ENTRY_WIDTH_SM,
+                height=34,
+                **get_ctk_entry_colors(self.colors),
             )
             entry.pack(side="left", padx=(8, 0))
             self.widgets[key] = entry
         else:
             from tkinter import ttk
-            tk.Label(row, text=label, font=("Segoe UI", 10), width=LABEL_WIDTH // 8, anchor="w",
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
-            spinbox = ttk.Spinbox(row, textvariable=self.vars[key],
-                                 from_=min_val, to=max_val, width=10)
+
+            tk.Label(
+                row,
+                text=label,
+                font=("Segoe UI", 10),
+                width=LABEL_WIDTH // 8,
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(side="left")
+            spinbox = ttk.Spinbox(row, textvariable=self.vars[key], from_=min_val, to=max_val, width=10)
             spinbox.pack(side="left", padx=(8, 0))
             self.widgets[key] = spinbox
 
         if hint:
             self._add_inline_hint(row, hint)
 
-    def _add_dropdown_field(self, parent, key: str, label: str, value: str,
-                            options: List[str], size: str = "sm", hint: str = None,
-                            command: Callable = None):
+    def _add_dropdown_field(
+        self,
+        parent,
+        key: str,
+        label: str,
+        value: str,
+        options: List[str],
+        size: str = "sm",
+        hint: str = None,
+        command: Callable = None,
+    ):
         """
         Add a dropdown/combobox field with uniform layout.
 
@@ -270,12 +313,19 @@ class FormFieldsMixin:
         self.vars[key] = tk.StringVar(master=self.root, value=value)
 
         if self.use_ctk:
-            ctk.CTkLabel(row, text=label, font=get_ctk_font(13), width=LABEL_WIDTH, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                row,
+                text=label,
+                font=get_ctk_font(13),
+                width=LABEL_WIDTH,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
             combo_kwargs = {
                 "variable": self.vars[key],
                 "values": options,
-                "width": width, "height": 34,
+                "width": width,
+                "height": 34,
                 "state": "readonly",
                 "font": get_ctk_font(13),
                 **get_ctk_combobox_colors(self.colors),
@@ -287,14 +337,19 @@ class FormFieldsMixin:
             self.widgets[key] = combo
         else:
             from tkinter import ttk
-            tk.Label(row, text=label, font=("Segoe UI", 10), width=LABEL_WIDTH // 8, anchor="w",
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
-            combo = ttk.Combobox(
-                row, textvariable=self.vars[key],
-                values=options, state="readonly", width=width // 10
-            )
+
+            tk.Label(
+                row,
+                text=label,
+                font=("Segoe UI", 10),
+                width=LABEL_WIDTH // 8,
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(side="left")
+            combo = ttk.Combobox(row, textvariable=self.vars[key], values=options, state="readonly", width=width // 10)
             if command:
-                combo.bind('<<ComboboxSelected>>', lambda e: command(self.vars[key].get()))
+                combo.bind("<<ComboboxSelected>>", lambda e: command(self.vars[key].get()))
             combo.pack(side="left", padx=(8, 0))
             self.widgets[key] = combo
 
@@ -304,9 +359,9 @@ class FormFieldsMixin:
             else:
                 self._add_hint(parent, hint)
 
-    def _add_scrollable_dropdown_field(self, parent, key: str, label: str, value: str,
-                                       options: List[str], size: str = "lg",
-                                       hint: str = None):
+    def _add_scrollable_dropdown_field(
+        self, parent, key: str, label: str, value: str, options: List[str], size: str = "lg", hint: str = None
+    ):
         """
         Add a scrollable dropdown field (for long lists like voices/models).
 
@@ -328,25 +383,34 @@ class FormFieldsMixin:
         self.vars[key] = tk.StringVar(master=self.root, value=value)
 
         if self.use_ctk:
-            ctk.CTkLabel(row, text=label, font=get_ctk_font(13), width=LABEL_WIDTH, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                row,
+                text=label,
+                font=get_ctk_font(13),
+                width=LABEL_WIDTH,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
 
             dropdown = ScrollableComboBox(
-                row, colors=self.colors, variable=self.vars[key],
-                values=options,
-                width=width, height=34, font_size=13
+                row, colors=self.colors, variable=self.vars[key], values=options, width=width, height=34, font_size=13
             )
             dropdown.pack(side="left", padx=(8, 0))
             self.widgets[key] = dropdown
         else:
             from tkinter import ttk
-            tk.Label(row, text=label, font=("Segoe UI", 10), width=LABEL_WIDTH // 8, anchor="w",
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
 
-            combo = ttk.Combobox(
-                row, textvariable=self.vars[key],
-                values=options, state="readonly", width=width // 10
-            )
+            tk.Label(
+                row,
+                text=label,
+                font=("Segoe UI", 10),
+                width=LABEL_WIDTH // 8,
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(side="left")
+
+            combo = ttk.Combobox(row, textvariable=self.vars[key], values=options, state="readonly", width=width // 10)
             combo.pack(side="left", padx=(8, 0))
             self.widgets[key] = combo
 
@@ -361,25 +425,36 @@ class FormFieldsMixin:
         """Add a hint label below the current row, with wrapping."""
         if self.use_ctk:
             ctk.CTkLabel(
-                parent, text=text, font=get_ctk_font(11),
-                wraplength=HINT_WRAP_LENGTH, justify="left", anchor="w",
-                **get_ctk_label_colors(self.colors, muted=True)
+                parent,
+                text=text,
+                font=get_ctk_font(11),
+                wraplength=HINT_WRAP_LENGTH,
+                justify="left",
+                anchor="w",
+                **get_ctk_label_colors(self.colors, muted=True),
             ).pack(fill="x", padx=(LABEL_WIDTH + 10, 0), pady=(0, 2), anchor="w")
         else:
             tk.Label(
-                parent, text=text, font=("Segoe UI", 9),
-                wraplength=HINT_WRAP_LENGTH, justify="left", anchor="w",
-                bg=self.colors.bg, fg=self.colors.blockquote
+                parent,
+                text=text,
+                font=("Segoe UI", 9),
+                wraplength=HINT_WRAP_LENGTH,
+                justify="left",
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.blockquote,
             ).pack(fill="x", padx=(LABEL_WIDTH + 10, 0), pady=(0, 2), anchor="w")
 
     def _add_inline_hint(self, row, text: str):
         """Add a short hint label inline (same row as the field)."""
         if self.use_ctk:
-            ctk.CTkLabel(row, text=text, font=get_ctk_font(11),
-                        **get_ctk_label_colors(self.colors, muted=True)).pack(side="left", padx=(12, 0))
+            ctk.CTkLabel(row, text=text, font=get_ctk_font(11), **get_ctk_label_colors(self.colors, muted=True)).pack(
+                side="left", padx=(12, 0)
+            )
         else:
-            tk.Label(row, text=text, font=("Segoe UI", 9),
-                    bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(12, 0))
+            tk.Label(row, text=text, font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote).pack(
+                side="left", padx=(12, 0)
+            )
 
     # -------------------------------------------------------------------------
     # Scrollable content frame helper

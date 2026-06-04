@@ -37,6 +37,7 @@ from ..utils import set_window_icon
 # Import emoji renderer for CTkImage support
 try:
     from ...emoji_renderer import HAVE_PIL, get_emoji_renderer
+
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
@@ -144,7 +145,9 @@ class SettingsWindow(
         self.root.geometry(f"+{100 + offset}+{100 + offset}")
 
         # Main container
-        main_container = ctk.CTkFrame(self.root, fg_color=self.colors.bg) if self.use_ctk else tk.Frame(self.root, bg=self.colors.bg)
+        main_container = (
+            ctk.CTkFrame(self.root, fg_color=self.colors.bg) if self.use_ctk else tk.Frame(self.root, bg=self.colors.bg)
+        )
         main_container.pack(fill="both", expand=True, padx=10, pady=5)
 
         # Title bar (pack first)
@@ -181,7 +184,7 @@ class SettingsWindow(
         # Register and bind
         register_window(self.window_tag)
         self.root.protocol("WM_DELETE_WINDOW", self._close)
-        self.root.bind('<Escape>', lambda e: self._close())
+        self.root.bind("<Escape>", lambda e: self._close())
 
         # Focus
         self.root.lift()
@@ -197,6 +200,7 @@ class SettingsWindow(
     def _handle_callback_error(self, exc, val, tb):
         """Handle exceptions in callbacks to suppress noise on exit."""
         import traceback
+
         err_msg = "".join(traceback.format_exception_only(exc, val))
         if "invalid command name" in err_msg:
             return
@@ -260,16 +264,14 @@ class SettingsWindow(
 
     def _create_title_bar(self, parent):
         """Create the title bar."""
-        title_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        title_frame = (
+            ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        )
         title_frame.pack(fill="x", pady=(0, 10))
 
         if self.use_ctk:
             title_text = "⚙️ Settings"
-            title_label_kwargs = {
-                "text": title_text,
-                "font": get_ctk_font(24, "bold"),
-                "text_color": self.colors.fg
-            }
+            title_label_kwargs = {"text": title_text, "font": get_ctk_font(24, "bold"), "text_color": self.colors.fg}
 
             if HAVE_EMOJI:
                 renderer = get_emoji_renderer()
@@ -285,15 +287,15 @@ class SettingsWindow(
                 title_frame,
                 text="Edit config.ini",
                 font=get_ctk_font(14),
-                **get_ctk_label_colors(self.colors, muted=True)
+                **get_ctk_label_colors(self.colors, muted=True),
             ).pack(side="left", padx=(20, 0))
         else:
-            tk.Label(title_frame, text="⚙️ Settings",
-                    font=("Segoe UI", 16, "bold"),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
-            tk.Label(title_frame, text="Edit config.ini",
-                    font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
+            tk.Label(
+                title_frame, text="⚙️ Settings", font=("Segoe UI", 16, "bold"), bg=self.colors.bg, fg=self.colors.fg
+            ).pack(side="left")
+            tk.Label(
+                title_frame, text="Edit config.ini", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.blockquote
+            ).pack(side="left", padx=(15, 0))
 
     def _create_notebook(self, parent):
         """Create the tabbed notebook with lazy tab loading."""
@@ -308,7 +310,7 @@ class SettingsWindow(
                 segmented_button_unselected_hover_color=self.colors.surface1,
                 text_color=self.colors.fg,
                 corner_radius=8,
-                command=self._on_tab_changed
+                command=self._on_tab_changed,
             )
             self.tabview.pack(fill="both", expand=True, pady=(0, 2))
 
@@ -331,8 +333,9 @@ class SettingsWindow(
             self._load_tab_content("⚙️ General")
         else:
             from tkinter import ttk
+
             style = ttk.Style(self.root)
-            style.theme_use('clam')
+            style.theme_use("clam")
             self.tabview = ttk.Notebook(parent)
             self.tabview.pack(fill="both", expand=True, pady=(0, 2))
 
@@ -352,14 +355,14 @@ class SettingsWindow(
 
     def _on_tab_changed(self):
         """Handle tab change event — lazy load tab content."""
-        if not self.use_ctk or not hasattr(self, '_tab_configs'):
+        if not self.use_ctk or not hasattr(self, "_tab_configs"):
             return
         current_tab = self.tabview.get()
         self._load_tab_content(current_tab)
 
     def _load_tab_content(self, tab_name: str):
         """Load content for a tab if not already loaded."""
-        if not hasattr(self, '_tab_configs') or tab_name not in self._tab_configs:
+        if not hasattr(self, "_tab_configs") or tab_name not in self._tab_configs:
             return
 
         method_name, is_loaded = self._tab_configs[tab_name]
@@ -375,25 +378,27 @@ class SettingsWindow(
 
     def _create_button_bar(self, parent):
         """Create the bottom button bar."""
-        btn_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        btn_frame = (
+            ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        )
         btn_frame.pack(fill="x", side="bottom", pady=(5, 0))
 
-        create_emoji_button(
-            btn_frame, "Save", "💾", self.colors, "success", 120, 42, self._save
-        ).pack(side="left", padx=6)
+        create_emoji_button(btn_frame, "Save", "💾", self.colors, "success", 120, 42, self._save).pack(
+            side="left", padx=6
+        )
 
-        create_emoji_button(
-            btn_frame, "Cancel", "✖️", self.colors, "secondary", 110, 42, self._close
-        ).pack(side="left", padx=6)
+        create_emoji_button(btn_frame, "Cancel", "✖️", self.colors, "secondary", 110, 42, self._close).pack(
+            side="left", padx=6
+        )
 
         if self.use_ctk:
             self.status_label = ctk.CTkLabel(
-                btn_frame, text="", font=get_ctk_font(13),
-                text_color=self.colors.accent_green
+                btn_frame, text="", font=get_ctk_font(13), text_color=self.colors.accent_green
             )
         else:
-            self.status_label = tk.Label(btn_frame, text="", font=("Segoe UI", 10),
-                                        bg=self.colors.bg, fg=self.colors.accent_green)
+            self.status_label = tk.Label(
+                btn_frame, text="", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.accent_green
+            )
         self.status_label.pack(side="left", padx=20)
 
         create_emoji_button(
@@ -458,7 +463,7 @@ class SettingsWindow(
             self.config_data.config[key] = value
 
         # Save API keys via KeyStore (pool-based)
-        if hasattr(self, '_save_keys_to_store'):
+        if hasattr(self, "_save_keys_to_store"):
             self._save_keys_to_store()
 
         # Cleanup transient keys
@@ -469,12 +474,14 @@ class SettingsWindow(
         if save_config_full(self.config_data):
             try:
                 from .... import web_server
+
                 for key, value in self.config_data.config.items():
                     web_server.CONFIG[key] = value
 
                 # Hot-reload API keys from KeyStore
                 try:
                     from ....key_store import KeyStore
+
                     key_store = KeyStore.get_instance()
                     web_server.KEY_MANAGERS = key_store.build_key_managers()
                     total_keys = sum(km.get_key_count() for km in web_server.KEY_MANAGERS.values())
@@ -484,6 +491,7 @@ class SettingsWindow(
 
                 # Notify config change listeners
                 from ....config import notify_config_change
+
                 notify_config_change("_bulk_update")
 
             except (ImportError, AttributeError) as e:
@@ -511,7 +519,7 @@ class SettingsWindow(
             "This will NOT delete your API keys, but all other settings will be restored to defaults.\n\n"
             "⚠️ This action cannot be undone!",
             icon="warning",
-            parent=self.root
+            parent=self.root,
         )
 
         if not confirm:
@@ -536,9 +544,13 @@ class SettingsWindow(
                 self._update_theme_preview()
 
             if self.use_ctk:
-                self.status_label.configure(text="🔄 Reset to defaults. Click Save to apply.", text_color=self.colors.accent_yellow)
+                self.status_label.configure(
+                    text="🔄 Reset to defaults. Click Save to apply.", text_color=self.colors.accent_yellow
+                )
             else:
-                self.status_label.configure(text="🔄 Reset to defaults. Click Save to apply.", fg=self.colors.accent_yellow)
+                self.status_label.configure(
+                    text="🔄 Reset to defaults. Click Save to apply.", fg=self.colors.accent_yellow
+                )
 
             print("[Settings] Configuration reset to defaults. Save to apply changes.")
 
@@ -598,6 +610,7 @@ class SettingsWindow(
 # Entry Points
 # =============================================================================
 
+
 class AttachedSettingsWindow:
     """
     Settings window as Toplevel attached to GUICoordinator's root.
@@ -617,6 +630,7 @@ def create_attached_settings_window(parent_root, on_close=None, initial_tab=None
 
 def show_settings_window():
     """Show settings window - can be called from any thread."""
+
     def run():
         settings = SettingsWindow()
         settings.show()

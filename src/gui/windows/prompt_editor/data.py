@@ -19,10 +19,10 @@ from ...prompts import PROMPTS_FILE, reload_prompts
 OPTIONS_FILE = PROMPTS_FILE
 
 
-
 # =============================================================================
 # JSON I/O
 # =============================================================================
+
 
 def load_options(filepath: str = PROMPTS_FILE) -> Dict:
     """
@@ -30,6 +30,7 @@ def load_options(filepath: str = PROMPTS_FILE) -> Dict:
     Uses centralized PromptsConfig which handles defaults if file is missing.
     """
     from ...prompts import get_prompts_config
+
     try:
         # Simply get the config from PromptsConfig which handles loading/defaults
         return get_prompts_config()._config
@@ -42,7 +43,7 @@ def save_options(data: Dict, filepath: str = OPTIONS_FILE) -> bool:
     """
     Save options with proper formatting.
     Creates a backup before saving.
-    
+
     Returns:
         True if save was successful
     """
@@ -52,7 +53,7 @@ def save_options(data: Dict, filepath: str = OPTIONS_FILE) -> bool:
             backup_path = filepath + ".bak"
             shutil.copy2(filepath, backup_path)
 
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         # Reload prompts in the main app

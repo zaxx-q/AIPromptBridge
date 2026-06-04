@@ -35,6 +35,7 @@ from .tab_tts_playground import TTSPlaygroundMixin
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
 try:
     from ...emoji_renderer import HAVE_PIL, get_emoji_renderer
+
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
@@ -44,6 +45,7 @@ except ImportError:
 # =============================================================================
 # Prompt Editor Window (CTk version)
 # =============================================================================
+
 
 class PromptEditorWindow(
     ActionsTabMixin,
@@ -125,7 +127,9 @@ class PromptEditorWindow(
         self.root.geometry(f"+{80 + offset}+{80 + offset}")
 
         # Main container
-        main_container = ctk.CTkFrame(self.root, fg_color=self.colors.bg) if self.use_ctk else tk.Frame(self.root, bg=self.colors.bg)
+        main_container = (
+            ctk.CTkFrame(self.root, fg_color=self.colors.bg) if self.use_ctk else tk.Frame(self.root, bg=self.colors.bg)
+        )
         main_container.pack(fill="both", expand=True, padx=10, pady=5)
 
         # Title bar (pack first at top)
@@ -140,7 +144,7 @@ class PromptEditorWindow(
         # Register and bind
         register_window(self.window_tag)
         self.root.protocol("WM_DELETE_WINDOW", self._close)
-        self.root.bind('<Escape>', lambda e: self._close())
+        self.root.bind("<Escape>", lambda e: self._close())
 
         # Start queue polling
         self._check_queue_editor()
@@ -187,7 +191,9 @@ class PromptEditorWindow(
 
     def _create_title_bar(self, parent):
         """Create the title bar."""
-        title_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        title_frame = (
+            ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        )
         title_frame.pack(fill="x", pady=(0, 10))
 
         if self.use_ctk:
@@ -196,7 +202,7 @@ class PromptEditorWindow(
             title_label_kwargs = {
                 "text": title_text,
                 "font": get_ctk_font(24, "bold"),
-                **get_ctk_label_colors(self.colors)
+                **get_ctk_label_colors(self.colors),
             }
 
             if HAVE_EMOJI:
@@ -207,24 +213,25 @@ class PromptEditorWindow(
                     title_label_kwargs["image"] = emoji_img
                     title_label_kwargs["compound"] = "left"
 
-            ctk.CTkLabel(
-                title_frame,
-                **title_label_kwargs
-            ).pack(side="left")
+            ctk.CTkLabel(title_frame, **title_label_kwargs).pack(side="left")
 
             ctk.CTkLabel(
                 title_frame,
                 text="Edit prompts.json",
                 font=get_ctk_font(14),
-                **get_ctk_label_colors(self.colors, muted=True)
+                **get_ctk_label_colors(self.colors, muted=True),
             ).pack(side="left", padx=(20, 0))
         else:
-            tk.Label(title_frame, text="✏️ Prompt Editor",
-                    font=("Segoe UI", 16, "bold"),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
-            tk.Label(title_frame, text="Edit prompts.json",
-                    font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.blockquote).pack(side="left", padx=(15, 0))
+            tk.Label(
+                title_frame, text="✏️ Prompt Editor", font=("Segoe UI", 16, "bold"), bg=self.colors.bg, fg=self.colors.fg
+            ).pack(side="left")
+            tk.Label(
+                title_frame,
+                text="Edit prompts.json",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.blockquote,
+            ).pack(side="left", padx=(15, 0))
 
     def _create_main_content(self, parent):
         """Create the main content area with tabview."""
@@ -239,7 +246,7 @@ class PromptEditorWindow(
                 segmented_button_unselected_hover_color=self.colors.surface1,
                 text_color=self.colors.fg,
                 corner_radius=8,
-                command=self._on_tab_changed
+                command=self._on_tab_changed,
             )
             self.tabview.pack(fill="both", expand=True, pady=(0, 2))
 
@@ -249,7 +256,7 @@ class PromptEditorWindow(
                 "📁 Groups": ("_create_groups_tab", False),
                 "⚙️ Settings": ("_create_settings_tab", False),
                 "🎛️ Modifiers": ("_create_modifiers_tab", False),
-                "🧪 Playground": ("_create_playground_tab", False)
+                "🧪 Playground": ("_create_playground_tab", False),
             }
 
             # Create tabs (empty initially)
@@ -265,8 +272,9 @@ class PromptEditorWindow(
         else:
             # Fallback to ttk.Notebook
             from tkinter import ttk
+
             style = ttk.Style(self.root)
-            style.theme_use('clam')
+            style.theme_use("clam")
             self.tabview = ttk.Notebook(parent)
             self.tabview.pack(fill="both", expand=True, pady=(0, 2))
 
@@ -290,7 +298,7 @@ class PromptEditorWindow(
 
     def _on_tab_changed(self):
         """Handle tab change event - lazy load tab content."""
-        if not self.use_ctk or not hasattr(self, '_tab_configs'):
+        if not self.use_ctk or not hasattr(self, "_tab_configs"):
             return
 
         current_tab = self.tabview.get()
@@ -298,7 +306,7 @@ class PromptEditorWindow(
 
     def _load_tab_content(self, tab_name: str):
         """Load content for a tab if not already loaded."""
-        if not hasattr(self, '_tab_configs') or tab_name not in self._tab_configs:
+        if not hasattr(self, "_tab_configs") or tab_name not in self._tab_configs:
             return
 
         method_name, is_loaded = self._tab_configs[tab_name]
@@ -320,40 +328,43 @@ class PromptEditorWindow(
             except Exception as e:
                 print(f"[PromptEditor] Error loading tab '{tab_name}': {e}")
                 import traceback
+
                 traceback.print_exc()
 
     def _create_button_bar(self, parent):
         """Create the bottom button bar."""
-        btn_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        btn_frame = (
+            ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        )
         # Pack with side="bottom" to ensure button bar is visible at all window sizes
         btn_frame.pack(fill="x", side="bottom", pady=(5, 0))
 
-        create_emoji_button(
-            btn_frame, "Save All", "💾", self.colors, "success", 140, 42, self._save_all
-        ).pack(side="left", padx=6)
+        create_emoji_button(btn_frame, "Save All", "💾", self.colors, "success", 140, 42, self._save_all).pack(
+            side="left", padx=6
+        )
 
-        create_emoji_button(
-            btn_frame, "Cancel", "✖️", self.colors, "secondary", 120, 42, self._close
-        ).pack(side="left", padx=6)
+        create_emoji_button(btn_frame, "Cancel", "✖️", self.colors, "secondary", 120, 42, self._close).pack(
+            side="left", padx=6
+        )
 
         create_emoji_button(
             btn_frame, "Reset to Defaults", "🔄", self.colors, "danger", 160, 42, self._reset_to_defaults
         ).pack(side="right", padx=6)
 
         if self.use_ctk:
-             self.status_label = ctk.CTkLabel(
-                btn_frame, text="", font=get_ctk_font(13),
-                text_color=self.colors.accent_green
+            self.status_label = ctk.CTkLabel(
+                btn_frame, text="", font=get_ctk_font(13), text_color=self.colors.accent_green
             )
         else:
-            self.status_label = tk.Label(btn_frame, text="", font=("Segoe UI", 10),
-                                        bg=self.colors.bg, fg=self.colors.accent_green)
+            self.status_label = tk.Label(
+                btn_frame, text="", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.accent_green
+            )
         self.status_label.pack(side="left", padx=20)
 
     def _save_all(self):
         """Save all options to file."""
         # Save settings from widgets
-        if hasattr(self, 'settings_widgets'):
+        if hasattr(self, "settings_widgets"):
             for widget_key, (widget_type, widget) in self.settings_widgets.items():
                 if ":" in widget_key:
                     section, key = widget_key.split(":", 1)
@@ -388,6 +399,7 @@ class PromptEditorWindow(
                     if isinstance(val, str):
                         try:
                             from ...prompts import PromptsConfig
+
                             defaults = PromptsConfig.get_instance()._get_defaults()
 
                             if section == "global":
@@ -428,12 +440,13 @@ class PromptEditorWindow(
     def _reset_to_defaults(self):
         """Reset all prompts configuration to defaults in-memory. Requires Save All to persist."""
         from tkinter import messagebox
+
         if not messagebox.askyesno(
             "Reset to Defaults",
             "This will reset ALL prompts, actions, modifiers, and settings to their default values.\n\n"
             "You will need to click 'Save All' to apply the changes to prompts.json.\n\n"
             "Are you sure you want to continue?",
-            parent=self.root
+            parent=self.root,
         ):
             return
 
@@ -448,7 +461,7 @@ class PromptEditorWindow(
             self.current_action = None
 
             # Reset all loaded tabs so they rebuild with new data
-            if self.use_ctk and hasattr(self, '_tab_configs'):
+            if self.use_ctk and hasattr(self, "_tab_configs"):
                 current_tab = self.tabview.get()
 
                 for tab_name, (method_name, is_loaded) in list(self._tab_configs.items()):
@@ -463,15 +476,15 @@ class PromptEditorWindow(
                 # Reset widget references that tabs depend on
                 self.action_listbox = None
                 self.editor_widgets = {}
-                if hasattr(self, 'settings_widgets'):
+                if hasattr(self, "settings_widgets"):
                     self.settings_widgets = {}
-                if hasattr(self, 'modifier_listbox'):
+                if hasattr(self, "modifier_listbox"):
                     self.modifier_listbox = None
-                if hasattr(self, 'modifier_widgets'):
+                if hasattr(self, "modifier_widgets"):
                     self.modifier_widgets = {}
-                if hasattr(self, 'group_listbox'):
+                if hasattr(self, "group_listbox"):
                     self.group_listbox = None
-                if hasattr(self, 'group_widgets'):
+                if hasattr(self, "group_widgets"):
                     self.group_widgets = {}
 
                 # Reload the current tab
@@ -484,9 +497,13 @@ class PromptEditorWindow(
 
             # Update status - tell user to Save All
             if self.use_ctk:
-                self.status_label.configure(text="🔄 Reset to defaults. Click Save All to apply.", text_color=self.colors.accent_yellow)
+                self.status_label.configure(
+                    text="🔄 Reset to defaults. Click Save All to apply.", text_color=self.colors.accent_yellow
+                )
             else:
-                self.status_label.configure(text="🔄 Reset to defaults. Click Save All to apply.", fg=self.colors.accent_yellow)
+                self.status_label.configure(
+                    text="🔄 Reset to defaults. Click Save All to apply.", fg=self.colors.accent_yellow
+                )
 
             print("[PromptEditor] Configuration reset to defaults in editor. Click Save All to apply.")
 
@@ -496,12 +513,13 @@ class PromptEditorWindow(
             else:
                 self.status_label.configure(text=f"❌ Reset failed: {e}", fg=self.colors.accent_red)
             from tkinter import messagebox
+
             messagebox.showerror("Reset Failed", f"Failed to reset configuration: {e}", parent=self.root)
 
     def _close(self):
         """Close the prompt editor window."""
         # Cleanup TTS recorder
-        if hasattr(self, 'tts_pg_recorder') and self.tts_pg_recorder:
+        if hasattr(self, "tts_pg_recorder") and self.tts_pg_recorder:
             try:
                 self.tts_pg_recorder.cleanup()
             except Exception:
@@ -521,6 +539,7 @@ class PromptEditorWindow(
 # =============================================================================
 # Wrapper Classes
 # =============================================================================
+
 
 class AttachedPromptEditorWindow:
     """
@@ -542,6 +561,7 @@ def create_attached_prompt_editor_window(parent_root):
 
 def show_prompt_editor():
     """Show prompt editor window - can be called from any thread."""
+
     def run():
         editor = PromptEditorWindow()
         editor.show()

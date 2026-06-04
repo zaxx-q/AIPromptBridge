@@ -27,6 +27,7 @@ from typing import Dict, Optional
 
 try:
     import darkdetect
+
     HAVE_DARKDETECT = True
 except ImportError:
     HAVE_DARKDETECT = False
@@ -39,46 +40,46 @@ from .platform import HAVE_CTK, ctk
 class ThemeColors:
     """
     Complete color definition for a theme.
-    
+
     This dataclass provides both the standard naming (bg, fg, accent)
     and legacy popup-style naming (base, text, blue) via properties
     for backward compatibility.
     """
 
     # Base colors
-    bg: str                    # Primary background
-    fg: str                    # Primary text
-    text_bg: str               # Text area background
-    input_bg: str              # Input field background
-    border: str                # Border color
+    bg: str  # Primary background
+    fg: str  # Primary text
+    text_bg: str  # Text area background
+    input_bg: str  # Input field background
+    border: str  # Border color
 
     # Accent colors
-    accent: str                # Primary accent (blue-ish)
-    accent_green: str          # Success/positive
-    accent_yellow: str         # Warning/attention
-    accent_red: str            # Error/danger
+    accent: str  # Primary accent (blue-ish)
+    accent_green: str  # Success/positive
+    accent_yellow: str  # Warning/attention
+    accent_red: str  # Error/danger
 
     # Chat-specific
-    user_bg: str               # User message background
-    user_accent: str           # User label color
-    assistant_bg: str          # Assistant message background
-    assistant_accent: str      # Assistant label color
+    user_bg: str  # User message background
+    user_accent: str  # User label color
+    assistant_bg: str  # Assistant message background
+    assistant_accent: str  # Assistant label color
 
     # Code/Markdown
-    code_bg: str               # Code block background
-    header1: str               # H1 color
-    header2: str               # H2 color
-    header3: str               # H3 color
-    bullet: str                # Bullet point color
-    blockquote: str            # Blockquote/muted text
+    code_bg: str  # Code block background
+    header1: str  # H1 color
+    header2: str  # H2 color
+    header3: str  # H3 color
+    bullet: str  # Bullet point color
+    blockquote: str  # Blockquote/muted text
 
     # Popup-specific (elevated surfaces)
-    surface0: str              # Elevated surface level 0
-    surface1: str              # Elevated surface level 1 (hover)
-    surface2: str              # Elevated surface level 2 (borders)
-    overlay0: str              # Muted overlay text
-    lavender: str              # Secondary accent (purple-ish)
-    peach: str                 # Tertiary accent (orange-ish)
+    surface0: str  # Elevated surface level 0
+    surface1: str  # Elevated surface level 1 (hover)
+    surface2: str  # Elevated surface level 2 (borders)
+    overlay0: str  # Muted overlay text
+    lavender: str  # Secondary accent (purple-ish)
+    peach: str  # Tertiary accent (orange-ish)
 
     # Legacy popup-style property aliases
     @property
@@ -119,7 +120,7 @@ class ThemeColors:
     @property
     def accent_fg(self) -> str:
         """Text color for use on accent-colored backgrounds.
-        
+
         Uses the theme's bg color, matching the official Catppuccin pattern
         where button text_color is the base background. This provides
         high contrast for both dark themes (dark text on pastel accents)
@@ -156,7 +157,7 @@ CATPPUCCIN_DARK = ThemeColors(
     surface0="#313244",
     surface1="#45475a",
     surface2="#585b70",
-    overlay0="#a6adc8",    # Improved readability (was #6c7086)
+    overlay0="#a6adc8",  # Improved readability (was #6c7086)
     lavender="#b4befe",
     peach="#fab387",
 )
@@ -214,7 +215,7 @@ DRACULA_DARK = ThemeColors(
     surface0="#44475a",
     surface1="#4d5066",
     surface2="#6272a4",
-    overlay0="#b0b5c4",    # Improved readability (was #6272a4)
+    overlay0="#b0b5c4",  # Improved readability (was #6272a4)
     lavender="#bd93f9",
     peach="#ffb86c",
 )
@@ -272,7 +273,7 @@ NORD_DARK = ThemeColors(
     surface0="#3b4252",
     surface1="#434c5e",
     surface2="#4c566a",
-    overlay0="#9aa5b8",    # Improved readability (was #4c566a)
+    overlay0="#9aa5b8",  # Improved readability (was #4c566a)
     lavender="#b48ead",
     peach="#d08770",
 )
@@ -330,7 +331,7 @@ GRUVBOX_DARK = ThemeColors(
     surface0="#3c3836",
     surface1="#504945",
     surface2="#665c54",
-    overlay0="#bdae93",    # Improved readability (was #928374)
+    overlay0="#bdae93",  # Improved readability (was #928374)
     lavender="#d3869b",
     peach="#fe8019",
 )
@@ -389,7 +390,7 @@ MINIMAL_DARK = ThemeColors(
     surface0="#252525",
     surface1="#303030",
     surface2="#404040",
-    overlay0="#b3b3b3",    # Improved readability (was #808080)
+    overlay0="#b3b3b3",  # Improved readability (was #808080)
     lavender="#9575cd",
     peach="#ff8a65",
 )
@@ -486,17 +487,18 @@ HIGHCONTRAST_LIGHT = ThemeColors(
 # Theme Registry
 # =============================================================================
 
+
 class ThemeRegistry:
     """
     Central registry for all available themes.
-    
+
     Usage:
         # Get current theme based on config and system
         colors = ThemeRegistry.get_current()
-        
+
         # Get specific theme
         colors = ThemeRegistry.get_theme("dracula", "dark")
-        
+
         # List available themes
         themes = ThemeRegistry.list_themes()
     """
@@ -523,11 +525,11 @@ class ThemeRegistry:
     def get_theme(cls, name: str, mode: str) -> ThemeColors:
         """
         Get specific theme colors.
-        
+
         Args:
             name: Theme name (catppuccin, dracula, nord, etc.)
             mode: 'dark' or 'light'
-        
+
         Returns:
             ThemeColors for the specified theme and mode
         """
@@ -554,11 +556,11 @@ class ThemeRegistry:
     def get_current(cls, config: Optional[Dict] = None) -> ThemeColors:
         """
         Get current theme colors based on config and system settings.
-        
+
         Args:
             config: Optional config dict with 'ui_theme' and 'ui_theme_mode' keys.
                    If not provided, reads from web_server.CONFIG.
-        
+
         Returns:
             ThemeColors for the current theme and mode
         """
@@ -566,6 +568,7 @@ class ThemeRegistry:
         if config is None:
             try:
                 from .. import web_server
+
                 config = web_server.CONFIG
             except (ImportError, AttributeError):
                 config = {}
@@ -592,10 +595,10 @@ class ThemeRegistry:
     def get_current_as_dict(cls, config: Optional[Dict] = None) -> Dict[str, str]:
         """
         Get current theme colors as a dictionary.
-        
+
         This provides backward compatibility with code expecting a dict
         from the old get_color_scheme() function.
-        
+
         Returns:
             Dict mapping color names to hex values
         """
@@ -636,13 +639,14 @@ class ThemeRegistry:
 # Convenience Functions
 # =============================================================================
 
+
 def get_colors() -> ThemeColors:
     """
     Get current theme colors.
-    
+
     This is a convenience function for use in popup windows and other
     GUI components that need access to the current theme.
-    
+
     Returns:
         ThemeColors dataclass with all color values
     """
@@ -652,10 +656,10 @@ def get_colors() -> ThemeColors:
 def get_color_scheme() -> Dict[str, str]:
     """
     Get current theme colors as a dictionary.
-    
+
     This maintains backward compatibility with existing code that uses
     the dict-based color scheme from utils.py.
-    
+
     Returns:
         Dict mapping color names to hex values
     """
@@ -665,7 +669,7 @@ def get_color_scheme() -> Dict[str, str]:
 def is_dark_mode() -> bool:
     """
     Check if system is in dark mode.
-    
+
     Returns:
         True if system is in dark mode, False otherwise
     """
@@ -675,7 +679,7 @@ def is_dark_mode() -> bool:
 def list_themes() -> list:
     """
     Get list of available theme names.
-    
+
     Returns:
         List of theme name strings
     """
@@ -686,19 +690,20 @@ def list_themes() -> list:
 # CustomTkinter Integration Functions
 # =============================================================================
 
+
 def get_ctk_font(size: int = 12, weight: str = "normal", family: str = None):
     """
     Get a font specification with appropriate defaults for the platform.
-    
+
     Args:
         size: Font size in points
         weight: "normal" or "bold"
         family: Font family (auto-detected if None)
-    
+
     Returns:
         Tuple font specification (family, size, weight) - works with both
         standard tkinter and CustomTkinter widgets, and is thread-safe.
-        
+
     Note:
         We return a tuple instead of CTkFont because CTkFont cannot be
         created from non-main threads (causes RuntimeError). Tuple fonts
@@ -718,7 +723,7 @@ def get_ctk_font(size: int = 12, weight: str = "normal", family: str = None):
 
 def _adjust_hex_color(hex_color: str, factor: float) -> str:
     """Adjust brightness of a hex color by a factor. factor < 1.0 darkens, > 1.0 lightens."""
-    hex_color = hex_color.lstrip('#')
+    hex_color = hex_color.lstrip("#")
     if len(hex_color) != 6:
         return f"#{hex_color}"
     try:
@@ -738,11 +743,11 @@ def _adjust_hex_color(hex_color: str, factor: float) -> str:
 def get_ctk_button_colors(colors: ThemeColors, variant: str = "primary") -> dict:
     """
     Get CTkButton color kwargs based on theme and variant.
-    
+
     Args:
         colors: ThemeColors instance
         variant: "primary", "secondary", "success", "danger", or "ghost"
-    
+
     Returns:
         Dict of CTkButton color kwargs
     """
@@ -793,11 +798,11 @@ def get_ctk_button_colors(colors: ThemeColors, variant: str = "primary") -> dict
 def get_ctk_frame_colors(colors: ThemeColors, elevated: bool = False) -> dict:
     """
     Get CTkFrame color kwargs based on theme.
-    
+
     Args:
         colors: ThemeColors instance
         elevated: If True, use slightly elevated surface color
-    
+
     Returns:
         Dict of CTkFrame color kwargs
     """
@@ -810,13 +815,13 @@ def get_ctk_frame_colors(colors: ThemeColors, elevated: bool = False) -> dict:
 def get_ctk_entry_colors(colors: ThemeColors) -> dict:
     """
     Get CTkEntry color kwargs based on theme.
-    
+
     Note: For CTkTextbox, use get_ctk_textbox_colors() instead.
     CTkTextbox does NOT support placeholder_text_color.
-    
+
     Args:
         colors: ThemeColors instance
-    
+
     Returns:
         Dict of CTkEntry color kwargs
     """
@@ -831,13 +836,13 @@ def get_ctk_entry_colors(colors: ThemeColors) -> dict:
 def get_ctk_textbox_colors(colors: ThemeColors) -> dict:
     """
     Get CTkTextbox color kwargs based on theme.
-    
+
     Note: CTkTextbox does NOT support placeholder text.
     Use CTkEntry for single-line input with placeholder.
-    
+
     Args:
         colors: ThemeColors instance
-    
+
     Returns:
         Dict of CTkTextbox color kwargs
     """
@@ -851,10 +856,10 @@ def get_ctk_textbox_colors(colors: ThemeColors) -> dict:
 def get_ctk_scrollbar_colors(colors: ThemeColors) -> dict:
     """
     Get CTkScrollbar color kwargs based on theme.
-    
+
     Args:
         colors: ThemeColors instance
-    
+
     Returns:
         Dict of CTkScrollbar color kwargs
     """
@@ -868,10 +873,10 @@ def get_ctk_scrollbar_colors(colors: ThemeColors) -> dict:
 def get_ctk_segmented_colors(colors: ThemeColors) -> dict:
     """
     Get CTkSegmentedButton color kwargs based on theme.
-    
+
     Args:
         colors: ThemeColors instance
-    
+
     Returns:
         Dict of CTkSegmentedButton color kwargs
     """
@@ -889,10 +894,10 @@ def get_ctk_segmented_colors(colors: ThemeColors) -> dict:
 def get_ctk_combobox_colors(colors: ThemeColors) -> dict:
     """
     Get CTkComboBox color kwargs based on theme.
-    
+
     Args:
         colors: ThemeColors instance
-    
+
     Returns:
         Dict of CTkComboBox color kwargs
     """
@@ -911,11 +916,11 @@ def get_ctk_combobox_colors(colors: ThemeColors) -> dict:
 def get_ctk_label_colors(colors: ThemeColors, muted: bool = False) -> dict:
     """
     Get CTkLabel color kwargs based on theme.
-    
+
     Args:
         colors: ThemeColors instance
         muted: If True, use muted text color
-    
+
     Returns:
         Dict of CTkLabel color kwargs
     """
@@ -927,7 +932,7 @@ def get_ctk_label_colors(colors: ThemeColors, muted: bool = False) -> dict:
 def sync_ctk_appearance(config: Optional[Dict] = None):
     """
     Sync CustomTkinter appearance mode with config.
-    
+
     Args:
         config: Optional config dict. If None, reads from web_server.CONFIG
     """
@@ -937,6 +942,7 @@ def sync_ctk_appearance(config: Optional[Dict] = None):
     if config is None:
         try:
             from .. import web_server
+
             config = web_server.CONFIG
         except (ImportError, AttributeError):
             config = {}
@@ -951,15 +957,13 @@ def sync_ctk_appearance(config: Optional[Dict] = None):
         ctk.set_appearance_mode("dark")
 
 
-def apply_hover_effect(widget, colors: ThemeColors,
-                       normal_color: str = None,
-                       hover_color: str = None):
+def apply_hover_effect(widget, colors: ThemeColors, normal_color: str = None, hover_color: str = None):
     """
     Apply hover effect to a CTk widget.
-    
+
     For widgets that don't have built-in hover (like CTkLabel used as button),
     this adds Enter/Leave bindings to change colors.
-    
+
     Args:
         widget: CTk widget to apply hover to
         colors: ThemeColors instance
@@ -991,13 +995,15 @@ def apply_hover_effect(widget, colors: ThemeColors,
 # Legacy Compatibility Classes
 # =============================================================================
 
+
 class CatppuccinMocha:
     """
     Legacy compatibility class for popup windows.
-    
+
     DEPRECATED: Use get_colors() or ThemeRegistry.get_current() instead.
     This class exists only for backward compatibility.
     """
+
     _colors = CATPPUCCIN_DARK
 
     base = _colors.bg
@@ -1018,10 +1024,11 @@ class CatppuccinMocha:
 class CatppuccinLatte:
     """
     Legacy compatibility class for popup windows.
-    
+
     DEPRECATED: Use get_colors() or ThemeRegistry.get_current() instead.
     This class exists only for backward compatibility.
     """
+
     _colors = CATPPUCCIN_LIGHT
 
     base = _colors.bg

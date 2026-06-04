@@ -44,9 +44,7 @@ _FORMAT_VERSION = 2
 _OBF_PREFIX = "$OBF$"
 
 # Built-in provider IDs that always have a pool by default
-_BUILTIN_PROVIDERS = (
-    "google", "openrouter", "custom", "anthropic", "openai", "xai", "mistral", "cohere"
-)
+_BUILTIN_PROVIDERS = ("google", "openrouter", "custom", "anthropic", "openai", "xai", "mistral", "cohere")
 
 # Salt mixed into the machine key derivation
 _SALT = b"AIPromptBridge::key-obfuscation::v1"
@@ -54,6 +52,7 @@ _SALT = b"AIPromptBridge::key-obfuscation::v1"
 # ---------------------------------------------------------------------------
 # Obfuscation helpers
 # ---------------------------------------------------------------------------
+
 
 def _get_machine_key() -> bytes:
     """Derive a deterministic key from the machine's hostname + salt."""
@@ -70,10 +69,7 @@ def obfuscate(plaintext: str) -> str:
     if not plaintext:
         return ""
     machine_key = _get_machine_key()
-    xored = bytes(
-        b ^ machine_key[i % len(machine_key)]
-        for i, b in enumerate(plaintext.encode("utf-8"))
-    )
+    xored = bytes(b ^ machine_key[i % len(machine_key)] for i, b in enumerate(plaintext.encode("utf-8")))
     return _OBF_PREFIX + base64.b64encode(xored).decode("ascii")
 
 
@@ -87,21 +83,20 @@ def deobfuscate(encoded: str) -> str:
         return ""
     if not encoded.startswith(_OBF_PREFIX):
         return encoded  # raw key — pass through
-    raw_b64 = encoded[len(_OBF_PREFIX):]
+    raw_b64 = encoded[len(_OBF_PREFIX) :]
     try:
         xored = base64.b64decode(raw_b64)
     except Exception:
         return encoded  # corrupt — return as-is
     machine_key = _get_machine_key()
-    plaintext_bytes = bytes(
-        b ^ machine_key[i % len(machine_key)]
-        for i, b in enumerate(xored)
-    )
+    plaintext_bytes = bytes(b ^ machine_key[i % len(machine_key)] for i, b in enumerate(xored))
     return plaintext_bytes.decode("utf-8", errors="replace")
+
 
 # ---------------------------------------------------------------------------
 # KeyStore
 # ---------------------------------------------------------------------------
+
 
 class KeyStore:
     """Singleton manager for pool-based API key storage.
@@ -182,6 +177,7 @@ class KeyStore:
                 data = json.load(fh)
         except Exception as exc:
             from .console import print_error
+
             print_error(f"Failed to load {self._file_path}: {exc}")
             self._ensure_builtin_pools()
             return
@@ -207,6 +203,7 @@ class KeyStore:
             return True
         except Exception as exc:
             from .console import print_error
+
             print_error(f"Failed to save {target}: {exc}")
             return False
 
@@ -227,6 +224,7 @@ class KeyStore:
         if config_path.exists():
             try:
                 import re as _re
+
                 with open(config_path, "r", encoding="utf-8") as fh:
                     current_section = None
                     for line in fh:
@@ -235,10 +233,10 @@ class KeyStore:
                             current_section = stripped[1:-1].strip().lower()
                         elif current_section in legacy_keys:
                             if stripped and not stripped.startswith("#"):
-                                match = _re.search(r'\s+#\s*', stripped)
+                                match = _re.search(r"\s+#\s*", stripped)
                                 if match:
-                                    key_part = stripped[:match.start()].strip()
-                                    name_part = stripped[match.end():].strip()
+                                    key_part = stripped[: match.start()].strip()
+                                    name_part = stripped[match.end() :].strip()
                                 else:
                                     key_part = stripped.strip()
                                     name_part = ""
@@ -276,10 +274,12 @@ class KeyStore:
                 for idx, raw_key in enumerate(raw_keys):
                     if raw_key:
                         name = names[idx] if idx < len(names) else ""
-                        keys_list.append({
-                            "key": obfuscate(raw_key),
-                            "name": name,
-                        })
+                        keys_list.append(
+                            {
+                                "key": obfuscate(raw_key),
+                                "name": name,
+                            }
+                        )
                 display = provider.capitalize()
                 if provider == "openrouter":
                     display = "OpenRouter"
@@ -383,10 +383,7 @@ class KeyStore:
             pool = self._pools.get(pool_id)
             if not pool:
                 return []
-            return [
-                {"key": deobfuscate(kd.get("key", "")), "name": kd.get("name", "")}
-                for kd in pool.get("keys", [])
-            ]
+            return [{"key": deobfuscate(kd.get("key", "")), "name": kd.get("name", "")} for kd in pool.get("keys", [])]
 
     def get_pool_for_provider(self, provider: str) -> List[Dict[str, str]]:
         """Shortcut: get deobfuscated keys for the pool mapped to *provider*."""
@@ -438,9 +435,7 @@ class KeyStore:
             if pool is None:
                 return False
             pool["keys"] = [
-                {"key": obfuscate(kd.get("key", "")), "name": kd.get("name", "")}
-                for kd in keys_data
-                if kd.get("key")
+                {"key": obfuscate(kd.get("key", "")), "name": kd.get("name", "")} for kd in keys_data if kd.get("key")
             ]
             return True
 
@@ -484,14 +479,10 @@ class KeyStore:
                     if k:
                         raw_keys.append(k)
                         key_names.append(kd.get("name", ""))
-                managers[provider] = KeyManager(
-                    raw_keys, provider, key_names=key_names
-                )
+                managers[provider] = KeyManager(raw_keys, provider, key_names=key_names)
         return managers
 
-    def build_key_manager_for_pool(
-        self, pool_id: str, provider_name: str = "pool"
-    ) -> Optional[KeyManager]:
+    def build_key_manager_for_pool(self, pool_id: str, provider_name: str = "pool") -> Optional[KeyManager]:
         """Build a single ``KeyManager`` for a specific pool.
 
         Used by profile resolver when ``api_key_pool`` overrides the

@@ -30,16 +30,22 @@ class ProviderTabMixin:
         create_section_header(content, "🔑 Key Pool Assignments", self.colors, top_padding=20)
 
         if self.use_ctk:
-            ctk.CTkLabel(content,
-                        text="Assign which key pool each provider draws API keys from.",
-                        font=get_ctk_font(11), justify="left",
-                        **get_ctk_label_colors(self.colors, muted=True)
-                        ).pack(anchor="w", pady=(0, 8))
+            ctk.CTkLabel(
+                content,
+                text="Assign which key pool each provider draws API keys from.",
+                font=get_ctk_font(11),
+                justify="left",
+                **get_ctk_label_colors(self.colors, muted=True),
+            ).pack(anchor="w", pady=(0, 8))
         else:
-            tk.Label(content,
-                    text="Assign which key pool each provider draws API keys from.",
-                    font=("Segoe UI", 9), justify="left",
-                    bg=self.colors.bg, fg=self.colors.blockquote).pack(anchor="w", pady=(0, 8))
+            tk.Label(
+                content,
+                text="Assign which key pool each provider draws API keys from.",
+                font=("Segoe UI", 9),
+                justify="left",
+                bg=self.colors.bg,
+                fg=self.colors.blockquote,
+            ).pack(anchor="w", pady=(0, 8))
 
         self._create_pool_assignment_dropdown(content, "custom")
         self._create_pool_assignment_dropdown(content, "openrouter")
@@ -53,17 +59,35 @@ class ProviderTabMixin:
         # --- Request Settings ---
         create_section_header(content, "🔄 Request Settings", self.colors, top_padding=20)
 
-        self._add_spinbox_field(content, "max_retries", "Max retries:",
+        self._add_spinbox_field(
+            content,
+            "max_retries",
+            "Max retries:",
             self.config_data.config.get("max_retries", 3),
-            0, 10, hint="Retries before giving up on API calls")
+            0,
+            10,
+            hint="Retries before giving up on API calls",
+        )
 
-        self._add_spinbox_field(content, "retry_delay", "Retry delay (s):",
+        self._add_spinbox_field(
+            content,
+            "retry_delay",
+            "Retry delay (s):",
             self.config_data.config.get("retry_delay", 5),
-            1, 60, hint="Seconds between retries")
+            1,
+            60,
+            hint="Seconds between retries",
+        )
 
-        self._add_spinbox_field(content, "request_timeout", "Request timeout (s):",
+        self._add_spinbox_field(
+            content,
+            "request_timeout",
+            "Request timeout (s):",
             self.config_data.config.get("request_timeout", 120),
-            10, 600, hint="Timeout for API requests (overridden by active profile)")
+            10,
+            600,
+            hint="Timeout for API requests (overridden by active profile)",
+        )
 
     # -------------------------------------------------------------------------
     # Connection Profile selector
@@ -84,15 +108,22 @@ class ProviderTabMixin:
 
         if self.use_ctk:
             ctk.CTkLabel(
-                row, text="Active Profile:",
-                font=get_ctk_font(13), width=LABEL_WIDTH, anchor="w",
-                **get_ctk_label_colors(self.colors)
+                row,
+                text="Active Profile:",
+                font=get_ctk_font(13),
+                width=LABEL_WIDTH,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
             ).pack(side="left")
 
             self._profile_var = tk.StringVar(master=self.root, value=active_name)
             dd = ctk.CTkComboBox(
-                row, variable=self._profile_var, values=profile_names,
-                width=DROPDOWN_WIDTH_MD, height=34, state="readonly",
+                row,
+                variable=self._profile_var,
+                values=profile_names,
+                width=DROPDOWN_WIDTH_MD,
+                height=34,
+                state="readonly",
                 font=get_ctk_font(13),
                 fg_color=self.colors.input_bg,
                 border_color=self.colors.surface1,
@@ -100,37 +131,43 @@ class ProviderTabMixin:
                 button_hover_color=self.colors.accent,
                 dropdown_fg_color=self.colors.surface0,
                 text_color=self.colors.fg,
-                command=self._on_profile_selected
+                command=self._on_profile_selected,
             )
             dd.pack(side="left", padx=(8, 0))
             self._profile_dropdown = dd
         else:
             tk.Label(
-                row, text="Active Profile:",
-                font=("Segoe UI", 10), width=LABEL_WIDTH // 8, anchor="w",
-                bg=self.colors.bg, fg=self.colors.fg
+                row,
+                text="Active Profile:",
+                font=("Segoe UI", 10),
+                width=LABEL_WIDTH // 8,
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.fg,
             ).pack(side="left")
 
             self._profile_var = tk.StringVar(master=self.root, value=active_name)
             from tkinter import ttk
+
             dd = ttk.Combobox(
-                row, textvariable=self._profile_var, values=profile_names,
-                width=DROPDOWN_WIDTH_MD // 10, state="readonly"
+                row,
+                textvariable=self._profile_var,
+                values=profile_names,
+                width=DROPDOWN_WIDTH_MD // 10,
+                state="readonly",
             )
             dd.pack(side="left", padx=(8, 0))
-            dd.bind('<<ComboboxSelected>>', lambda e: self._on_profile_selected(self._profile_var.get()))
+            dd.bind("<<ComboboxSelected>>", lambda e: self._on_profile_selected(self._profile_var.get()))
             self._profile_dropdown = dd
 
         # Status label
         if self.use_ctk:
             self._profile_status = ctk.CTkLabel(
-                row, text="", font=get_ctk_font(11),
-                text_color=self.colors.accent_green
+                row, text="", font=get_ctk_font(11), text_color=self.colors.accent_green
             )
         else:
             self._profile_status = tk.Label(
-                row, text="", font=("Segoe UI", 9),
-                bg=self.colors.bg, fg=self.colors.accent_green
+                row, text="", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.accent_green
             )
         self._profile_status.pack(side="left", padx=(12, 0))
 
@@ -139,21 +176,22 @@ class ProviderTabMixin:
         btn_row.pack(fill="x", pady=(4, 8))
 
         create_emoji_button(
-            btn_row, "Manage Profiles", "🔌", self.colors, "primary", 170, 36,
-            command=self._open_connection_manager
+            btn_row, "Manage Profiles", "🔌", self.colors, "primary", 170, 36, command=self._open_connection_manager
         ).pack(side="left")
 
         hint_text = "Create, edit, and test connection profiles"
         if self.use_ctk:
-            ctk.CTkLabel(btn_row, text=hint_text,
-                        font=get_ctk_font(11), justify="left",
-                        **get_ctk_label_colors(self.colors, muted=True)
-                        ).pack(side="left", padx=(12, 0))
+            ctk.CTkLabel(
+                btn_row,
+                text=hint_text,
+                font=get_ctk_font(11),
+                justify="left",
+                **get_ctk_label_colors(self.colors, muted=True),
+            ).pack(side="left", padx=(12, 0))
         else:
-            tk.Label(btn_row, text=hint_text,
-                    font=("Segoe UI", 9),
-                    bg=self.colors.bg, fg=self.colors.blockquote
-                    ).pack(side="left", padx=(12, 0))
+            tk.Label(btn_row, text=hint_text, font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote).pack(
+                side="left", padx=(12, 0)
+            )
 
     def _on_profile_selected(self, name: str = None):
         """Handle profile selection from dropdown."""
@@ -164,6 +202,7 @@ class ProviderTabMixin:
 
         try:
             from ....web_server import switch_active_profile
+
             if switch_active_profile(name):
                 status_text = f"⭐ Switched to '{name}'"
                 color = self.colors.accent_green
@@ -183,8 +222,8 @@ class ProviderTabMixin:
         """Open the Connection Profile Manager window."""
         try:
             from ..connection_manager import ConnectionProfileManager
-            ConnectionProfileManager(self.root, colors=self.colors,
-                                     on_close=self._refresh_profile_dropdown)
+
+            ConnectionProfileManager(self.root, colors=self.colors, on_close=self._refresh_profile_dropdown)
         except Exception as e:
             print(f"[Settings] Error opening connection manager: {e}")
 
@@ -192,6 +231,7 @@ class ProviderTabMixin:
         """Refresh profile dropdown after connection manager closes."""
         try:
             from src.connection_profiles import ProfileStore
+
             store = ProfileStore.get_instance()
             names = store.get_profile_names()
             active = store.get_active_profile_name()
@@ -212,6 +252,7 @@ class ProviderTabMixin:
         from src.key_store import KeyStore
 
         from .widgets import DROPDOWN_WIDTH_MD, LABEL_WIDTH
+
         key_store = KeyStore.get_instance()
 
         pool_ids = key_store.get_all_pool_ids()
@@ -225,36 +266,47 @@ class ProviderTabMixin:
 
         if self.use_ctk:
             ctk.CTkLabel(
-                row, text=label_text,
-                font=get_ctk_font(13), width=LABEL_WIDTH, anchor="w",
-                **get_ctk_label_colors(self.colors)
+                row,
+                text=label_text,
+                font=get_ctk_font(13),
+                width=LABEL_WIDTH,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
             ).pack(side="left")
 
             var = tk.StringVar(master=self.root, value=self._pool_label_for(key_store, current_pool))
             dd = ctk.CTkComboBox(
-                row, variable=var, values=pool_display,
-                width=DROPDOWN_WIDTH_MD, height=34, state="readonly",
+                row,
+                variable=var,
+                values=pool_display,
+                width=DROPDOWN_WIDTH_MD,
+                height=34,
+                state="readonly",
                 font=get_ctk_font(13),
                 fg_color=self.colors.input_bg,
                 border_color=self.colors.surface1,
                 button_color=self.colors.surface1,
                 button_hover_color=self.colors.accent,
                 dropdown_fg_color=self.colors.surface0,
-                text_color=self.colors.fg
+                text_color=self.colors.fg,
             )
             dd.pack(side="left", padx=(8, 0))
         else:
             tk.Label(
-                row, text=label_text,
-                font=("Segoe UI", 10), width=LABEL_WIDTH // 8, anchor="w",
-                bg=self.colors.bg, fg=self.colors.fg
+                row,
+                text=label_text,
+                font=("Segoe UI", 10),
+                width=LABEL_WIDTH // 8,
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.fg,
             ).pack(side="left")
 
             var = tk.StringVar(master=self.root, value=self._pool_label_for(key_store, current_pool))
             from tkinter import ttk
+
             dd = ttk.Combobox(
-                row, textvariable=var, values=pool_display,
-                width=DROPDOWN_WIDTH_MD // 10, state="readonly"
+                row, textvariable=var, values=pool_display, width=DROPDOWN_WIDTH_MD // 10, state="readonly"
             )
             dd.pack(side="left", padx=(8, 0))
 

@@ -23,6 +23,7 @@ MAX_INLINE_SIZE_BYTES = 15 * 1024 * 1024
 @dataclass
 class UploadedFile:
     """Represents a file uploaded to the Gemini Files API"""
+
     name: str
     uri: str
     mime_type: str
@@ -31,18 +32,11 @@ class UploadedFile:
 
     def to_file_data_part(self) -> Dict:
         """Convert to fileData part for generateContent request"""
-        return {
-            "fileData": {
-                "mimeType": self.mime_type,
-                "fileUri": self.uri
-            }
-        }
+        return {"fileData": {"mimeType": self.mime_type, "fileUri": self.uri}}
 
 
 def upload_file(
-    provider,
-    filepath: Path,
-    display_name: Optional[str] = None
+    provider, filepath: Path, display_name: Optional[str] = None
 ) -> Tuple[Optional[UploadedFile], Optional[str]]:
     """
     Upload a file to Gemini Files API using resumable upload.
@@ -78,7 +72,7 @@ def upload_file(
     if display_name is None:
         display_name = filepath.name
 
-    provider.log("info", f"Uploading file: {filepath.name} ({file_size / (1024*1024):.1f} MB)")
+    provider.log("info", f"Uploading file: {filepath.name} ({file_size / (1024 * 1024):.1f} MB)")
 
     try:
         base = provider.base_url
@@ -93,21 +87,12 @@ def upload_file(
             "X-Goog-Upload-Command": "start",
             "X-Goog-Upload-Header-Content-Length": str(file_size),
             "X-Goog-Upload-Header-Content-Type": mime_type,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
-        init_body = {
-            "file": {
-                "display_name": display_name
-            }
-        }
+        init_body = {"file": {"display_name": display_name}}
 
-        init_response = requests.post(
-            init_url,
-            headers=init_headers,
-            json=init_body,
-            timeout=60
-        )
+        init_response = requests.post(init_url, headers=init_headers, json=init_body, timeout=60)
 
         if init_response.status_code != 200:
             return None, f"Failed to initiate upload ({init_response.status_code}): {init_response.text[:200]}"
@@ -123,15 +108,10 @@ def upload_file(
         upload_headers = {
             "Content-Length": str(file_size),
             "X-Goog-Upload-Offset": "0",
-            "X-Goog-Upload-Command": "upload, finalize"
+            "X-Goog-Upload-Command": "upload, finalize",
         }
 
-        upload_response = requests.post(
-            upload_url,
-            headers=upload_headers,
-            data=file_data,
-            timeout=300
-        )
+        upload_response = requests.post(upload_url, headers=upload_headers, data=file_data, timeout=300)
 
         if upload_response.status_code != 200:
             return None, f"Failed to upload file ({upload_response.status_code}): {upload_response.text[:200]}"
@@ -144,7 +124,7 @@ def upload_file(
             uri=file_obj.get("uri", ""),
             mime_type=mime_type,
             size_bytes=file_size,
-            display_name=display_name
+            display_name=display_name,
         )
 
         provider._uploaded_files[str(filepath)] = uploaded
@@ -226,11 +206,7 @@ def list_files(provider, page_size: int = 100) -> Tuple[Optional[List[Dict]], Op
 
 
 def create_batch(
-    provider,
-    messages: List[Dict],
-    model: str,
-    params: Dict,
-    display_name: Optional[str] = None
+    provider, messages: List[Dict], model: str, params: Dict, display_name: Optional[str] = None
 ) -> Tuple[Optional[Dict], Optional[str]]:
     """Create a batch job."""
     if not provider.key_manager or not provider.key_manager.has_keys():
@@ -243,24 +219,11 @@ def create_batch(
     url = f"{provider.base_url}/models/{model}:batchGenerateContent"
     gen_req_body = provider._build_request_body(messages, model, params, thinking_enabled=False)
 
-    req_body = {
-        "displayName": display_name or f"batch_{int(time.time())}",
-        "requests": [
-            {
-                "request": gen_req_body
-            }
-        ]
-    }
+    req_body = {"displayName": display_name or f"batch_{int(time.time())}", "requests": [{"request": gen_req_body}]}
 
     try:
         response = requests.post(
-            url,
-            headers={
-                "Content-Type": "application/json",
-                "x-goog-api-key": current_key
-            },
-            json=req_body,
-            timeout=30
+            url, headers={"Content-Type": "application/json", "x-goog-api-key": current_key}, json=req_body, timeout=30
         )
         if response.status_code != 200:
             return None, f"Failed to create batch ({response.status_code}): {response.text[:200]}"
@@ -278,11 +241,7 @@ def get_batch(provider, batch_name: str) -> Tuple[Optional[Dict], Optional[str]]
     url = f"{provider.base_url}/{batch_name}"
 
     try:
-        response = requests.get(
-            url,
-            headers={"x-goog-api-key": current_key},
-            timeout=30
-        )
+        response = requests.get(url, headers={"x-goog-api-key": current_key}, timeout=30)
         if response.status_code != 200:
             return None, f"Failed to get batch ({response.status_code}): {response.text[:200]}"
         return response.json(), None
@@ -299,11 +258,7 @@ def list_batches(provider, page_size: int = 50) -> Tuple[Optional[List[Dict]], O
     url = f"{provider.base_url}/batches?pageSize={page_size}"
 
     try:
-        response = requests.get(
-            url,
-            headers={"x-goog-api-key": current_key},
-            timeout=30
-        )
+        response = requests.get(url, headers={"x-goog-api-key": current_key}, timeout=30)
         if response.status_code != 200:
             return None, f"Failed to list batches ({response.status_code}): {response.text[:200]}"
         return response.json().get("batches", []), None
@@ -320,11 +275,7 @@ def cancel_batch(provider, batch_name: str) -> Tuple[bool, Optional[str]]:
     url = f"{provider.base_url}/{batch_name}:cancel"
 
     try:
-        response = requests.post(
-            url,
-            headers={"x-goog-api-key": current_key},
-            timeout=30
-        )
+        response = requests.post(url, headers={"x-goog-api-key": current_key}, timeout=30)
         if response.status_code != 200:
             return False, f"Failed to cancel batch ({response.status_code}): {response.text[:200]}"
         return True, None
@@ -338,7 +289,7 @@ def generate_tts(
     model: str,
     voice_name: str,
     multi_speaker_config: Optional[List[Dict]] = None,
-    retry_count: int = 0
+    retry_count: int = 0,
 ) -> Tuple[Optional[bytes], Optional[str]]:
     """Generate TTS audio using Gemini TTS models."""
     if not provider.key_manager or not provider.key_manager.has_keys():
@@ -355,10 +306,7 @@ def generate_tts(
         url = f"{GEMINI_BASE_URL}/models/{model}:generateContent"
     else:
         url = provider._get_url(model, streaming=False)
-    headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": current_key
-    }
+    headers = {"Content-Type": "application/json", "x-goog-api-key": current_key}
 
     body = _build_tts_request_body(text, voice_name, multi_speaker_config)
 
@@ -366,9 +314,12 @@ def generate_tts(
     if not key_str.startswith("#"):
         key_str = f"'{key_str}'"
 
-    provider.log("info", f"[TTS] Request: model={model}, voice={voice_name}, "
-             f"multi_speaker={'yes' if multi_speaker_config else 'no'}, "
-             f"key={key_str}, retry={retry_count}")
+    provider.log(
+        "info",
+        f"[TTS] Request: model={model}, voice={voice_name}, "
+        f"multi_speaker={'yes' if multi_speaker_config else 'no'}, "
+        f"key={key_str}, retry={retry_count}",
+    )
 
     try:
         response = requests.post(url, headers=headers, json=body, timeout=timeout)
@@ -390,9 +341,7 @@ def generate_tts(
                 if delay > 0:
                     time.sleep(delay)
 
-                return generate_tts(
-                    provider, text, model, voice_name, multi_speaker_config, retry_count + 1
-                )
+                return generate_tts(provider, text, model, voice_name, multi_speaker_config, retry_count + 1)
 
             provider.log_error(f"[TTS] API error: {error_text}", status_code)
             return None, f"TTS API error ({status_code}): {provider.sanitize_api_error(error_text, status_code)}"
@@ -417,9 +366,7 @@ def generate_tts(
                 if delay > 0:
                     time.sleep(delay)
 
-                return generate_tts(
-                    provider, text, model, voice_name, multi_speaker_config, retry_count + 1
-                )
+                return generate_tts(provider, text, model, voice_name, multi_speaker_config, retry_count + 1)
 
             return None, f"No audio data in TTS response: {e}"
 
@@ -427,8 +374,11 @@ def generate_tts(
         prompt_tokens = usage_meta.get("promptTokenCount", 0)
         total_tokens = usage_meta.get("totalTokenCount", 0)
 
-        provider.log("info", f"[TTS] Success: {len(pcm_bytes)} bytes PCM audio, "
-                 f"{prompt_tokens} prompt tokens, {total_tokens} total tokens")
+        provider.log(
+            "info",
+            f"[TTS] Success: {len(pcm_bytes)} bytes PCM audio, "
+            f"{prompt_tokens} prompt tokens, {total_tokens} total tokens",
+        )
 
         return pcm_bytes, None
 
@@ -443,9 +393,7 @@ def generate_tts(
             if delay > 0:
                 time.sleep(delay)
 
-            return generate_tts(
-                provider, text, model, voice_name, multi_speaker_config, retry_count + 1
-            )
+            return generate_tts(provider, text, model, voice_name, multi_speaker_config, retry_count + 1)
 
         return None, f"TTS request timeout after {timeout}s"
 
@@ -461,9 +409,7 @@ def generate_tts(
             if delay > 0:
                 time.sleep(delay)
 
-            return generate_tts(
-                provider, text, model, voice_name, multi_speaker_config, retry_count + 1
-            )
+            return generate_tts(provider, text, model, voice_name, multi_speaker_config, retry_count + 1)
 
         return None, f"TTS network error: {error_msg}"
 
@@ -473,48 +419,25 @@ def generate_tts(
         return None, f"TTS unexpected error: {error_msg}"
 
 
-def _build_tts_request_body(
-    text: str,
-    voice_name: str,
-    multi_speaker_config: Optional[List[Dict]] = None
-) -> Dict:
+def _build_tts_request_body(text: str, voice_name: str, multi_speaker_config: Optional[List[Dict]] = None) -> Dict:
     """Build the TTS-specific request body."""
     if multi_speaker_config and len(multi_speaker_config) > 0:
         speaker_voice_configs = []
         for speaker_cfg in multi_speaker_config:
-            speaker_voice_configs.append({
-                "speaker": speaker_cfg["speaker"],
-                "voiceConfig": {
-                    "prebuiltVoiceConfig": {
-                        "voiceName": speaker_cfg["voice_name"]
-                    }
+            speaker_voice_configs.append(
+                {
+                    "speaker": speaker_cfg["speaker"],
+                    "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": speaker_cfg["voice_name"]}},
                 }
-            })
+            )
 
-        speech_config = {
-            "multiSpeakerVoiceConfig": {
-                "speakerVoiceConfigs": speaker_voice_configs
-            }
-        }
+        speech_config = {"multiSpeakerVoiceConfig": {"speakerVoiceConfigs": speaker_voice_configs}}
     else:
-        speech_config = {
-            "voiceConfig": {
-                "prebuiltVoiceConfig": {
-                    "voiceName": voice_name
-                }
-            }
-        }
+        speech_config = {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice_name}}}
 
     body = {
-        "contents": [
-            {
-                "parts": [{"text": text}]
-            }
-        ],
-        "generationConfig": {
-            "responseModalities": ["AUDIO"],
-            "speechConfig": speech_config
-        }
+        "contents": [{"parts": [{"text": text}]}],
+        "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": speech_config},
     }
 
     return body

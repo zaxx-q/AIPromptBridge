@@ -39,7 +39,7 @@ from .utils import set_dark_titlebar, set_window_icon
 class ChatWindowBase(ABC):
     """
     Base class for chat windows with unified UI creation and message handling.
-    
+
     Subclasses must implement:
     - _create_root() -> creates the root window (CTk/Tk vs CTkToplevel/Toplevel)
     - _get_window_tag() -> return unique window tag for registration
@@ -71,8 +71,9 @@ class ChatWindowBase(ABC):
         # Model selection — per-session override takes priority over global
         self.available_models: List[Dict] = []
         from ... import web_server
+
         # Use session's model_override if set, otherwise None (will show global sentinel)
-        self.selected_model = self.session.model_override # None = use global
+        self.selected_model = self.session.model_override  # None = use global
         self._last_global_model = web_server.get_active_setting("model", "")
 
         # Profile selector mode: show profiles instead of model list
@@ -122,7 +123,7 @@ class ChatWindowBase(ABC):
 
     def _get_last_assistant_response(self) -> str:
         """Get the last assistant response from session history.
-        
+
         Used to initialize last_response when reopening an existing session,
         so that Copy Last works immediately without requiring a new API call.
         """
@@ -139,12 +140,14 @@ class ChatWindowBase(ABC):
         (A built-in Default profile always exists, so no need to check ProfileStore.)
         """
         from ... import web_server
+
         return web_server.CONFIG.get("profile_selector_enabled", True)
 
     def _get_profile_names(self) -> list:
         """Get sorted profile names from ProfileStore."""
         try:
             from ...connection_profiles import ProfileStore
+
             return ProfileStore.get_instance().get_profile_names()
         except Exception:
             return []
@@ -184,35 +187,32 @@ class ChatWindowBase(ABC):
         self._create_input_area()
         self._create_action_buttons()
         # Ensure row resizing behavior
-        self.root.rowconfigure(2, weight=1) # Chat area expands
-        self.root.rowconfigure(3, weight=0) # Input area fixed
-        self.root.rowconfigure(4, weight=0) # Attachments fixed
-
+        self.root.rowconfigure(2, weight=1)  # Chat area expands
+        self.root.rowconfigure(3, weight=0)  # Input area fixed
+        self.root.rowconfigure(4, weight=0)  # Attachments fixed
 
         register_window(self._get_window_tag())
         self.root.protocol("WM_DELETE_WINDOW", self._close)
 
         # Subscribe to config changes for global sentinel updates
         from ...config import subscribe_config_change
+
         subscribe_config_change(self._on_config_changed)
 
     def _create_info_label(self):
         """Create session info label."""
         from ... import web_server
+
         current_provider = web_server.get_active_setting("provider", "google")
         info_text = f"Session: {self.session.session_id} | Origin: {self.session.origin} | Provider: {current_provider}"
 
         if HAVE_CTK:
-            ctk.CTkLabel(
-                self.root,
-                text=info_text,
-                font=get_ctk_font(size=11),
-                text_color=self.theme.blockquote
-            ).grid(row=0, column=0, sticky="w", padx=15, pady=(5, 2)) # Reduced padding
+            ctk.CTkLabel(self.root, text=info_text, font=get_ctk_font(size=11), text_color=self.theme.blockquote).grid(
+                row=0, column=0, sticky="w", padx=15, pady=(5, 2)
+            )  # Reduced padding
         else:
             tk.Label(
-                self.root, text=info_text, font=("Segoe UI", 9),
-                bg=self.colors["bg"], fg=self.colors["blockquote"]
+                self.root, text=info_text, font=("Segoe UI", 9), bg=self.colors["bg"], fg=self.colors["blockquote"]
             ).grid(row=0, column=0, sticky=tk.W, padx=15, pady=(5, 2))
 
     def _create_toolbar(self):
@@ -232,7 +232,7 @@ class ChatWindowBase(ABC):
                 height=28,
                 corner_radius=6,
                 command=self._rename_session,
-                **warn_colors
+                **warn_colors,
             )
             self.rename_btn.pack(side="left", padx=(0, 2))
 
@@ -246,7 +246,7 @@ class ChatWindowBase(ABC):
                 height=28,
                 corner_radius=6,
                 command=self._delete_session,
-                **danger_colors
+                **danger_colors,
             )
             self.delete_btn.pack(side="left", padx=(0, 8))
 
@@ -261,7 +261,7 @@ class ChatWindowBase(ABC):
                 height=28,
                 corner_radius=6,
                 command=self._toggle_wrap,
-                **btn_colors
+                **btn_colors,
             )
             self.wrap_btn.pack(side="left", padx=2)
 
@@ -273,7 +273,7 @@ class ChatWindowBase(ABC):
                 height=28,
                 corner_radius=6,
                 command=self._toggle_markdown,
-                **btn_colors
+                **btn_colors,
             )
             self.md_btn.pack(side="left", padx=2)
 
@@ -285,7 +285,7 @@ class ChatWindowBase(ABC):
                 height=28,
                 corner_radius=6,
                 command=self._toggle_autoscroll,
-                **btn_colors
+                **btn_colors,
             )
             self.scroll_btn.pack(side="left", padx=2)
 
@@ -299,69 +299,90 @@ class ChatWindowBase(ABC):
                 initial_display = self.selected_model or self._get_global_sentinel()
 
             self.model_dropdown = ScrollableComboBox(
-                btn_frame,
-                colors=self.theme,
-                values=initial_values,
-                width=220,
-                height=28,
-                command=self._on_model_select
+                btn_frame, colors=self.theme, values=initial_values, width=220, height=28, command=self._on_model_select
             )
             self.model_dropdown.pack(side="right", padx=(5, 0))
             self.model_dropdown.set(initial_display)
 
             self.model_label_widget = ctk.CTkLabel(
-                btn_frame,
-                text=dropdown_label,
-                font=get_ctk_font(size=11),
-                text_color=self.theme.fg
+                btn_frame, text=dropdown_label, font=get_ctk_font(size=11), text_color=self.theme.fg
             )
             self.model_label_widget.pack(side="right", padx=(0, 5))
         else:
             from tkinter import ttk
+
             btn_frame = tk.Frame(self.root, bg=self.colors["bg"])
             btn_frame.grid(row=1, column=0, sticky=tk.EW, padx=15, pady=5)
 
             # Session action buttons (left side)
             self.rename_btn = tk.Button(
-                btn_frame, text="✏️", font=("Segoe UI", 10),
+                btn_frame,
+                text="✏️",
+                font=("Segoe UI", 10),
                 bg=self.colors.get("accent_yellow", "#f9e2af"),
                 fg=self.colors["bg"],
-                relief=tk.FLAT, padx=4, pady=4,
-                command=self._rename_session, cursor="hand2"
+                relief=tk.FLAT,
+                padx=4,
+                pady=4,
+                command=self._rename_session,
+                cursor="hand2",
             )
             self.rename_btn.pack(side=tk.LEFT, padx=(0, 2))
 
             self.delete_btn = tk.Button(
-                btn_frame, text="🗑️", font=("Segoe UI", 10),
+                btn_frame,
+                text="🗑️",
+                font=("Segoe UI", 10),
                 bg=self.colors.get("accent_red", "#f38ba8"),
                 fg=self.colors["accent_fg"],
-                relief=tk.FLAT, padx=4, pady=4,
-                command=self._delete_session, cursor="hand2"
+                relief=tk.FLAT,
+                padx=4,
+                pady=4,
+                command=self._delete_session,
+                cursor="hand2",
             )
             self.delete_btn.pack(side=tk.LEFT, padx=(0, 8))
 
             # Toggle buttons
             self.wrap_btn = tk.Button(
-                btn_frame, text="Wrap: ON", font=("Segoe UI", 9),
-                bg=self.colors["button_bg"], fg=self.colors["fg"],
-                relief=tk.FLAT, padx=8, pady=4,
-                command=self._toggle_wrap, cursor="hand2"
+                btn_frame,
+                text="Wrap: ON",
+                font=("Segoe UI", 9),
+                bg=self.colors["button_bg"],
+                fg=self.colors["fg"],
+                relief=tk.FLAT,
+                padx=8,
+                pady=4,
+                command=self._toggle_wrap,
+                cursor="hand2",
             )
             self.wrap_btn.pack(side=tk.LEFT, padx=2)
 
             self.md_btn = tk.Button(
-                btn_frame, text="Markdown", font=("Segoe UI", 9),
-                bg=self.colors["button_bg"], fg=self.colors["fg"],
-                relief=tk.FLAT, padx=8, pady=4,
-                command=self._toggle_markdown, cursor="hand2"
+                btn_frame,
+                text="Markdown",
+                font=("Segoe UI", 9),
+                bg=self.colors["button_bg"],
+                fg=self.colors["fg"],
+                relief=tk.FLAT,
+                padx=8,
+                pady=4,
+                command=self._toggle_markdown,
+                cursor="hand2",
             )
             self.md_btn.pack(side=tk.LEFT, padx=2)
 
             self.scroll_btn = tk.Button(
-                btn_frame, text="Autoscroll: ON", font=("Segoe UI", 9),
-                bg=self.colors["button_bg"], fg=self.colors["fg"],
-                relief=tk.FLAT, padx=8, pady=4,
-                command=self._toggle_autoscroll, cursor="hand2"
+                btn_frame,
+                text="Autoscroll: ON",
+                font=("Segoe UI", 9),
+                bg=self.colors["button_bg"],
+                fg=self.colors["fg"],
+                relief=tk.FLAT,
+                padx=8,
+                pady=4,
+                command=self._toggle_autoscroll,
+                cursor="hand2",
             )
             self.scroll_btn.pack(side=tk.LEFT, padx=2)
 
@@ -374,16 +395,13 @@ class ChatWindowBase(ABC):
                 initial_values = ["(loading...)"]
                 initial_display = self.selected_model or self._get_global_sentinel()
 
-            self.model_dropdown = ttk.Combobox(
-                btn_frame, values=initial_values, width=30, state="readonly"
-            )
+            self.model_dropdown = ttk.Combobox(btn_frame, values=initial_values, width=30, state="readonly")
             self.model_dropdown.pack(side=tk.RIGHT, padx=(5, 0))
             self.model_dropdown.set(initial_display)
             self.model_dropdown.bind("<<ComboboxSelected>>", lambda e: self._on_model_select(self.model_dropdown.get()))
 
             self.model_label_widget = tk.Label(
-                btn_frame, text=dropdown_label, font=("Segoe UI", 9),
-                bg=self.colors["bg"], fg=self.colors["fg"]
+                btn_frame, text=dropdown_label, font=("Segoe UI", 9), bg=self.colors["bg"], fg=self.colors["fg"]
             )
             self.model_label_widget.pack(side=tk.RIGHT, padx=(0, 5))
 
@@ -393,18 +411,14 @@ class ChatWindowBase(ABC):
     def _schedule_model_loading(self):
         """Schedule model loading - skip in profile mode (profiles are local)."""
         if self._use_profile_mode:
-            return # Profile names already populated in _create_toolbar
+            return  # Profile names already populated in _create_toolbar
         threading.Thread(target=self._load_models, daemon=True).start()
 
     def _create_chat_area(self):
         """Create the chat display area (hybrid: CTkFrame + tk.Text for markdown)."""
         if HAVE_CTK:
             chat_frame = ctk.CTkFrame(
-                self.root,
-                corner_radius=10,
-                fg_color=self.theme.text_bg,
-                border_color=self.theme.border,
-                border_width=1
+                self.root, corner_radius=10, fg_color=self.theme.text_bg, border_color=self.theme.border, border_width=1
             )
             chat_frame.grid(row=2, column=0, sticky="nsew", padx=15, pady=5)
             chat_frame.columnconfigure(0, weight=1)
@@ -423,17 +437,13 @@ class ChatWindowBase(ABC):
                 highlightthickness=0,
                 padx=12,
                 pady=12,
-                borderwidth=0
+                borderwidth=0,
             )
             self.chat_text.grid(row=0, column=0, sticky="nsew", padx=(8, 0), pady=8)
 
             scrollbar_colors = get_ctk_scrollbar_colors(self.theme)
             self.v_scrollbar = ctk.CTkScrollbar(
-                chat_frame,
-                command=self.chat_text.yview,
-                corner_radius=4,
-                width=14,
-                **scrollbar_colors
+                chat_frame, command=self.chat_text.yview, corner_radius=4, width=14, **scrollbar_colors
             )
             self.v_scrollbar.grid(row=0, column=1, sticky="ns", padx=(0, 4), pady=8)
             self.chat_text.configure(yscrollcommand=self.v_scrollbar.set)
@@ -444,17 +454,16 @@ class ChatWindowBase(ABC):
                 command=self.chat_text.xview,
                 corner_radius=4,
                 height=14,
-                **scrollbar_colors
+                **scrollbar_colors,
             )
             self.h_scrollbar.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 4))
             self.h_scrollbar.grid_remove()
             self.chat_text.configure(xscrollcommand=self.h_scrollbar.set)
         else:
             from tkinter import ttk
+
             chat_frame = tk.Frame(
-                self.root, bg=self.colors["text_bg"],
-                highlightbackground=self.colors["border"],
-                highlightthickness=1
+                self.root, bg=self.colors["text_bg"], highlightbackground=self.colors["border"], highlightthickness=1
             )
             chat_frame.grid(row=2, column=0, sticky=tk.NSEW, padx=15, pady=5)
             chat_frame.columnconfigure(0, weight=1)
@@ -473,7 +482,7 @@ class ChatWindowBase(ABC):
                 highlightthickness=0,
                 padx=12,
                 pady=12,
-                borderwidth=0
+                borderwidth=0,
             )
             self.chat_text.grid(row=0, column=0, sticky="nsew", padx=(8, 0), pady=8)
 
@@ -511,16 +520,13 @@ class ChatWindowBase(ABC):
                 corner_radius=8,
                 border_width=1,
                 wrap="word",
-                **textbox_colors
+                **textbox_colors,
             )
             self.input_text.grid(row=0, column=0, sticky="ew", padx=(0, 5))
 
             # Pending attachments indicator (inside input frame now)
             self._attachments_label = ctk.CTkLabel(
-                input_frame,
-                text="",
-                font=get_ctk_font(size=10),
-                text_color=self.theme.accent_yellow
+                input_frame, text="", font=get_ctk_font(size=10), text_color=self.theme.accent_yellow
             )
 
             # Attachment button (📎)
@@ -533,13 +539,13 @@ class ChatWindowBase(ABC):
                 height=40,
                 corner_radius=8,
                 command=self._on_attach_click,
-                **attach_colors
+                **attach_colors,
             )
             self.attach_btn.grid(row=0, column=1, sticky="n", pady=5)
 
             # Pending attachments preview frame (below input)
             self.attachments_frame = ctk.CTkFrame(self.root, fg_color="transparent", height=0)
-            self.attachments_frame.grid(row=4, column=0, sticky="ew", padx=15) # Row 5 -> 4
+            self.attachments_frame.grid(row=4, column=0, sticky="ew", padx=15)  # Row 5 -> 4
             self.attachments_frame.grid_remove()  # Initially hidden
 
             self.input_text.insert("0.0", placeholder)
@@ -569,13 +575,14 @@ class ChatWindowBase(ABC):
             def on_ctrl_backspace(event):
                 try:
                     import re
+
                     cursor_pos = self.input_text.index(tk.INSERT)
-                    line, col = map(int, cursor_pos.split('.'))
+                    line, col = map(int, cursor_pos.split("."))
                     if col == 0:
                         return None
                     line_start = f"{line}.0"
                     text_before = self.input_text.get(line_start, cursor_pos)
-                    match = re.search(r'(\s*\S+\s*)$', text_before)
+                    match = re.search(r"(\s*\S+\s*)$", text_before)
                     if match:
                         delete_start = f"{line}.{col - len(match.group(0))}"
                         self.input_text.delete(delete_start, cursor_pos)
@@ -583,11 +590,11 @@ class ChatWindowBase(ABC):
                 except Exception:
                     return None
 
-            self.input_text.bind('<FocusIn>', on_focus_in)
-            self.input_text.bind('<FocusOut>', on_focus_out)
-            self.input_text.bind('<Return>', on_key_return)
-            self.input_text.bind('<Control-BackSpace>', on_ctrl_backspace)
-            self.input_text.bind('<Control-v>', self._on_paste)
+            self.input_text.bind("<FocusIn>", on_focus_in)
+            self.input_text.bind("<FocusOut>", on_focus_out)
+            self.input_text.bind("<Return>", on_key_return)
+            self.input_text.bind("<Control-BackSpace>", on_ctrl_backspace)
+            self.input_text.bind("<Control-v>", self._on_paste)
         else:
             input_frame = tk.Frame(self.root, bg=self.colors["bg"])
             # Moved up to row 3 (was 4), removed header frame
@@ -606,28 +613,33 @@ class ChatWindowBase(ABC):
                 highlightthickness=1,
                 padx=8,
                 pady=8,
-                wrap=tk.WORD
+                wrap=tk.WORD,
             )
             self.input_text.grid(row=0, column=0, sticky="ew", padx=(0, 5))
 
             # Pending attachments indicator
             self._attachments_label = tk.Label(
-                input_frame, text="", font=("Segoe UI", 9),
-                bg=self.colors["bg"], fg=self.colors["accent"]
+                input_frame, text="", font=("Segoe UI", 9), bg=self.colors["bg"], fg=self.colors["accent"]
             )
 
             # Attachment button
             self.attach_btn = tk.Button(
-                input_frame, text="📎", font=("Segoe UI", 14),
-                bg=self.colors["button_bg"], fg=self.colors["fg"],
-                relief=tk.FLAT, width=3, height=2,
-                command=self._on_attach_click, cursor="hand2"
+                input_frame,
+                text="📎",
+                font=("Segoe UI", 14),
+                bg=self.colors["button_bg"],
+                fg=self.colors["fg"],
+                relief=tk.FLAT,
+                width=3,
+                height=2,
+                command=self._on_attach_click,
+                cursor="hand2",
             )
             self.attach_btn.grid(row=0, column=1, sticky="n", pady=5)
 
             # Pending attachments preview frame
             self.attachments_frame = tk.Frame(self.root, bg=self.colors["bg"])
-            self.attachments_frame.grid(row=4, column=0, sticky=tk.EW, padx=15) # Row 5 -> 4
+            self.attachments_frame.grid(row=4, column=0, sticky=tk.EW, padx=15)  # Row 5 -> 4
             self.attachments_frame.grid_remove()  # Initially hidden
 
             self.input_text.insert("1.0", placeholder)
@@ -654,16 +666,16 @@ class ChatWindowBase(ABC):
                     self._send()
                     return "break"
 
-            self.input_text.bind('<FocusIn>', on_focus_in)
-            self.input_text.bind('<FocusOut>', on_focus_out)
-            self.input_text.bind('<Return>', on_key_return)
-            self.input_text.bind('<Control-v>', self._on_paste)
+            self.input_text.bind("<FocusIn>", on_focus_in)
+            self.input_text.bind("<FocusOut>", on_focus_out)
+            self.input_text.bind("<Return>", on_key_return)
+            self.input_text.bind("<Control-v>", self._on_paste)
 
     def _create_action_buttons(self):
         """Create the action button row."""
         if HAVE_CTK:
             btn_row = ctk.CTkFrame(self.root, fg_color="transparent")
-            btn_row.grid(row=5, column=0, sticky="ew", padx=15, pady=(5, 15)) # Row 6 -> 5
+            btn_row.grid(row=5, column=0, sticky="ew", padx=15, pady=(5, 15))  # Row 6 -> 5
 
             send_colors = get_ctk_button_colors(self.theme, "success")
             send_content = prepare_emoji_content("📤 Send", size=16)
@@ -675,7 +687,7 @@ class ChatWindowBase(ABC):
                 height=32,
                 corner_radius=8,
                 command=self._send,
-                **send_colors
+                **send_colors,
             )
             self.send_btn.pack(side="left", padx=2)
 
@@ -690,7 +702,7 @@ class ChatWindowBase(ABC):
                 height=32,
                 corner_radius=8,
                 command=self._regenerate,
-                **regen_colors
+                **regen_colors,
             )
             self.regen_btn.pack(side="left", padx=2)
 
@@ -704,7 +716,7 @@ class ChatWindowBase(ABC):
                 height=32,
                 corner_radius=8,
                 command=self._copy_all,
-                **sec_colors
+                **sec_colors,
             ).pack(side="left", padx=2)
 
             ctk.CTkButton(
@@ -715,7 +727,7 @@ class ChatWindowBase(ABC):
                 height=32,
                 corner_radius=8,
                 command=self._copy_last,
-                **sec_colors
+                **sec_colors,
             ).pack(side="left", padx=2)
 
             ctk.CTkButton(
@@ -726,50 +738,63 @@ class ChatWindowBase(ABC):
                 height=32,
                 corner_radius=8,
                 command=self._close,
-                **sec_colors
+                **sec_colors,
             ).pack(side="left", padx=2)
 
             self.status_label = ctk.CTkLabel(
-                btn_row,
-                text="",
-                font=get_ctk_font(size=11),
-                text_color=self.theme.accent_green
+                btn_row, text="", font=get_ctk_font(size=11), text_color=self.theme.accent_green
             )
             self.status_label.pack(side="left", padx=15)
         else:
             btn_row = tk.Frame(self.root, bg=self.colors["bg"])
-            btn_row.grid(row=5, column=0, sticky=tk.EW, padx=15, pady=(5, 15)) # Row 6 -> 5
+            btn_row.grid(row=5, column=0, sticky=tk.EW, padx=15, pady=(5, 15))  # Row 6 -> 5
 
             self.send_btn = tk.Button(
-                btn_row, text="Send", font=("Segoe UI", 10, "bold"),
-                bg=self.colors["accent"], fg=self.colors["accent_fg"],
-                relief=tk.FLAT, padx=12, pady=6,
-                command=self._send, cursor="hand2"
+                btn_row,
+                text="Send",
+                font=("Segoe UI", 10, "bold"),
+                bg=self.colors["accent"],
+                fg=self.colors["accent_fg"],
+                relief=tk.FLAT,
+                padx=12,
+                pady=6,
+                command=self._send,
+                cursor="hand2",
             )
             self.send_btn.pack(side=tk.LEFT, padx=2)
 
             # Regenerate button (warning/yellow color)
             self.regen_btn = tk.Button(
-                btn_row, text="🔄 Regen", font=("Segoe UI", 10),
+                btn_row,
+                text="🔄 Regen",
+                font=("Segoe UI", 10),
                 bg=self.colors.get("accent_yellow", "#f9e2af"),
                 fg=self.colors["bg"],
-                relief=tk.FLAT, padx=10, pady=6,
-                command=self._regenerate, cursor="hand2"
+                relief=tk.FLAT,
+                padx=10,
+                pady=6,
+                command=self._regenerate,
+                cursor="hand2",
             )
             self.regen_btn.pack(side=tk.LEFT, padx=2)
 
             for text, cmd in [("Copy All", self._copy_all), ("Copy Last", self._copy_last), ("Close", self._close)]:
                 btn = tk.Button(
-                    btn_row, text=text, font=("Segoe UI", 10),
-                    bg=self.colors["button_bg"], fg=self.colors["fg"],
-                    relief=tk.FLAT, padx=10, pady=6,
-                    command=cmd, cursor="hand2"
+                    btn_row,
+                    text=text,
+                    font=("Segoe UI", 10),
+                    bg=self.colors["button_bg"],
+                    fg=self.colors["fg"],
+                    relief=tk.FLAT,
+                    padx=10,
+                    pady=6,
+                    command=cmd,
+                    cursor="hand2",
                 )
                 btn.pack(side=tk.LEFT, padx=2)
 
             self.status_label = tk.Label(
-                btn_row, text="", font=("Segoe UI", 9),
-                bg=self.colors["bg"], fg=self.colors["accent"]
+                btn_row, text="", font=("Segoe UI", 9), bg=self.colors["bg"], fg=self.colors["accent"]
             )
             self.status_label.pack(side=tk.LEFT, padx=15)
 
@@ -787,7 +812,7 @@ class ChatWindowBase(ABC):
             saved_scroll = self.chat_text.yview()
 
         # Clear previous thumbnail references to allow garbage collection
-        if hasattr(self, '_chat_thumbnails'):
+        if hasattr(self, "_chat_thumbnails"):
             self._chat_thumbnails.clear()
         else:
             self._chat_thumbnails = []
@@ -847,22 +872,25 @@ class ChatWindowBase(ABC):
             more_tag = f"more_{i}"
             for atag in (edit_tag, rerun_tag, more_tag):
                 self.chat_text.tag_configure(atag)
-                self.chat_text.tag_bind(atag, "<Enter>",
+                self.chat_text.tag_bind(
+                    atag,
+                    "<Enter>",
                     lambda e, t=atag: (
                         self.chat_text.config(cursor="hand2"),
-                        self.chat_text.tag_configure(t, foreground=self.theme.accent)
-                    ))
-                self.chat_text.tag_bind(atag, "<Leave>",
+                        self.chat_text.tag_configure(t, foreground=self.theme.accent),
+                    ),
+                )
+                self.chat_text.tag_bind(
+                    atag,
+                    "<Leave>",
                     lambda e, t=atag: (
                         self.chat_text.config(cursor=""),
-                        self.chat_text.tag_configure(t, foreground="")
-                    ))
-            self.chat_text.tag_bind(edit_tag, "<Button-1>",
-                lambda e, idx=i: self._edit_message(idx))
-            self.chat_text.tag_bind(rerun_tag, "<Button-1>",
-                lambda e, idx=i: self._rerun_turn(idx))
-            self.chat_text.tag_bind(more_tag, "<Button-1>",
-                lambda e, idx=i: self._show_message_context_menu(e, idx))
+                        self.chat_text.tag_configure(t, foreground=""),
+                    ),
+                )
+            self.chat_text.tag_bind(edit_tag, "<Button-1>", lambda e, idx=i: self._edit_message(idx))
+            self.chat_text.tag_bind(rerun_tag, "<Button-1>", lambda e, idx=i: self._rerun_turn(idx))
+            self.chat_text.tag_bind(more_tag, "<Button-1>", lambda e, idx=i: self._show_message_context_menu(e, idx))
 
             self.chat_text.insert(tk.END, "  edit", ("action_icon", edit_tag, message_tag))
             self.chat_text.insert(tk.END, "  rerun", ("action_icon", rerun_tag, message_tag))
@@ -880,18 +908,18 @@ class ChatWindowBase(ABC):
 
                 # Create per-message thinking header tag
                 thinking_tag = f"thinking_header_{i}"
-                self.chat_text.tag_configure(thinking_tag,
+                self.chat_text.tag_configure(
+                    thinking_tag,
                     font=("Segoe UI", 10, "bold"),
                     foreground=self.theme.accent_yellow,
-                    spacing1=2, spacing3=2)
+                    spacing1=2,
+                    spacing3=2,
+                )
 
                 # Bind click event for this specific message
-                self.chat_text.tag_bind(thinking_tag, "<Button-1>",
-                    lambda e, idx=i: self._toggle_thinking(idx))
-                self.chat_text.tag_bind(thinking_tag, "<Enter>",
-                    lambda e: self.chat_text.config(cursor="hand2"))
-                self.chat_text.tag_bind(thinking_tag, "<Leave>",
-                    lambda e: self.chat_text.config(cursor=""))
+                self.chat_text.tag_bind(thinking_tag, "<Button-1>", lambda e, idx=i: self._toggle_thinking(idx))
+                self.chat_text.tag_bind(thinking_tag, "<Enter>", lambda e: self.chat_text.config(cursor="hand2"))
+                self.chat_text.tag_bind(thinking_tag, "<Leave>", lambda e: self.chat_text.config(cursor=""))
 
                 # Insert thinking header
                 thinking_header = "▶ Thinking..." if is_collapsed else "▼ Thinking:"
@@ -900,28 +928,42 @@ class ChatWindowBase(ABC):
                 # Show thinking content if expanded
                 if not is_collapsed:
                     if self.markdown:
-                        render_markdown(thinking, self.chat_text, self.colors,
-                                      wrap=self.wrapped, as_role="thinking",
-                                      block_tag="thinking_block_layout", enable_emojis=True,
-                                      line_prefix="    ")
+                        render_markdown(
+                            thinking,
+                            self.chat_text,
+                            self.colors,
+                            wrap=self.wrapped,
+                            as_role="thinking",
+                            block_tag="thinking_block_layout",
+                            enable_emojis=True,
+                            line_prefix="    ",
+                        )
                     else:
-                        for t_line in thinking.split('\n'):
-                            self.chat_text.insert(tk.END, "    " + t_line + "\n", ("thinking_content", "thinking_block_layout"))
+                        for t_line in thinking.split("\n"):
+                            self.chat_text.insert(
+                                tk.END, "    " + t_line + "\n", ("thinking_content", "thinking_block_layout")
+                            )
 
                     # Insert separator between thinking and answer
                     self.chat_text.insert(tk.END, "  " + "─" * 36 + "\n", ("thinking_end_sep", "thinking_block_layout"))
 
             # Render content
             if self.markdown:
-                render_markdown(content, self.chat_text, self.colors,
-                              wrap=self.wrapped, as_role=role,
-                              block_tag=message_tag, enable_emojis=True,
-                              line_prefix="  ")
+                render_markdown(
+                    content,
+                    self.chat_text,
+                    self.colors,
+                    wrap=self.wrapped,
+                    as_role=role,
+                    block_tag=message_tag,
+                    enable_emojis=True,
+                    line_prefix="  ",
+                )
             else:
                 self.chat_text.configure(wrap=tk.WORD if self.wrapped else tk.NONE)
-                for c_idx, c_line in enumerate(content.split('\n')):
+                for c_idx, c_line in enumerate(content.split("\n")):
                     self.chat_text.insert(tk.END, "  " + c_line, ("normal", message_tag))
-                    if c_idx < len(content.split('\n')) - 1:
+                    if c_idx < len(content.split("\n")) - 1:
                         self.chat_text.insert(tk.END, "\n", (message_tag,))
 
             # End of card - add trailing newline
@@ -950,7 +992,7 @@ class ChatWindowBase(ABC):
         try:
             gap_pos = self.chat_text.search("▌ Assistant", "end", backwards=True)
             if gap_pos:
-                line_num = int(gap_pos.split('.')[0])
+                line_num = int(gap_pos.split(".")[0])
                 if line_num > 1:
                     self.chat_text.delete(f"{line_num - 1}.0", tk.END)
         except:
@@ -979,7 +1021,7 @@ class ChatWindowBase(ABC):
             thinking_header = "▶ Thinking..." if is_collapsed else "▼ Thinking:"
             self.chat_text.insert(tk.END, f"  {thinking_header}\n", ("thinking_header", "thinking_block_layout"))
             if not is_collapsed:
-                for t_line in self.streaming_thinking.split('\n'):
+                for t_line in self.streaming_thinking.split("\n"):
                     self.chat_text.insert(tk.END, "    " + t_line + "\n", ("thinking_content", "thinking_block_layout"))
 
             # Add separator after thinking (even while streaming)
@@ -988,9 +1030,9 @@ class ChatWindowBase(ABC):
 
         # Streaming content
         if self.streaming_text:
-            for c_idx, c_line in enumerate(self.streaming_text.split('\n')):
+            for c_idx, c_line in enumerate(self.streaming_text.split("\n")):
                 self.chat_text.insert(tk.END, "  " + c_line, ("normal", message_tag))
-                if c_idx < len(self.streaming_text.split('\n')) - 1:
+                if c_idx < len(self.streaming_text.split("\n")) - 1:
                     self.chat_text.insert(tk.END, "\n", (message_tag,))
         else:
             self.chat_text.insert(tk.END, "  ...", ("normal", message_tag))
@@ -1040,9 +1082,11 @@ class ChatWindowBase(ABC):
 
     def _on_thinking_click(self, event):
         """Legacy handler - toggles all thinking sections."""
-        all_collapsed = all(self.thinking_collapsed_states.get(i, True)
-                          for i, msg in enumerate(self.session.messages)
-                          if msg.get("thinking"))
+        all_collapsed = all(
+            self.thinking_collapsed_states.get(i, True)
+            for i, msg in enumerate(self.session.messages)
+            if msg.get("thinking")
+        )
         for i, msg in enumerate(self.session.messages):
             if msg.get("thinking"):
                 self.thinking_collapsed_states[i] = not all_collapsed
@@ -1069,6 +1113,7 @@ class ChatWindowBase(ABC):
     def _get_global_sentinel(self) -> str:
         """Build the '(Use Global: <model>)' sentinel label from current config."""
         from ... import web_server
+
         global_model = web_server.get_active_setting("model", "")
         return f"(Use Global: {global_model})" if global_model else "(Use Global)"
 
@@ -1084,7 +1129,7 @@ class ChatWindowBase(ABC):
 
             if models and not error and not self._destroyed:
                 self.available_models = models
-                model_ids = [m['id'] for m in models]
+                model_ids = [m["id"] for m in models]
 
                 def update_dropdown():
                     if self._destroyed:
@@ -1149,6 +1194,7 @@ class ChatWindowBase(ABC):
             if not self._destroyed:
                 try:
                     from ... import web_server
+
                     provider = web_server.get_active_setting("default_provider", "google")
                 except Exception:
                     provider = "google"
@@ -1179,7 +1225,7 @@ class ChatWindowBase(ABC):
 
     def _on_config_changed(self, key: str, value=None):
         """Handle config change events — marshal to GUI thread for sentinel update.
-        
+
         Called from any thread (config pub/sub). Uses _safe_after to schedule
         the actual UI update on the main thread.
         """
@@ -1196,9 +1242,10 @@ class ChatWindowBase(ABC):
     def _refresh_global_sentinel(self):
         """Update the global sentinel label in the dropdown when the global model changes."""
         if self._destroyed or self._use_profile_mode:
-            return # Profile mode doesn't use the global model sentinel
+            return  # Profile mode doesn't use the global model sentinel
         try:
             from ... import web_server
+
             current_global = web_server.get_active_setting("model", "")
 
             if current_global != self._last_global_model:
@@ -1207,7 +1254,7 @@ class ChatWindowBase(ABC):
 
                 # Rebuild dropdown values with updated sentinel
                 if self.available_models:
-                    model_ids = [m['id'] for m in self.available_models]
+                    model_ids = [m["id"] for m in self.available_models]
                     dropdown_values = [new_sentinel] + model_ids
 
                     if HAVE_CTK:
@@ -1267,7 +1314,7 @@ class ChatWindowBase(ABC):
                 self._update_status("✅ Using global settings", self.theme.accent_green)
             else:
                 self.session.profile_override = selected
-                self.session.model_override = None # Profile handles model
+                self.session.model_override = None  # Profile handles model
                 self.selected_model = None
                 self._update_status(f"✅ Using profile: {selected}", self.theme.accent_green)
         else:
@@ -1334,6 +1381,7 @@ class ChatWindowBase(ABC):
             self.session.messages.pop()
             # Save session after modifying messages
             from ... import web_server
+
             add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
             self._update_chat_display(scroll_to_bottom=True)
             self._update_status("Regenerating response...")
@@ -1346,7 +1394,7 @@ class ChatWindowBase(ABC):
 
     def _regenerate_response(self, on_complete=None):
         """Internal method to regenerate without adding new user message.
-        
+
         Args:
             on_complete: Optional callback invoked after successful response,
                         before display update. Used by _rerun_turn() to restore
@@ -1359,7 +1407,7 @@ class ChatWindowBase(ABC):
         self.is_loading = True
         if HAVE_CTK:
             self.send_btn.configure(state="disabled")
-            if hasattr(self, 'regen_btn') and self.regen_btn:
+            if hasattr(self, "regen_btn") and self.regen_btn:
                 self.regen_btn.configure(state="disabled")
             if self.rename_btn:
                 self.rename_btn.configure(state="disabled")
@@ -1370,7 +1418,7 @@ class ChatWindowBase(ABC):
                 self.attach_btn.configure(state="disabled")
         else:
             self.send_btn.configure(state=tk.DISABLED)
-            if hasattr(self, 'regen_btn') and self.regen_btn:
+            if hasattr(self, "regen_btn") and self.regen_btn:
                 self.regen_btn.configure(state=tk.DISABLED)
             if self.rename_btn:
                 self.rename_btn.configure(state=tk.DISABLED)
@@ -1394,12 +1442,10 @@ class ChatWindowBase(ABC):
             # Always resolve profile to get a merged config with connection keys
             if self.session.profile_override:
                 resolved = resolve_profile_by_name(
-                    self.session.profile_override, web_server.CONFIG,
-                    web_server.AI_PARAMS, web_server.KEY_MANAGERS
+                    self.session.profile_override, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS
                 )
             else:
-                resolved = resolve_profile(None, web_server.CONFIG,
-                    web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+                resolved = resolve_profile(None, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
 
             current_provider = resolved.provider
             current_model = self.session.model_override or resolved.model
@@ -1415,7 +1461,7 @@ class ChatWindowBase(ABC):
                 model=current_model,
                 streaming=streaming_enabled,
                 thinking_enabled=thinking_enabled,
-                session_id=str(self.session.session_id)
+                session_id=str(self.session.session_id),
             )
 
             def on_text(content):
@@ -1438,27 +1484,20 @@ class ChatWindowBase(ABC):
                     return
                 self._safe_after(0, lambda: self._update_status(f"Error: {content}", self.theme.accent_red))
 
-            callbacks = StreamCallback(
-                on_text=on_text,
-                on_thinking=on_thinking,
-                on_usage=on_usage,
-                on_error=on_error
-            )
+            callbacks = StreamCallback(on_text=on_text, on_thinking=on_thinking, on_usage=on_usage, on_error=on_error)
 
             self.is_streaming = True
             self._safe_after(0, lambda: self._update_status("Streaming..." if streaming_enabled else "Processing..."))
 
             if streaming_enabled and current_provider in ("custom", "google", "openrouter"):
                 ctx = RequestPipeline.execute_streaming(
-                    ctx, self.session, effective_config, effective_ai_params,
-                    effective_key_managers, callbacks
+                    ctx, self.session, effective_config, effective_ai_params, effective_key_managers, callbacks
                 )
             else:
                 self.is_streaming = False
                 messages = self.session.get_conversation_for_api(include_image=True)
                 ctx = RequestPipeline.execute_simple(
-                    ctx, messages, effective_config, effective_ai_params,
-                    effective_key_managers
+                    ctx, messages, effective_config, effective_ai_params, effective_key_managers
                 )
 
             self.is_streaming = False
@@ -1466,7 +1505,7 @@ class ChatWindowBase(ABC):
                 "prompt_tokens": ctx.input_tokens,
                 "completion_tokens": ctx.output_tokens,
                 "total_tokens": ctx.total_tokens,
-                "estimated": ctx.estimated
+                "estimated": ctx.estimated,
             }
 
             if self._destroyed:
@@ -1514,7 +1553,7 @@ class ChatWindowBase(ABC):
                 self.is_loading = False
                 if HAVE_CTK:
                     self.send_btn.configure(state="normal")
-                    if hasattr(self, 'regen_btn') and self.regen_btn:
+                    if hasattr(self, "regen_btn") and self.regen_btn:
                         self.regen_btn.configure(state="normal")
                     if self.rename_btn:
                         self.rename_btn.configure(state="normal")
@@ -1525,7 +1564,7 @@ class ChatWindowBase(ABC):
                         self.attach_btn.configure(state="normal")
                 else:
                     self.send_btn.configure(state=tk.NORMAL)
-                    if hasattr(self, 'regen_btn') and self.regen_btn:
+                    if hasattr(self, "regen_btn") and self.regen_btn:
                         self.regen_btn.configure(state=tk.NORMAL)
                     if self.rename_btn:
                         self.rename_btn.configure(state=tk.NORMAL)
@@ -1558,7 +1597,7 @@ class ChatWindowBase(ABC):
                 return None
 
             # Case 1: PIL Image (bitmap from clipboard — screenshot, snip, etc.)
-            if hasattr(clip, 'save'):
+            if hasattr(clip, "save"):
                 import os
                 import tempfile
 
@@ -1591,7 +1630,7 @@ class ChatWindowBase(ABC):
                 added = False
                 for fpath in clip:
                     if isinstance(fpath, str):
-                        ext = fpath.rsplit('.', 1)[-1].lower() if '.' in fpath else ''
+                        ext = fpath.rsplit(".", 1)[-1].lower() if "." in fpath else ""
                         if ext in supported_exts:
                             self._add_pending_attachment(fpath)
                             added = True
@@ -1621,15 +1660,14 @@ class ChatWindowBase(ABC):
         filetypes = [
             ("Images", "*.png *.jpg *.jpeg *.gif *.webp *.bmp"),
             ("Audio", "*.wav *.mp3 *.ogg *.opus *.flac *.webm *.m4a"),
-            ("All supported", "*.png *.jpg *.jpeg *.gif *.webp *.bmp *.pdf *.wav *.mp3 *.ogg *.opus *.flac *.webm *.m4a"),
-            ("All files", "*.*")
+            (
+                "All supported",
+                "*.png *.jpg *.jpeg *.gif *.webp *.bmp *.pdf *.wav *.mp3 *.ogg *.opus *.flac *.webm *.m4a",
+            ),
+            ("All files", "*.*"),
         ]
 
-        files = filedialog.askopenfilenames(
-            title="Select file(s) to attach",
-            filetypes=filetypes,
-            parent=self.root
-        )
+        files = filedialog.askopenfilenames(title="Select file(s) to attach", filetypes=filetypes, parent=self.root)
 
         if files:
             for file_path in files:
@@ -1654,12 +1692,20 @@ class ChatWindowBase(ABC):
         # Determine MIME type
         ext = path.suffix.lower().lstrip(".")
         mime_map = {
-            "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
-            "gif": "image/gif", "webp": "image/webp", "bmp": "image/bmp",
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "gif": "image/gif",
+            "webp": "image/webp",
+            "bmp": "image/bmp",
             "pdf": "application/pdf",
-            "wav": "audio/wav", "mp3": "audio/mpeg", "ogg": "audio/ogg",
-            "opus": "audio/opus", "flac": "audio/flac", "webm": "audio/webm",
-            "m4a": "audio/mp4"
+            "wav": "audio/wav",
+            "mp3": "audio/mpeg",
+            "ogg": "audio/ogg",
+            "opus": "audio/opus",
+            "flac": "audio/flac",
+            "webm": "audio/webm",
+            "m4a": "audio/mp4",
         }
         mime_type = mime_map.get(ext, "application/octet-stream")
 
@@ -1686,7 +1732,7 @@ class ChatWindowBase(ABC):
             "filename": path.name,
             "mime_type": mime_type,
             "thumbnail": thumbnail,
-            "is_audio": is_audio
+            "is_audio": is_audio,
         }
         self.pending_attachments.append(attach_info)
 
@@ -1756,7 +1802,7 @@ class ChatWindowBase(ABC):
                     thumbnail = ImageTk.PhotoImage(img)
 
                 # Store reference to prevent garbage collection
-                if not hasattr(self, '_chat_thumbnails'):
+                if not hasattr(self, "_chat_thumbnails"):
                     self._chat_thumbnails = []
                 self._chat_thumbnails.append(thumbnail)
 
@@ -1771,20 +1817,20 @@ class ChatWindowBase(ABC):
 
                 # Add image tag for click handling
                 current_pos = self.chat_text.index(tk.INSERT)
-                line = int(current_pos.split('.')[0])
+                line = int(current_pos.split(".")[0])
                 img_start = f"{line}.2"  # After the indentation
                 img_end = f"{line}.3"
                 self.chat_text.tag_add(img_tag, img_start, img_end)
 
                 # Bind click events
-                self.chat_text.tag_bind(img_tag, "<Button-1>",
-                    lambda e, path=file_path: self._on_image_left_click(e, path))
-                self.chat_text.tag_bind(img_tag, "<Button-3>",
-                    lambda e, path=file_path: self._on_image_right_click(e, path))
-                self.chat_text.tag_bind(img_tag, "<Enter>",
-                    lambda e: self.chat_text.config(cursor="hand2"))
-                self.chat_text.tag_bind(img_tag, "<Leave>",
-                    lambda e: self.chat_text.config(cursor=""))
+                self.chat_text.tag_bind(
+                    img_tag, "<Button-1>", lambda e, path=file_path: self._on_image_left_click(e, path)
+                )
+                self.chat_text.tag_bind(
+                    img_tag, "<Button-3>", lambda e, path=file_path: self._on_image_right_click(e, path)
+                )
+                self.chat_text.tag_bind(img_tag, "<Enter>", lambda e: self.chat_text.config(cursor="hand2"))
+                self.chat_text.tag_bind(img_tag, "<Leave>", lambda e: self.chat_text.config(cursor=""))
 
                 # Add newline after image
                 self.chat_text.insert(tk.END, "\n", (message_tag,))
@@ -1799,41 +1845,24 @@ class ChatWindowBase(ABC):
 
         # Create a frame for the audio player
         if HAVE_CTK:
-            player_frame = ctk.CTkFrame(
-                self.chat_text,
-                fg_color=self.theme.surface0,
-                corner_radius=6,
-                height=36
-            )
+            player_frame = ctk.CTkFrame(self.chat_text, fg_color=self.theme.surface0, corner_radius=6, height=36)
         else:
-            player_frame = tk.Frame(
-                self.chat_text,
-                bg=self.colors["surface0"],
-                height=36
-            )
+            player_frame = tk.Frame(self.chat_text, bg=self.colors["surface0"], height=36)
 
         # Keep reference to prevent GC
-        if not hasattr(self, '_audio_player_frames'):
+        if not hasattr(self, "_audio_player_frames"):
             self._audio_player_frames = []
         self._audio_player_frames.append(player_frame)
 
         # Speaker icon
         if HAVE_CTK:
-            icon_label = ctk.CTkLabel(
-                player_frame,
-                text="🔊",
-                font=get_ctk_font(size=14),
-                width=24
-            )
+            icon_label = ctk.CTkLabel(player_frame, text="🔊", font=get_ctk_font(size=14), width=24)
             icon_label.pack(side="left", padx=(8, 4))
 
             # Filename (truncated)
             display_name = filename[:30] + "..." if len(filename) > 30 else filename
             name_label = ctk.CTkLabel(
-                player_frame,
-                text=display_name,
-                font=get_ctk_font(size=11),
-                text_color=self.theme.fg
+                player_frame, text=display_name, font=get_ctk_font(size=11), text_color=self.theme.fg
             )
             name_label.pack(side="left", padx=4)
 
@@ -1847,7 +1876,7 @@ class ChatWindowBase(ABC):
                 corner_radius=4,
                 fg_color=self.theme.accent,
                 hover_color=self.theme.surface1,
-                command=lambda p=file_path: self._toggle_audio(p)
+                command=lambda p=file_path: self._toggle_audio(p),
             )
             play_btn.pack(side="left", padx=4)
 
@@ -1864,26 +1893,18 @@ class ChatWindowBase(ABC):
                 corner_radius=4,
                 fg_color=self.theme.surface1,
                 hover_color=self.theme.overlay0,
-                command=lambda p=file_path: self._open_file_external(p)
+                command=lambda p=file_path: self._open_file_external(p),
             )
             open_btn.pack(side="left", padx=(0, 8))
         else:
             icon_label = tk.Label(
-                player_frame,
-                text="🔊",
-                font=("Segoe UI", 12),
-                bg=self.colors["surface0"],
-                fg=self.colors["fg"]
+                player_frame, text="🔊", font=("Segoe UI", 12), bg=self.colors["surface0"], fg=self.colors["fg"]
             )
             icon_label.pack(side=tk.LEFT, padx=(8, 4))
 
             display_name = filename[:30] + "..." if len(filename) > 30 else filename
             name_label = tk.Label(
-                player_frame,
-                text=display_name,
-                font=("Segoe UI", 10),
-                bg=self.colors["surface0"],
-                fg=self.colors["fg"]
+                player_frame, text=display_name, font=("Segoe UI", 10), bg=self.colors["surface0"], fg=self.colors["fg"]
             )
             name_label.pack(side=tk.LEFT, padx=4)
 
@@ -1896,7 +1917,7 @@ class ChatWindowBase(ABC):
                 relief=tk.FLAT,
                 width=3,
                 command=lambda p=file_path: self._toggle_audio(p),
-                cursor="hand2"
+                cursor="hand2",
             )
             play_btn.pack(side=tk.LEFT, padx=4)
 
@@ -1912,7 +1933,7 @@ class ChatWindowBase(ABC):
                 relief=tk.FLAT,
                 width=3,
                 command=lambda p=file_path: self._open_file_external(p),
-                cursor="hand2"
+                cursor="hand2",
             )
             open_btn.pack(side=tk.LEFT, padx=(0, 8))
 
@@ -1943,11 +1964,11 @@ class ChatWindowBase(ABC):
         try:
             from ...audio.recorder import AudioRecorder
 
-            if not hasattr(self, '_audio_recorder'):
+            if not hasattr(self, "_audio_recorder"):
                 self._audio_recorder = AudioRecorder()
 
             # Read the audio file
-            with open(file_path, 'rb') as f:
+            with open(file_path, "rb") as f:
                 audio_data = f.read()
 
             self._audio_recorder.play(audio_data)
@@ -1974,7 +1995,7 @@ class ChatWindowBase(ABC):
             return
 
         try:
-            if hasattr(self, '_audio_recorder'):
+            if hasattr(self, "_audio_recorder"):
                 self._audio_recorder.stop_playback()
         except Exception as e:
             print(f"[ChatWindow] Failed to stop audio: {e}")
@@ -2075,14 +2096,12 @@ class ChatWindowBase(ABC):
             # Close button
             if HAVE_CTK:
                 close_btn = ctk.CTkButton(
-                    modal, text="Close", command=modal.destroy,
-                    **get_ctk_button_colors(self.theme, "secondary")
+                    modal, text="Close", command=modal.destroy, **get_ctk_button_colors(self.theme, "secondary")
                 )
                 close_btn.pack(pady=(0, 10))
             else:
                 close_btn = tk.Button(
-                    modal, text="Close", command=modal.destroy,
-                    bg=self.colors["button_bg"], fg=self.colors["fg"]
+                    modal, text="Close", command=modal.destroy, bg=self.colors["button_bg"], fg=self.colors["fg"]
                 )
                 close_btn.pack(pady=(0, 10))
 
@@ -2128,12 +2147,12 @@ class ChatWindowBase(ABC):
 
         if not self.pending_attachments:
             self.attachments_frame.grid_remove()
-            if hasattr(self, '_attachments_label') and self._attachments_label:
+            if hasattr(self, "_attachments_label") and self._attachments_label:
                 if HAVE_CTK:
                     self._attachments_label.configure(text="")
                 else:
                     self._attachments_label.configure(text="")
-                self._attachments_label.grid_remove() # Hide label
+                self._attachments_label.grid_remove()  # Hide label
             return
 
         # Show frame
@@ -2142,12 +2161,12 @@ class ChatWindowBase(ABC):
         # Update header label
         count = len(self.pending_attachments)
         label_text = f"📎 {count} file{'s' if count > 1 else ''} attached"
-        if hasattr(self, '_attachments_label') and self._attachments_label:
+        if hasattr(self, "_attachments_label") and self._attachments_label:
             if HAVE_CTK:
                 self._attachments_label.configure(text=label_text)
             else:
                 self._attachments_label.configure(text=label_text)
-            self._attachments_label.grid(row=1, column=0, sticky="w", padx=5) # Show label
+            self._attachments_label.grid(row=1, column=0, sticky="w", padx=5)  # Show label
 
         # Create preview items
         if HAVE_CTK:
@@ -2161,25 +2180,27 @@ class ChatWindowBase(ABC):
                     thumb_label = tk.Label(item_frame, image=attach["thumbnail"], bg=self.theme.surface0)
                     thumb_label.pack(side="left", padx=4, pady=4)
                 else:
-                    ctk.CTkLabel(
-                        item_frame, text="📄", font=get_ctk_font(size=20)
-                    ).pack(side="left", padx=4, pady=4)
+                    ctk.CTkLabel(item_frame, text="📄", font=get_ctk_font(size=20)).pack(side="left", padx=4, pady=4)
 
                 # Filename (truncated)
                 name = attach.get("filename", "file")[:20]
                 if len(attach.get("filename", "")) > 20:
                     name += "..."
-                ctk.CTkLabel(
-                    item_frame, text=name, font=get_ctk_font(size=10),
-                    text_color=self.theme.fg
-                ).pack(side="left", padx=2)
+                ctk.CTkLabel(item_frame, text=name, font=get_ctk_font(size=10), text_color=self.theme.fg).pack(
+                    side="left", padx=2
+                )
 
                 # Remove button
                 remove_btn = ctk.CTkButton(
-                    item_frame, text="×", width=20, height=20,
-                    font=get_ctk_font(size=12), corner_radius=4,
-                    fg_color="transparent", hover_color=self.theme.accent_red,
-                    command=lambda idx=i: self._remove_pending_attachment(idx)
+                    item_frame,
+                    text="×",
+                    width=20,
+                    height=20,
+                    font=get_ctk_font(size=12),
+                    corner_radius=4,
+                    fg_color="transparent",
+                    hover_color=self.theme.accent_red,
+                    command=lambda idx=i: self._remove_pending_attachment(idx),
                 )
                 remove_btn.pack(side="left", padx=2)
         else:
@@ -2193,8 +2214,7 @@ class ChatWindowBase(ABC):
                     thumb_label.pack(side=tk.LEFT, padx=4, pady=4)
                 else:
                     tk.Label(
-                        item_frame, text="📄", font=("Segoe UI", 16),
-                        bg=self.colors["surface0"], fg=self.colors["fg"]
+                        item_frame, text="📄", font=("Segoe UI", 16), bg=self.colors["surface0"], fg=self.colors["fg"]
                     ).pack(side=tk.LEFT, padx=4, pady=4)
 
                 # Filename
@@ -2202,16 +2222,19 @@ class ChatWindowBase(ABC):
                 if len(attach.get("filename", "")) > 20:
                     name += "..."
                 tk.Label(
-                    item_frame, text=name, font=("Segoe UI", 9),
-                    bg=self.colors["surface0"], fg=self.colors["fg"]
+                    item_frame, text=name, font=("Segoe UI", 9), bg=self.colors["surface0"], fg=self.colors["fg"]
                 ).pack(side=tk.LEFT, padx=2)
 
                 # Remove button
                 remove_btn = tk.Button(
-                    item_frame, text="×", font=("Segoe UI", 10),
-                    bg=self.colors["surface0"], fg=self.colors["fg"],
-                    relief=tk.FLAT, cursor="hand2",
-                    command=lambda idx=i: self._remove_pending_attachment(idx)
+                    item_frame,
+                    text="×",
+                    font=("Segoe UI", 10),
+                    bg=self.colors["surface0"],
+                    fg=self.colors["fg"],
+                    relief=tk.FLAT,
+                    cursor="hand2",
+                    command=lambda idx=i: self._remove_pending_attachment(idx),
                 )
                 remove_btn.pack(side=tk.LEFT, padx=2)
 
@@ -2285,19 +2308,20 @@ class ChatWindowBase(ABC):
                 if source_path:
                     # Save file to session attachments
                     saved_path = AttachmentManager.save_file(
-                        session_id=self.session.session_id,
-                        file_path=source_path,
-                        message_index=message_index
+                        session_id=self.session.session_id, file_path=source_path, message_index=message_index
                     )
                     if saved_path:
-                        message_attachments.append({
-                            "path": saved_path,
-                            "mime_type": attach.get("mime_type", "application/octet-stream"),
-                            "filename": attach.get("filename", "attachment")
-                        })
+                        message_attachments.append(
+                            {
+                                "path": saved_path,
+                                "mime_type": attach.get("mime_type", "application/octet-stream"),
+                                "filename": attach.get("filename", "attachment"),
+                            }
+                        )
 
             # Clean up clipboard temp files now that save_file() has copied them
             import os
+
             for tmp in clipboard_temps_to_clean:
                 try:
                     os.remove(tmp)
@@ -2319,6 +2343,7 @@ class ChatWindowBase(ABC):
                 else:
                     self.input_text.configure(state=tk.NORMAL)
                     self.input_text.delete("1.0", tk.END)
+
             self._safe_after(0, update_ui)
 
             from ...profile_resolver import resolve_profile, resolve_profile_by_name
@@ -2326,12 +2351,10 @@ class ChatWindowBase(ABC):
             # Always resolve profile to get a merged config with connection keys
             if self.session.profile_override:
                 resolved = resolve_profile_by_name(
-                    self.session.profile_override, web_server.CONFIG,
-                    web_server.AI_PARAMS, web_server.KEY_MANAGERS
+                    self.session.profile_override, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS
                 )
             else:
-                resolved = resolve_profile(None, web_server.CONFIG,
-                    web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+                resolved = resolve_profile(None, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
 
             current_provider = resolved.provider
             current_model = self.session.model_override or resolved.model
@@ -2347,7 +2370,7 @@ class ChatWindowBase(ABC):
                 model=current_model,
                 streaming=streaming_enabled,
                 thinking_enabled=thinking_enabled,
-                session_id=str(self.session.session_id)
+                session_id=str(self.session.session_id),
             )
 
             def on_text(content):
@@ -2370,27 +2393,20 @@ class ChatWindowBase(ABC):
                     return
                 self._safe_after(0, lambda: self._update_status(f"Error: {content}", self.theme.accent_red))
 
-            callbacks = StreamCallback(
-                on_text=on_text,
-                on_thinking=on_thinking,
-                on_usage=on_usage,
-                on_error=on_error
-            )
+            callbacks = StreamCallback(on_text=on_text, on_thinking=on_thinking, on_usage=on_usage, on_error=on_error)
 
             self.is_streaming = True
             self._safe_after(0, lambda: self._update_status("Streaming..." if streaming_enabled else "Processing..."))
 
             if streaming_enabled and current_provider in ("custom", "google", "openrouter"):
                 ctx = RequestPipeline.execute_streaming(
-                    ctx, self.session, effective_config, effective_ai_params,
-                    effective_key_managers, callbacks
+                    ctx, self.session, effective_config, effective_ai_params, effective_key_managers, callbacks
                 )
             else:
                 self.is_streaming = False
                 messages = self.session.get_conversation_for_api(include_image=True)
                 ctx = RequestPipeline.execute_simple(
-                    ctx, messages, effective_config, effective_ai_params,
-                    effective_key_managers
+                    ctx, messages, effective_config, effective_ai_params, effective_key_managers
                 )
 
             self.is_streaming = False
@@ -2398,7 +2414,7 @@ class ChatWindowBase(ABC):
                 "prompt_tokens": ctx.input_tokens,
                 "completion_tokens": ctx.output_tokens,
                 "total_tokens": ctx.total_tokens,
-                "estimated": ctx.estimated
+                "estimated": ctx.estimated,
             }
 
             if self._destroyed:
@@ -2481,6 +2497,7 @@ class ChatWindowBase(ABC):
     def _save_and_refresh(self):
         """Save session and refresh display after mutation."""
         from ... import web_server
+
         add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
         self._update_chat_display(preserve_scroll=True)
 
@@ -2512,33 +2529,28 @@ class ChatWindowBase(ABC):
 
         # Theme the context menu to match the chat window
         menu = tk.Menu(
-            self.root, tearoff=0,
+            self.root,
+            tearoff=0,
             bg=self.colors.get("surface0", self.colors.get("bg", "#1e1e2e")),
             fg=self.colors.get("fg", "#cdd6f4"),
             activebackground=self.colors.get("accent", "#89b4fa"),
             activeforeground=self.colors.get("bg", "#1e1e2e"),
             relief=tk.FLAT,
             borderwidth=1,
-            font=("Segoe UI", 10)
+            font=("Segoe UI", 10),
         )
 
         label_edit = "Edit Message" if is_user else "Edit Response"
         label_copy = "Copy Message" if is_user else "Copy Response"
         label_delete = "Delete Message" if is_user else "Delete Response"
 
-        menu.add_command(label=f"  {label_edit}",
-                        command=lambda: self._edit_message(index))
-        menu.add_command(label="  Rerun This Turn",
-                        command=lambda: self._rerun_turn(index))
-        menu.add_command(label=f"  {label_copy}",
-                        command=lambda: self._copy_message(index))
+        menu.add_command(label=f"  {label_edit}", command=lambda: self._edit_message(index))
+        menu.add_command(label="  Rerun This Turn", command=lambda: self._rerun_turn(index))
+        menu.add_command(label=f"  {label_copy}", command=lambda: self._copy_message(index))
         menu.add_separator()
-        menu.add_command(label=f"  {label_delete}",
-                        command=lambda: self._delete_message(index))
-        menu.add_command(label="  Delete From Here",
-                        command=lambda: self._delete_from_here(index))
-        menu.add_command(label="  Branch From Here",
-                        command=lambda: self._branch_from_here(index))
+        menu.add_command(label=f"  {label_delete}", command=lambda: self._delete_message(index))
+        menu.add_command(label="  Delete From Here", command=lambda: self._delete_from_here(index))
+        menu.add_command(label="  Branch From Here", command=lambda: self._branch_from_here(index))
 
         try:
             menu.post(event.x_root, event.y_root)
@@ -2565,10 +2577,9 @@ class ChatWindowBase(ABC):
             count = len(self.session.messages) - index
             if count > 1:
                 from tkinter import messagebox
+
                 if not messagebox.askyesno(
-                    "Confirm Delete",
-                    f"Delete {count} messages from here to end?",
-                    parent=self.root
+                    "Confirm Delete", f"Delete {count} messages from here to end?", parent=self.root
                 ):
                     return
             self.session.messages = self.session.messages[:index]
@@ -2606,7 +2617,7 @@ class ChatWindowBase(ABC):
 
     def _rerun_turn(self, index: int):
         """Rerun a turn: regenerate the assistant response without deleting subsequent messages.
-        
+
         Uses closure-based state to capture and restore messages after the target,
         avoiding fragile instance-level state.
         """
@@ -2619,19 +2630,21 @@ class ChatWindowBase(ABC):
         if msg["role"] == "user":
             # Target the assistant response at index+1 (if it exists)
             assistant_idx = index + 1
-            if assistant_idx < len(self.session.messages) and \
-               self.session.messages[assistant_idx]["role"] == "assistant":
+            if (
+                assistant_idx < len(self.session.messages)
+                and self.session.messages[assistant_idx]["role"] == "assistant"
+            ):
                 removed_assistant = self.session.messages[assistant_idx].copy()
-                saved_messages = self.session.messages[assistant_idx + 1:]
+                saved_messages = self.session.messages[assistant_idx + 1 :]
                 self.session.messages = self.session.messages[:assistant_idx]
             else:
                 # No assistant response after this user message — just generate
-                saved_messages = self.session.messages[index + 1:]
-                self.session.messages = self.session.messages[:index + 1]
+                saved_messages = self.session.messages[index + 1 :]
+                self.session.messages = self.session.messages[: index + 1]
         else:
             # Assistant message — regenerate this response
             removed_assistant = self.session.messages[index].copy()
-            saved_messages = self.session.messages[index + 1:]
+            saved_messages = self.session.messages[index + 1 :]
             self.session.messages = self.session.messages[:index]
 
         def restore_after_rerun(success=True):
@@ -2655,7 +2668,7 @@ class ChatWindowBase(ABC):
 
         # Carry over the parent's origin so origin-aware system prompts are preserved
         new_session = ChatSession(origin=self.session.origin)
-        new_session.messages = [msg.copy() for msg in self.session.messages[:index + 1]]
+        new_session.messages = [msg.copy() for msg in self.session.messages[: index + 1]]
         new_session.title = f"Branch: {self.session.title or 'Untitled'}"
         new_session.system_instruction = self.session.system_instruction
         # Carry over model override so branched sessions use the same model
@@ -2667,14 +2680,12 @@ class ChatWindowBase(ABC):
 
         # Open new chat window via coordinator
         from ..core import GUICoordinator
+
         coordinator = GUICoordinator.get_instance()
         if coordinator:
             coordinator.request_chat_window(new_session)
 
-        self._update_status(
-            f"✅ Branched to session #{new_session.session_id}",
-            self.theme.accent_green
-        )
+        self._update_status(f"✅ Branched to session #{new_session.session_id}", self.theme.accent_green)
 
     # =========================================================================
     # Session Rename & Delete
@@ -2723,6 +2734,7 @@ class ChatWindowBase(ABC):
                 save_sessions()
                 # Notify any open browser windows to refresh
                 from .session_browser import notify_browsers_refresh
+
                 notify_browsers_refresh()
                 # Update window title bar
                 try:
@@ -2738,19 +2750,13 @@ class ChatWindowBase(ABC):
 
         # Build UI
         if HAVE_CTK:
-            ctk.CTkLabel(
-                dialog, text="Session Title:",
-                font=get_ctk_font(size=12),
-                text_color=self.theme.fg
-            ).pack(anchor="w", padx=20, pady=(15, 5))
+            ctk.CTkLabel(dialog, text="Session Title:", font=get_ctk_font(size=12), text_color=self.theme.fg).pack(
+                anchor="w", padx=20, pady=(15, 5)
+            )
 
             entry_colors = get_ctk_entry_colors(self.theme)
             entry = ctk.CTkEntry(
-                dialog,
-                textvariable=title_var,
-                font=get_ctk_font(size=12),
-                height=32, corner_radius=8,
-                **entry_colors
+                dialog, textvariable=title_var, font=get_ctk_font(size=12), height=32, corner_radius=8, **entry_colors
             )
             entry.pack(fill="x", padx=20, pady=(0, 10))
 
@@ -2759,26 +2765,30 @@ class ChatWindowBase(ABC):
 
             success_colors = get_ctk_button_colors(self.theme, "success")
             ctk.CTkButton(
-                btn_frame, text="Save",
+                btn_frame,
+                text="Save",
                 font=get_ctk_font(size=12),
-                width=70, height=32, corner_radius=8,
+                width=70,
+                height=32,
+                corner_radius=8,
                 command=do_save,
-                **success_colors
+                **success_colors,
             ).pack(side="right", padx=(5, 0))
 
             sec_colors = get_ctk_button_colors(self.theme, "secondary")
             ctk.CTkButton(
-                btn_frame, text="Cancel",
+                btn_frame,
+                text="Cancel",
                 font=get_ctk_font(size=12),
-                width=70, height=32, corner_radius=8,
+                width=70,
+                height=32,
+                corner_radius=8,
                 command=do_cancel,
-                **sec_colors
+                **sec_colors,
             ).pack(side="right")
         else:
             tk.Label(
-                dialog, text="Session Title:",
-                font=("Segoe UI", 10),
-                bg=self.colors["bg"], fg=self.colors["fg"]
+                dialog, text="Session Title:", font=("Segoe UI", 10), bg=self.colors["bg"], fg=self.colors["fg"]
             ).pack(anchor="w", padx=20, pady=(15, 5))
 
             entry = tk.Entry(
@@ -2790,7 +2800,7 @@ class ChatWindowBase(ABC):
                 insertbackground=self.colors["fg"],
                 relief=tk.FLAT,
                 highlightthickness=1,
-                highlightbackground=self.colors["border"]
+                highlightbackground=self.colors["border"],
             )
             entry.pack(fill="x", padx=20, pady=(0, 10))
 
@@ -2798,19 +2808,29 @@ class ChatWindowBase(ABC):
             btn_frame.pack(fill="x", padx=20, pady=(0, 15))
 
             tk.Button(
-                btn_frame, text="Save",
+                btn_frame,
+                text="Save",
                 font=("Segoe UI", 10),
-                bg=self.colors["accent"], fg=self.colors["accent_fg"],
-                relief=tk.FLAT, padx=10, pady=6,
-                command=do_save, cursor="hand2"
+                bg=self.colors["accent"],
+                fg=self.colors["accent_fg"],
+                relief=tk.FLAT,
+                padx=10,
+                pady=6,
+                command=do_save,
+                cursor="hand2",
             ).pack(side="right", padx=(5, 0))
 
             tk.Button(
-                btn_frame, text="Cancel",
+                btn_frame,
+                text="Cancel",
                 font=("Segoe UI", 10),
-                bg=self.colors["button_bg"], fg=self.colors["fg"],
-                relief=tk.FLAT, padx=10, pady=6,
-                command=do_cancel, cursor="hand2"
+                bg=self.colors["button_bg"],
+                fg=self.colors["fg"],
+                relief=tk.FLAT,
+                padx=10,
+                pady=6,
+                command=do_cancel,
+                cursor="hand2",
             ).pack(side="right")
 
         # Select all text
@@ -2840,8 +2860,8 @@ class ChatWindowBase(ABC):
 
         if not messagebox.askyesno(
             "Delete Session",
-            f"Permanently delete \"{session_title}\"?\n\nThis will close the chat window and remove all messages.",
-            parent=self.root
+            f'Permanently delete "{session_title}"?\n\nThis will close the chat window and remove all messages.',
+            parent=self.root,
         ):
             return
 
@@ -2850,6 +2870,7 @@ class ChatWindowBase(ABC):
             save_sessions()
             # Notify any open browser windows to refresh
             from .session_browser import notify_browsers_refresh
+
             notify_browsers_refresh()
             self._close()
         else:
@@ -2866,8 +2887,10 @@ class ChatWindowBase(ABC):
         try:
             self.root.lift()
             self.root.focus_force()
-            self.root.attributes('-topmost', True)
-            self.root.after(100, lambda: self.root.attributes('-topmost', False) if self.root and not self._destroyed else None)
+            self.root.attributes("-topmost", True)
+            self.root.after(
+                100, lambda: self.root.attributes("-topmost", False) if self.root and not self._destroyed else None
+            )
         except tk.TclError:
             pass
 
@@ -2879,11 +2902,13 @@ class ChatWindowBase(ABC):
 
         # Unsubscribe from config change events
         from ...config import unsubscribe_config_change
+
         unsubscribe_config_change(self._on_config_changed)
 
         # Clean up any remaining clipboard temp files
         import os
-        for tmp in getattr(self, '_clipboard_temp_files', []):
+
+        for tmp in getattr(self, "_clipboard_temp_files", []):
             try:
                 os.remove(tmp)
             except OSError:
@@ -2936,27 +2961,18 @@ class _EditMessageDialog:
         # Title label
         if HAVE_CTK:
             ctk.CTkLabel(
-                self.dialog, text=title,
-                font=get_ctk_font(size=14, weight="bold"),
-                text_color=theme.accent
+                self.dialog, text=title, font=get_ctk_font(size=14, weight="bold"), text_color=theme.accent
             ).grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
         else:
-            tk.Label(
-                self.dialog, text=title,
-                font=("Segoe UI", 12, "bold"),
-                bg=colors["bg"], fg=colors["accent"]
-            ).grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
+            tk.Label(self.dialog, text=title, font=("Segoe UI", 12, "bold"), bg=colors["bg"], fg=colors["accent"]).grid(
+                row=0, column=0, padx=15, pady=(15, 5), sticky="w"
+            )
 
         # Text area
         if HAVE_CTK:
             textbox_colors = get_ctk_textbox_colors(theme)
             self.text_area = ctk.CTkTextbox(
-                self.dialog,
-                font=get_ctk_font(size=12),
-                corner_radius=8,
-                border_width=1,
-                wrap="word",
-                **textbox_colors
+                self.dialog, font=get_ctk_font(size=12), corner_radius=8, border_width=1, wrap="word", **textbox_colors
             )
             self.text_area.grid(row=1, column=0, padx=15, pady=5, sticky="nsew")
             self.text_area.insert("0.0", content)
@@ -2970,7 +2986,7 @@ class _EditMessageDialog:
                 insertbackground=colors["fg"],
                 relief=tk.FLAT,
                 highlightthickness=1,
-                highlightbackground=colors["border"]
+                highlightbackground=colors["border"],
             )
             self.text_area.grid(row=1, column=0, padx=15, pady=5, sticky="nsew")
             self.text_area.insert("1.0", content)
@@ -2982,57 +2998,80 @@ class _EditMessageDialog:
 
             warn_colors = get_ctk_button_colors(theme, "warning")
             ctk.CTkButton(
-                btn_frame, text="Save & Rerun",
+                btn_frame,
+                text="Save & Rerun",
                 font=get_ctk_font(size=12),
-                width=110, height=32, corner_radius=8,
+                width=110,
+                height=32,
+                corner_radius=8,
                 command=self._save_and_rerun,
-                **warn_colors
+                **warn_colors,
             ).pack(side="left", padx=2)
 
             success_colors = get_ctk_button_colors(theme, "success")
             ctk.CTkButton(
-                btn_frame, text="Save",
+                btn_frame,
+                text="Save",
                 font=get_ctk_font(size=12),
-                width=70, height=32, corner_radius=8,
+                width=70,
+                height=32,
+                corner_radius=8,
                 command=self._save,
-                **success_colors
+                **success_colors,
             ).pack(side="left", padx=2)
 
             sec_colors = get_ctk_button_colors(theme, "secondary")
             ctk.CTkButton(
-                btn_frame, text="Cancel",
+                btn_frame,
+                text="Cancel",
                 font=get_ctk_font(size=12),
-                width=70, height=32, corner_radius=8,
+                width=70,
+                height=32,
+                corner_radius=8,
                 command=self._cancel,
-                **sec_colors
+                **sec_colors,
             ).pack(side="left", padx=2)
         else:
             btn_frame = tk.Frame(self.dialog, bg=colors["bg"])
             btn_frame.grid(row=2, column=0, padx=15, pady=(5, 15), sticky="e")
 
             tk.Button(
-                btn_frame, text="Save & Rerun",
+                btn_frame,
+                text="Save & Rerun",
                 font=("Segoe UI", 10),
                 bg=colors.get("accent_yellow", "#f9e2af"),
                 fg=colors["bg"],
-                relief=tk.FLAT, padx=10, pady=6,
-                command=self._save_and_rerun, cursor="hand2"
+                relief=tk.FLAT,
+                padx=10,
+                pady=6,
+                command=self._save_and_rerun,
+                cursor="hand2",
             ).pack(side=tk.LEFT, padx=2)
 
             tk.Button(
-                btn_frame, text="Save",
+                btn_frame,
+                text="Save",
                 font=("Segoe UI", 10),
-                bg=colors["accent"], fg=colors["accent_fg"],
-                relief=tk.FLAT, padx=10, pady=6,
-                command=self._save, cursor="hand2"
+                bg=colors["accent"],
+                fg=colors["accent_fg"],
+                relief=tk.FLAT,
+                padx=10,
+                pady=6,
+                command=self._save,
+                cursor="hand2",
             ).pack(side=tk.LEFT, padx=2)
 
             tk.Button(
-                btn_frame, text="Cancel",
+                btn_frame,
+                text="Cancel",
                 font=("Segoe UI", 10),
-                bg=colors["button_bg"], fg=colors["fg"],
-                relief=tk.FLAT, padx=10, pady=6,
-                command=self._cancel, cursor="hand2"
+                bg=colors["button_bg"],
+                fg=colors["fg"],
+                relief=tk.FLAT,
+                padx=10,
+                pady=6,
+                command=self._cancel,
+                cursor="hand2",
             ).pack(side=tk.LEFT, padx=2)
 
         # Keyboard shortcuts

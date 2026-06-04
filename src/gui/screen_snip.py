@@ -25,6 +25,7 @@ from .themes import ThemeColors, get_colors
 @dataclass
 class CaptureResult:
     """Result of a screen capture operation."""
+
     image_base64: str
     mime_type: str = "image/png"
     width: int = 0
@@ -35,14 +36,14 @@ class CaptureResult:
 class ScreenSnipOverlay:
     """
     Fullscreen overlay for selecting a screen region.
-    
+
     Flow:
     1. Take snapshot of entire screen with PIL.ImageGrab (for frozen background)
     2. Display as fullscreen overlay with dark tint (stipple pattern)
     3. User drags to select region (selection area shows through tint)
     4. On mouse release, hide overlay and capture just that region fresh
     5. Return base64-encoded PNG via callback
-    
+
     The overlay uses a frozen screenshot as background rather than true
     transparency because:
     - Cross-platform compatibility
@@ -53,15 +54,10 @@ class ScreenSnipOverlay:
     # Minimum selection size in pixels
     MIN_SELECTION_SIZE = 10
 
-    def __init__(
-        self,
-        parent_root: tk.Tk,
-        on_capture: Callable[[CaptureResult], None],
-        on_cancel: Callable[[], None]
-    ):
+    def __init__(self, parent_root: tk.Tk, on_capture: Callable[[CaptureResult], None], on_cancel: Callable[[], None]):
         """
         Initialize the screen snip overlay.
-        
+
         Args:
             parent_root: Parent Tk root (from GUICoordinator)
             on_capture: Callback with CaptureResult when capture completes
@@ -98,10 +94,7 @@ class ScreenSnipOverlay:
         try:
             # all_screens=True captures all monitors on Windows
             # include_layered_windows=True captures transparent windows
-            self.background_image = ImageGrab.grab(
-                all_screens=True,
-                include_layered_windows=True
-            )
+            self.background_image = ImageGrab.grab(all_screens=True, include_layered_windows=True)
             logging.debug(f"[ScreenSnip] Captured full screen: {self.background_image.size}")
         except Exception as e:
             logging.warning(f"[ScreenSnip] Multi-monitor capture failed: {e}, falling back to primary")
@@ -119,8 +112,8 @@ class ScreenSnipOverlay:
         self.root = tk.Toplevel(self.parent_root)
 
         # Configure window for fullscreen overlay
-        self.root.attributes('-fullscreen', True)
-        self.root.attributes('-topmost', True)
+        self.root.attributes("-fullscreen", True)
+        self.root.attributes("-topmost", True)
         self.root.config(cursor="crosshair")
         self.root.overrideredirect(True)  # No window decorations
 
@@ -135,7 +128,7 @@ class ScreenSnipOverlay:
             height=self.screen_height,
             highlightthickness=0,
             bd=0,
-            bg="black"  # Fallback color
+            bg="black",  # Fallback color
         )
         self.canvas.pack(fill="both", expand=True)
 
@@ -146,20 +139,24 @@ class ScreenSnipOverlay:
         # Semi-transparent dark overlay using stipple pattern
         # This creates the "screen dimming" effect
         self.canvas.create_rectangle(
-            0, 0, self.screen_width, self.screen_height,
+            0,
+            0,
+            self.screen_width,
+            self.screen_height,
             fill="black",
             stipple="gray50",  # 50% transparent black
             outline="",
-            tags="overlay"
+            tags="overlay",
         )
 
         # Instructions text at top
         self.canvas.create_text(
-            self.screen_width // 2, 30,
+            self.screen_width // 2,
+            30,
             text="Drag to select region • Click anywhere or Press Escape to cancel",
             fill="white",
             font=("Arial", 14, "bold"),
-            tags="instructions"
+            tags="instructions",
         )
 
         # Mouse bindings
@@ -225,24 +222,25 @@ class ScreenSnipOverlay:
         for i, color in enumerate(glow_colors):
             offset = len(glow_colors) - i
             self.canvas.create_rectangle(
-                x1 - offset, y1 - offset, x2 + offset, y2 + offset,
-                outline=color, width=1, tags="selection"
+                x1 - offset, y1 - offset, x2 + offset, y2 + offset, outline=color, width=1, tags="selection"
             )
 
         # Main selection border (green)
-        self.canvas.create_rectangle(
-            x1, y1, x2, y2,
-            outline=self.colors.green, width=2, tags="selection"
-        )
+        self.canvas.create_rectangle(x1, y1, x2, y2, outline=self.colors.green, width=2, tags="selection")
 
         # Corner handles
         handle_size = 5
         corners = [(x1, y1), (x2, y1), (x1, y2), (x2, y2)]
         for cx, cy in corners:
             self.canvas.create_rectangle(
-                cx - handle_size, cy - handle_size,
-                cx + handle_size, cy + handle_size,
-                fill=self.colors.green, outline="white", width=1, tags="selection"
+                cx - handle_size,
+                cy - handle_size,
+                cx + handle_size,
+                cy + handle_size,
+                fill=self.colors.green,
+                outline="white",
+                width=1,
+                tags="selection",
             )
 
         # Size label
@@ -256,16 +254,12 @@ class ScreenSnipOverlay:
 
         # Label background
         self.canvas.create_rectangle(
-            label_x - 50, label_y - 12,
-            label_x + 50, label_y + 12,
-            fill="#2e2e2e", outline="#4f4f4f", tags="size_label"
+            label_x - 50, label_y - 12, label_x + 50, label_y + 12, fill="#2e2e2e", outline="#4f4f4f", tags="size_label"
         )
 
         # Label text
         self.canvas.create_text(
-            label_x, label_y,
-            text=label_text, fill="white",
-            font=("Arial", 11, "bold"), tags="size_label"
+            label_x, label_y, text=label_text, fill="white", font=("Arial", 11, "bold"), tags="size_label"
         )
 
     def _on_release(self, event):
@@ -312,7 +306,7 @@ class ScreenSnipOverlay:
     def _capture_region(self, x1: int, y1: int, x2: int, y2: int) -> Optional[CaptureResult]:
         """
         Capture a screen region from the frozen background.
-        
+
         Uses the background image captured when the overlay was created to ensure
         consistency with what the user saw during selection.
         """
@@ -337,7 +331,7 @@ class ScreenSnipOverlay:
                 mime_type="image/png",
                 width=x2 - x1,
                 height=y2 - y1,
-                pil_image=img  # Keep reference for thumbnail
+                pil_image=img,  # Keep reference for thumbnail
             )
 
         except Exception as e:
@@ -354,7 +348,7 @@ class ScreenSnipOverlay:
         """Confirm current selection on Enter key."""
         if self.is_selecting:
             # Treat as mouse release at current position
-            self._on_release(type('Event', (), {'x': self.current_x, 'y': self.current_y})())
+            self._on_release(type("Event", (), {"x": self.current_x, "y": self.current_y})())
 
     def _close(self):
         """Close and cleanup the overlay window."""
@@ -376,25 +370,23 @@ class ScreenSnipOverlay:
 # Convenience function for direct capture (non-GUI contexts)
 # =============================================================================
 
+
 def capture_screen_region(x1: int, y1: int, x2: int, y2: int) -> Optional[CaptureResult]:
     """
     Capture a screen region without showing overlay.
-    
+
     Useful for programmatic capture when coordinates are already known
     (e.g., from external tools like ShareX).
-    
+
     Args:
         x1, y1: Top-left corner
         x2, y2: Bottom-right corner
-        
+
     Returns:
         CaptureResult or None if capture fails
     """
     try:
-        img = ImageGrab.grab(
-            bbox=(x1, y1, x2, y2),
-            include_layered_windows=True
-        )
+        img = ImageGrab.grab(bbox=(x1, y1, x2, y2), include_layered_windows=True)
 
         buffer = io.BytesIO()
         img.save(buffer, format="PNG", optimize=True)
@@ -403,11 +395,7 @@ def capture_screen_region(x1: int, y1: int, x2: int, y2: int) -> Optional[Captur
         image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
         return CaptureResult(
-            image_base64=image_base64,
-            mime_type="image/png",
-            width=x2 - x1,
-            height=y2 - y1,
-            pil_image=img
+            image_base64=image_base64, mime_type="image/png", width=x2 - x1, height=y2 - y1, pil_image=img
         )
 
     except Exception as e:
@@ -418,15 +406,12 @@ def capture_screen_region(x1: int, y1: int, x2: int, y2: int) -> Optional[Captur
 def capture_full_screen() -> Optional[CaptureResult]:
     """
     Capture the entire screen (all monitors on Windows).
-    
+
     Returns:
         CaptureResult or None if capture fails
     """
     try:
-        img = ImageGrab.grab(
-            all_screens=True,
-            include_layered_windows=True
-        )
+        img = ImageGrab.grab(all_screens=True, include_layered_windows=True)
 
         buffer = io.BytesIO()
         img.save(buffer, format="PNG", optimize=True)
@@ -435,11 +420,7 @@ def capture_full_screen() -> Optional[CaptureResult]:
         image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
         return CaptureResult(
-            image_base64=image_base64,
-            mime_type="image/png",
-            width=img.width,
-            height=img.height,
-            pil_image=img
+            image_base64=image_base64, mime_type="image/png", width=img.width, height=img.height, pil_image=img
         )
 
     except Exception as e:

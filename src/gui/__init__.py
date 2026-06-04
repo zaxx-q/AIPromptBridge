@@ -42,6 +42,7 @@ try:
         insert_with_emojis,
         prepare_emoji_content,
     )
+
     HAVE_EMOJI_RENDERER = HAVE_PIL
 except ImportError:
     HAVE_EMOJI_RENDERER = False
@@ -54,51 +55,46 @@ except ImportError:
 
 __all__ = [
     # Core exports
-    'TextEditToolApp',
-    'SnipToolApp',
-    'show_chat_gui',
-    'show_session_browser',
-    'get_gui_status',
-    'HAVE_GUI',
-    'HAVE_CTK',
-    'show_settings_window',
-    'show_prompt_editor',
-    'GUICoordinator',
-
+    "TextEditToolApp",
+    "SnipToolApp",
+    "show_chat_gui",
+    "show_session_browser",
+    "get_gui_status",
+    "HAVE_GUI",
+    "HAVE_CTK",
+    "show_settings_window",
+    "show_prompt_editor",
+    "GUICoordinator",
     # Prompts configuration
-    'PromptsConfig',
-    'get_prompts_config',
-    'reload_prompts',
-
+    "PromptsConfig",
+    "get_prompts_config",
+    "reload_prompts",
     # Theme system
-    'ThemeRegistry',
-    'ThemeColors',
-    'get_colors',
-    'get_color_scheme',
-    'list_themes',
-    'get_ctk_button_colors',
-    'get_ctk_frame_colors',
-    'get_ctk_entry_colors',
-    'get_ctk_textbox_colors',
-    'get_ctk_scrollbar_colors',
-    'sync_ctk_appearance',
-
+    "ThemeRegistry",
+    "ThemeColors",
+    "get_colors",
+    "get_color_scheme",
+    "list_themes",
+    "get_ctk_button_colors",
+    "get_ctk_frame_colors",
+    "get_ctk_entry_colors",
+    "get_ctk_textbox_colors",
+    "get_ctk_scrollbar_colors",
+    "sync_ctk_appearance",
     # Utilities
-    'copy_to_clipboard',
-    'render_markdown',
-    'setup_text_tags',
-    'get_tk_text_for_ctk_frame',
-
+    "copy_to_clipboard",
+    "render_markdown",
+    "setup_text_tags",
+    "get_tk_text_for_ctk_frame",
     # Emoji rendering
-    'EmojiRenderer',
-    'get_emoji_renderer',
-    'insert_with_emojis',
-    'get_ctk_emoji_image',
-    'prepare_emoji_content',
-    'HAVE_EMOJI_RENDERER',
-
+    "EmojiRenderer",
+    "get_emoji_renderer",
+    "insert_with_emojis",
+    "get_ctk_emoji_image",
+    "prepare_emoji_content",
+    "HAVE_EMOJI_RENDERER",
     # Popups
-    'create_typing_indicator',
-    'dismiss_typing_indicator',
-    'TypingIndicator',
+    "create_typing_indicator",
+    "dismiss_typing_indicator",
+    "TypingIndicator",
 ]

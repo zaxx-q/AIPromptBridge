@@ -20,6 +20,7 @@ _WM_COPY = 0x0301
 
 _PUL = ctypes.POINTER(ctypes.c_ulong)
 
+
 # --- Win32 GUITHREADINFO for finding the focused control within a window ---
 class _GUITHREADINFO(ctypes.Structure):
     _fields_ = [
@@ -47,6 +48,7 @@ class _KEYBDINPUT(ctypes.Structure):
 
 class _MOUSEINPUT(ctypes.Structure):
     """Only used to ensure the INPUT union is large enough (MOUSEINPUT > KEYBDINPUT)."""
+
     _fields_ = [
         ("dx", ctypes.c_long),
         ("dy", ctypes.c_long),
@@ -83,13 +85,13 @@ class TextHandler:
         self.keyboard = pykeyboard.Controller()
         self.is_copying = False
         self.last_copy_time = 0.0
-        logging.debug('TextHandler initialized')
+        logging.debug("TextHandler initialized")
 
     @staticmethod
     def _send_copy_keystroke():
         """
         Send a copy command using two parallel strategies (no delays):
-        
+
         1. **WM_COPY** window message → tells the focused control to copy
            its selection directly, completely bypassing keyboard state.
         2. **SendInput** bare-C keystroke → leverages the Ctrl key that is
@@ -97,7 +99,7 @@ class TextHandler:
            fighting the hardware (releasing Ctrl then re-pressing it, which
            the physical keyboard overrides), we embrace it: just inject 'C'
            and the OS naturally combines it with the physical Ctrl state.
-        
+
         Both fire instantly.  Whichever the target app responds to first
         triggers the clipboard change detected by get_selected_text().
         """
@@ -118,9 +120,9 @@ class TextHandler:
                         target_hwnd = gti.hwndFocus
 
                 user32.SendMessageW(target_hwnd, _WM_COPY, 0, 0)
-                logging.debug(f'WM_COPY sent to hwnd=0x{target_hwnd:X}')
+                logging.debug(f"WM_COPY sent to hwnd=0x{target_hwnd:X}")
         except Exception as e:
-            logging.debug(f'WM_COPY strategy failed: {e}')
+            logging.debug(f"WM_COPY strategy failed: {e}")
 
         # ── Strategy 2: SendInput (bare C if Ctrl held, full Ctrl+C otherwise)
         ctrl_held = bool(user32.GetAsyncKeyState(_VK_CONTROL) & 0x8000)
@@ -145,21 +147,19 @@ class TextHandler:
         sent = user32.SendInput(n, arr, ctypes.sizeof(_INPUT))
 
         if sent != n:
-            logging.warning(f'SendInput: only {sent}/{n} events were injected')
+            logging.warning(f"SendInput: only {sent}/{n} events were injected")
 
-        logging.debug(
-            f'SendInput copy: ctrl_held={ctrl_held}, {sent}/{n} events sent'
-        )
+        logging.debug(f"SendInput copy: ctrl_held={ctrl_held}, {sent}/{n} events sent")
 
     def get_selected_text(self, sleep_duration: float = 0.01, max_wait: float = 0.4) -> str:
         """
         Get the currently selected text from any application using polling.
         Uses Windows clipboard sequence number to detect changes without modifying clipboard history.
-        
+
         Args:
             sleep_duration: Short delay before Ctrl+C for stability (default: 0.01s)
             max_wait: Maximum time to wait for clipboard content (default: 0.4s)
-            
+
         Returns:
             The selected text, or empty string if none
         """
@@ -188,7 +188,7 @@ class TextHandler:
             # even when modifier keys are still held from the hotkey combo
             self._send_copy_keystroke()
         except Exception as e:
-            logging.error(f'Failed to simulate Ctrl+C: {e}')
+            logging.error(f"Failed to simulate Ctrl+C: {e}")
             self.is_copying = False
             return ""
 
@@ -221,14 +221,14 @@ class TextHandler:
                 time.sleep(0.05)
                 pyperclip.copy(clipboard_backup)
             except Exception as e:
-                logging.error(f'Failed to restore clipboard: {e}')
+                logging.error(f"Failed to restore clipboard: {e}")
 
         return selected_text
 
     def get_selected_text_with_retry(self) -> str:
         """
         Get selected text with a retry using longer wait time.
-        
+
         Returns:
             The selected text, or empty string if none
         """
@@ -237,7 +237,7 @@ class TextHandler:
 
         # Retry with longer wait if no text captured
         if not selected_text:
-            logging.debug('No text captured, retrying with longer wait')
+            logging.debug("No text captured, retrying with longer wait")
             # Increase stability delay and max wait
             selected_text = self.get_selected_text(sleep_duration=0.1, max_wait=0.8)
 
@@ -246,10 +246,10 @@ class TextHandler:
     def replace_selected_text(self, new_text: str) -> bool:
         """
         Replace the currently selected text with new text.
-        
+
         Args:
             new_text: The text to paste
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -264,14 +264,14 @@ class TextHandler:
 
         try:
             # Copy new text to clipboard
-            cleaned_text = new_text.rstrip('\n')
+            cleaned_text = new_text.rstrip("\n")
             pyperclip.copy(cleaned_text)
 
             # Simulate Ctrl+V
             time.sleep(0.1)
             self.keyboard.press(pykeyboard.Key.ctrl)
-            self.keyboard.press('v')
-            self.keyboard.release('v')
+            self.keyboard.press("v")
+            self.keyboard.release("v")
             self.keyboard.release(pykeyboard.Key.ctrl)
 
             time.sleep(0.2)
@@ -279,11 +279,11 @@ class TextHandler:
             # Restore clipboard
             pyperclip.copy(clipboard_backup)
 
-            logging.debug('Text replaced successfully')
+            logging.debug("Text replaced successfully")
             return True
 
         except Exception as e:
-            logging.error(f'Failed to replace text: {e}')
+            logging.error(f"Failed to replace text: {e}")
             # Try to restore clipboard
             try:
                 pyperclip.copy(clipboard_backup)
@@ -295,18 +295,18 @@ class TextHandler:
     def clear_clipboard():
         """Clear the system clipboard."""
         try:
-            pyperclip.copy('')
+            pyperclip.copy("")
         except Exception as e:
-            logging.error(f'Error clearing clipboard: {e}')
+            logging.error(f"Error clearing clipboard: {e}")
 
     @staticmethod
     def copy_to_clipboard(text: str) -> bool:
         """
         Copy text to clipboard.
-        
+
         Args:
             text: Text to copy
-            
+
         Returns:
             True if successful
         """
@@ -314,5 +314,5 @@ class TextHandler:
             pyperclip.copy(text)
             return True
         except Exception as e:
-            logging.error(f'Failed to copy to clipboard: {e}')
+            logging.error(f"Failed to copy to clipboard: {e}")
             return False

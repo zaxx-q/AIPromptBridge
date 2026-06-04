@@ -47,7 +47,7 @@ from .utils import set_window_icon
 class TTSWindow:
     """
     Full window for TTS (Text-to-Speech) generation using Gemini TTS models.
-    
+
     Features:
     - Editable input text area
     - Voice selection from 30 prebuilt voices
@@ -68,11 +68,11 @@ class TTSWindow:
         ai_params: Dict[str, Any],
         key_managers: Dict[str, Any],
         initial_text: str = "",
-        on_close: Optional[Callable[[], None]] = None
+        on_close: Optional[Callable[[], None]] = None,
     ):
         """
         Initialize the TTS window.
-        
+
         Args:
             parent_root: Parent Tk root (from GUICoordinator)
             config: Application configuration dictionary
@@ -196,6 +196,7 @@ class TTSWindow:
     def _build_tk_fallback_ui(self):
         """Build standard Tkinter fallback UI from separate module."""
         from .tts_window_tk import build_tk_ui
+
         build_tk_ui(self)
 
     def _build_ctk_ui(self):
@@ -242,20 +243,13 @@ class TTSWindow:
     def _create_section_frame(self, parent, title: str) -> Any:
         """Create a titled section frame using pack layout."""
         frame = ctk.CTkFrame(
-            parent,
-            fg_color=self.colors.surface0,
-            corner_radius=10,
-            border_color=self.colors.surface2,
-            border_width=1
+            parent, fg_color=self.colors.surface0, corner_radius=10, border_color=self.colors.surface2, border_width=1
         )
         frame.pack(fill="x", pady=(0, 8))
 
-        ctk.CTkLabel(
-            frame,
-            text=title,
-            font=get_ctk_font(size=12, weight="bold"),
-            text_color=self.colors.accent
-        ).pack(anchor="w", padx=12, pady=(10, 5))
+        ctk.CTkLabel(frame, text=title, font=get_ctk_font(size=12, weight="bold"), text_color=self.colors.accent).pack(
+            anchor="w", padx=12, pady=(10, 5)
+        )
 
         content = ctk.CTkFrame(frame, fg_color="transparent")
         content.pack(fill="x", padx=12, pady=(0, 10))
@@ -275,12 +269,9 @@ class TTSWindow:
         left_frame = ctk.CTkFrame(bar, fg_color="transparent")
         left_frame.pack(side="left", fill="x", expand=True)
 
-        ctk.CTkLabel(
-            left_frame,
-            text="TTS Model:",
-            font=get_ctk_font(size=11),
-            text_color=self.colors.text
-        ).pack(side="left", padx=(0, 5))
+        ctk.CTkLabel(left_frame, text="TTS Model:", font=get_ctk_font(size=11), text_color=self.colors.text).pack(
+            side="left", padx=(0, 5)
+        )
 
         self.model_dropdown = ctk.CTkOptionMenu(
             left_frame,
@@ -295,7 +286,7 @@ class TTSWindow:
             dropdown_fg_color=self.colors.surface0,
             dropdown_hover_color=self.colors.surface1,
             text_color=self.colors.text,
-            font=get_ctk_font(size=11)
+            font=get_ctk_font(size=11),
         )
         self.model_dropdown.set(self.selected_model)
         self.model_dropdown.pack(side="left")
@@ -313,7 +304,7 @@ class TTSWindow:
             height=38,
             corner_radius=8,
             command=self._on_generate_audio,
-            **get_ctk_button_colors(self.colors, "success")
+            **get_ctk_button_colors(self.colors, "success"),
         )
         self.generate_audio_btn.pack(side="right")
 
@@ -329,12 +320,7 @@ class TTSWindow:
         voice_list = get_voice_list()
 
         self.voice_dropdown = ScrollableComboBox(
-            content,
-            colors=self.colors,
-            values=voice_list,
-            width=240,
-            height=32,
-            command=self._on_voice_changed
+            content, colors=self.colors, values=voice_list, width=240, height=32, command=self._on_voice_changed
         )
 
         # Set default
@@ -366,7 +352,7 @@ class TTSWindow:
             text_color=self.colors.text,
             fg_color=self.colors.accent,
             hover_color=self.colors.lavender,
-            border_color=self.colors.surface2
+            border_color=self.colors.surface2,
         ).pack(side="left", padx=(0, 15))
 
         ctk.CTkRadioButton(
@@ -379,17 +365,13 @@ class TTSWindow:
             text_color=self.colors.text,
             fg_color=self.colors.accent,
             hover_color=self.colors.lavender,
-            border_color=self.colors.surface2
+            border_color=self.colors.surface2,
         ).pack(side="left")
 
     def _create_multi_speaker_section(self, parent):
         """Create multi-speaker configuration (initially hidden)."""
         self.multi_speaker_frame = ctk.CTkFrame(
-            parent,
-            fg_color=self.colors.surface0,
-            corner_radius=10,
-            border_color=self.colors.surface2,
-            border_width=1
+            parent, fg_color=self.colors.surface0, corner_radius=10, border_color=self.colors.surface2, border_width=1
         )
         # Initially hidden - pack/forget based on toggle
 
@@ -397,7 +379,7 @@ class TTSWindow:
             self.multi_speaker_frame,
             text="Multi-Speaker Config",
             font=get_ctk_font(size=12, weight="bold"),
-            text_color=self.colors.accent
+            text_color=self.colors.accent,
         ).pack(anchor="w", padx=12, pady=(10, 5))
 
         ms_content = ctk.CTkFrame(self.multi_speaker_frame, fg_color="transparent")
@@ -409,18 +391,26 @@ class TTSWindow:
         s1_row = ctk.CTkFrame(ms_content, fg_color="transparent")
         s1_row.pack(fill="x", pady=(0, 5))
 
-        ctk.CTkLabel(s1_row, text="Speaker 1:", font=get_ctk_font(size=10),
-                     text_color=self.colors.overlay0).pack(side="left", padx=(0, 5))
+        ctk.CTkLabel(s1_row, text="Speaker 1:", font=get_ctk_font(size=10), text_color=self.colors.overlay0).pack(
+            side="left", padx=(0, 5)
+        )
 
         self.speaker1_name_entry = ctk.CTkEntry(
-            s1_row, placeholder_text="Name...", width=80, height=28,
-            font=get_ctk_font(size=10), border_color=self.colors.surface2
+            s1_row,
+            placeholder_text="Name...",
+            width=80,
+            height=28,
+            font=get_ctk_font(size=10),
+            border_color=self.colors.surface2,
         )
         self.speaker1_name_entry.insert(0, self.speaker1_name)
         self.speaker1_name_entry.pack(side="left", padx=(0, 5))
 
         self.speaker1_voice_dropdown = ctk.CTkOptionMenu(
-            s1_row, values=voice_list, width=140, height=28,
+            s1_row,
+            values=voice_list,
+            width=140,
+            height=28,
             corner_radius=6,
             fg_color=self.colors.surface1,
             button_color=self.colors.surface2,
@@ -428,7 +418,7 @@ class TTSWindow:
             dropdown_fg_color=self.colors.surface0,
             dropdown_hover_color=self.colors.surface1,
             text_color=self.colors.text,
-            font=get_ctk_font(size=9)
+            font=get_ctk_font(size=9),
         )
 
         s1_data = get_voice_details(self.speaker1_voice)
@@ -444,18 +434,26 @@ class TTSWindow:
         s2_row = ctk.CTkFrame(ms_content, fg_color="transparent")
         s2_row.pack(fill="x")
 
-        ctk.CTkLabel(s2_row, text="Speaker 2:", font=get_ctk_font(size=10),
-                     text_color=self.colors.overlay0).pack(side="left", padx=(0, 5))
+        ctk.CTkLabel(s2_row, text="Speaker 2:", font=get_ctk_font(size=10), text_color=self.colors.overlay0).pack(
+            side="left", padx=(0, 5)
+        )
 
         self.speaker2_name_entry = ctk.CTkEntry(
-            s2_row, placeholder_text="Name...", width=80, height=28,
-            font=get_ctk_font(size=10), border_color=self.colors.surface2
+            s2_row,
+            placeholder_text="Name...",
+            width=80,
+            height=28,
+            font=get_ctk_font(size=10),
+            border_color=self.colors.surface2,
         )
         self.speaker2_name_entry.insert(0, self.speaker2_name)
         self.speaker2_name_entry.pack(side="left", padx=(0, 5))
 
         self.speaker2_voice_dropdown = ctk.CTkOptionMenu(
-            s2_row, values=voice_list, width=140, height=28,
+            s2_row,
+            values=voice_list,
+            width=140,
+            height=28,
             corner_radius=6,
             fg_color=self.colors.surface1,
             button_color=self.colors.surface2,
@@ -463,7 +461,7 @@ class TTSWindow:
             dropdown_fg_color=self.colors.surface0,
             dropdown_hover_color=self.colors.surface1,
             text_color=self.colors.text,
-            font=get_ctk_font(size=9)
+            font=get_ctk_font(size=9),
         )
         s2_data = get_voice_details(self.speaker2_voice)
         if s2_data["style"] != "Unknown":
@@ -491,22 +489,24 @@ class TTSWindow:
             corner_radius=6,
             command=self._toggle_playback,
             state="disabled",
-            **get_ctk_button_colors(self.colors, "success")
+            **get_ctk_button_colors(self.colors, "success"),
         )
         self.play_pause_btn.pack(side="left", padx=(0, 8))
 
         # Seek slider
         self.seek_slider = ctk.CTkSlider(
             row_frame,
-            from_=0, to=100,
-            width=80, height=16,
+            from_=0,
+            to=100,
+            width=80,
+            height=16,
             corner_radius=8,
             button_corner_radius=8,
             fg_color=self.colors.surface1,
             progress_color=self.colors.accent,
             button_color=self.colors.accent,
             button_hover_color=self.colors.lavender,
-            command=self._on_seek
+            command=self._on_seek,
         )
         self.seek_slider.set(0)
         self.seek_slider.configure(state="disabled")
@@ -514,10 +514,7 @@ class TTSWindow:
 
         # Position label
         self.position_label = ctk.CTkLabel(
-            row_frame,
-            text="00:00 / 00:00",
-            font=get_ctk_font(size=10),
-            text_color=self.colors.overlay0
+            row_frame, text="00:00 / 00:00", font=get_ctk_font(size=10), text_color=self.colors.overlay0
         )
         self.position_label.pack(side="left")
 
@@ -528,10 +525,7 @@ class TTSWindow:
         # Format info label (read from config)
         fmt = self.config.get("audio_output_format", "ogg").upper()
         self._format_label = ctk.CTkLabel(
-            content,
-            text=f"Format: {fmt} (set in config)",
-            font=get_ctk_font(size=10),
-            text_color=self.colors.overlay0
+            content, text=f"Format: {fmt} (set in config)", font=get_ctk_font(size=10), text_color=self.colors.overlay0
         )
         self._format_label.pack(fill="x", pady=(0, 5))
 
@@ -545,7 +539,7 @@ class TTSWindow:
             corner_radius=6,
             command=self._save_audio,
             state="disabled",
-            **get_ctk_button_colors(self.colors, "secondary")
+            **get_ctk_button_colors(self.colors, "secondary"),
         )
         self.save_btn.pack(fill="x")
 
@@ -556,19 +550,12 @@ class TTSWindow:
     def _create_input_text_section(self, parent):
         """Create editable input text section."""
         frame = ctk.CTkFrame(
-            parent,
-            fg_color=self.colors.surface0,
-            corner_radius=10,
-            border_color=self.colors.surface2,
-            border_width=1
+            parent, fg_color=self.colors.surface0, corner_radius=10, border_color=self.colors.surface2, border_width=1
         )
         frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
 
         ctk.CTkLabel(
-            frame,
-            text="Input Text",
-            font=get_ctk_font(size=12, weight="bold"),
-            text_color=self.colors.accent
+            frame, text="Input Text", font=get_ctk_font(size=12, weight="bold"), text_color=self.colors.accent
         ).pack(anchor="w", padx=12, pady=(10, 5))
 
         self.input_textbox = ctk.CTkTextbox(
@@ -579,7 +566,7 @@ class TTSWindow:
             border_color=self.colors.surface2,
             border_width=1,
             corner_radius=8,
-            wrap="word"
+            wrap="word",
         )
         self.input_textbox.pack(fill="both", expand=True, padx=12, pady=(0, 10))
 
@@ -590,11 +577,7 @@ class TTSWindow:
     def _create_director_section(self, parent):
         """Create AI Director panel."""
         frame = ctk.CTkFrame(
-            parent,
-            fg_color=self.colors.surface0,
-            corner_radius=10,
-            border_color=self.colors.surface2,
-            border_width=1
+            parent, fg_color=self.colors.surface0, corner_radius=10, border_color=self.colors.surface2, border_width=1
         )
         frame.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
 
@@ -603,10 +586,7 @@ class TTSWindow:
         header.pack(fill="x", padx=12, pady=(10, 5))
 
         ctk.CTkLabel(
-            header,
-            text="AI Director",
-            font=get_ctk_font(size=12, weight="bold"),
-            text_color=self.colors.accent
+            header, text="AI Director", font=get_ctk_font(size=12, weight="bold"), text_color=self.colors.accent
         ).pack(side="left")
 
         # Auto/Manual toggle
@@ -621,12 +601,12 @@ class TTSWindow:
             hover_color=self.colors.lavender,
             border_color=self.colors.surface2,
             checkmark_color=self.colors.base,
-            width=24
+            width=24,
         )
         self.director_toggle.pack(side="right")
         Tooltip(
             self.director_toggle,
-            "Automatically generate style instructions when clicking 'Generate Audio' if the style box is empty or still has the default placeholder text."
+            "Automatically generate style instructions when clicking 'Generate Audio' if the style box is empty or still has the default placeholder text.",
         )
 
         # Director controls row
@@ -635,10 +615,7 @@ class TTSWindow:
 
         # Director model override (optional)
         ctk.CTkLabel(
-            controls,
-            text="Director Model:",
-            font=get_ctk_font(size=10),
-            text_color=self.colors.overlay0
+            controls, text="Director Model:", font=get_ctk_font(size=10), text_color=self.colors.overlay0
         ).pack(side="left", padx=(0, 5))
 
         self.director_model_entry = ctk.CTkEntry(
@@ -647,7 +624,7 @@ class TTSWindow:
             width=160,
             height=28,
             font=get_ctk_font(size=10),
-            border_color=self.colors.surface2
+            border_color=self.colors.surface2,
         )
         if self.director_model:
             self.director_model_entry.insert(0, self.director_model)
@@ -663,7 +640,7 @@ class TTSWindow:
             height=28,
             corner_radius=6,
             command=self._on_generate_style,
-            **get_ctk_button_colors(self.colors, "primary")
+            **get_ctk_button_colors(self.colors, "primary"),
         )
         self.generate_style_btn.pack(side="right")
 
@@ -677,10 +654,13 @@ class TTSWindow:
             border_width=1,
             corner_radius=8,
             height=120,
-            wrap="word"
+            wrap="word",
         )
         self.style_textbox.pack(fill="both", expand=True, padx=12, pady=(0, 10))
-        self.style_textbox.insert("1.0", "(Style instructions will appear here after clicking 'Generate Style', or you can write your own) \nClear this text or leave this text as is to have no style instructions applied to input text.")
+        self.style_textbox.insert(
+            "1.0",
+            "(Style instructions will appear here after clicking 'Generate Style', or you can write your own) \nClear this text or leave this text as is to have no style instructions applied to input text.",
+        )
 
     # =========================================================================
     # Bottom Bar
@@ -688,12 +668,7 @@ class TTSWindow:
 
     def _create_bottom_bar(self):
         """Create bottom bar with status."""
-        bottom_frame = ctk.CTkFrame(
-            self.root,
-            fg_color=self.colors.surface0,
-            corner_radius=0,
-            height=40
-        )
+        bottom_frame = ctk.CTkFrame(self.root, fg_color=self.colors.surface0, corner_radius=0, height=40)
         bottom_frame.pack(fill="x", side="bottom")
         bottom_frame.pack_propagate(False)
 
@@ -704,7 +679,7 @@ class TTSWindow:
             status_container,
             text="Ready — Enter text and click Generate Audio",
             font=get_ctk_font(size=10),
-            text_color=self.colors.overlay0
+            text_color=self.colors.overlay0,
         )
         self.status_label.pack(side="left")
 
@@ -727,7 +702,7 @@ class TTSWindow:
     def _on_speaker_mode_changed(self):
         """Handle speaker mode toggle."""
         mode = self.speaker_mode_var.get()
-        self.is_multi_speaker = (mode == "multi")
+        self.is_multi_speaker = mode == "multi"
 
         if self.is_multi_speaker:
             self.multi_speaker_frame.pack(fill="x", pady=(0, 8))
@@ -748,10 +723,7 @@ class TTSWindow:
         s1_voice = s1_voice_display.split(" — ")[0] if " — " in s1_voice_display else s1_voice_display
         s2_voice = s2_voice_display.split(" — ")[0] if " — " in s2_voice_display else s2_voice_display
 
-        return [
-            {"speaker": s1_name, "voice_name": s1_voice},
-            {"speaker": s2_name, "voice_name": s2_voice}
-        ]
+        return [{"speaker": s1_name, "voice_name": s1_voice}, {"speaker": s2_name, "voice_name": s2_voice}]
 
     # =========================================================================
     # AI Director
@@ -759,7 +731,7 @@ class TTSWindow:
 
     def _get_voice_info(self) -> dict:
         """Build voice info dict from current UI state for gender injection.
-        
+
         Returns:
             Single-speaker: {"voice": "Kore"}
             Multi-speaker: {"multi": True, "speakers": [{"name": "...", "voice": "..."}, ...]}
@@ -769,13 +741,17 @@ class TTSWindow:
 
             # Speaker 1
             s1_name = self.speaker1_name_entry.get().strip() if self.speaker1_name_entry else "Speaker1"
-            s1_voice_display = self.speaker1_voice_dropdown.get() if self.speaker1_voice_dropdown else self.speaker1_voice
+            s1_voice_display = (
+                self.speaker1_voice_dropdown.get() if self.speaker1_voice_dropdown else self.speaker1_voice
+            )
             s1_voice = s1_voice_display.split(" — ")[0] if " — " in s1_voice_display else s1_voice_display
             speakers.append({"name": s1_name or "Speaker1", "voice": s1_voice})
 
             # Speaker 2
             s2_name = self.speaker2_name_entry.get().strip() if self.speaker2_name_entry else "Speaker2"
-            s2_voice_display = self.speaker2_voice_dropdown.get() if self.speaker2_voice_dropdown else self.speaker2_voice
+            s2_voice_display = (
+                self.speaker2_voice_dropdown.get() if self.speaker2_voice_dropdown else self.speaker2_voice
+            )
             s2_voice = s2_voice_display.split(" — ")[0] if " — " in s2_voice_display else s2_voice_display
             speakers.append({"name": s2_name or "Speaker2", "voice": s2_voice})
 
@@ -802,9 +778,7 @@ class TTSWindow:
         self._update_status("Generating style instructions...", self.colors.accent)
 
         threading.Thread(
-            target=self._run_director,
-            args=(input_text, director_model_override, voice_info),
-            daemon=True
+            target=self._run_director, args=(input_text, director_model_override, voice_info), daemon=True
         ).start()
 
     def _run_director(self, input_text: str, director_model_override: str, voice_info: dict = None):
@@ -820,7 +794,8 @@ class TTSWindow:
             return
 
         def on_success(response_text, tokens):
-            if self._destroyed: return
+            if self._destroyed:
+                return
 
             def update():
                 self.style_textbox.delete("1.0", "end")
@@ -832,7 +807,8 @@ class TTSWindow:
             GUICoordinator.get_instance().run_on_gui_thread(update)
 
         def on_error(error_msg):
-            if self._destroyed: return
+            if self._destroyed:
+                return
 
             def update():
                 self._update_status(error_msg, self.colors.red)
@@ -879,7 +855,8 @@ class TTSWindow:
                 self._update_status("Auto-directing then generating...", self.colors.accent)
                 threading.Thread(
                     target=self._auto_direct_then_generate,
-                    args=(input_text, director_model, multi_config, voice_info), daemon=True
+                    args=(input_text, director_model, multi_config, voice_info),
+                    daemon=True,
                 ).start()
                 return
 
@@ -898,13 +875,11 @@ class TTSWindow:
         else:
             full_prompt = input_text
 
-        threading.Thread(
-            target=self._run_tts_generation,
-            args=(full_prompt, multi_config),
-            daemon=True
-        ).start()
+        threading.Thread(target=self._run_tts_generation, args=(full_prompt, multi_config), daemon=True).start()
 
-    def _auto_direct_then_generate(self, input_text: str, director_model_override: str, multi_config: Optional[List[Dict]], voice_info: dict = None):
+    def _auto_direct_then_generate(
+        self, input_text: str, director_model_override: str, multi_config: Optional[List[Dict]], voice_info: dict = None
+    ):
         """Run director first, then generate audio (auto mode)."""
         from ...gui.tts_tool import get_instance as get_tts_tool
 
@@ -916,7 +891,8 @@ class TTSWindow:
             return
 
         def on_director_success(style_text, tokens):
-            if self._destroyed: return
+            if self._destroyed:
+                return
 
             def update_style():
                 self.style_textbox.delete("1.0", "end")
@@ -934,7 +910,8 @@ class TTSWindow:
 
         def on_director_error(error_msg):
             def update():
-                if self._destroyed: return
+                if self._destroyed:
+                    return
                 self._update_status(error_msg, self.colors.red)
                 self.is_generating = False
                 self.generate_audio_btn.configure(state="normal")
@@ -964,12 +941,12 @@ class TTSWindow:
             self.audio_duration = duration
 
             def update():
-                if self._destroyed: return
+                if self._destroyed:
+                    return
 
                 duration_str = self._format_short_duration(self.audio_duration)
                 self._update_status(
-                    f"✅ Audio generated — {duration_str} ({len(pcm_data)} bytes PCM)",
-                    self.colors.green
+                    f"✅ Audio generated — {duration_str} ({len(pcm_data)} bytes PCM)", self.colors.green
                 )
 
                 # Enable playback controls
@@ -990,7 +967,8 @@ class TTSWindow:
 
         def on_error(error_msg):
             def update():
-                if self._destroyed: return
+                if self._destroyed:
+                    return
                 self._update_status(error_msg, self.colors.red)
                 self.is_generating = False
                 self.generate_audio_btn.configure(state="normal")
@@ -1003,7 +981,7 @@ class TTSWindow:
             model=self.selected_model,
             multi_config=multi_config,
             callback_success=on_success,
-            callback_error=on_error
+            callback_error=on_error,
         )
 
     # =========================================================================
@@ -1113,6 +1091,7 @@ class TTSWindow:
             return
 
         from ...gui.tts_tool import get_instance as get_tts_tool
+
         tool = get_tts_tool()
 
         if not tool:
@@ -1137,12 +1116,7 @@ class TTSWindow:
                 pass
 
         filename, error = tool.save_audio_file(
-            self.pcm_audio,
-            self.wav_audio,
-            save_dir,
-            self.selected_voice,
-            ext,
-            transcript_text=transcript_text
+            self.pcm_audio, self.wav_audio, save_dir, self.selected_voice, ext, transcript_text=transcript_text
         )
 
         if error:
@@ -1162,7 +1136,7 @@ class TTSWindow:
 
     def _set_play_button_icon(self, mode: str):
         """Set play/pause button icon, handling both CTk and Tk widgets.
-        
+
         Args:
             mode: "play" for ▶ or "pause" for ⏸
         """
@@ -1172,30 +1146,16 @@ class TTSWindow:
         if HAVE_CTK and isinstance(self.play_pause_btn, ctk.CTkButton):
             if mode == "pause":
                 content = prepare_emoji_content("⏸", size=14)
-                self.play_pause_btn.configure(
-                    **content,
-                    **get_ctk_button_colors(self.colors, "secondary")
-                )
+                self.play_pause_btn.configure(**content, **get_ctk_button_colors(self.colors, "secondary"))
             else:
                 content = prepare_emoji_content("▶", size=14)
-                self.play_pause_btn.configure(
-                    **content,
-                    **get_ctk_button_colors(self.colors, "success")
-                )
+                self.play_pause_btn.configure(**content, **get_ctk_button_colors(self.colors, "success"))
         else:
             # Standard Tk button
             if mode == "pause":
-                self.play_pause_btn.configure(
-                    text="⏸",
-                    bg=self.colors.surface1,
-                    fg=self.colors.text
-                )
+                self.play_pause_btn.configure(text="⏸", bg=self.colors.surface1, fg=self.colors.text)
             else:
-                self.play_pause_btn.configure(
-                    text="▶",
-                    bg=self.colors.green,
-                    fg=self.colors.accent_fg
-                )
+                self.play_pause_btn.configure(text="▶", bg=self.colors.green, fg=self.colors.accent_fg)
 
     def _update_status(self, text: str, color: str = None):
         """Update status bar. Handles both CTk and Tk label widgets."""
@@ -1234,11 +1194,11 @@ def create_tts_window(
     ai_params: Dict[str, Any],
     key_managers: Dict[str, Any],
     initial_text: str = "",
-    on_close: Optional[Callable[[], None]] = None
+    on_close: Optional[Callable[[], None]] = None,
 ) -> TTSWindow:
     """
     Create a TTS window.
-    
+
     Args:
         parent_root: Parent Tk root
         config: Application configuration
@@ -1246,10 +1206,8 @@ def create_tts_window(
         key_managers: Key manager instances
         initial_text: Text to pre-fill
         on_close: Optional close callback
-        
+
     Returns:
         The created window instance
     """
-    return TTSWindow(
-        parent_root, config, ai_params, key_managers, initial_text, on_close
-    )
+    return TTSWindow(parent_root, config, ai_params, key_managers, initial_text, on_close)

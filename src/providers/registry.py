@@ -14,13 +14,14 @@ from .base import BaseProvider
 @dataclass
 class ProviderDefinition:
     """Metadata for a provider type."""
-    id: str                    # e.g. "google", "openrouter", "anthropic"
-    name: str                  # e.g. "Google Gemini", "Anthropic Claude"
-    default_base_url: str      # e.g. "https://api.anthropic.com/v1"
-    auth_style: str            # "bearer" | "x-api-key" | "x-goog-api-key"
+
+    id: str  # e.g. "google", "openrouter", "anthropic"
+    name: str  # e.g. "Google Gemini", "Anthropic Claude"
+    default_base_url: str  # e.g. "https://api.anthropic.com/v1"
+    auth_style: str  # "bearer" | "x-api-key" | "x-goog-api-key"
     supports_streaming: bool
-    default_key_pool: str      # maps to KeyStore pool name
-    provider_class: str        # e.g. "openai_compatible", "gemini_native", "anthropic"
+    default_key_pool: str  # maps to KeyStore pool name
+    provider_class: str  # e.g. "openai_compatible", "gemini_native", "anthropic"
     extra_headers: Optional[Dict[str, str]] = None  # e.g. OpenRouter tracking headers
 
 
@@ -117,7 +118,7 @@ def get_provider_definition(provider_id: str) -> Optional[ProviderDefinition]:
 def create_provider(provider_type: str, key_manager=None, config: Optional[Dict] = None) -> BaseProvider:
     """
     Registry-based provider factory.
-    
+
     Resolves base_url from config -> registry default.
     """
     if config is None:
@@ -144,19 +145,19 @@ def create_provider(provider_type: str, key_manager=None, config: Optional[Dict]
 
     if definition.provider_class == "gemini_native":
         from .gemini_native import GeminiNativeProvider
+
         # Also set gemini_endpoint for backward compat with GeminiNativeProvider's config-based init
         provider_config["gemini_endpoint"] = base_url
         return GeminiNativeProvider(base_url=base_url, key_manager=key_manager, config=provider_config)
 
     elif definition.provider_class == "anthropic":
         from .anthropic import AnthropicProvider
+
         return AnthropicProvider(base_url=base_url, key_manager=key_manager, config=provider_config)
 
     else:  # openai_compatible
         from .openai_compatible import OpenAICompatibleProvider
+
         return OpenAICompatibleProvider(
-            endpoint_type=provider_type,
-            base_url=base_url,
-            key_manager=key_manager,
-            config=provider_config
+            endpoint_type=provider_type, base_url=base_url, key_manager=key_manager, config=provider_config
         )

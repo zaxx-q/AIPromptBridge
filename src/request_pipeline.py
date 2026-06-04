@@ -123,9 +123,7 @@ class RequestPipeline:
             style = "green" if not ctx.error else "red"
             if ctx.error:
                 # Use brief error in title to avoid stretching the panel
-                error_brief = (
-                    ctx.error[:80] + "..." if len(ctx.error) > 80 else ctx.error
-                )
+                error_brief = ctx.error[:80] + "..." if len(ctx.error) > 80 else ctx.error
                 title = f"[bold red]FAILED: {error_brief}[/bold red]"
             else:
                 title = "[bold green]SUCCESS[/bold green]"
@@ -146,9 +144,7 @@ class RequestPipeline:
 
             summary.append(f"\n{ctx.get_usage_summary()}")
 
-            print_panel(
-                "\n".join(summary), title=title, border_style=style, style="white"
-            )
+            print_panel("\n".join(summary), title=title, border_style=style, style="white")
             console.print()
         else:
             if ctx.error:
@@ -185,11 +181,7 @@ class RequestPipeline:
                         border_style="dim white",
                     )
                 else:
-                    preview = (
-                        ctx.response_text[:200] + "..."
-                        if len(ctx.response_text) > 200
-                        else ctx.response_text
-                    )
+                    preview = ctx.response_text[:200] + "..." if len(ctx.response_text) > 200 else ctx.response_text
                     console.print(f"[dim]Preview: {preview}[/dim]")
             else:
                 if log_full:
@@ -197,11 +189,7 @@ class RequestPipeline:
                     print(ctx.response_text)
                     print("--- END RAW OUTPUT ---\n")
                 else:
-                    preview = (
-                        ctx.response_text[:200] + "..."
-                        if len(ctx.response_text) > 200
-                        else ctx.response_text
-                    )
+                    preview = ctx.response_text[:200] + "..." if len(ctx.response_text) > 200 else ctx.response_text
                     print(f"  Preview: {preview}")
 
     @staticmethod

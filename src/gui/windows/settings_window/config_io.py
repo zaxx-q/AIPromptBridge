@@ -26,11 +26,11 @@ class ConfigData:
     """
 
     def __init__(self):
-        self.config: Dict[str, Any] = {} # [config] section values
-        self.ai_params: Dict[str, Any] = {} # [ai_params] section values
+        self.config: Dict[str, Any] = {}  # [config] section values
+        self.ai_params: Dict[str, Any] = {}  # [ai_params] section values
         # API keys are now managed by KeyStore (keys.json), not here.
-        self.raw_lines: List[str] = [] # Original lines for preservation
-        self.comments: Dict[str, str] = {} # Comments associated with keys
+        self.raw_lines: List[str] = []  # Original lines for preservation
+        self.comments: Dict[str, str] = {}  # Comments associated with keys
 
 
 def parse_config_full(filepath: str = "config.ini") -> ConfigData:
@@ -46,7 +46,7 @@ def parse_config_full(filepath: str = "config.ini") -> ConfigData:
         return data
 
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         data.raw_lines = lines
@@ -54,11 +54,11 @@ def parse_config_full(filepath: str = "config.ini") -> ConfigData:
         last_comment = ""
 
         for line in lines:
-            raw_line = line.rstrip('\n\r')
+            raw_line = line.rstrip("\n\r")
             stripped = raw_line.strip()
 
             # Track comments
-            if stripped.startswith('#'):
+            if stripped.startswith("#"):
                 last_comment = stripped
                 continue
 
@@ -67,14 +67,14 @@ def parse_config_full(filepath: str = "config.ini") -> ConfigData:
                 continue
 
             # Section header
-            if stripped.startswith('[') and stripped.endswith(']'):
+            if stripped.startswith("[") and stripped.endswith("]"):
                 current_section = stripped[1:-1].lower()
                 continue
 
             # Parse based on section
-            if current_section == 'config':
-                if '=' in stripped:
-                    key, value = stripped.split('=', 1)
+            if current_section == "config":
+                if "=" in stripped:
+                    key, value = stripped.split("=", 1)
                     key = key.strip().lower()
                     value = _parse_value(value.strip())
                     data.config[key] = value
@@ -82,9 +82,9 @@ def parse_config_full(filepath: str = "config.ini") -> ConfigData:
                         data.comments[key] = last_comment
                     last_comment = ""
 
-            elif current_section == 'ai_params':
-                if '=' in stripped:
-                    key, value = stripped.split('=', 1)
+            elif current_section == "ai_params":
+                if "=" in stripped:
+                    key, value = stripped.split("=", 1)
                     key = key.strip().lower()
                     value = _parse_value(value.strip())
                     data.ai_params[key] = value
@@ -92,7 +92,7 @@ def parse_config_full(filepath: str = "config.ini") -> ConfigData:
                         data.comments[f"ai_params.{key}"] = last_comment
                     last_comment = ""
 
-            elif current_section in ('custom', 'openrouter', 'google'):
+            elif current_section in ("custom", "openrouter", "google"):
                 # API key sections — now managed by KeyStore (keys.json).
                 # Silently skip so old config.ini files don't cause errors.
                 pass
@@ -106,22 +106,23 @@ def parse_config_full(filepath: str = "config.ini") -> ConfigData:
 def _parse_value(value_str: str) -> Any:
     """Parse a configuration value from string to appropriate type."""
     value_str = value_str.strip()
-    if value_str.lower() in ['none', 'null', '']:
+    if value_str.lower() in ["none", "null", ""]:
         return None
     # Note: '1'/'0' intentionally excluded - they should parse as int, not bool.
-    if value_str.lower() in ['true', 'yes', 'on']:
+    if value_str.lower() in ["true", "yes", "on"]:
         return True
-    if value_str.lower() in ['false', 'no', 'off']:
+    if value_str.lower() in ["false", "no", "off"]:
         return False
     try:
-        if '.' not in value_str:
+        if "." not in value_str:
             return int(value_str)
         return float(value_str)
     except ValueError:
         pass
     # Remove quotes
-    if (value_str.startswith('"') and value_str.endswith('"')) or \
-       (value_str.startswith("'") and value_str.endswith("'")):
+    if (value_str.startswith('"') and value_str.endswith('"')) or (
+        value_str.startswith("'") and value_str.endswith("'")
+    ):
         return value_str[1:-1]
     return value_str
 
@@ -156,32 +157,32 @@ def save_config_full(data: ConfigData, filepath: str = "config.ini") -> bool:
         written_ai_params = set()
 
         for line in data.raw_lines:
-            raw_line = line.rstrip('\n\r')
+            raw_line = line.rstrip("\n\r")
             stripped = raw_line.strip()
 
             # Section header
-            if stripped.startswith('[') and stripped.endswith(']'):
+            if stripped.startswith("[") and stripped.endswith("]"):
                 current_section = stripped[1:-1].lower()
-                lines.append(raw_line + '\n')
+                lines.append(raw_line + "\n")
                 continue
 
             # Comment or empty - preserve as-is
-            if not stripped or stripped.startswith('#'):
-                lines.append(raw_line + '\n')
+            if not stripped or stripped.startswith("#"):
+                lines.append(raw_line + "\n")
                 continue
 
             # Handle based on section
-            if current_section == 'config' and '=' in stripped:
-                key = stripped.split('=', 1)[0].strip().lower()
+            if current_section == "config" and "=" in stripped:
+                key = stripped.split("=", 1)[0].strip().lower()
                 if key in data.config:
                     value = _value_to_str(data.config[key])
                     lines.append(f"{key} = {value}\n")
                     written_keys.add(key)
                 else:
-                    lines.append(raw_line + '\n')
+                    lines.append(raw_line + "\n")
 
-            elif current_section == 'ai_params' and '=' in stripped:
-                key = stripped.split('=', 1)[0].strip().lower()
+            elif current_section == "ai_params" and "=" in stripped:
+                key = stripped.split("=", 1)[0].strip().lower()
                 if key in data.ai_params:
                     value = _value_to_str(data.ai_params[key])
                     lines.append(f"{key} = {value}\n")
@@ -189,17 +190,17 @@ def save_config_full(data: ConfigData, filepath: str = "config.ini") -> bool:
                 else:
                     continue
 
-            elif current_section in ('custom', 'openrouter', 'google'):
+            elif current_section in ("custom", "openrouter", "google"):
                 # API key sections — skip old key lines, they're in keys.json now.
-                if stripped and not stripped.startswith('#'):
+                if stripped and not stripped.startswith("#"):
                     continue
-                lines.append(raw_line + '\n')
+                lines.append(raw_line + "\n")
 
             else:
-                lines.append(raw_line + '\n')
+                lines.append(raw_line + "\n")
 
         # Add new config keys not in original file
-        config_section_end = _find_section_end(lines, 'config')
+        config_section_end = _find_section_end(lines, "config")
         new_config_lines = []
         for key, value in data.config.items():
             if key not in written_keys:
@@ -211,18 +212,18 @@ def save_config_full(data: ConfigData, filepath: str = "config.ini") -> bool:
             lines = lines[:config_section_end] + new_config_lines + lines[config_section_end:]
 
         # Add new ai_params keys not in original file
-        ai_params_section_end = _find_section_end(lines, 'ai_params')
+        ai_params_section_end = _find_section_end(lines, "ai_params")
         if ai_params_section_end == -1 and data.ai_params:
             # [ai_params] section doesn't exist yet - create it before API key sections
             insert_pos = len(lines)
             for i, line in enumerate(lines):
                 stripped = line.strip()
-                if stripped.startswith('[') and stripped.endswith(']'):
+                if stripped.startswith("[") and stripped.endswith("]"):
                     sec = stripped[1:-1].lower()
-                    if sec in ('custom', 'openrouter', 'google'):
+                    if sec in ("custom", "openrouter", "google"):
                         insert_pos = i
                         break
-            section_lines = ['\n[ai_params]\n']
+            section_lines = ["\n[ai_params]\n"]
             for key, value in data.ai_params.items():
                 if value is not None:
                     section_lines.append(f"{key} = {_value_to_str(value)}\n")
@@ -240,7 +241,7 @@ def save_config_full(data: ConfigData, filepath: str = "config.ini") -> bool:
         # API keys are no longer written to config.ini — managed by KeyStore (keys.json)
 
         # Write file
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             f.writelines(lines)
 
         return True
@@ -255,7 +256,7 @@ def _find_section_end(lines: List[str], section: str) -> int:
     in_section = False
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if stripped.startswith('[') and stripped.endswith(']'):
+        if stripped.startswith("[") and stripped.endswith("]"):
             if in_section:
                 return i
             if stripped[1:-1].lower() == section:

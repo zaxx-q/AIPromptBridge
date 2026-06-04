@@ -58,6 +58,7 @@ if not _force_standard_tk:
     try:
         import customtkinter as ctk
         from customtkinter import CTkImage as _CTkImage
+
         HAVE_CTK = True
         CTkImage = _CTkImage
     except ImportError:

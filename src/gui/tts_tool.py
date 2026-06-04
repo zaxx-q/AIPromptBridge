@@ -21,7 +21,7 @@ from .prompts import PromptsConfig
 class TTSToolApp:
     """
     Main controller for TTS feature.
-    
+
     Manages the lifecycle of:
     - Hotkey listener for activation
     - TTS window request
@@ -29,15 +29,10 @@ class TTSToolApp:
     - AI Director logic
     """
 
-    def __init__(
-        self,
-        config: Dict[str, Any],
-        ai_params: Dict[str, Any],
-        key_managers: Dict[str, Any]
-    ):
+    def __init__(self, config: Dict[str, Any], ai_params: Dict[str, Any], key_managers: Dict[str, Any]):
         """
         Initialize the TTS tool.
-        
+
         Args:
             config: Main application configuration
             ai_params: AI parameters dictionary
@@ -58,27 +53,24 @@ class TTSToolApp:
         self.hotkey_listener: Optional[HotkeyListener] = None
         self._window_open = False
 
-        logging.debug('TTSToolApp initialized')
+        logging.debug("TTSToolApp initialized")
 
     def start(self):
         """Start the TTS tool with hotkey listener."""
         if not self.enabled:
-            logging.info('TTS Tool is disabled')
+            logging.info("TTS Tool is disabled")
             return
 
-        logging.info(f'Starting TTSTool with hotkey: {self.hotkey}')
+        logging.info(f"Starting TTSTool with hotkey: {self.hotkey}")
 
-        self.hotkey_listener = HotkeyListener(
-            shortcut=self.hotkey,
-            callback=self._on_hotkey_pressed
-        )
+        self.hotkey_listener = HotkeyListener(shortcut=self.hotkey, callback=self._on_hotkey_pressed)
         self.hotkey_listener.start()
 
         print(f"  ✅ TTSTool: Hotkey '{self.hotkey}' registered")
 
     def stop(self):
         """Stop the TTS tool."""
-        logging.info('Stopping TTSTool')
+        logging.info("Stopping TTSTool")
 
         if self.hotkey_listener:
             self.hotkey_listener.stop()
@@ -96,24 +88,22 @@ class TTSToolApp:
 
     def _on_hotkey_pressed(self):
         """Handle hotkey press - show TTS window."""
-        logging.debug('TTS Tool hotkey pressed')
+        logging.debug("TTS Tool hotkey pressed")
 
         if self._window_open:
-            logging.debug('TTS Window already open, ignoring hotkey')
+            logging.debug("TTS Window already open, ignoring hotkey")
             return
 
         self._window_open = True
 
         # Request window via GUICoordinator (runs on GUI thread)
         from .core import GUICoordinator
-        GUICoordinator.get_instance().request_tts_window(
-            initial_text="",
-            on_close=self._on_window_closed
-        )
+
+        GUICoordinator.get_instance().request_tts_window(initial_text="", on_close=self._on_window_closed)
 
     def _on_window_closed(self):
         """Handle window close."""
-        logging.debug('TTS window closed')
+        logging.debug("TTS window closed")
         self._window_open = False
 
     def is_running(self) -> bool:
@@ -131,7 +121,7 @@ class TTSToolApp:
             "running": self.is_running(),
             "paused": self.is_paused(),
             "hotkey": self.hotkey,
-            "window_open": self._window_open
+            "window_open": self._window_open,
         }
 
     def reload_prompts(self):
@@ -147,11 +137,11 @@ class TTSToolApp:
     def _build_gender_constraint(self, voice_info: Optional[Dict[str, Any]]) -> str:
         """
         Build a gender constraint string from voice info for the AI Director.
-        
+
         Args:
             voice_info: Dict with voice info. Single-speaker: {"voice": "Kore"}.
                         Multi-speaker: {"multi": True, "speakers": [{"name": "...", "voice": "..."}, ...]}.
-        
+
         Returns:
             Gender constraint string to append to the director task, or empty string.
         """
@@ -202,11 +192,11 @@ class TTSToolApp:
         model_override: str = "",
         voice_info: Optional[Dict[str, Any]] = None,
         callback_success: Optional[Callable[[str, int], None]] = None,
-        callback_error: Optional[Callable[[str], None]] = None
+        callback_error: Optional[Callable[[str], None]] = None,
     ):
         """
         Run the AI Director to generate style instructions.
-        
+
         Args:
             input_text: The text to analyze and style.
             model_override: Optional model name to override default provider.
@@ -216,6 +206,7 @@ class TTSToolApp:
             callback_success: Callback function(response_text, token_count).
             callback_error: Callback function(error_message).
         """
+
         def _target():
             try:
                 # Get director prompts
@@ -226,10 +217,7 @@ class TTSToolApp:
                 # Inject voice gender constraint
                 task += self._build_gender_constraint(voice_info)
 
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": task}
-                ]
+                messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": task}]
 
                 from .. import web_server as _ws
                 from ..profile_resolver import resolve_profile
@@ -246,7 +234,7 @@ class TTSToolApp:
                     provider=provider,
                     model=model,
                     streaming=False,
-                    thinking_enabled=thinking_enabled
+                    thinking_enabled=thinking_enabled,
                 )
 
                 ctx = RequestPipeline.execute_simple(
@@ -274,11 +262,11 @@ class TTSToolApp:
         model: str,
         multi_config: Optional[List[Dict]] = None,
         callback_success: Optional[Callable[[bytes, bytes, float], None]] = None,
-        callback_error: Optional[Callable[[str], None]] = None
+        callback_error: Optional[Callable[[str], None]] = None,
     ):
         """
         Generate TTS audio using Google Gemini.
-        
+
         Args:
             text: The text to synthesize.
             voice_name: The voice name to use.
@@ -287,6 +275,7 @@ class TTSToolApp:
             callback_success: Callback function(pcm_data, wav_data, duration).
             callback_error: Callback function(error_message).
         """
+
         def _target():
             try:
                 from ..profile_resolver import resolve_profile
@@ -302,10 +291,7 @@ class TTSToolApp:
                 provider = create_provider("google", key_manager, resolved.config)
 
                 pcm_data, error = provider.generate_tts(
-                    text=text,
-                    model=model,
-                    voice_name=voice_name,
-                    multi_speaker_config=multi_config
+                    text=text, model=model, voice_name=voice_name, multi_speaker_config=multi_config
                 )
 
                 if error:
@@ -333,11 +319,11 @@ class TTSToolApp:
         directory: str,
         voice_name: str,
         format_ext: str,
-        transcript_text: Optional[str] = None
+        transcript_text: Optional[str] = None,
     ) -> tuple[Optional[str], Optional[str]]:
         """
         Save audio data to a file using centralized export utilities.
-        
+
         Args:
             pcm_data: Raw PCM bytes.
             wav_data: WAV bytes (optional, will be generated if None and needed).
@@ -345,7 +331,7 @@ class TTSToolApp:
             voice_name: Name of the voice (for filename fallback).
             format_ext: File extension (wav, mp3, ogg, etc.).
             transcript_text: Optional transcript to embed as metadata and use for filename.
-            
+
         Returns:
             (filename, error_message)
         """
@@ -355,11 +341,7 @@ class TTSToolApp:
 
         # Build filename: always include voice name, transcript slug added when available
         voice_slug = voice_name.lower().replace(" ", "_")
-        filename = build_output_filename(
-            prefix=f"tts_{voice_slug}",
-            text_source=transcript_text,
-            format_ext=format_ext
-        )
+        filename = build_output_filename(prefix=f"tts_{voice_slug}", text_source=transcript_text, format_ext=format_ext)
         filepath = os.path.join(directory, filename)
 
         # Ensure we have WAV data for encoding
@@ -370,10 +352,7 @@ class TTSToolApp:
                 wav_data = pcm_to_wav(pcm_data)
 
             error = export_audio_file(
-                wav_data=wav_data,
-                output_path=filepath,
-                format_ext=format_ext,
-                metadata_comment=transcript_text
+                wav_data=wav_data, output_path=filepath, format_ext=format_ext, metadata_comment=transcript_text
             )
 
         return (filename if not error else None), error

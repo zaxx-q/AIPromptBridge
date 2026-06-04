@@ -18,7 +18,7 @@ TOOLS_CONFIG_FILE = "tools_config.json"
 def get_default_config() -> Dict[str, Any]:
     """
     Get default tools configuration.
-    
+
     Returns:
         Default configuration dictionary from defaults.py
     """
@@ -28,13 +28,13 @@ def get_default_config() -> Dict[str, Any]:
 def ensure_tools_config(filepath: str = TOOLS_CONFIG_FILE) -> Path:
     """
     Ensure tools_config.json exists, creating it from defaults if needed.
-    
+
     This should be called when user first interacts with tools,
     NOT at application startup.
-    
+
     Args:
         filepath: Path to tools_config.json
-    
+
     Returns:
         Path to the config file
     """
@@ -112,7 +112,8 @@ def _merge_with_defaults(user_config: Dict[str, Any]) -> tuple[Dict[str, Any], b
 
         # Tag untagged actions
         for name, u_action in user_prompts.items():
-            if not isinstance(u_action, dict): continue
+            if not isinstance(u_action, dict):
+                continue
             if "_is_default" not in u_action:
                 d_action = default_prompts.get(name)
                 if d_action and compare_prompt(u_action, d_action):
@@ -124,7 +125,7 @@ def _merge_with_defaults(user_config: Dict[str, Any]) -> tuple[Dict[str, Any], b
         # Add missing or update default
         for name, d_action in default_prompts.items():
             if name in deleted_defaults:
-                continue # Skip re-adding defaults the user explicitly deleted
+                continue  # Skip re-adding defaults the user explicitly deleted
 
             if name not in user_prompts:
                 user_prompts[name] = d_action.copy()
@@ -139,14 +140,15 @@ def _merge_with_defaults(user_config: Dict[str, Any]) -> tuple[Dict[str, Any], b
 
     return user_config, changed
 
+
 def load_tools_config(filepath: str = TOOLS_CONFIG_FILE, create_if_missing: bool = True) -> Dict[str, Any]:
     """
     Load tools configuration from JSON file.
-    
+
     Args:
         filepath: Path to tools_config.json
         create_if_missing: If True, create the file from defaults when missing
-    
+
     Returns:
         Configuration dictionary
     """
@@ -178,10 +180,10 @@ def load_tools_config(filepath: str = TOOLS_CONFIG_FILE, create_if_missing: bool
 def get_file_processor_prompts(config: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """
     Get file processor prompts from config.
-    
+
     Args:
         config: Tools configuration dictionary
-    
+
     Returns:
         Dictionary of prompt name -> prompt config
     """
@@ -191,11 +193,11 @@ def get_file_processor_prompts(config: Dict[str, Any]) -> Dict[str, Dict[str, An
 def get_prompt_by_key(config: Dict[str, Any], key: str) -> Optional[Dict[str, Any]]:
     """
     Get a specific prompt configuration.
-    
+
     Args:
         config: Tools configuration dictionary
         key: Prompt key name
-    
+
     Returns:
         Prompt configuration or None
     """
@@ -206,12 +208,12 @@ def get_prompt_by_key(config: Dict[str, Any], key: str) -> Optional[Dict[str, An
 def get_setting(config: Dict[str, Any], key: str, default: Any = None) -> Any:
     """
     Get a setting from _settings section.
-    
+
     Args:
         config: Tools configuration dictionary
         key: Setting key
         default: Default value if not found
-    
+
     Returns:
         Setting value
     """
@@ -221,20 +223,17 @@ def get_setting(config: Dict[str, Any], key: str, default: Any = None) -> Any:
 def get_file_type_mappings(config: Dict[str, Any]) -> Dict[str, List[str]]:
     """
     Get file type mappings from config.
-    
+
     Args:
         config: Tools configuration dictionary
-    
+
     Returns:
         Dictionary of file type -> list of extensions
     """
     return config.get("file_processor", {}).get("file_type_mappings", {})
 
 
-def list_available_prompts(
-    config: Dict[str, Any],
-    filter_input_type: str = None
-) -> List[Dict[str, Any]]:
+def list_available_prompts(config: Dict[str, Any], filter_input_type: str = None) -> List[Dict[str, Any]]:
     """
     List all available prompts for file processor.
 
@@ -251,7 +250,7 @@ def list_available_prompts(
     # Add tool prompts
     for key, prompt_config in prompts.items():
         if key.startswith("_"):
-            continue # Skip internal prompts
+            continue  # Skip internal prompts
 
         input_types = prompt_config.get("input_types", ["image", "text", "code"])
 
@@ -259,12 +258,14 @@ def list_available_prompts(
         if filter_input_type and filter_input_type not in input_types:
             continue
 
-        result.append({
-            "key": key,
-            "icon": prompt_config.get("icon", "📄"),
-            "description": prompt_config.get("description", ""),
-            "input_types": input_types,
-            "source": "tool"
-        })
+        result.append(
+            {
+                "key": key,
+                "icon": prompt_config.get("icon", "📄"),
+                "description": prompt_config.get("description", ""),
+                "input_types": input_types,
+                "source": "tool",
+            }
+        )
 
     return result

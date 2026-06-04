@@ -29,7 +29,7 @@ from .base import (
 class AnthropicProvider(BaseProvider):
     """
     Provider for Anthropic Claude API using the Messages API.
-    
+
     Features:
     - Native Messages API format: system separate, alternating user/assistant
     - Extended thinking with content blocks: type=thinking and type=text
@@ -40,12 +40,7 @@ class AnthropicProvider(BaseProvider):
 
     ANTHROPIC_API_VERSION = "2023-06-01"
 
-    def __init__(
-        self,
-        base_url: Optional[str] = None,
-        key_manager=None,
-        config: Optional[Dict] = None
-    ):
+    def __init__(self, base_url: Optional[str] = None, key_manager=None, config: Optional[Dict] = None):
         super().__init__("Anthropic", key_manager, config)
         self.base_url = (base_url or "https://api.anthropic.com/v1").rstrip("/")
 
@@ -106,10 +101,7 @@ class AnthropicProvider(BaseProvider):
                 elif isinstance(existing_content, list):
                     existing_content.append({"type": "text", "text": "\n\n" + new_text})
             else:
-                merged.append({
-                    "role": role,
-                    "content": self._copy_content(content)
-                })
+                merged.append({"role": role, "content": self._copy_content(content)})
 
         # Ensure starts with user message
         if not merged:
@@ -137,14 +129,16 @@ class AnthropicProvider(BaseProvider):
                             url = item["url"]
                         match = re.match(r"data:([^;]+);base64,(.+)", url)
                         if match:
-                            parts.append({
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": match.group(1),
-                                    "data": match.group(2),
+                            parts.append(
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": match.group(1),
+                                        "data": match.group(2),
+                                    },
                                 }
-                            })
+                            )
 
                     elif item_type == "inline_data":
                         inline = item.get("inline_data", {})
@@ -152,33 +146,39 @@ class AnthropicProvider(BaseProvider):
                         data = inline.get("data", "")
 
                         if mime_type.startswith("image/"):
-                            parts.append({
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": mime_type,
-                                    "data": data,
+                            parts.append(
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": mime_type,
+                                        "data": data,
+                                    },
                                 }
-                            })
+                            )
                         elif mime_type == "application/pdf":
-                            parts.append({
-                                "type": "document",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "application/pdf",
-                                    "data": data,
+                            parts.append(
+                                {
+                                    "type": "document",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": "application/pdf",
+                                        "data": data,
+                                    },
                                 }
-                            })
+                            )
                         elif mime_type.startswith("text/") or mime_type in (
-                            "application/json", "application/xml", "application/javascript"
+                            "application/json",
+                            "application/xml",
+                            "application/javascript",
                         ):
                             try:
                                 import base64
+
                                 text_content = base64.b64decode(data).decode("utf-8")
-                                parts.append({
-                                    "type": "text",
-                                    "text": f"\n\n[File Content: {mime_type}]\n{text_content}"
-                                })
+                                parts.append(
+                                    {"type": "text", "text": f"\n\n[File Content: {mime_type}]\n{text_content}"}
+                                )
                             except Exception:
                                 pass
 
@@ -188,12 +188,7 @@ class AnthropicProvider(BaseProvider):
         return formatted
 
     def _build_request_body(
-        self,
-        messages: List[Dict],
-        model: str,
-        params: Dict,
-        thinking_enabled: bool,
-        streaming: bool
+        self, messages: List[Dict], model: str, params: Dict, thinking_enabled: bool, streaming: bool
     ) -> Dict:
         """Build Anthropic Messages API request body."""
         system_messages, chat_messages = self._separate_system_messages(messages)
@@ -251,7 +246,7 @@ class AnthropicProvider(BaseProvider):
         callback: StreamCallback,
         thinking_enabled: bool,
         api_key: str,
-        abort_event: Optional[Any]
+        abort_event: Optional[Any],
     ) -> ProviderResult:
         timeout = self.config.get("request_timeout", 120)
         url = f"{self.base_url}/messages"
@@ -263,23 +258,13 @@ class AnthropicProvider(BaseProvider):
         input_tokens = 0
         output_tokens = 0
 
-        response = requests.post(
-            url,
-            headers=headers,
-            json=body,
-            timeout=timeout,
-            stream=True
-        )
+        response = requests.post(url, headers=headers, json=body, timeout=timeout, stream=True)
 
         if response.status_code != 200:
             error_text = response.text
-            return ProviderResult(
-                success=False,
-                error=error_text,
-                status_code=response.status_code
-            )
+            return ProviderResult(success=False, error=error_text, status_code=response.status_code)
 
-        response.encoding = 'utf-8'
+        response.encoding = "utf-8"
         last_content_time = time.time()
 
         for line in response.iter_lines(decode_unicode=True):
@@ -287,9 +272,7 @@ class AnthropicProvider(BaseProvider):
 
             if time.time() - last_content_time > timeout:
                 response.close()
-                raise requests.exceptions.Timeout(
-                    f"No content received for {timeout}s (content-idle timeout)"
-                )
+                raise requests.exceptions.Timeout(f"No content received for {timeout}s (content-idle timeout)")
 
             if not line:
                 continue
@@ -311,10 +294,7 @@ class AnthropicProvider(BaseProvider):
                 if event_type == "error":
                     error_obj = data.get("error", {})
                     error_message = error_obj.get("message", "Unknown error")
-                    return ProviderResult(
-                        success=False,
-                        error=error_message
-                    )
+                    return ProviderResult(success=False, error=error_message)
 
                 elif event_type == "message_start":
                     msg_obj = data.get("message", {})
@@ -357,15 +337,10 @@ class AnthropicProvider(BaseProvider):
         if self.detect_empty_response(accumulated_content, accumulated_thinking, [], output_tokens):
             thinking_note = f", thinking: {len(accumulated_thinking)} chars" if accumulated_thinking else ""
             self.log("warn", f"Empty response detected (no content{thinking_note})")
-            return ProviderResult(
-                success=False,
-                error="Empty response (0 output tokens, no content)"
-            )
+            return ProviderResult(success=False, error="Empty response (0 output tokens, no content)")
 
         usage_data = UsageData(
-            prompt_tokens=input_tokens,
-            completion_tokens=output_tokens,
-            total_tokens=input_tokens + output_tokens
+            prompt_tokens=input_tokens, completion_tokens=output_tokens, total_tokens=input_tokens + output_tokens
         )
 
         if not input_tokens and not output_tokens:
@@ -375,10 +350,7 @@ class AnthropicProvider(BaseProvider):
         callback(CallbackType.USAGE, usage_data.to_dict())
 
         return ProviderResult(
-            success=True,
-            content=accumulated_content,
-            thinking_content=accumulated_thinking,
-            usage=usage_data
+            success=True, content=accumulated_content, thinking_content=accumulated_thinking, usage=usage_data
         )
 
     def _do_generate(
@@ -388,7 +360,7 @@ class AnthropicProvider(BaseProvider):
         params: Dict,
         thinking_enabled: bool,
         api_key: str,
-        abort_event: Optional[Any]
+        abort_event: Optional[Any],
     ) -> ProviderResult:
         timeout = self.config.get("request_timeout", 120)
         url = f"{self.base_url}/messages"
@@ -401,11 +373,7 @@ class AnthropicProvider(BaseProvider):
 
         if response.status_code != 200:
             error_text = response.text
-            return ProviderResult(
-                success=False,
-                error=error_text,
-                status_code=response.status_code
-            )
+            return ProviderResult(success=False, error=error_text, status_code=response.status_code)
 
         data = response.json()
 
@@ -426,25 +394,17 @@ class AnthropicProvider(BaseProvider):
         if self.detect_empty_response(accumulated_content, accumulated_thinking, [], output_tokens):
             thinking_note = f", thinking: {len(accumulated_thinking)} chars" if accumulated_thinking else ""
             self.log("warn", f"Empty response detected (no content{thinking_note})")
-            return ProviderResult(
-                success=False,
-                error="Empty response (0 output tokens, no content)"
-            )
+            return ProviderResult(success=False, error="Empty response (0 output tokens, no content)")
 
         usage_data = UsageData(
-            prompt_tokens=input_tokens,
-            completion_tokens=output_tokens,
-            total_tokens=input_tokens + output_tokens
+            prompt_tokens=input_tokens, completion_tokens=output_tokens, total_tokens=input_tokens + output_tokens
         )
 
         if not input_tokens and not output_tokens:
             usage_data = self._estimate_usage_fallback(messages, accumulated_content, accumulated_thinking)
 
         return ProviderResult(
-            success=True,
-            content=accumulated_content,
-            thinking_content=accumulated_thinking,
-            usage=usage_data
+            success=True, content=accumulated_content, thinking_content=accumulated_thinking, usage=usage_data
         )
 
     def fetch_models(self) -> tuple[List[Dict], Optional[str]]:
@@ -468,13 +428,15 @@ class AnthropicProvider(BaseProvider):
             models = []
             for model in data.get("data", []):
                 model_id = model.get("id", "")
-                models.append({
-                    "id": model_id,
-                    "name": model.get("display_name", model_id),
-                    "context_length": model.get("max_tokens", None),
-                    "thinking": any(kw in model_id.lower() for kw in ["opus", "sonnet", "thinking"]),
-                    "_raw": model,
-                })
+                models.append(
+                    {
+                        "id": model_id,
+                        "name": model.get("display_name", model_id),
+                        "context_length": model.get("max_tokens", None),
+                        "thinking": any(kw in model_id.lower() for kw in ["opus", "sonnet", "thinking"]),
+                        "_raw": model,
+                    }
+                )
             return models, None
         except requests.exceptions.RequestException as e:
             return None, f"Request failed: {e}"

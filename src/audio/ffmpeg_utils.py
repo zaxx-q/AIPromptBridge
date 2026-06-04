@@ -43,7 +43,7 @@ def _ensure_checked():
 
 def is_ffmpeg_available() -> bool:
     """Check if FFmpeg is available in PATH (cached).
-    
+
     Returns:
         True if ffmpeg binary was found on PATH.
     """
@@ -53,7 +53,7 @@ def is_ffmpeg_available() -> bool:
 
 def is_ffprobe_available() -> bool:
     """Check if FFprobe is available in PATH (cached).
-    
+
     Returns:
         True if ffprobe binary was found on PATH.
     """
@@ -63,7 +63,7 @@ def is_ffprobe_available() -> bool:
 
 def is_ffplay_available() -> bool:
     """Check if FFplay is available in PATH (cached).
-    
+
     Returns:
         True if ffplay binary was found on PATH.
     """
@@ -73,7 +73,7 @@ def is_ffplay_available() -> bool:
 
 def get_ffmpeg_path() -> Optional[str]:
     """Get cached FFmpeg binary path.
-    
+
     Returns:
         Absolute path to ffmpeg, or None if not found.
     """
@@ -83,7 +83,7 @@ def get_ffmpeg_path() -> Optional[str]:
 
 def get_ffprobe_path() -> Optional[str]:
     """Get cached FFprobe binary path.
-    
+
     Returns:
         Absolute path to ffprobe, or None if not found.
     """
@@ -93,7 +93,7 @@ def get_ffprobe_path() -> Optional[str]:
 
 def get_ffplay_path() -> Optional[str]:
     """Get cached FFplay binary path.
-    
+
     Returns:
         Absolute path to ffplay, or None if not found.
     """
@@ -103,7 +103,7 @@ def get_ffplay_path() -> Optional[str]:
 
 def get_ffmpeg_version() -> Optional[str]:
     """Get FFmpeg version string (first line of ``ffmpeg -version``).
-    
+
     Returns:
         Version string, or None if FFmpeg is unavailable.
     """
@@ -112,11 +112,7 @@ def get_ffmpeg_version() -> Optional[str]:
         return None
     try:
         result = subprocess.run(
-            [path, "-version"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            creationflags=get_creation_flags()
+            [path, "-version"], capture_output=True, text=True, timeout=10, creationflags=get_creation_flags()
         )
         if result.returncode == 0:
             return result.stdout.split("\n")[0]
@@ -129,35 +125,37 @@ def get_ffmpeg_version() -> Optional[str]:
 # Subprocess Helpers
 # =============================================================================
 
+
 def get_creation_flags() -> int:
     """Get subprocess creation flags for Windows (hides console window).
-    
+
     Returns:
         CREATE_NO_WINDOW on Windows, 0 elsewhere.
     """
-    return subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+    return subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
 
 
 # =============================================================================
 # Audio Duration
 # =============================================================================
 
+
 def get_audio_duration(audio_data: bytes) -> float:
     """Get duration of in-memory audio data in seconds.
-    
+
     Tries WAV header parsing first (fast, no subprocess),
     then falls back to FFprobe for compressed formats.
-    
+
     Args:
         audio_data: WAV or compressed audio bytes.
-        
+
     Returns:
         Duration in seconds (0.0 on failure).
     """
     # Try WAV first (fast, no subprocess)
     try:
         wav_buffer = io.BytesIO(audio_data)
-        with wave.open(wav_buffer, 'rb') as wf:
+        with wave.open(wav_buffer, "rb") as wf:
             return wf.getnframes() / wf.getframerate()
     except Exception:
         pass
@@ -172,14 +170,18 @@ def get_audio_duration(audio_data: bytes) -> float:
             try:
                 result = subprocess.run(
                     [
-                        get_ffprobe_path(), "-v", "error",
-                        "-show_entries", "format=duration",
-                        "-of", "default=noprint_wrappers=1:nokey=1",
-                        tmp_path
+                        get_ffprobe_path(),
+                        "-v",
+                        "error",
+                        "-show_entries",
+                        "format=duration",
+                        "-of",
+                        "default=noprint_wrappers=1:nokey=1",
+                        tmp_path,
                     ],
                     capture_output=True,
                     text=True,
-                    creationflags=get_creation_flags()
+                    creationflags=get_creation_flags(),
                 )
 
                 if result.returncode == 0:

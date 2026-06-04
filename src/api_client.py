@@ -25,6 +25,7 @@ from .providers import (
 # STREAMING API - Uses new provider classes
 # ============================================================
 
+
 def call_api_stream_unified(
     provider_type: str,
     messages: List[Dict],
@@ -38,7 +39,7 @@ def call_api_stream_unified(
 ) -> Tuple[Optional[str], Optional[str], Optional[Dict], Optional[str]]:
     """
     Unified streaming API call using new provider classes.
-    
+
     Args:
         provider_type: Provider type (custom, openrouter, google, anthropic, etc.)
         messages: List of messages in OpenAI format
@@ -49,7 +50,7 @@ def call_api_stream_unified(
         callback: Callback function (type, content)
         thinking_enabled: Enable thinking/reasoning mode
         abort_event: Event to trigger request abort
-    
+
     Returns:
         (full_text, reasoning_text, usage_data, error) tuple
     """
@@ -123,16 +124,11 @@ def call_api_stream_unified(
         params=params,
         callback=provider_callback,
         thinking_enabled=thinking_enabled,
-        abort_event=abort_event
+        abort_event=abort_event,
     )
 
     if result.success:
-        return (
-            result.content,
-            result.thinking_content,
-            result.usage.to_dict() if result.usage else usage_data,
-            None
-        )
+        return (result.content, result.thinking_content, result.usage.to_dict() if result.usage else usage_data, None)
     else:
         return None, None, None, result.error
 
@@ -197,16 +193,11 @@ def call_custom_api_stream(key_manager, url, model, messages, ai_params, timeout
         params=params,
         callback=provider_callback,
         thinking_enabled=thinking_enabled,
-        abort_event=abort_event
+        abort_event=abort_event,
     )
 
     if result.success:
-        return (
-            result.content,
-            result.thinking_content,
-            result.usage.to_dict() if result.usage else usage_data,
-            None
-        )
+        return (result.content, result.thinking_content, result.usage.to_dict() if result.usage else usage_data, None)
     else:
         return None, None, None, result.error
 
@@ -215,7 +206,10 @@ def call_custom_api_stream(key_manager, url, model, messages, ai_params, timeout
 # NON-STREAMING API - Uses new provider classes
 # ============================================================
 
-def call_api_with_retry(provider, messages, model_override, config, ai_params, key_managers, abort_event=None, result_out=None):
+
+def call_api_with_retry(
+    provider, messages, model_override, config, ai_params, key_managers, abort_event=None, result_out=None
+):
     """
     Call API with retry logic and key rotation.
     """
@@ -260,11 +254,7 @@ def call_api_with_retry(provider, messages, model_override, config, ai_params, k
         thinking_enabled = config.get("thinking_enabled", False)
 
         result = prov.generate(
-            messages=messages,
-            model=model,
-            params=params,
-            thinking_enabled=thinking_enabled,
-            abort_event=abort_event
+            messages=messages, model=model, params=params, thinking_enabled=thinking_enabled, abort_event=abort_event
         )
 
         if result.success:
@@ -278,20 +268,33 @@ def call_api_with_retry(provider, messages, model_override, config, ai_params, k
         return None, f"Provider error: {e}"
 
 
-def call_api_simple(provider, prompt, image_base64, mime_type, model_override, config, ai_params, key_managers, abort_event=None):
+def call_api_simple(
+    provider, prompt, image_base64, mime_type, model_override, config, ai_params, key_managers, abort_event=None
+):
     """Simple API call with image and prompt"""
     data_url = f"data:{mime_type};base64,{image_base64}"
-    messages = [{
-        "role": "user",
-        "content": [
-            {"type": "image_url", "image_url": {"url": data_url}},
-            {"type": "text", "text": prompt}
-        ]
-    }]
-    return call_api_with_retry(provider, messages, model_override, config, ai_params, key_managers, abort_event=abort_event)
+    messages = [
+        {
+            "role": "user",
+            "content": [{"type": "image_url", "image_url": {"url": data_url}}, {"type": "text", "text": prompt}],
+        }
+    ]
+    return call_api_with_retry(
+        provider, messages, model_override, config, ai_params, key_managers, abort_event=abort_event
+    )
 
 
-def call_api_chat(session, config, ai_params, key_managers, provider_override=None, model_override=None, system_instruction=None, abort_event=None, result_out=None):
+def call_api_chat(
+    session,
+    config,
+    ai_params,
+    key_managers,
+    provider_override=None,
+    model_override=None,
+    system_instruction=None,
+    abort_event=None,
+    result_out=None,
+):
     """
     API call for chat session.
     Uses current config settings for provider/model, not session-stored values.
@@ -304,7 +307,9 @@ def call_api_chat(session, config, ai_params, key_managers, provider_override=No
 
     provider = provider_override or config.get("default_provider", "google")
     model = model_override or config.get(f"{provider}_model")
-    return call_api_with_retry(provider, messages, model, config, ai_params, key_managers, abort_event=abort_event, result_out=result_out)
+    return call_api_with_retry(
+        provider, messages, model, config, ai_params, key_managers, abort_event=abort_event, result_out=result_out
+    )
 
 
 def call_api_chat_stream(
@@ -316,7 +321,7 @@ def call_api_chat_stream(
     provider_override=None,
     model_override=None,
     system_instruction=None,
-    abort_event=None
+    abort_event=None,
 ):
     """
     API call for chat session with streaming support.
@@ -366,6 +371,7 @@ def call_api_chat_stream(
 # ============================================================
 # MODEL FETCHING - Uses provider classes
 # ============================================================
+
 
 def fetch_models(config, key_managers, provider_override=None):
     """

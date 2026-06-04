@@ -44,6 +44,7 @@ PROFILE_DEFAULTS: Dict[str, Any] = {
 @dataclass
 class ConnectionProfile:
     """A complete connection profile — every field has a value."""
+
     description: str = ""
     provider: str = "google"
     model: str = "gemini-flash-latest"
@@ -113,6 +114,7 @@ class ConnectionProfile:
 
             clean[k] = val
         return cls(**clean)
+
 
 class ProfileStore:
     """Singleton store for connection profiles backed by profiles.json."""

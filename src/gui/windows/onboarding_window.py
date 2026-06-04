@@ -2,7 +2,7 @@
 """
 Onboarding Wizard window.
 
-Guided multi-step setup experience for first-time startup. 
+Guided multi-step setup experience for first-time startup.
 Configures API Keys (stored in KeyStore) and default connection profile (ProfileStore).
 """
 
@@ -34,6 +34,7 @@ from .utils import set_dark_titlebar, set_window_icon
 
 try:
     from ..emoji_renderer import HAVE_PIL, prepare_emoji_content
+
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
@@ -44,7 +45,7 @@ from ...model_defaults import get_fallback_models
 
 def _adjust_hex_color(hex_color: str, factor: float) -> str:
     """Adjust brightness of a hex color by a factor. factor < 1.0 darkens, > 1.0 lightens."""
-    hex_color = hex_color.lstrip('#')
+    hex_color = hex_color.lstrip("#")
     if len(hex_color) != 6:
         return f"#{hex_color}"
     try:
@@ -65,6 +66,7 @@ class OnboardingWizard:
     """
     Onboarding wizard guiding first-time users through configuration.
     """
+
     def __init__(self, master=None, on_close=None):
         self.master = master
         self.on_close_callback = on_close
@@ -103,7 +105,7 @@ class OnboardingWizard:
         set_window_icon(self.root)
 
         self.root.protocol("WM_DELETE_WINDOW", self._close)
-        self.root.bind('<Escape>', lambda e: self._close())
+        self.root.bind("<Escape>", lambda e: self._close())
 
         # Focus
         self.root.lift()
@@ -121,12 +123,18 @@ class OnboardingWizard:
         self.root.geometry(f"{w}x{h}+{x}+{y}")
 
         # Bottom navigation layout first (prevents squashing when content_frame expands)
-        self.nav_frame = ctk.CTkFrame(self.root, fg_color=c.surface0, height=64) if self.use_ctk else tk.Frame(self.root, bg=c.surface0, height=64)
+        self.nav_frame = (
+            ctk.CTkFrame(self.root, fg_color=c.surface0, height=64)
+            if self.use_ctk
+            else tk.Frame(self.root, bg=c.surface0, height=64)
+        )
         self.nav_frame.pack(fill="x", side="bottom")
         self.nav_frame.pack_propagate(False)
 
         # Main Content Layout (takes remaining space)
-        self.content_frame = ctk.CTkFrame(self.root, fg_color="transparent") if self.use_ctk else tk.Frame(self.root, bg=c.bg)
+        self.content_frame = (
+            ctk.CTkFrame(self.root, fg_color="transparent") if self.use_ctk else tk.Frame(self.root, bg=c.bg)
+        )
         self.content_frame.pack(fill="both", expand=True, padx=25, pady=(20, 10))
 
         self._build_nav_frame(self.nav_frame)
@@ -144,41 +152,47 @@ class OnboardingWizard:
         # Left side: Skip button
         if self.use_ctk:
             self.btn_skip = ctk.CTkButton(
-                parent, text="Skip Setup", width=100, command=self._skip,
-                **get_ctk_button_colors(c, "ghost")
+                parent, text="Skip Setup", width=100, command=self._skip, **get_ctk_button_colors(c, "ghost")
             )
         else:
             self.btn_skip = tk.Button(
-                parent, text="Skip Setup", bg=c.surface0, fg=c.fg, bd=0, activebackground=c.surface1, activeforeground=c.fg, command=self._skip
+                parent,
+                text="Skip Setup",
+                bg=c.surface0,
+                fg=c.fg,
+                bd=0,
+                activebackground=c.surface1,
+                activeforeground=c.fg,
+                command=self._skip,
             )
         self.btn_skip.pack(side="left", padx=15, pady=12)
 
         # Right side: Navigation buttons
         if self.use_ctk:
             self.btn_next = ctk.CTkButton(
-                parent, text="Next", width=100, command=self._go_next,
-                **get_ctk_button_colors(c, "primary")
+                parent, text="Next", width=100, command=self._go_next, **get_ctk_button_colors(c, "primary")
             )
             self.btn_back = ctk.CTkButton(
-                parent, text="Back", width=100, command=self._go_back,
-                **get_ctk_button_colors(c, "secondary")
+                parent, text="Back", width=100, command=self._go_back, **get_ctk_button_colors(c, "secondary")
             )
         else:
-            self.btn_next = tk.Button(
-                parent, text="Next", bg=c.accent, fg=c.accent_fg, width=12, command=self._go_next
-            )
-            self.btn_back = tk.Button(
-                parent, text="Back", bg=c.surface1, fg=c.fg, width=12, command=self._go_back
-            )
+            self.btn_next = tk.Button(parent, text="Next", bg=c.accent, fg=c.accent_fg, width=12, command=self._go_next)
+            self.btn_back = tk.Button(parent, text="Back", bg=c.surface1, fg=c.fg, width=12, command=self._go_back)
 
         self.btn_next.pack(side="right", padx=15, pady=12)
         self.btn_back.pack(side="right", padx=5, pady=12)
 
         # Center: Step Dots Indicator
-        dots_container = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=c.surface0)
+        dots_container = (
+            ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=c.surface0)
+        )
         dots_container.pack(side="left", expand=True, fill="both")
 
-        dots_sub = ctk.CTkFrame(dots_container, fg_color="transparent") if self.use_ctk else tk.Frame(dots_container, bg=c.surface0)
+        dots_sub = (
+            ctk.CTkFrame(dots_container, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(dots_container, bg=c.surface0)
+        )
         dots_sub.pack(expand=True, pady=10)
 
         self.step_dots = []
@@ -242,7 +256,9 @@ class OnboardingWizard:
         # Next/Finish button configuration
         if self.current_page == len(self.step_dots) - 1:
             if self.use_ctk:
-                self.btn_next.configure(text="Finish", fg_color=c.accent_green, hover_color=_adjust_hex_color(c.accent_green, 0.85))
+                self.btn_next.configure(
+                    text="Finish", fg_color=c.accent_green, hover_color=_adjust_hex_color(c.accent_green, 0.85)
+                )
             else:
                 self.btn_next.configure(text="Finish", bg=c.accent_green)
         else:
@@ -277,7 +293,7 @@ class OnboardingWizard:
                     "No API Keys Added",
                     "You have not added any API keys yet. Without a key, AI features will not work.\n\n"
                     "Would you like to proceed anyway?",
-                    parent=self.root
+                    parent=self.root,
                 )
                 if not ans:
                     return
@@ -299,7 +315,7 @@ class OnboardingWizard:
         ans = messagebox.askyesno(
             "Skip Welcome Guide",
             "Are you sure you want to skip the welcome guide? You can run it again later.",
-            parent=self.root
+            parent=self.root,
         )
         if ans:
             self._mark_completed()
@@ -349,10 +365,14 @@ class OnboardingWizard:
         c = self.colors
 
         if self.use_ctk:
-            title = ctk.CTkLabel(parent, text="Welcome to AIPromptBridge", font=get_ctk_font(22, "bold"), **get_ctk_label_colors(c))
+            title = ctk.CTkLabel(
+                parent, text="Welcome to AIPromptBridge", font=get_ctk_font(22, "bold"), **get_ctk_label_colors(c)
+            )
             title.pack(pady=(20, 5))
 
-            ver = ctk.CTkLabel(parent, text=f"Version {__version__}", font=get_ctk_font(12), **get_ctk_label_colors(c, muted=True))
+            ver = ctk.CTkLabel(
+                parent, text=f"Version {__version__}", font=get_ctk_font(12), **get_ctk_label_colors(c, muted=True)
+            )
             ver.pack()
 
             desc = ctk.CTkLabel(
@@ -360,8 +380,10 @@ class OnboardingWizard:
                 text="A Windows system-wide app that brings AI assistance to your fingertips.\n"
                 "Edit text, capture screens, transcribe audio, and chat with AI — all from your system tray.\n"
                 "Let's get you set up in just a few quick steps!",
-                font=get_ctk_font(13), justify="center", wraplength=600,
-                **get_ctk_label_colors(c)
+                font=get_ctk_font(13),
+                justify="center",
+                wraplength=600,
+                **get_ctk_label_colors(c),
             )
             desc.pack(pady=(15, 10))
 
@@ -379,8 +401,10 @@ class OnboardingWizard:
                 text="A Windows system-wide app that brings AI assistance to your fingertips.\n"
                 "Edit text, capture screens, transcribe audio, and chat with AI — all from your system tray.\n"
                 "Let's get you set up in just a few quick steps!",
-                font=("Segoe UI", 10), justify="center",
-                bg=c.bg, fg=c.fg
+                font=("Segoe UI", 10),
+                justify="center",
+                bg=c.bg,
+                fg=c.fg,
             )
             desc.pack(pady=(15, 10))
 
@@ -388,20 +412,42 @@ class OnboardingWizard:
             features_frame.pack(fill="x", expand=True, padx=20)
 
         features = [
-            ("🔑", "Secure API Keys", "Keys saved locally with XOR obfuscation. Add multiple per provider for auto-rotation."),
+            (
+                "🔑",
+                "Secure API Keys",
+                "Keys saved locally with XOR obfuscation. Add multiple per provider for auto-rotation.",
+            ),
             ("🤖", "Multi-Provider AI", "Gemini, Claude, OpenAI, OpenRouter, xAI, Mistral, Cohere & custom endpoints."),
-            ("⚡", "Global Hotkeys", "Edit text, capture screens, transcribe speech, or hear AI read aloud — anywhere."),
+            (
+                "⚡",
+                "Global Hotkeys",
+                "Edit text, capture screens, transcribe speech, or hear AI read aloud — anywhere.",
+            ),
             ("💬", "Chat Interface", "Streaming responses, markdown rendering, and full session history."),
-            ("🎨", "Themes & Customization", "6 themes with dark/light modes, custom prompts, and per-action profiles."),
+            (
+                "🎨",
+                "Themes & Customization",
+                "6 themes with dark/light modes, custom prompts, and per-action profiles.",
+            ),
         ]
 
         for emoji, name, text in features:
-            row = ctk.CTkFrame(features_frame, fg_color=c.surface0, corner_radius=8) if self.use_ctk else tk.Frame(features_frame, bg=c.surface0, bd=1, relief="solid", pady=4)
+            row = (
+                ctk.CTkFrame(features_frame, fg_color=c.surface0, corner_radius=8)
+                if self.use_ctk
+                else tk.Frame(features_frame, bg=c.surface0, bd=1, relief="solid", pady=4)
+            )
             row.pack(fill="x", pady=4, ipady=4)
 
             if self.use_ctk:
                 if HAVE_EMOJI and prepare_emoji_content:
-                    icon_lbl = ctk.CTkLabel(row, font=get_ctk_font(24), width=40, **prepare_emoji_content(emoji, size=24), **get_ctk_label_colors(c))
+                    icon_lbl = ctk.CTkLabel(
+                        row,
+                        font=get_ctk_font(24),
+                        width=40,
+                        **prepare_emoji_content(emoji, size=24),
+                        **get_ctk_label_colors(c),
+                    )
                 else:
                     icon_lbl = ctk.CTkLabel(row, text=emoji, font=get_ctk_font(24), width=40, **get_ctk_label_colors(c))
                 icon_lbl.pack(side="left", padx=(15, 10))
@@ -409,10 +455,19 @@ class OnboardingWizard:
                 txt_container = ctk.CTkFrame(row, fg_color="transparent")
                 txt_container.pack(side="left", fill="both", expand=True)
 
-                title_lbl = ctk.CTkLabel(txt_container, text=name, font=get_ctk_font(12, "bold"), anchor="w", **get_ctk_label_colors(c))
+                title_lbl = ctk.CTkLabel(
+                    txt_container, text=name, font=get_ctk_font(12, "bold"), anchor="w", **get_ctk_label_colors(c)
+                )
                 title_lbl.pack(anchor="w")
 
-                body_lbl = ctk.CTkLabel(txt_container, text=text, font=get_ctk_font(11), anchor="w", wraplength=530, **get_ctk_label_colors(c, muted=True))
+                body_lbl = ctk.CTkLabel(
+                    txt_container,
+                    text=text,
+                    font=get_ctk_font(11),
+                    anchor="w",
+                    wraplength=530,
+                    **get_ctk_label_colors(c, muted=True),
+                )
                 body_lbl.pack(anchor="w")
             else:
                 icon_lbl = tk.Label(row, text=emoji, font=("Segoe UI", 18), width=4, bg=c.surface0, fg=c.fg)
@@ -421,26 +476,35 @@ class OnboardingWizard:
                 txt_container = tk.Frame(row, bg=c.surface0)
                 txt_container.pack(side="left", fill="both", expand=True)
 
-                title_lbl = tk.Label(txt_container, text=name, font=("Segoe UI", 9, "bold"), anchor="w", bg=c.surface0, fg=c.fg)
+                title_lbl = tk.Label(
+                    txt_container, text=name, font=("Segoe UI", 9, "bold"), anchor="w", bg=c.surface0, fg=c.fg
+                )
                 title_lbl.pack(anchor="w")
 
-                body_lbl = tk.Label(txt_container, text=text, font=("Segoe UI", 8), anchor="w", wraplength=530, bg=c.surface0, fg=c.blockquote)
+                body_lbl = tk.Label(
+                    txt_container,
+                    text=text,
+                    font=("Segoe UI", 8),
+                    anchor="w",
+                    wraplength=530,
+                    bg=c.surface0,
+                    fg=c.blockquote,
+                )
                 body_lbl.pack(anchor="w")
 
     def _create_keys_page(self, parent):
         c = self.colors
 
         if self.use_ctk:
-            title = ctk.CTkLabel(
-                parent, text="Configure API Keys",
-                font=get_ctk_font(22, "bold"), text_color=c.accent
-            )
+            title = ctk.CTkLabel(parent, text="Configure API Keys", font=get_ctk_font(22, "bold"), text_color=c.accent)
             title.pack(pady=(10, 5))
 
             subtitle = ctk.CTkLabel(
                 parent,
                 text="Add your API keys to get started. You can add multiple keys and organize them in pools.",
-                font=get_ctk_font(13), text_color=c.blockquote, wraplength=600
+                font=get_ctk_font(13),
+                text_color=c.blockquote,
+                wraplength=600,
             )
             subtitle.pack(pady=(0, 15))
         else:
@@ -450,7 +514,10 @@ class OnboardingWizard:
             subtitle = tk.Label(
                 parent,
                 text="Add your API keys to get started. You can add multiple keys and organize them in pools.",
-                font=("Segoe UI", 9), justify="left", bg=c.bg, fg=c.blockquote
+                font=("Segoe UI", 9),
+                justify="left",
+                bg=c.bg,
+                fg=c.blockquote,
             )
             subtitle.pack(pady=(0, 15))
 
@@ -467,20 +534,20 @@ class OnboardingWizard:
         # ── Left Column: Add New Key Form ──────────────────────────────
         if self.use_ctk:
             form_frame = ctk.CTkFrame(
-                split_frame, fg_color=c.surface0,
-                border_color=c.surface2, border_width=1, corner_radius=10
+                split_frame, fg_color=c.surface0, border_color=c.surface2, border_width=1, corner_radius=10
             )
         else:
             form_frame = tk.Frame(split_frame, bg=c.surface0, bd=1, relief="solid")
         form_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
 
         if self.use_ctk:
-            ctk.CTkLabel(
-                form_frame, text="Add New Key",
-                font=get_ctk_font(14, "bold"), text_color=c.accent
-            ).pack(anchor="w", padx=15, pady=(15, 10))
+            ctk.CTkLabel(form_frame, text="Add New Key", font=get_ctk_font(14, "bold"), text_color=c.accent).pack(
+                anchor="w", padx=15, pady=(15, 10)
+            )
         else:
-            tk.Label(form_frame, text="Add New Key", font=("Segoe UI", 11, "bold"), bg=c.surface0, fg=c.fg).pack(anchor="w", padx=15, pady=(12, 8))
+            tk.Label(form_frame, text="Add New Key", font=("Segoe UI", 11, "bold"), bg=c.surface0, fg=c.fg).pack(
+                anchor="w", padx=15, pady=(12, 8)
+            )
 
         # Provider Pool dropdown
         self._pool_mapping = {
@@ -494,44 +561,51 @@ class OnboardingWizard:
             "Custom OpenAI-Compatible": "custom",
         }
         if self.use_ctk:
-            ctk.CTkLabel(
-                form_frame, text="Provider Pool:",
-                font=get_ctk_font(12), text_color=c.fg
-            ).pack(anchor="w", padx=15, pady=(5, 2))
+            ctk.CTkLabel(form_frame, text="Provider Pool:", font=get_ctk_font(12), text_color=c.fg).pack(
+                anchor="w", padx=15, pady=(5, 2)
+            )
         else:
-            tk.Label(form_frame, text="Provider Pool:", font=("Segoe UI", 9), bg=c.surface0, fg=c.fg).pack(anchor="w", padx=15, pady=(5, 2))
+            tk.Label(form_frame, text="Provider Pool:", font=("Segoe UI", 9), bg=c.surface0, fg=c.fg).pack(
+                anchor="w", padx=15, pady=(5, 2)
+            )
 
         self._pool_var = tk.StringVar(value="Google Gemini")
         if self.use_ctk:
             self._pool_dropdown = ctk.CTkOptionMenu(
-                form_frame, variable=self._pool_var,
+                form_frame,
+                variable=self._pool_var,
                 values=list(self._pool_mapping.keys()),
                 command=self._on_pool_changed,
                 height=32,
-                fg_color=c.surface1, button_color=c.surface2,
-                button_hover_color=c.overlay0, dropdown_fg_color=c.surface0,
-                dropdown_hover_color=c.surface1, text_color=c.fg,
-                font=get_ctk_font(12)
+                fg_color=c.surface1,
+                button_color=c.surface2,
+                button_hover_color=c.overlay0,
+                dropdown_fg_color=c.surface0,
+                dropdown_hover_color=c.surface1,
+                text_color=c.fg,
+                font=get_ctk_font(12),
             )
             self._pool_dropdown.pack(fill="x", padx=15, pady=(0, 10))
         else:
             self._pool_dropdown = ttk.Combobox(
-                form_frame, textvariable=self._pool_var,
-                values=list(self._pool_mapping.keys()), state="readonly"
+                form_frame, textvariable=self._pool_var, values=list(self._pool_mapping.keys()), state="readonly"
             )
             self._pool_dropdown.pack(fill="x", padx=15, pady=(0, 10))
             self._pool_dropdown.bind("<<ComboboxSelected>>", lambda e: self._on_pool_changed(self._pool_var.get()))
 
         # API Key entry with show/hide toggle
         if self.use_ctk:
-            ctk.CTkLabel(
-                form_frame, text="API Key:",
-                font=get_ctk_font(12), text_color=c.fg
-            ).pack(anchor="w", padx=15, pady=(5, 2))
+            ctk.CTkLabel(form_frame, text="API Key:", font=get_ctk_font(12), text_color=c.fg).pack(
+                anchor="w", padx=15, pady=(5, 2)
+            )
         else:
-            tk.Label(form_frame, text="API Key:", font=("Segoe UI", 9), bg=c.surface0, fg=c.fg).pack(anchor="w", padx=15, pady=(5, 2))
+            tk.Label(form_frame, text="API Key:", font=("Segoe UI", 9), bg=c.surface0, fg=c.fg).pack(
+                anchor="w", padx=15, pady=(5, 2)
+            )
 
-        key_input_row = ctk.CTkFrame(form_frame, fg_color="transparent") if self.use_ctk else tk.Frame(form_frame, bg=c.surface0)
+        key_input_row = (
+            ctk.CTkFrame(form_frame, fg_color="transparent") if self.use_ctk else tk.Frame(form_frame, bg=c.surface0)
+        )
         key_input_row.pack(fill="x", padx=15, pady=(0, 10))
 
         self._key_entry_var = tk.StringVar()
@@ -539,67 +613,81 @@ class OnboardingWizard:
 
         if self.use_ctk:
             self._key_entry = ctk.CTkEntry(
-                key_input_row, textvariable=self._key_entry_var,
-                font=get_ctk_font(12), height=32, show="*",
+                key_input_row,
+                textvariable=self._key_entry_var,
+                font=get_ctk_font(12),
+                height=32,
+                show="*",
                 placeholder_text="Paste your API key here...",
-                fg_color=c.input_bg, border_color=c.surface1, text_color=c.fg
+                fg_color=c.input_bg,
+                border_color=c.surface1,
+                text_color=c.fg,
             )
             self._key_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
 
-            _eye_kwargs = prepare_emoji_content("👁", size=16) if (HAVE_EMOJI and prepare_emoji_content) else {"text": "👁"}
+            _eye_kwargs = (
+                prepare_emoji_content("👁", size=16) if (HAVE_EMOJI and prepare_emoji_content) else {"text": "👁"}
+            )
             self._btn_show_key = ctk.CTkButton(
-                key_input_row, width=32, height=32,
-                fg_color=c.surface1, hover_color=c.surface2, text_color=c.fg,
-                command=self._toggle_key_visibility, **_eye_kwargs
+                key_input_row,
+                width=32,
+                height=32,
+                fg_color=c.surface1,
+                hover_color=c.surface2,
+                text_color=c.fg,
+                command=self._toggle_key_visibility,
+                **_eye_kwargs,
             )
             self._btn_show_key.pack(side="right")
         else:
-            self._key_entry = tk.Entry(
-                key_input_row, textvariable=self._key_entry_var,
-                font=("Segoe UI", 9), show="*"
-            )
+            self._key_entry = tk.Entry(key_input_row, textvariable=self._key_entry_var, font=("Segoe UI", 9), show="*")
             self._key_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
 
             self._btn_show_key = tk.Button(
-                key_input_row, text="👁", font=("Segoe UI", 9),
-                bg=c.surface1, fg=c.fg, command=self._toggle_key_visibility
+                key_input_row,
+                text="👁",
+                font=("Segoe UI", 9),
+                bg=c.surface1,
+                fg=c.fg,
+                command=self._toggle_key_visibility,
             )
             self._btn_show_key.pack(side="right")
 
         # Optional name/label
         if self.use_ctk:
-            ctk.CTkLabel(
-                form_frame, text="Name / Label (Optional):",
-                font=get_ctk_font(12), text_color=c.fg
-            ).pack(anchor="w", padx=15, pady=(5, 2))
+            ctk.CTkLabel(form_frame, text="Name / Label (Optional):", font=get_ctk_font(12), text_color=c.fg).pack(
+                anchor="w", padx=15, pady=(5, 2)
+            )
         else:
-            tk.Label(form_frame, text="Name / Label (Optional):", font=("Segoe UI", 9), bg=c.surface0, fg=c.fg).pack(anchor="w", padx=15, pady=(5, 2))
+            tk.Label(form_frame, text="Name / Label (Optional):", font=("Segoe UI", 9), bg=c.surface0, fg=c.fg).pack(
+                anchor="w", padx=15, pady=(5, 2)
+            )
 
         self._key_name_var = tk.StringVar()
         if self.use_ctk:
             ctk.CTkEntry(
-                form_frame, textvariable=self._key_name_var,
-                font=get_ctk_font(12), height=32,
+                form_frame,
+                textvariable=self._key_name_var,
+                font=get_ctk_font(12),
+                height=32,
                 placeholder_text="e.g. My Primary Key",
-                fg_color=c.input_bg, border_color=c.surface1, text_color=c.fg
+                fg_color=c.input_bg,
+                border_color=c.surface1,
+                text_color=c.fg,
             ).pack(fill="x", padx=15, pady=(0, 15))
         else:
-            tk.Entry(
-                form_frame, textvariable=self._key_name_var,
-                font=("Segoe UI", 9)
-            ).pack(fill="x", padx=15, pady=(0, 15))
+            tk.Entry(form_frame, textvariable=self._key_name_var, font=("Segoe UI", 9)).pack(
+                fill="x", padx=15, pady=(0, 15)
+            )
 
-        create_emoji_button(
-            form_frame, "Add Key", "➕", c,
-            variant="success", height=34,
-            command=self._add_key
-        ).pack(fill="x", padx=15, pady=(0, 15))
+        create_emoji_button(form_frame, "Add Key", "➕", c, variant="success", height=34, command=self._add_key).pack(
+            fill="x", padx=15, pady=(0, 15)
+        )
 
         # ── Right Column: Key List ─────────────────────────────────────
         if self.use_ctk:
             list_container = ctk.CTkFrame(
-                split_frame, fg_color=c.surface0,
-                border_color=c.surface2, border_width=1, corner_radius=10
+                split_frame, fg_color=c.surface0, border_color=c.surface2, border_width=1, corner_radius=10
             )
         else:
             list_container = tk.Frame(split_frame, bg=c.surface0, bd=1, relief="solid")
@@ -608,26 +696,24 @@ class OnboardingWizard:
         self._list_header_var = tk.StringVar(value="Current Keys (google)")
         if self.use_ctk:
             ctk.CTkLabel(
-                list_container, textvariable=self._list_header_var,
-                font=get_ctk_font(14, "bold"), text_color=c.accent
+                list_container, textvariable=self._list_header_var, font=get_ctk_font(14, "bold"), text_color=c.accent
             ).pack(anchor="w", padx=15, pady=(15, 10))
         else:
             tk.Label(
-                list_container, textvariable=self._list_header_var,
-                font=("Segoe UI", 10, "bold"), bg=c.surface0, fg=c.fg
+                list_container,
+                textvariable=self._list_header_var,
+                font=("Segoe UI", 10, "bold"),
+                bg=c.surface0,
+                fg=c.fg,
             ).pack(anchor="w", padx=15, pady=(12, 8))
 
         self._key_list = ScrollableButtonList(
-            list_container, colors=c,
-            command=self._on_key_selected,
-            corner_radius=6, fg_color=c.input_bg
+            list_container, colors=c, command=self._on_key_selected, corner_radius=6, fg_color=c.input_bg
         )
         self._key_list.pack(fill="both", expand=True, padx=15, pady=(0, 10))
 
         self._btn_remove_key = create_emoji_button(
-            list_container, "Remove Selected Key", "✕", c,
-            variant="danger", height=32,
-            command=self._remove_key
+            list_container, "Remove Selected Key", "✕", c, variant="danger", height=32, command=self._remove_key
         )
         self._btn_remove_key.pack(fill="x", padx=15, pady=(0, 15))
         self._btn_remove_key.configure(state="disabled")
@@ -715,26 +801,35 @@ class OnboardingWizard:
         c = self.colors
 
         if self.use_ctk:
-            title = ctk.CTkLabel(parent, text="Step 2: Choose Default Model", font=get_ctk_font(18, "bold"), **get_ctk_label_colors(c))
+            title = ctk.CTkLabel(
+                parent, text="Step 2: Choose Default Model", font=get_ctk_font(18, "bold"), **get_ctk_label_colors(c)
+            )
             title.pack(anchor="w", pady=(10, 5))
 
             subtitle = ctk.CTkLabel(
                 parent,
                 text="Configure which AI provider and model will be your global default. You can change this anytime.",
-                font=get_ctk_font(12), justify="left", **get_ctk_label_colors(c, muted=True)
+                font=get_ctk_font(12),
+                justify="left",
+                **get_ctk_label_colors(c, muted=True),
             )
             subtitle.pack(anchor="w", pady=(0, 15))
 
             form_frame = ctk.CTkFrame(parent, fg_color=c.surface0, corner_radius=8)
             form_frame.pack(fill="both", expand=True, padx=5, pady=5, ipady=10)
         else:
-            title = tk.Label(parent, text="Step 2: Choose Default Model", font=("Segoe UI", 14, "bold"), bg=c.bg, fg=c.fg)
+            title = tk.Label(
+                parent, text="Step 2: Choose Default Model", font=("Segoe UI", 14, "bold"), bg=c.bg, fg=c.fg
+            )
             title.pack(anchor="w", pady=(10, 5))
 
             subtitle = tk.Label(
                 parent,
                 text="Configure which AI provider and model will be your global default. You can change this anytime.",
-                font=("Segoe UI", 9), justify="left", bg=c.bg, fg=c.blockquote
+                font=("Segoe UI", 9),
+                justify="left",
+                bg=c.bg,
+                fg=c.blockquote,
             )
             subtitle.pack(anchor="w", pady=(0, 15))
 
@@ -760,83 +855,119 @@ class OnboardingWizard:
         row1.pack(fill="x", padx=20, pady=8)
 
         defs = get_provider_definitions()
-        current_display = defs[self._provider_var.get()].name if self._provider_var.get() in defs else self._provider_var.get()
+        current_display = (
+            defs[self._provider_var.get()].name if self._provider_var.get() in defs else self._provider_var.get()
+        )
         self.profile_provider_display_var = tk.StringVar(value=current_display)
 
         if self.use_ctk:
-            ctk.CTkLabel(row1, text="Provider:", font=get_ctk_font(13, "bold"), width=120, anchor="w", **get_ctk_label_colors(c)).pack(side="left")
+            ctk.CTkLabel(
+                row1, text="Provider:", font=get_ctk_font(13, "bold"), width=120, anchor="w", **get_ctk_label_colors(c)
+            ).pack(side="left")
             combo = ctk.CTkComboBox(
-                row1, variable=self.profile_provider_display_var, values=self.provider_names_list,
-                width=240, height=32, font=get_ctk_font(13), state="readonly",
+                row1,
+                variable=self.profile_provider_display_var,
+                values=self.provider_names_list,
+                width=240,
+                height=32,
+                font=get_ctk_font(13),
+                state="readonly",
                 command=self._on_profile_provider_change,
-                **get_ctk_combobox_colors(c)
+                **get_ctk_combobox_colors(c),
             )
             combo.pack(side="left")
         else:
-            tk.Label(row1, text="Provider:", font=("Segoe UI", 10, "bold"), width=14, anchor="w", bg=c.surface0, fg=c.fg).pack(side="left")
-            combo = ttk.Combobox(row1, textvariable=self.profile_provider_display_var, values=self.provider_names_list, width=28, state="readonly")
+            tk.Label(
+                row1, text="Provider:", font=("Segoe UI", 10, "bold"), width=14, anchor="w", bg=c.surface0, fg=c.fg
+            ).pack(side="left")
+            combo = ttk.Combobox(
+                row1,
+                textvariable=self.profile_provider_display_var,
+                values=self.provider_names_list,
+                width=28,
+                state="readonly",
+            )
             combo.pack(side="left")
-            combo.bind('<<ComboboxSelected>>', lambda e: self._on_profile_provider_change(self.profile_provider_display_var.get()))
+            combo.bind(
+                "<<ComboboxSelected>>",
+                lambda e: self._on_profile_provider_change(self.profile_provider_display_var.get()),
+            )
 
         # Model Selector Row
         row2 = ctk.CTkFrame(form_frame, fg_color="transparent") if self.use_ctk else tk.Frame(form_frame, bg=c.surface0)
         row2.pack(fill="x", padx=20, pady=8)
 
         if self.use_ctk:
-            ctk.CTkLabel(row2, text="Model:", font=get_ctk_font(13, "bold"), width=120, anchor="w", **get_ctk_label_colors(c)).pack(side="left")
+            ctk.CTkLabel(
+                row2, text="Model:", font=get_ctk_font(13, "bold"), width=120, anchor="w", **get_ctk_label_colors(c)
+            ).pack(side="left")
 
             self.model_combo = ScrollableComboBox(
-                row2, colors=c, variable=self._model_var, values=[],
-                width=240, height=32, font_size=13
+                row2, colors=c, variable=self._model_var, values=[], width=240, height=32, font_size=13
             )
             self.model_combo.pack(side="left")
 
-            create_emoji_button(row2, "", "🔄", c, "secondary", 34, 32, self._refresh_models).pack(side="left", padx=(8, 0))
+            create_emoji_button(row2, "", "🔄", c, "secondary", 34, 32, self._refresh_models).pack(
+                side="left", padx=(8, 0)
+            )
 
             self._model_status_label = ctk.CTkLabel(
-                row2, text="", font=get_ctk_font(11),
-                **get_ctk_label_colors(c, muted=True)
+                row2, text="", font=get_ctk_font(11), **get_ctk_label_colors(c, muted=True)
             )
             self._model_status_label.pack(side="left", padx=(10, 0))
         else:
-            tk.Label(row2, text="Model:", font=("Segoe UI", 10, "bold"), width=14, anchor="w", bg=c.surface0, fg=c.fg).pack(side="left")
+            tk.Label(
+                row2, text="Model:", font=("Segoe UI", 10, "bold"), width=14, anchor="w", bg=c.surface0, fg=c.fg
+            ).pack(side="left")
             self.model_combo = ttk.Combobox(row2, textvariable=self._model_var, values=[], width=26)
             self.model_combo.pack(side="left")
 
-            tk.Button(row2, text="🔄", font=("Segoe UI", 9), bg=c.surface1, fg=c.fg, command=self._refresh_models).pack(side="left", padx=(6, 0))
-
-            self._model_status_label = tk.Label(
-                row2, text="", font=("Segoe UI", 9),
-                bg=c.surface0, fg=c.blockquote
+            tk.Button(row2, text="🔄", font=("Segoe UI", 9), bg=c.surface1, fg=c.fg, command=self._refresh_models).pack(
+                side="left", padx=(6, 0)
             )
+
+            self._model_status_label = tk.Label(row2, text="", font=("Segoe UI", 9), bg=c.surface0, fg=c.blockquote)
             self._model_status_label.pack(side="left", padx=(8, 0))
 
         # Base URL row — only shown for custom (OAI-compatible) provider
-        self._base_url_row = ctk.CTkFrame(form_frame, fg_color="transparent") if self.use_ctk else tk.Frame(form_frame, bg=c.surface0)
+        self._base_url_row = (
+            ctk.CTkFrame(form_frame, fg_color="transparent") if self.use_ctk else tk.Frame(form_frame, bg=c.surface0)
+        )
         # (not packed yet; shown dynamically by _on_profile_provider_change)
 
         if self.use_ctk:
             ctk.CTkLabel(
-                self._base_url_row, text="Base URL:",
-                font=get_ctk_font(13, "bold"), width=120, anchor="w",
-                **get_ctk_label_colors(c)
+                self._base_url_row,
+                text="Base URL:",
+                font=get_ctk_font(13, "bold"),
+                width=120,
+                anchor="w",
+                **get_ctk_label_colors(c),
             ).pack(side="left")
             ctk.CTkEntry(
-                self._base_url_row, textvariable=self._base_url_var,
-                font=get_ctk_font(12), width=320, height=32,
+                self._base_url_row,
+                textvariable=self._base_url_var,
+                font=get_ctk_font(12),
+                width=320,
+                height=32,
                 placeholder_text="https://api.example.com/v1",
-                fg_color=c.input_bg, border_color=c.surface1, text_color=c.fg
+                fg_color=c.input_bg,
+                border_color=c.surface1,
+                text_color=c.fg,
             ).pack(side="left")
         else:
             tk.Label(
-                self._base_url_row, text="Base URL:",
-                font=("Segoe UI", 10, "bold"), width=14, anchor="w",
-                bg=c.surface0, fg=c.fg
+                self._base_url_row,
+                text="Base URL:",
+                font=("Segoe UI", 10, "bold"),
+                width=14,
+                anchor="w",
+                bg=c.surface0,
+                fg=c.fg,
             ).pack(side="left")
-            tk.Entry(
-                self._base_url_row, textvariable=self._base_url_var,
-                font=("Segoe UI", 9), width=35
-            ).pack(side="left")
+            tk.Entry(self._base_url_row, textvariable=self._base_url_var, font=("Segoe UI", 9), width=35).pack(
+                side="left"
+            )
 
         # Populate model dropdown and trigger visibility logic
         self._on_profile_provider_change(self.profile_provider_display_var.get(), update_var=False)
@@ -980,14 +1111,17 @@ class OnboardingWizard:
     def _schedule_ui(self, callback):
         if self._destroyed:
             return
+
         def safe_wrapper():
             if not self._destroyed:
                 try:
                     callback()
                 except Exception:
                     pass
+
         try:
             from ..core import GUICoordinator
+
             GUICoordinator.get_instance().run_on_gui_thread(safe_wrapper)
         except Exception:
             try:
@@ -1007,8 +1141,8 @@ class OnboardingWizard:
 
         profile.provider = provider
         profile.model = model
-        profile.streaming = True   # always on for simplicity
-        profile.thinking = False   # always off by default
+        profile.streaming = True  # always on for simplicity
+        profile.thinking = False  # always off by default
         if provider == "custom" and base_url:
             profile.base_url = base_url
 
@@ -1018,6 +1152,7 @@ class OnboardingWizard:
         self._profile_store.set_active_profile("Default")
         try:
             from ...web_server import switch_active_profile
+
             switch_active_profile("Default")
         except Exception:
             pass
@@ -1026,26 +1161,35 @@ class OnboardingWizard:
         c = self.colors
 
         if self.use_ctk:
-            title = ctk.CTkLabel(parent, text="Step 3: Quick Tour & Hotkeys", font=get_ctk_font(18, "bold"), **get_ctk_label_colors(c))
+            title = ctk.CTkLabel(
+                parent, text="Step 3: Quick Tour & Hotkeys", font=get_ctk_font(18, "bold"), **get_ctk_label_colors(c)
+            )
             title.pack(anchor="w", pady=(10, 5))
 
             subtitle = ctk.CTkLabel(
                 parent,
                 text="AIPromptBridge runs in the system tray. Use these global hotkeys anywhere in Windows:",
-                font=get_ctk_font(12), justify="left", **get_ctk_label_colors(c, muted=True)
+                font=get_ctk_font(12),
+                justify="left",
+                **get_ctk_label_colors(c, muted=True),
             )
             subtitle.pack(anchor="w", pady=(0, 15))
 
             grid = ctk.CTkFrame(parent, fg_color="transparent")
             grid.pack(fill="both", expand=True, padx=5, pady=5)
         else:
-            title = tk.Label(parent, text="Step 3: Quick Tour & Hotkeys", font=("Segoe UI", 14, "bold"), bg=c.bg, fg=c.fg)
+            title = tk.Label(
+                parent, text="Step 3: Quick Tour & Hotkeys", font=("Segoe UI", 14, "bold"), bg=c.bg, fg=c.fg
+            )
             title.pack(anchor="w", pady=(10, 5))
 
             subtitle = tk.Label(
                 parent,
                 text="AIPromptBridge runs in the system tray. Use these global hotkeys anywhere in Windows:",
-                font=("Segoe UI", 9), justify="left", bg=c.bg, fg=c.blockquote
+                font=("Segoe UI", 9),
+                justify="left",
+                bg=c.bg,
+                fg=c.blockquote,
             )
             subtitle.pack(anchor="w", pady=(0, 15))
 
@@ -1058,10 +1202,34 @@ class OnboardingWizard:
         grid.rowconfigure(1, weight=1)
 
         tools = [
-            ("📝 Text Edit Tool", "ctrl+space", "Select text and press hotkey to edit, translate, or rewrite it in-place using AI prompts.", 0, 0),
-            ("📸 Screen Snip Tool", "ctrl+alt+x", "Capture any part of your screen to extract text, solve math/homework, or ask AI about the image.", 0, 1),
-            ("🎙️ Audio Tool", "ctrl+alt+a", "Record voice dictations or system audio and let AI transcribe and type them directly into the active application.", 1, 0),
-            ("🔊 Text-to-Speech", "ctrl+alt+t", "Select text and hear the AI read it aloud using natural-sounding voices.", 1, 1),
+            (
+                "📝 Text Edit Tool",
+                "ctrl+space",
+                "Select text and press hotkey to edit, translate, or rewrite it in-place using AI prompts.",
+                0,
+                0,
+            ),
+            (
+                "📸 Screen Snip Tool",
+                "ctrl+alt+x",
+                "Capture any part of your screen to extract text, solve math/homework, or ask AI about the image.",
+                0,
+                1,
+            ),
+            (
+                "🎙️ Audio Tool",
+                "ctrl+alt+a",
+                "Record voice dictations or system audio and let AI transcribe and type them directly into the active application.",
+                1,
+                0,
+            ),
+            (
+                "🔊 Text-to-Speech",
+                "ctrl+alt+t",
+                "Select text and hear the AI read it aloud using natural-sounding voices.",
+                1,
+                1,
+            ),
         ]
 
         for name, hotkey, desc, r, col in tools:
@@ -1074,15 +1242,28 @@ class OnboardingWizard:
 
                 if HAVE_EMOJI and prepare_emoji_content:
                     kwargs = prepare_emoji_content(name, size=22)
-                    ctk.CTkLabel(header_row, font=get_ctk_font(12, "bold"), **kwargs, **get_ctk_label_colors(c)).pack(side="left")
+                    ctk.CTkLabel(header_row, font=get_ctk_font(12, "bold"), **kwargs, **get_ctk_label_colors(c)).pack(
+                        side="left"
+                    )
                 else:
-                    ctk.CTkLabel(header_row, text=name, font=get_ctk_font(12, "bold"), **get_ctk_label_colors(c)).pack(side="left")
+                    ctk.CTkLabel(header_row, text=name, font=get_ctk_font(12, "bold"), **get_ctk_label_colors(c)).pack(
+                        side="left"
+                    )
 
                 tag = ctk.CTkFrame(header_row, fg_color=c.accent, corner_radius=4)
                 tag.pack(side="right")
-                ctk.CTkLabel(tag, text=hotkey.upper(), font=get_ctk_font(10, "bold"), text_color=c.accent_fg).pack(padx=6, pady=2)
+                ctk.CTkLabel(tag, text=hotkey.upper(), font=get_ctk_font(10, "bold"), text_color=c.accent_fg).pack(
+                    padx=6, pady=2
+                )
 
-                body = ctk.CTkLabel(card, text=desc, font=get_ctk_font(11), justify="left", wraplength=270, **get_ctk_label_colors(c, muted=True))
+                body = ctk.CTkLabel(
+                    card,
+                    text=desc,
+                    font=get_ctk_font(11),
+                    justify="left",
+                    wraplength=270,
+                    **get_ctk_label_colors(c, muted=True),
+                )
                 body.pack(anchor="w", padx=12, pady=(0, 10), fill="both", expand=True)
             else:
                 card = tk.Frame(grid, bg=c.surface0, bd=1, relief="solid")
@@ -1093,10 +1274,26 @@ class OnboardingWizard:
 
                 tk.Label(header_row, text=name, font=("Segoe UI", 9, "bold"), bg=c.surface0, fg=c.fg).pack(side="left")
 
-                tag = tk.Label(header_row, text=hotkey.upper(), font=("Segoe UI", 8, "bold"), bg=c.accent, fg=c.accent_fg, bd=2, relief="flat")
+                tag = tk.Label(
+                    header_row,
+                    text=hotkey.upper(),
+                    font=("Segoe UI", 8, "bold"),
+                    bg=c.accent,
+                    fg=c.accent_fg,
+                    bd=2,
+                    relief="flat",
+                )
                 tag.pack(side="right")
 
-                body = tk.Label(card, text=desc, font=("Segoe UI", 8), justify="left", wraplength=270, bg=c.surface0, fg=c.blockquote)
+                body = tk.Label(
+                    card,
+                    text=desc,
+                    font=("Segoe UI", 8),
+                    justify="left",
+                    wraplength=270,
+                    bg=c.surface0,
+                    fg=c.blockquote,
+                )
                 body.pack(anchor="w", padx=10, pady=(0, 8), fill="both", expand=True)
 
         # Additional features note — rendered once, outside the for loop
@@ -1107,17 +1304,38 @@ class OnboardingWizard:
 
             if HAVE_EMOJI and prepare_emoji_content:
                 icon_kwargs = prepare_emoji_content("💡", size=18)
-                ctk.CTkLabel(extra_frame, font=get_ctk_font(18), width=30, **icon_kwargs, **get_ctk_label_colors(c, muted=True)).pack(side="left", padx=(0, 5))
+                ctk.CTkLabel(
+                    extra_frame, font=get_ctk_font(18), width=30, **icon_kwargs, **get_ctk_label_colors(c, muted=True)
+                ).pack(side="left", padx=(0, 5))
             else:
-                ctk.CTkLabel(extra_frame, text="💡", font=get_ctk_font(18), width=30, **get_ctk_label_colors(c, muted=True)).pack(side="left", padx=(0, 5))
+                ctk.CTkLabel(
+                    extra_frame, text="💡", font=get_ctk_font(18), width=30, **get_ctk_label_colors(c, muted=True)
+                ).pack(side="left", padx=(0, 5))
 
-            ctk.CTkLabel(extra_frame, text=extra_text, font=get_ctk_font(11), justify="left", wraplength=600, anchor="w", **get_ctk_label_colors(c, muted=True)).pack(side="left", fill="x", expand=True)
+            ctk.CTkLabel(
+                extra_frame,
+                text=extra_text,
+                font=get_ctk_font(11),
+                justify="left",
+                wraplength=600,
+                anchor="w",
+                **get_ctk_label_colors(c, muted=True),
+            ).pack(side="left", fill="x", expand=True)
         else:
             extra_frame = tk.Frame(parent, bg=c.bg)
             extra_frame.pack(fill="x", padx=15, pady=(8, 0))
 
             tk.Label(extra_frame, text="💡", font=("Segoe UI", 12), bg=c.bg, fg=c.fg).pack(side="left", padx=(0, 5))
-            tk.Label(extra_frame, text=extra_text, font=("Segoe UI", 9), justify="left", wraplength=600, anchor="w", bg=c.bg, fg=c.blockquote).pack(side="left", fill="x", expand=True)
+            tk.Label(
+                extra_frame,
+                text=extra_text,
+                font=("Segoe UI", 9),
+                justify="left",
+                wraplength=600,
+                anchor="w",
+                bg=c.bg,
+                fg=c.blockquote,
+            ).pack(side="left", fill="x", expand=True)
 
     def _create_complete_page(self, parent):
         c = self.colors
@@ -1127,14 +1345,17 @@ class OnboardingWizard:
                 title_kwargs = prepare_emoji_content("🎉 All Set!", size=30)
                 title = ctk.CTkLabel(parent, font=get_ctk_font(22, "bold"), **title_kwargs, **get_ctk_label_colors(c))
             else:
-                title = ctk.CTkLabel(parent, text="All Set! 🎉", font=get_ctk_font(22, "bold"), **get_ctk_label_colors(c))
+                title = ctk.CTkLabel(
+                    parent, text="All Set! 🎉", font=get_ctk_font(22, "bold"), **get_ctk_label_colors(c)
+                )
             title.pack(pady=(20, 10))
 
             desc = ctk.CTkLabel(
                 parent,
-                text="AIPromptBridge is fully configured and ready to use.\n"
-                     "Below is a summary of your configuration:",
-                font=get_ctk_font(13), justify="center", **get_ctk_label_colors(c)
+                text="AIPromptBridge is fully configured and ready to use.\nBelow is a summary of your configuration:",
+                font=get_ctk_font(13),
+                justify="center",
+                **get_ctk_label_colors(c),
             )
             desc.pack(pady=(0, 20))
 
@@ -1146,9 +1367,11 @@ class OnboardingWizard:
 
             desc = tk.Label(
                 parent,
-                text="AIPromptBridge is fully configured and ready to use.\n"
-                     "Below is a summary of your configuration:",
-                font=("Segoe UI", 10), justify="center", bg=c.bg, fg=c.fg
+                text="AIPromptBridge is fully configured and ready to use.\nBelow is a summary of your configuration:",
+                font=("Segoe UI", 10),
+                justify="center",
+                bg=c.bg,
+                fg=c.fg,
             )
             desc.pack(pady=(0, 20))
 
@@ -1164,7 +1387,9 @@ class OnboardingWizard:
         keys_summary = ", ".join(pools_with_keys) if pools_with_keys else "None (Add later in Settings)"
 
         defs = get_provider_definitions()
-        provider_name = defs[self._provider_var.get()].name if self._provider_var.get() in defs else self._provider_var.get()
+        provider_name = (
+            defs[self._provider_var.get()].name if self._provider_var.get() in defs else self._provider_var.get()
+        )
         model_name = self._model_var.get()
 
         # (emoji, label_text, value) — emoji in separate column for vertical alignment
@@ -1179,48 +1404,87 @@ class OnboardingWizard:
         if self._provider_var.get() == "custom" and base_url:
             summary_details.append(("🌐", "Base URL:", base_url))
 
-        summary_box.columnconfigure(0, weight=0, minsize=35)   # emoji column
-        summary_box.columnconfigure(1, weight=1)                # label column
-        summary_box.columnconfigure(2, weight=1)                # value column
+        summary_box.columnconfigure(0, weight=0, minsize=35)  # emoji column
+        summary_box.columnconfigure(1, weight=1)  # label column
+        summary_box.columnconfigure(2, weight=1)  # value column
 
         for idx, (emoji, label, val) in enumerate(summary_details):
             if self.use_ctk:
                 # Emoji column — fixed width, centered
                 if HAVE_EMOJI and prepare_emoji_content:
                     emoji_kwargs = prepare_emoji_content(emoji, size=20)
-                    lbl_emoji = ctk.CTkLabel(summary_box, font=get_ctk_font(16), anchor="center", **emoji_kwargs, **get_ctk_label_colors(c, muted=True))
+                    lbl_emoji = ctk.CTkLabel(
+                        summary_box,
+                        font=get_ctk_font(16),
+                        anchor="center",
+                        **emoji_kwargs,
+                        **get_ctk_label_colors(c, muted=True),
+                    )
                 else:
-                    lbl_emoji = ctk.CTkLabel(summary_box, text=emoji, font=get_ctk_font(16), anchor="center", **get_ctk_label_colors(c, muted=True))
+                    lbl_emoji = ctk.CTkLabel(
+                        summary_box,
+                        text=emoji,
+                        font=get_ctk_font(16),
+                        anchor="center",
+                        **get_ctk_label_colors(c, muted=True),
+                    )
                 lbl_emoji.grid(row=idx, column=0, padx=(15, 2), pady=4, sticky="e")
 
                 # Label column
-                lbl_l = ctk.CTkLabel(summary_box, text=label, font=get_ctk_font(12, "bold"), anchor="e", **get_ctk_label_colors(c, muted=True))
+                lbl_l = ctk.CTkLabel(
+                    summary_box,
+                    text=label,
+                    font=get_ctk_font(12, "bold"),
+                    anchor="e",
+                    **get_ctk_label_colors(c, muted=True),
+                )
                 lbl_l.grid(row=idx, column=1, padx=(2, 10), pady=4, sticky="e")
 
                 # Value column
-                lbl_r = ctk.CTkLabel(summary_box, text=val, font=get_ctk_font(12, "bold"), anchor="w", **get_ctk_label_colors(c))
+                lbl_r = ctk.CTkLabel(
+                    summary_box, text=val, font=get_ctk_font(12, "bold"), anchor="w", **get_ctk_label_colors(c)
+                )
                 lbl_r.grid(row=idx, column=2, padx=(10, 20), pady=4, sticky="w")
             else:
-                lbl_emoji = tk.Label(summary_box, text=emoji, font=("Segoe UI", 12), anchor="center", bg=c.surface0, fg=c.blockquote, width=3)
+                lbl_emoji = tk.Label(
+                    summary_box,
+                    text=emoji,
+                    font=("Segoe UI", 12),
+                    anchor="center",
+                    bg=c.surface0,
+                    fg=c.blockquote,
+                    width=3,
+                )
                 lbl_emoji.grid(row=idx, column=0, padx=(15, 2), pady=4, sticky="e")
 
-                lbl_l = tk.Label(summary_box, text=label, font=("Segoe UI", 9, "bold"), anchor="e", bg=c.surface0, fg=c.blockquote)
+                lbl_l = tk.Label(
+                    summary_box, text=label, font=("Segoe UI", 9, "bold"), anchor="e", bg=c.surface0, fg=c.blockquote
+                )
                 lbl_l.grid(row=idx, column=1, padx=(2, 10), pady=4, sticky="e")
 
-                lbl_r = tk.Label(summary_box, text=val, font=("Segoe UI", 9, "bold"), anchor="w", bg=c.surface0, fg=c.fg)
+                lbl_r = tk.Label(
+                    summary_box, text=val, font=("Segoe UI", 9, "bold"), anchor="w", bg=c.surface0, fg=c.fg
+                )
                 lbl_r.grid(row=idx, column=2, padx=(10, 20), pady=4, sticky="w")
 
-        next_text = "AIPromptBridge will stay active in the system tray.\n" \
-            "Double-click the tray icon to hide/show the console."
+        next_text = (
+            "AIPromptBridge will stay active in the system tray.\nDouble-click the tray icon to hide/show the console."
+        )
         if self.use_ctk:
-            ctk.CTkLabel(parent, text=next_text, font=get_ctk_font(11), justify="center", **get_ctk_label_colors(c, muted=True)).pack(pady=(15, 5))
+            ctk.CTkLabel(
+                parent, text=next_text, font=get_ctk_font(11), justify="center", **get_ctk_label_colors(c, muted=True)
+            ).pack(pady=(15, 5))
         else:
-            tk.Label(parent, text=next_text, font=("Segoe UI", 9), justify="center", bg=c.bg, fg=c.blockquote).pack(pady=(15, 5))
+            tk.Label(parent, text=next_text, font=("Segoe UI", 9), justify="center", bg=c.bg, fg=c.blockquote).pack(
+                pady=(15, 5)
+            )
 
         # Tips & Next Steps
         tips_title_text = "Tips & Next Steps"
         if self.use_ctk:
-            ctk.CTkLabel(parent, text=tips_title_text, font=get_ctk_font(12, "bold"), **get_ctk_label_colors(c)).pack(pady=(10, 5))
+            ctk.CTkLabel(parent, text=tips_title_text, font=get_ctk_font(12, "bold"), **get_ctk_label_colors(c)).pack(
+                pady=(10, 5)
+            )
         else:
             tk.Label(parent, text=tips_title_text, font=("Segoe UI", 10, "bold"), bg=c.bg, fg=c.fg).pack(pady=(10, 5))
 
@@ -1238,18 +1502,28 @@ class OnboardingWizard:
                 tip_row.pack(fill="x", pady=1)
                 if HAVE_EMOJI and prepare_emoji_content:
                     icon_kwargs = prepare_emoji_content(emoji, size=16)
-                    ctk.CTkLabel(tip_row, font=get_ctk_font(16), width=28, **icon_kwargs, **get_ctk_label_colors(c, muted=True)).pack(side="left", padx=(0, 6))
+                    ctk.CTkLabel(
+                        tip_row, font=get_ctk_font(16), width=28, **icon_kwargs, **get_ctk_label_colors(c, muted=True)
+                    ).pack(side="left", padx=(0, 6))
                 else:
-                    ctk.CTkLabel(tip_row, text=emoji, font=get_ctk_font(16), width=28, **get_ctk_label_colors(c, muted=True)).pack(side="left", padx=(0, 6))
-                ctk.CTkLabel(tip_row, text=tip_text, font=get_ctk_font(11), anchor="w", **get_ctk_label_colors(c, muted=True)).pack(side="left", fill="x", expand=True)
+                    ctk.CTkLabel(
+                        tip_row, text=emoji, font=get_ctk_font(16), width=28, **get_ctk_label_colors(c, muted=True)
+                    ).pack(side="left", padx=(0, 6))
+                ctk.CTkLabel(
+                    tip_row, text=tip_text, font=get_ctk_font(11), anchor="w", **get_ctk_label_colors(c, muted=True)
+                ).pack(side="left", fill="x", expand=True)
         else:
             tips_frame = tk.Frame(parent, bg=c.bg)
             tips_frame.pack(fill="x", padx=40)
             for emoji, tip_text in tips:
                 tip_row = tk.Frame(tips_frame, bg=c.bg)
                 tip_row.pack(fill="x", pady=1)
-                tk.Label(tip_row, text=emoji, font=("Segoe UI", 12), bg=c.bg, fg=c.fg, width=3).pack(side="left", padx=(0, 4))
-                tk.Label(tip_row, text=tip_text, font=("Segoe UI", 9), anchor="w", bg=c.bg, fg=c.blockquote).pack(side="left", fill="x", expand=True)
+                tk.Label(tip_row, text=emoji, font=("Segoe UI", 12), bg=c.bg, fg=c.fg, width=3).pack(
+                    side="left", padx=(0, 4)
+                )
+                tk.Label(tip_row, text=tip_text, font=("Segoe UI", 9), anchor="w", bg=c.bg, fg=c.blockquote).pack(
+                    side="left", fill="x", expand=True
+                )
 
 
 class AttachedOnboardingWindow:
@@ -1257,6 +1531,7 @@ class AttachedOnboardingWindow:
     Onboarding wizard window as Toplevel attached to GUICoordinator's root.
     Used for centralized GUI threading.
     """
+
     def __init__(self, parent_root, on_close=None):
         self.parent_root = parent_root
         wizard = OnboardingWizard(master=parent_root, on_close=on_close)
@@ -1274,9 +1549,11 @@ def show_onboarding_blocking():
     Can be run from any thread, and will dispatch to GUICoordinator.
     """
     from ..core import GUICoordinator
+
     coordinator = GUICoordinator.get_instance()
 
     done_event = threading.Event()
+
     def on_close():
         done_event.set()
 

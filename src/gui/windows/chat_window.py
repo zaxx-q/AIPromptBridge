@@ -159,8 +159,10 @@ class AttachedChatWindow(ChatWindowBase):
             self.root.lift()
             self.root.focus_force()
             # Temporarily set topmost to grab focus, then remove
-            self.root.attributes('-topmost', True)
-            self.root.after(150, lambda: self.root.attributes('-topmost', False) if self.root and not self._destroyed else None)
+            self.root.attributes("-topmost", True)
+            self.root.after(
+                150, lambda: self.root.attributes("-topmost", False) if self.root and not self._destroyed else None
+            )
         except tk.TclError:
             pass
 

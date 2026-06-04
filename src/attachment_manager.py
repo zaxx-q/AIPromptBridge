@@ -32,6 +32,7 @@ from typing import Dict, List, Optional, Tuple
 # Optional PIL import for image processing
 try:
     from PIL import Image
+
     HAVE_PIL = True
 except ImportError:
     HAVE_PIL = False
@@ -48,7 +49,7 @@ _FILE_LOCK = threading.Lock()
 class AttachmentManager:
     """
     Manages session attachment storage and retrieval.
-    
+
     All methods are class methods for easy access without instantiation.
     Thread-safe for concurrent access from multiple windows/threads.
     """
@@ -109,12 +110,13 @@ class AttachmentManager:
     def _get_config(cls) -> Tuple[str, int]:
         """
         Get image format and quality from config.
-        
+
         Returns:
             Tuple of (format, quality)
         """
         try:
             from .config import load_config
+
             config = load_config()
             fmt = config.get("session_image_format", cls.DEFAULT_FORMAT).lower()
             quality = config.get("session_image_quality", cls.DEFAULT_QUALITY)
@@ -151,7 +153,7 @@ class AttachmentManager:
     def _sanitize_filename(cls, filename: str) -> str:
         """Sanitize filename to be safe for filesystem."""
         # Remove or replace unsafe characters
-        safe = re.sub(r'[<>:"/\\|?*]', '_', filename)
+        safe = re.sub(r'[<>:"/\\|?*]', "_", filename)
         # Limit length
         if len(safe) > 50:
             name, ext = os.path.splitext(safe)
@@ -165,21 +167,21 @@ class AttachmentManager:
         image_base64: str,
         mime_type: str,
         message_index: int = 0,
-        original_filename: Optional[str] = None
+        original_filename: Optional[str] = None,
     ) -> str:
         """
         Save image to external file and return relative path.
-        
+
         Converts the image to the configured format (WebP by default) for
         consistent storage and optimal file size.
-        
+
         Args:
             session_id: The session ID
             image_base64: Base64 encoded image data
             mime_type: Original MIME type (e.g., "image/png")
             message_index: Index of the message (for ordering)
             original_filename: Optional original filename
-            
+
         Returns:
             Relative path to saved file (e.g., "session_attachments/5/0_1706000000_image.webp")
         """
@@ -246,21 +248,21 @@ class AttachmentManager:
         audio_data: bytes,
         mime_type: str,
         message_index: int = 0,
-        original_filename: Optional[str] = None
+        original_filename: Optional[str] = None,
     ) -> str:
         """
         Save audio data to external file and return relative path.
-        
+
         Unlike images, audio files are saved as-is without conversion
         to preserve quality and compatibility.
-        
+
         Args:
             session_id: The session ID
             audio_data: Raw audio bytes
             mime_type: MIME type (e.g., "audio/wav", "audio/ogg")
             message_index: Index of the message (for ordering)
             original_filename: Optional original filename
-            
+
         Returns:
             Relative path to saved file (e.g., "session_attachments/5/0_1706000000_audio.wav")
         """
@@ -294,22 +296,17 @@ class AttachmentManager:
             return ""
 
     @classmethod
-    def save_file(
-        cls,
-        session_id: int,
-        file_path: str,
-        message_index: int = 0
-    ) -> str:
+    def save_file(cls, session_id: int, file_path: str, message_index: int = 0) -> str:
         """
         Copy a file to session attachments directory.
-        
+
         For images, converts to configured format. For other files, copies as-is.
-        
+
         Args:
             session_id: The session ID
             file_path: Path to the source file
             message_index: Index of the message (for ordering)
-            
+
         Returns:
             Relative path to saved file
         """
@@ -327,10 +324,7 @@ class AttachmentManager:
                     image_data = f.read()
                 image_base64 = base64.b64encode(image_data).decode("ascii")
                 mime_type = cls.FORMAT_MIME_MAP.get(extension, "image/png")
-                return cls.save_image(
-                    session_id, image_base64, mime_type,
-                    message_index, source.name
-                )
+                return cls.save_image(session_id, image_base64, mime_type, message_index, source.name)
             except Exception as e:
                 logging.error(f"[AttachmentManager] Failed to convert image: {e}")
 
@@ -355,10 +349,10 @@ class AttachmentManager:
     def load_image(cls, file_path: str) -> Tuple[str, str]:
         """
         Load image from file and return base64 data.
-        
+
         Args:
             file_path: Path to the image file
-            
+
         Returns:
             Tuple of (base64_data, mime_type)
             Returns ("", "") if file not found or load fails
@@ -390,10 +384,10 @@ class AttachmentManager:
     def get_attachment_info(cls, file_path: str) -> Dict:
         """
         Get information about an attachment file.
-        
+
         Args:
             file_path: Path to the attachment
-            
+
         Returns:
             Dict with keys: exists, size, mime_type, width, height (for images)
         """
@@ -431,10 +425,10 @@ class AttachmentManager:
     def list_session_attachments(cls, session_id: int) -> List[str]:
         """
         List all attachment paths for a session.
-        
+
         Args:
             session_id: The session ID
-            
+
         Returns:
             List of relative paths to attachments
         """
@@ -456,10 +450,10 @@ class AttachmentManager:
     def delete_attachment(cls, file_path: str) -> bool:
         """
         Delete a single attachment file.
-        
+
         Args:
             file_path: Path to the attachment
-            
+
         Returns:
             True if deleted successfully
         """
@@ -480,10 +474,10 @@ class AttachmentManager:
     def delete_session_attachments(cls, session_id: int) -> bool:
         """
         Delete all attachments for a session.
-        
+
         Args:
             session_id: The session ID
-            
+
         Returns:
             True if deleted successfully
         """
@@ -504,15 +498,15 @@ class AttachmentManager:
     def cleanup_orphaned_attachments(cls) -> int:
         """
         Remove attachment folders for sessions that no longer exist.
-        
+
         Compares attachment directories against existing sessions and
         removes any orphaned directories.
-        
+
         Built with CPU usage optimization:
         - Checks file age before deleting (skips very new files to avoid race conditions)
         - Yields CPU during heavy deletion operations
         - Runs once and exits (designed for background thread usage)
-        
+
         Returns:
             Number of orphaned directories removed
         """
@@ -581,7 +575,7 @@ class AttachmentManager:
     def get_total_size(cls) -> int:
         """
         Get total size of all attachments in bytes.
-        
+
         Returns:
             Total size in bytes
         """
@@ -613,8 +607,7 @@ class AttachmentManager:
 
 
 # Convenience functions for external use
-def save_session_image(session_id: int, image_base64: str, mime_type: str,
-                       message_index: int = 0) -> str:
+def save_session_image(session_id: int, image_base64: str, mime_type: str, message_index: int = 0) -> str:
     """Save image to session attachments and return path."""
     return AttachmentManager.save_image(session_id, image_base64, mime_type, message_index)
 

@@ -19,7 +19,7 @@ class HotkeyListener:
     def __init__(self, shortcut: str, callback: Callable[[], None]):
         """
         Initialize the hotkey listener.
-        
+
         Args:
             shortcut: Hotkey string like 'ctrl+space' or 'ctrl+alt+w'
             callback: Function to call when hotkey is triggered
@@ -35,14 +35,14 @@ class HotkeyListener:
         self.TRIGGER_WINDOW = 1.5  # seconds
         self.MAX_TRIGGERS = 3
 
-        logging.debug(f'HotkeyListener initialized with shortcut: {shortcut}')
+        logging.debug(f"HotkeyListener initialized with shortcut: {shortcut}")
 
     def _parse_shortcut(self, shortcut: str) -> str:
         """
         Parse shortcut string to pynput format.
         e.g., 'ctrl+space' -> '<ctrl>+<space>'
         """
-        parts = shortcut.lower().split('+')
+        parts = shortcut.lower().split("+")
         parsed_parts = []
 
         for part in parts:
@@ -52,9 +52,9 @@ class HotkeyListener:
                 parsed_parts.append(part)
             else:
                 # Modifier or special key
-                parsed_parts.append(f'<{part}>')
+                parsed_parts.append(f"<{part}>")
 
-        return '+'.join(parsed_parts)
+        return "+".join(parsed_parts)
 
     def _check_trigger_spam(self) -> bool:
         """
@@ -67,10 +67,7 @@ class HotkeyListener:
         self.recent_triggers.append(current_time)
 
         # Remove old triggers outside the window
-        self.recent_triggers = [
-            t for t in self.recent_triggers
-            if current_time - t <= self.TRIGGER_WINDOW
-        ]
+        self.recent_triggers = [t for t in self.recent_triggers if current_time - t <= self.TRIGGER_WINDOW]
 
         # Check if we have too many triggers in the window
         return len(self.recent_triggers) >= self.MAX_TRIGGERS
@@ -78,14 +75,14 @@ class HotkeyListener:
     def _on_activate(self):
         """Called when hotkey is activated."""
         if self.paused:
-            logging.debug('Hotkey pressed but listener is paused')
+            logging.debug("Hotkey pressed but listener is paused")
             return
 
         if self._check_trigger_spam():
-            logging.warning('Hotkey spam detected - ignoring trigger')
+            logging.warning("Hotkey spam detected - ignoring trigger")
             return
 
-        logging.debug('Hotkey triggered')
+        logging.debug("Hotkey triggered")
 
         # Call callback in a separate thread to not block the listener
         threading.Thread(target=self.callback, daemon=True).start()
@@ -93,18 +90,15 @@ class HotkeyListener:
     def start(self):
         """Start listening for the hotkey."""
         if self.running:
-            logging.debug('Hotkey listener already running')
+            logging.debug("Hotkey listener already running")
             return
 
         try:
             parsed_shortcut = self._parse_shortcut(self.shortcut)
-            logging.debug(f'Starting hotkey listener for: {parsed_shortcut}')
+            logging.debug(f"Starting hotkey listener for: {parsed_shortcut}")
 
             # Create the hotkey combination
-            hotkey = pykeyboard.HotKey(
-                pykeyboard.HotKey.parse(parsed_shortcut),
-                self._on_activate
-            )
+            hotkey = pykeyboard.HotKey(pykeyboard.HotKey.parse(parsed_shortcut), self._on_activate)
 
             # Helper function to standardize key event
             def for_canonical(f):
@@ -112,16 +106,15 @@ class HotkeyListener:
 
             # Create and start the listener
             self.listener = pykeyboard.Listener(
-                on_press=for_canonical(hotkey.press),
-                on_release=for_canonical(hotkey.release)
+                on_press=for_canonical(hotkey.press), on_release=for_canonical(hotkey.release)
             )
 
             self.listener.start()
             self.running = True
-            logging.info(f'Hotkey listener started: {self.shortcut}')
+            logging.info(f"Hotkey listener started: {self.shortcut}")
 
         except Exception as e:
-            logging.error(f'Failed to start hotkey listener: {e}')
+            logging.error(f"Failed to start hotkey listener: {e}")
             self.running = False
 
     def stop(self):
@@ -130,17 +123,17 @@ class HotkeyListener:
             self.listener.stop()
             self.listener = None
         self.running = False
-        logging.debug('Hotkey listener stopped')
+        logging.debug("Hotkey listener stopped")
 
     def pause(self):
         """Pause the hotkey listener (stops responding to hotkeys)."""
         self.paused = True
-        logging.debug('Hotkey listener paused')
+        logging.debug("Hotkey listener paused")
 
     def resume(self):
         """Resume the hotkey listener."""
         self.paused = False
-        logging.debug('Hotkey listener resumed')
+        logging.debug("Hotkey listener resumed")
 
     def toggle_pause(self):
         """Toggle pause state."""

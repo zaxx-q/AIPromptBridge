@@ -53,8 +53,10 @@ AUDIO_EXTENSIONS = {".mp3", ".wav", ".aiff", ".aac", ".ogg", ".flac", ".m4a", ".
 # AUDIO EFFECTS SYSTEM
 # =============================================================================
 
+
 class Intensity(Enum):
     """Effect intensity levels"""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -63,7 +65,8 @@ class Intensity(Enum):
 @dataclass
 class AudioEffect:
     """Single FFmpeg audio filter with parameters"""
-    name: str           # Filter name (e.g., "highpass")
+
+    name: str  # Filter name (e.g., "highpass")
     params: Dict[str, Any] = field(default_factory=dict)  # Filter parameters
     description: str = ""  # Human-readable description
 
@@ -74,7 +77,7 @@ class AudioEffect:
         params_str = ":".join(f"{k}={v}" for k, v in self.params.items())
         return f"{self.name}={params_str}"
 
-    def with_params(self, **kwargs) -> 'AudioEffect':
+    def with_params(self, **kwargs) -> "AudioEffect":
         """Create a copy with modified parameters"""
         new_params = {**self.params, **kwargs}
         return AudioEffect(self.name, new_params, self.description)
@@ -83,6 +86,7 @@ class AudioEffect:
 @dataclass
 class AudioPreset:
     """Collection of effects forming a preset with intensity variants"""
+
     id: str
     name: str
     description: str
@@ -109,6 +113,7 @@ class AudioPreset:
 # =============================================================================
 # BUILT-IN PRESETS
 # =============================================================================
+
 
 def _create_voice_clarity_preset() -> AudioPreset:
     """Voice Clarity - Enhance speech intelligibility"""
@@ -137,7 +142,7 @@ def _create_voice_clarity_preset() -> AudioPreset:
                 AudioEffect("equalizer", {"f": 5000, "t": "q", "w": 2, "g": 2}, "Add clarity"),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "EBU R128 loudness"),
             ],
-        }
+        },
     )
 
 
@@ -162,7 +167,7 @@ def _create_noise_reduction_preset() -> AudioPreset:
                 AudioEffect("anlmdn", {"s": 0.3, "p": 0.002, "r": 0.002}, "Non-local means denoise"),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
             ],
-        }
+        },
     )
 
 
@@ -176,21 +181,21 @@ def _create_podcast_preset() -> AudioPreset:
         effects_by_intensity={
             Intensity.LOW: [
                 AudioEffect("highpass", {"f": 80}, "Remove rumble"),
-                AudioEffect("compand", {
-                    "attacks": 0.1,
-                    "decays": 0.3,
-                    "points": "-80/-80|-45/-45|-30/-30|-20/-25|0/-10"
-                }, "Light compression"),
+                AudioEffect(
+                    "compand",
+                    {"attacks": 0.1, "decays": 0.3, "points": "-80/-80|-45/-45|-30/-30|-20/-25|0/-10"},
+                    "Light compression",
+                ),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Broadcast loudness"),
             ],
             Intensity.MEDIUM: [
                 AudioEffect("highpass", {"f": 80}, "Remove rumble"),
                 AudioEffect("equalizer", {"f": 120, "t": "q", "w": 2, "g": 1}, "Add warmth"),
-                AudioEffect("compand", {
-                    "attacks": 0.08,
-                    "decays": 0.25,
-                    "points": "-80/-80|-45/-45|-27/-27|-20/-23|-10/-15|0/-8"
-                }, "Medium compression"),
+                AudioEffect(
+                    "compand",
+                    {"attacks": 0.08, "decays": 0.25, "points": "-80/-80|-45/-45|-27/-27|-20/-23|-10/-15|0/-8"},
+                    "Medium compression",
+                ),
                 AudioEffect("equalizer", {"f": 3500, "t": "q", "w": 1.5, "g": 2}, "Presence boost"),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Broadcast loudness"),
             ],
@@ -199,16 +204,16 @@ def _create_podcast_preset() -> AudioPreset:
                 AudioEffect("lowpass", {"f": 14000}, "Remove ultra-high hiss"),
                 AudioEffect("equalizer", {"f": 120, "t": "q", "w": 2, "g": 2}, "Add warmth"),
                 AudioEffect("equalizer", {"f": 300, "t": "q", "w": 2, "g": -2}, "Reduce mud"),
-                AudioEffect("compand", {
-                    "attacks": 0.05,
-                    "decays": 0.2,
-                    "points": "-80/-80|-45/-45|-25/-25|-18/-20|-10/-12|-5/-8|0/-5"
-                }, "Strong compression"),
+                AudioEffect(
+                    "compand",
+                    {"attacks": 0.05, "decays": 0.2, "points": "-80/-80|-45/-45|-25/-25|-18/-20|-10/-12|-5/-8|0/-5"},
+                    "Strong compression",
+                ),
                 AudioEffect("equalizer", {"f": 3500, "t": "q", "w": 1.5, "g": 3}, "Presence boost"),
                 AudioEffect("equalizer", {"f": 7000, "t": "q", "w": 2, "g": 1}, "Air/brightness"),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Broadcast loudness"),
             ],
-        }
+        },
     )
 
 
@@ -243,7 +248,7 @@ def _create_phone_recording_preset() -> AudioPreset:
                 AudioEffect("equalizer", {"f": 3000, "t": "q", "w": 1.5, "g": 4}, "Restore clarity"),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
             ],
-        }
+        },
     )
 
 
@@ -267,7 +272,7 @@ def _create_dynamic_volume_preset() -> AudioPreset:
                 AudioEffect("dynaudnorm", {"f": 150, "g": 20, "p": 0.95}, "Strong dynamic normalization"),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Final loudness"),
             ],
-        }
+        },
     )
 
 
@@ -291,7 +296,7 @@ def _create_boost_quiet_preset() -> AudioPreset:
                 AudioEffect("speechnorm", {"e": 20, "r": 0.0001, "l": 1}, "Strong speech boost"),
                 AudioEffect("loudnorm", {"I": -14, "LRA": 7, "TP": -1.5}, "Louder target"),
             ],
-        }
+        },
     )
 
 
@@ -318,7 +323,7 @@ def _create_de_ess_preset() -> AudioPreset:
                 AudioEffect("equalizer", {"f": 8000, "t": "q", "w": 0.8, "g": -4}, "Strong de-ess high"),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
             ],
-        }
+        },
     )
 
 
@@ -338,24 +343,24 @@ def _create_room_echo_reduction_preset() -> AudioPreset:
             Intensity.MEDIUM: [
                 AudioEffect("highpass", {"f": 100}, "Remove low reverb"),
                 AudioEffect("afftdn", {"nr": 10, "nf": -50, "tn": 1}, "Reverb reduction"),
-                AudioEffect("compand", {
-                    "attacks": 0.05,
-                    "decays": 0.2,
-                    "points": "-80/-80|-45/-45|-30/-32|-20/-22|0/-10"
-                }, "Gentle expansion"),
+                AudioEffect(
+                    "compand",
+                    {"attacks": 0.05, "decays": 0.2, "points": "-80/-80|-45/-45|-30/-32|-20/-22|0/-10"},
+                    "Gentle expansion",
+                ),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
             ],
             Intensity.HIGH: [
                 AudioEffect("highpass", {"f": 120}, "Remove low reverb"),
                 AudioEffect("afftdn", {"nr": 18, "nf": -45, "tn": 1}, "Strong reverb reduction"),
-                AudioEffect("compand", {
-                    "attacks": 0.02,
-                    "decays": 0.1,
-                    "points": "-80/-80|-40/-45|-25/-30|-15/-20|0/-8"
-                }, "Medium gate"),
+                AudioEffect(
+                    "compand",
+                    {"attacks": 0.02, "decays": 0.1, "points": "-80/-80|-40/-45|-25/-30|-15/-20|0/-8"},
+                    "Medium gate",
+                ),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
             ],
-        }
+        },
     )
 
 
@@ -401,13 +406,15 @@ def get_presets_by_category(category: str) -> List[AudioPreset]:
 # OUTPUT OPTIMIZATION OPTIONS
 # =============================================================================
 
+
 @dataclass
 class OutputOptimization:
     """
     Audio output optimization settings for file size reduction.
-    
+
     Optimized for voice/speech and AI processing.
     """
+
     # Channel settings
     convert_to_mono: bool = False  # Convert stereo/multichannel to mono
 
@@ -451,22 +458,22 @@ class OutputOptimization:
         return ", ".join(parts) if parts else "No optimization"
 
     @classmethod
-    def for_voice_small(cls) -> 'OutputOptimization':
+    def for_voice_small(cls) -> "OutputOptimization":
         """Preset: Smallest file size for voice (phone quality)"""
         return cls(convert_to_mono=True, sample_rate=16000, bitrate_kbps=32)
 
     @classmethod
-    def for_voice_balanced(cls) -> 'OutputOptimization':
+    def for_voice_balanced(cls) -> "OutputOptimization":
         """Preset: Balanced quality/size for voice (recommended)"""
         return cls(convert_to_mono=True, sample_rate=22050, bitrate_kbps=64)
 
     @classmethod
-    def for_voice_quality(cls) -> 'OutputOptimization':
+    def for_voice_quality(cls) -> "OutputOptimization":
         """Preset: Higher quality voice"""
         return cls(convert_to_mono=True, sample_rate=44100, bitrate_kbps=96)
 
     @classmethod
-    def mono_only(cls) -> 'OutputOptimization':
+    def mono_only(cls) -> "OutputOptimization":
         """Preset: Just convert to mono, keep other settings"""
         return cls(convert_to_mono=True)
 
@@ -494,6 +501,7 @@ BITRATE_OPTIONS = {
 @dataclass
 class AudioInfo:
     """Information about an audio file"""
+
     path: Path
     duration_seconds: float
     bitrate_kbps: float
@@ -533,6 +541,7 @@ class AudioInfo:
 @dataclass
 class AudioChunk:
     """A single chunk of audio"""
+
     path: Path
     index: int
     start_time: float
@@ -543,15 +552,18 @@ class AudioChunk:
     @property
     def time_range_str(self) -> str:
         """Format time range as MM:SS - MM:SS"""
+
         def fmt(secs):
             m, s = divmod(int(secs), 60)
             return f"{m:02d}:{s:02d}"
+
         return f"{fmt(self.start_time)} - {fmt(self.end_time)}"
 
 
 @dataclass
 class ChunkingResult:
     """Result of chunking operation"""
+
     success: bool
     chunks: List[AudioChunk] = field(default_factory=list)
     temp_dir: Optional[Path] = None
@@ -567,6 +579,7 @@ class ChunkingResult:
 @dataclass
 class ProcessingResult:
     """Result of audio processing operation"""
+
     success: bool
     output_path: Optional[Path] = None
     error: Optional[str] = None
@@ -585,10 +598,10 @@ class ProcessingResult:
 class AudioProcessor:
     """
     Handle audio file processing including chunking and volume adjustments.
-    
+
     Uses FFmpeg for all audio operations. Requires FFmpeg to be
     installed and available on the system PATH.
-    
+
     Binary detection is delegated to ``src.audio.ffmpeg_utils`` which
     caches PATH lookups at the module level for efficiency.
     """
@@ -608,10 +621,10 @@ class AudioProcessor:
     def get_audio_info(self, filepath: Path) -> Optional[AudioInfo]:
         """
         Get detailed information about an audio file.
-        
+
         Args:
             filepath: Path to audio file
-            
+
         Returns:
             AudioInfo or None if ffprobe fails
         """
@@ -622,16 +635,18 @@ class AudioProcessor:
             result = subprocess.run(
                 [
                     get_ffprobe_path(),
-                    "-v", "quiet",
-                    "-print_format", "json",
+                    "-v",
+                    "quiet",
+                    "-print_format",
+                    "json",
                     "-show_format",
                     "-show_streams",
-                    str(filepath)
+                    str(filepath),
                 ],
                 capture_output=True,
                 text=True,
                 timeout=30,
-                creationflags=get_creation_flags()
+                creationflags=get_creation_flags(),
             )
 
             if result.returncode != 0:
@@ -658,7 +673,7 @@ class AudioProcessor:
                 size_bytes=size,
                 format=fmt.get("format_name", "unknown"),
                 sample_rate=int(audio_stream.get("sample_rate", 0)) if audio_stream else 0,
-                channels=int(audio_stream.get("channels", 0)) if audio_stream else 0
+                channels=int(audio_stream.get("channels", 0)) if audio_stream else 0,
             )
 
         except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception) as e:
@@ -668,10 +683,10 @@ class AudioProcessor:
     def get_peak_volume(self, filepath: Path) -> Optional[float]:
         """
         Analyze audio to get peak volume level.
-        
+
         Args:
             filepath: Path to audio file
-            
+
         Returns:
             Peak volume in dB (negative values, 0 = max) or None on error
         """
@@ -680,17 +695,11 @@ class AudioProcessor:
 
         try:
             result = subprocess.run(
-                [
-                    get_ffmpeg_path(),
-                    "-i", str(filepath),
-                    "-af", "volumedetect",
-                    "-f", "null",
-                    "-"
-                ],
+                [get_ffmpeg_path(), "-i", str(filepath), "-af", "volumedetect", "-f", "null", "-"],
                 capture_output=True,
                 text=True,
                 timeout=120,
-                creationflags=get_creation_flags()
+                creationflags=get_creation_flags(),
             )
 
             # Parse output for max_volume
@@ -713,36 +722,30 @@ class AudioProcessor:
         volume_change_db: Optional[float] = None,
         volume_percent: Optional[int] = None,
         normalize: bool = False,
-        output_path: Optional[Path] = None
+        output_path: Optional[Path] = None,
     ) -> ProcessingResult:
         """
         Amplify or adjust audio volume.
-        
+
         Args:
             filepath: Path to audio file
             volume_change_db: Volume change in decibels (e.g., 5 for +5dB)
             volume_percent: Volume as percentage (e.g., 150 for 150%)
             normalize: If True, use EBU R128 loudness normalization (same as preview)
             output_path: Where to save output. If None, creates temp file.
-            
+
         Returns:
             ProcessingResult with output path
-            
+
         Note: Provide either volume_change_db OR volume_percent, not both.
               normalize uses the loudnorm filter for consistent loudness.
         """
         if not self.is_available():
-            return ProcessingResult(
-                success=False,
-                error="FFmpeg not available on PATH"
-            )
+            return ProcessingResult(success=False, error="FFmpeg not available on PATH")
 
         audio_info = self.get_audio_info(filepath)
         if not audio_info:
-            return ProcessingResult(
-                success=False,
-                error=f"Could not analyze audio file: {filepath}"
-            )
+            return ProcessingResult(success=False, error=f"Could not analyze audio file: {filepath}")
 
         # Determine volume filter
         volume_filter = None
@@ -763,8 +766,7 @@ class AudioProcessor:
             volume_filter = f"volume={volume_multiplier}"
         else:
             return ProcessingResult(
-                success=False,
-                error="Must specify volume_change_db, volume_percent, or normalize=True"
+                success=False, error="Must specify volume_change_db, volume_percent, or normalize=True"
             )
 
         # Determine output path
@@ -782,8 +784,10 @@ class AudioProcessor:
             cmd = [
                 get_ffmpeg_path(),
                 "-y",  # Overwrite
-                "-i", str(filepath),
-                "-af", volume_filter,
+                "-i",
+                str(filepath),
+                "-af",
+                volume_filter,
             ]
 
             # Choose codec based on output format
@@ -800,35 +804,22 @@ class AudioProcessor:
             cmd.append(str(output_path))
 
             result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=600,
-                creationflags=get_creation_flags()
+                cmd, capture_output=True, text=True, timeout=600, creationflags=get_creation_flags()
             )
 
             if result.returncode != 0:
                 if temp_file:
                     output_path.unlink(missing_ok=True)
-                return ProcessingResult(
-                    success=False,
-                    error=f"FFmpeg failed: {result.stderr[:500]}"
-                )
+                return ProcessingResult(success=False, error=f"FFmpeg failed: {result.stderr[:500]}")
 
             return ProcessingResult(
-                success=True,
-                output_path=output_path,
-                original_info=audio_info,
-                temp_file=temp_file
+                success=True, output_path=output_path, original_info=audio_info, temp_file=temp_file
             )
 
         except Exception as e:
             if temp_file and output_path.exists():
                 output_path.unlink(missing_ok=True)
-            return ProcessingResult(
-                success=False,
-                error=str(e)
-            )
+            return ProcessingResult(success=False, error=str(e))
 
     def apply_preset(
         self,
@@ -836,33 +827,29 @@ class AudioProcessor:
         preset_id: str,
         intensity: Intensity = Intensity.MEDIUM,
         output_path: Optional[Path] = None,
-        optimization: Optional[OutputOptimization] = None
+        optimization: Optional[OutputOptimization] = None,
     ) -> ProcessingResult:
         """
         Apply a voice enhancement preset to an audio file.
-        
+
         Args:
             filepath: Path to audio file
             preset_id: ID of the preset to apply (e.g., "voice_clarity")
             intensity: Intensity level (LOW, MEDIUM, HIGH)
             output_path: Where to save output. If None, creates temp file.
             optimization: Optional output optimization settings (mono, bitrate, sample rate)
-            
+
         Returns:
             ProcessingResult with output path
         """
         preset = get_preset(preset_id)
         if not preset:
-            return ProcessingResult(
-                success=False,
-                error=f"Unknown preset: {preset_id}"
-            )
+            return ProcessingResult(success=False, error=f"Unknown preset: {preset_id}")
 
         filter_chain = preset.to_filter_chain(intensity)
         if not filter_chain:
             return ProcessingResult(
-                success=False,
-                error=f"Preset {preset_id} has no effects for intensity {intensity.value}"
+                success=False, error=f"Preset {preset_id} has no effects for intensity {intensity.value}"
             )
 
         print_info(f"Applying preset: {preset.name} ({intensity.value})")
@@ -873,25 +860,22 @@ class AudioProcessor:
         filepath: Path,
         effects: List[AudioEffect],
         output_path: Optional[Path] = None,
-        optimization: Optional[OutputOptimization] = None
+        optimization: Optional[OutputOptimization] = None,
     ) -> ProcessingResult:
         """
         Apply a custom list of audio effects to a file.
-        
+
         Args:
             filepath: Path to audio file
             effects: List of AudioEffect objects to apply
             output_path: Where to save output. If None, creates temp file.
             optimization: Optional output optimization settings
-            
+
         Returns:
             ProcessingResult with output path
         """
         if not effects:
-            return ProcessingResult(
-                success=False,
-                error="No effects specified"
-            )
+            return ProcessingResult(success=False, error="No effects specified")
 
         filter_chain = ",".join(e.to_filter_string() for e in effects)
         print_info(f"Applying {len(effects)} custom effects")
@@ -902,32 +886,26 @@ class AudioProcessor:
         filepath: Path,
         filter_chain: str,
         output_path: Optional[Path] = None,
-        optimization: Optional[OutputOptimization] = None
+        optimization: Optional[OutputOptimization] = None,
     ) -> ProcessingResult:
         """
         Apply an FFmpeg audio filter chain to a file.
-        
+
         Args:
             filepath: Path to audio file
             filter_chain: FFmpeg -af filter string (e.g., "highpass=f=80,loudnorm")
             output_path: Where to save output. If None, creates temp file.
             optimization: Optional output optimization settings (mono, bitrate, sample rate)
-            
+
         Returns:
             ProcessingResult with output path
         """
         if not self.is_available():
-            return ProcessingResult(
-                success=False,
-                error="FFmpeg not available on PATH"
-            )
+            return ProcessingResult(success=False, error="FFmpeg not available on PATH")
 
         audio_info = self.get_audio_info(filepath)
         if not audio_info:
-            return ProcessingResult(
-                success=False,
-                error=f"Could not analyze audio file: {filepath}"
-            )
+            return ProcessingResult(success=False, error=f"Could not analyze audio file: {filepath}")
 
         # Determine output path
         temp_file = False
@@ -942,7 +920,8 @@ class AudioProcessor:
             cmd = [
                 get_ffmpeg_path(),
                 "-y",  # Overwrite
-                "-i", str(filepath),
+                "-i",
+                str(filepath),
             ]
 
             # Add filter chain if provided
@@ -980,46 +959,34 @@ class AudioProcessor:
                 capture_output=True,
                 text=True,
                 timeout=1200,  # Allow more time for complex filter chains
-                creationflags=get_creation_flags()
+                creationflags=get_creation_flags(),
             )
 
             if result.returncode != 0:
                 if temp_file:
                     output_path.unlink(missing_ok=True)
-                return ProcessingResult(
-                    success=False,
-                    error=f"FFmpeg failed: {result.stderr[:500]}"
-                )
+                return ProcessingResult(success=False, error=f"FFmpeg failed: {result.stderr[:500]}")
 
             return ProcessingResult(
-                success=True,
-                output_path=output_path,
-                original_info=audio_info,
-                temp_file=temp_file
+                success=True, output_path=output_path, original_info=audio_info, temp_file=temp_file
             )
 
         except Exception as e:
             if temp_file and output_path.exists():
                 output_path.unlink(missing_ok=True)
-            return ProcessingResult(
-                success=False,
-                error=str(e)
-            )
+            return ProcessingResult(success=False, error=str(e))
 
     def apply_optimization_only(
-        self,
-        filepath: Path,
-        optimization: OutputOptimization,
-        output_path: Optional[Path] = None
+        self, filepath: Path, optimization: OutputOptimization, output_path: Optional[Path] = None
     ) -> ProcessingResult:
         """
         Apply only output optimization (mono, bitrate, sample rate) without effects.
-        
+
         Args:
             filepath: Path to audio file
             optimization: Output optimization settings
             output_path: Where to save output. If None, creates temp file.
-            
+
         Returns:
             ProcessingResult with output path
         """
@@ -1031,18 +998,18 @@ class AudioProcessor:
         preset_id: str,
         intensity: Intensity = Intensity.MEDIUM,
         duration_seconds: float = 10.0,
-        start_seconds: float = 0.0
+        start_seconds: float = 0.0,
     ) -> bool:
         """
         Preview a preset without creating a file.
-        
+
         Args:
             filepath: Path to audio file
             preset_id: ID of the preset to preview
             intensity: Intensity level
             duration_seconds: Preview duration
             start_seconds: Start position
-            
+
         Returns:
             True if preview played successfully
         """
@@ -1060,21 +1027,17 @@ class AudioProcessor:
         return self.preview_filter_chain(filepath, filter_chain, duration_seconds, start_seconds)
 
     def preview_effects(
-        self,
-        filepath: Path,
-        effects: List[AudioEffect],
-        duration_seconds: float = 10.0,
-        start_seconds: float = 0.0
+        self, filepath: Path, effects: List[AudioEffect], duration_seconds: float = 10.0, start_seconds: float = 0.0
     ) -> bool:
         """
         Preview custom effects without creating a file.
-        
+
         Args:
             filepath: Path to audio file
             effects: List of effects to preview
             duration_seconds: Preview duration
             start_seconds: Start position
-            
+
         Returns:
             True if preview played successfully
         """
@@ -1086,21 +1049,17 @@ class AudioProcessor:
         return self.preview_filter_chain(filepath, filter_chain, duration_seconds, start_seconds)
 
     def preview_filter_chain(
-        self,
-        filepath: Path,
-        filter_chain: str,
-        duration_seconds: float = 10.0,
-        start_seconds: float = 0.0
+        self, filepath: Path, filter_chain: str, duration_seconds: float = 10.0, start_seconds: float = 0.0
     ) -> bool:
         """
         Preview an FFmpeg filter chain without creating a file.
-        
+
         Args:
             filepath: Path to audio file
             filter_chain: FFmpeg -af filter string
             duration_seconds: Preview duration
             start_seconds: Start position
-            
+
         Returns:
             True if preview played successfully
         """
@@ -1113,18 +1072,18 @@ class AudioProcessor:
                 get_ffplay_path(),
                 "-nodisp",
                 "-autoexit",
-                "-ss", str(start_seconds),
-                "-t", str(duration_seconds),
-                "-af", filter_chain,
-                "-i", str(filepath)
+                "-ss",
+                str(start_seconds),
+                "-t",
+                str(duration_seconds),
+                "-af",
+                filter_chain,
+                "-i",
+                str(filepath),
             ]
 
             print_info(f"Previewing {duration_seconds}s... (press 'q' to stop)")
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+            process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
             self._wait_with_keypress(process, duration_seconds + 10)
             return True
@@ -1136,17 +1095,19 @@ class AudioProcessor:
     def _wait_with_keypress(self, process: subprocess.Popen, timeout: float) -> bool:
         """
         Wait for process to complete, checking for 'q' key to stop early.
-        
+
         Args:
             process: The subprocess to monitor
             timeout: Maximum time to wait
-            
+
         Returns:
             True if completed normally, False if stopped by user
         """
         import time
+
         try:
             import msvcrt  # Windows-only
+
             has_msvcrt = True
         except ImportError:
             has_msvcrt = False
@@ -1161,7 +1122,7 @@ class AudioProcessor:
             # Check for 'q' key press (Windows only)
             if has_msvcrt and msvcrt.kbhit():
                 key = msvcrt.getch()
-                if key.lower() == b'q':
+                if key.lower() == b"q":
                     process.terminate()
                     print("\n⏹️ Stopped by user")
                     return False
@@ -1170,20 +1131,15 @@ class AudioProcessor:
 
         return True
 
-    def play_audio(
-        self,
-        filepath: Path,
-        duration_seconds: Optional[float] = None,
-        start_seconds: float = 0.0
-    ) -> bool:
+    def play_audio(self, filepath: Path, duration_seconds: Optional[float] = None, start_seconds: float = 0.0) -> bool:
         """
         Play audio file using ffplay.
-        
+
         Args:
             filepath: Path to audio file
             duration_seconds: Optional max duration to play (None = full file)
             start_seconds: Start position in seconds
-            
+
         Returns:
             True if playback started successfully
         """
@@ -1196,7 +1152,8 @@ class AudioProcessor:
                 get_ffplay_path(),
                 "-nodisp",  # No video display window
                 "-autoexit",  # Exit when done
-                "-ss", str(start_seconds),
+                "-ss",
+                str(start_seconds),
             ]
 
             if duration_seconds:
@@ -1206,11 +1163,7 @@ class AudioProcessor:
 
             # Run ffplay with Popen for better control
             print_info("Playing audio... (press 'q' to stop)")
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+            process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
             # Wait for process with keyboard check
             timeout = duration_seconds + 5 if duration_seconds else 3600
@@ -1229,11 +1182,11 @@ class AudioProcessor:
         volume_db: Optional[float] = None,
         normalize: bool = False,
         duration_seconds: float = 10.0,
-        start_seconds: float = 0.0
+        start_seconds: float = 0.0,
     ) -> bool:
         """
         Preview audio with effects applied (without creating a file).
-        
+
         Args:
             filepath: Path to audio file
             volume_percent: Volume as percentage (100 = normal)
@@ -1241,7 +1194,7 @@ class AudioProcessor:
             normalize: If True, normalize audio using EBU R128
             duration_seconds: Preview duration (default 10s)
             start_seconds: Start position
-            
+
         Returns:
             True if preview played successfully
         """
@@ -1265,8 +1218,10 @@ class AudioProcessor:
                 get_ffplay_path(),
                 "-nodisp",
                 "-autoexit",
-                "-ss", str(start_seconds),
-                "-t", str(duration_seconds),
+                "-ss",
+                str(start_seconds),
+                "-t",
+                str(duration_seconds),
             ]
 
             if filters:
@@ -1276,11 +1231,7 @@ class AudioProcessor:
 
             # Run ffplay with Popen for better control
             print_info(f"Previewing {duration_seconds}s... (press 'q' to stop)")
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+            process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
             # Wait for process with keyboard check
             self._wait_with_keypress(process, duration_seconds + 5)
@@ -1294,11 +1245,11 @@ class AudioProcessor:
     def estimate_chunk_duration(self, audio_info: AudioInfo, target_bitrate_kbps: Optional[float] = None) -> float:
         """
         Estimate duration per chunk to stay under size limit.
-        
+
         Args:
             audio_info: Audio file information
             target_bitrate_kbps: Target bitrate if transcoding (to accurately predict size)
-            
+
         Returns:
             Recommended chunk duration in seconds
         """
@@ -1332,32 +1283,26 @@ class AudioProcessor:
         filepath: Path,
         output_format: Optional[str] = None,
         target_bitrate: Optional[str] = None,
-        volume_change_db: Optional[float] = None
+        volume_change_db: Optional[float] = None,
     ) -> ChunkingResult:
         """
         Split audio file into chunks under the size limit.
-        
+
         Args:
             filepath: Path to audio file
             output_format: Output format for chunks (default: follows input or mp3)
             target_bitrate: Optional target bitrate (e.g., "128k")
             volume_change_db: Optional volume adjustment in dB
-            
+
         Returns:
             ChunkingResult with list of chunk paths
         """
         if not self.is_available():
-            return ChunkingResult(
-                success=False,
-                error="FFmpeg not available on PATH"
-            )
+            return ChunkingResult(success=False, error="FFmpeg not available on PATH")
 
         audio_info = self.get_audio_info(filepath)
         if not audio_info:
-            return ChunkingResult(
-                success=False,
-                error=f"Could not analyze audio file: {filepath}"
-            )
+            return ChunkingResult(success=False, error=f"Could not analyze audio file: {filepath}")
 
         if output_format is None:
             output_format = filepath.suffix.lstrip(".").lower()
@@ -1369,15 +1314,17 @@ class AudioProcessor:
             print_info("Audio file is under 15 MB, no chunking needed")
             return ChunkingResult(
                 success=True,
-                chunks=[AudioChunk(
-                    path=filepath,
-                    index=0,
-                    start_time=0,
-                    end_time=audio_info.duration_seconds,
-                    duration=audio_info.duration_seconds,
-                    size_bytes=audio_info.size_bytes
-                )],
-                original_info=audio_info
+                chunks=[
+                    AudioChunk(
+                        path=filepath,
+                        index=0,
+                        start_time=0,
+                        end_time=audio_info.duration_seconds,
+                        duration=audio_info.duration_seconds,
+                        size_bytes=audio_info.size_bytes,
+                    )
+                ],
+                original_info=audio_info,
             )
 
         # Create temp directory for chunks
@@ -1415,9 +1362,12 @@ class AudioProcessor:
                 cmd = [
                     get_ffmpeg_path(),
                     "-y",  # Overwrite
-                    "-i", str(filepath),
-                    "-ss", str(current_time),
-                    "-t", str(end_time - current_time),
+                    "-i",
+                    str(filepath),
+                    "-ss",
+                    str(current_time),
+                    "-t",
+                    str(end_time - current_time),
                     "-vn",  # No video
                 ]
 
@@ -1437,11 +1387,7 @@ class AudioProcessor:
                 cmd.append(str(chunk_path))
 
                 result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=300,
-                    creationflags=get_creation_flags()
+                    cmd, capture_output=True, text=True, timeout=300, creationflags=get_creation_flags()
                 )
 
                 if result.returncode != 0:
@@ -1450,47 +1396,38 @@ class AudioProcessor:
                 # Get actual chunk size
                 chunk_size = chunk_path.stat().st_size
 
-                chunks.append(AudioChunk(
-                    path=chunk_path,
-                    index=chunk_index,
-                    start_time=current_time,
-                    end_time=end_time,
-                    duration=end_time - current_time,
-                    size_bytes=chunk_size
-                ))
+                chunks.append(
+                    AudioChunk(
+                        path=chunk_path,
+                        index=chunk_index,
+                        start_time=current_time,
+                        end_time=end_time,
+                        duration=end_time - current_time,
+                        size_bytes=chunk_size,
+                    )
+                )
 
                 current_time = end_time
                 chunk_index += 1
 
             print_info(f"Created {len(chunks)} chunks in {temp_dir}")
 
-            return ChunkingResult(
-                success=True,
-                chunks=chunks,
-                temp_dir=temp_dir,
-                original_info=audio_info
-            )
+            return ChunkingResult(success=True, chunks=chunks, temp_dir=temp_dir, original_info=audio_info)
 
         except Exception as e:
             # Cleanup on failure
             shutil.rmtree(temp_dir, ignore_errors=True)
-            return ChunkingResult(
-                success=False,
-                error=str(e)
-            )
+            return ChunkingResult(success=False, error=str(e))
 
     @staticmethod
-    def merge_transcripts(
-        chunk_outputs: List[Tuple[AudioChunk, str]],
-        include_timestamps: bool = True
-    ) -> str:
+    def merge_transcripts(chunk_outputs: List[Tuple[AudioChunk, str]], include_timestamps: bool = True) -> str:
         """
         Merge transcripts from multiple chunks into a single output.
-        
+
         Args:
             chunk_outputs: List of (chunk, transcript_text) tuples
             include_timestamps: Whether to add chunk timestamps as headers
-            
+
         Returns:
             Merged transcript text
         """
@@ -1510,11 +1447,10 @@ class AudioProcessor:
         return "\n\n".join(parts)
 
 
-
 def check_ffmpeg_available() -> Tuple[bool, Optional[str]]:
     """
     Quick check if FFmpeg is available.
-    
+
     Returns:
         Tuple of (is_available, version_string)
     """

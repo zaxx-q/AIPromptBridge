@@ -28,8 +28,8 @@ from .editor import (
 )
 
 __all__ = [
-    'AttachedPromptEditorWindow',
-    'PromptEditorWindow',
-    'create_attached_prompt_editor_window',
-    'show_prompt_editor',
+    "AttachedPromptEditorWindow",
+    "PromptEditorWindow",
+    "create_attached_prompt_editor_window",
+    "show_prompt_editor",
 ]

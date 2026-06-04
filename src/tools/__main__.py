@@ -2,6 +2,7 @@
 """
 Tools Package Entry Point - Allows running tools via 'python -m src.tools'
 """
+
 import os
 import sys
 
@@ -31,10 +32,12 @@ def main():
 
     # Set ACTIVE_PROFILE from ProfileStore
     from src.connection_profiles import ProfileStore
+
     web_server.ACTIVE_PROFILE = ProfileStore.get_instance().get_active_profile()
 
     # Run the menu
     show_tools_menu()
+
 
 if __name__ == "__main__":
     main()

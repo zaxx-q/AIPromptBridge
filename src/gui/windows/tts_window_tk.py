@@ -61,23 +61,13 @@ def build_tk_ui(window):
 
 def _create_section_frame_tk(parent, title: str, colors) -> tk.Frame:
     """Create a titled section frame (pack layout)."""
-    frame = tk.Frame(
-        parent,
-        bg=colors.surface0,
-        highlightbackground=colors.surface2,
-        highlightthickness=1,
-        bd=0
-    )
+    frame = tk.Frame(parent, bg=colors.surface0, highlightbackground=colors.surface2, highlightthickness=1, bd=0)
     frame.pack(fill="x", pady=(0, 8))
 
     # Title
-    tk.Label(
-        frame,
-        text=title,
-        font=("Segoe UI", 10, "bold"),
-        bg=colors.surface0,
-        fg=colors.accent
-    ).pack(anchor="w", padx=12, pady=(10, 5))
+    tk.Label(frame, text=title, font=("Segoe UI", 10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
+        anchor="w", padx=12, pady=(10, 5)
+    )
 
     # Content area
     content = tk.Frame(frame, bg=colors.surface0)
@@ -90,6 +80,7 @@ def _create_section_frame_tk(parent, title: str, colors) -> tk.Frame:
 # Top Action Bar
 # =========================================================================
 
+
 def _create_top_action_bar_tk(window, parent):
     """Create top action bar with model selector and Generate Audio button."""
     colors = window.colors
@@ -100,16 +91,12 @@ def _create_top_action_bar_tk(window, parent):
     left_frame = tk.Frame(bar, bg=colors.base)
     left_frame.pack(side="left", fill="x", expand=True)
 
-    tk.Label(
-        left_frame, text="TTS Model:", font=("Segoe UI", 10),
-        bg=colors.base, fg=colors.text
-    ).pack(side="left", padx=(0, 5))
+    tk.Label(left_frame, text="TTS Model:", font=("Segoe UI", 10), bg=colors.base, fg=colors.text).pack(
+        side="left", padx=(0, 5)
+    )
 
     window.model_dropdown = TkOptionMenuWrapper(
-        left_frame,
-        values=window.TTS_MODELS,
-        command=window._on_model_changed,
-        width=30
+        left_frame, values=window.TTS_MODELS, command=window._on_model_changed, width=30
     )
     window.model_dropdown.set(window.selected_model)
     window.model_dropdown.pack(side="left")
@@ -127,7 +114,7 @@ def _create_top_action_bar_tk(window, parent):
         relief="flat",
         padx=15,
         pady=5,
-        command=window._on_generate_audio
+        command=window._on_generate_audio,
     )
     window.generate_audio_btn.pack(side="right")
 
@@ -135,6 +122,7 @@ def _create_top_action_bar_tk(window, parent):
 # =========================================================================
 # Left Column Sections
 # =========================================================================
+
 
 def _create_voice_section_tk(window, parent):
     """Create voice selector section."""
@@ -144,20 +132,17 @@ def _create_voice_section_tk(window, parent):
     # Build voice list
     try:
         from ...audio.tts_constants import get_voice_details, get_voice_list
+
         voice_list = get_voice_list()
     except ImportError:
         voice_list = [window.selected_voice]
 
-    window.voice_dropdown = TkOptionMenuWrapper(
-        content,
-        values=voice_list,
-        command=window._on_voice_changed,
-        width=30
-    )
+    window.voice_dropdown = TkOptionMenuWrapper(content, values=voice_list, command=window._on_voice_changed, width=30)
 
     # Set default display
     try:
         from ...audio.tts_constants import get_voice_details
+
         voice_data = get_voice_details(window.selected_voice)
         if voice_data["style"] != "Unknown":
             default_display = f"{window.selected_voice} — {voice_data['gender']}, {voice_data['style']}"
@@ -191,7 +176,7 @@ def _create_speaker_mode_section_tk(window, parent):
         fg=colors.text,
         selectcolor=colors.surface0,
         activebackground=colors.surface0,
-        activeforeground=colors.text
+        activeforeground=colors.text,
     ).pack(side="left", padx=(0, 15))
 
     tk.Radiobutton(
@@ -205,7 +190,7 @@ def _create_speaker_mode_section_tk(window, parent):
         fg=colors.text,
         selectcolor=colors.surface0,
         activebackground=colors.surface0,
-        activeforeground=colors.text
+        activeforeground=colors.text,
     ).pack(side="left")
 
 
@@ -214,11 +199,7 @@ def _create_multi_speaker_section_tk(window, parent):
     colors = window.colors
 
     window.multi_speaker_frame = tk.Frame(
-        parent,
-        bg=colors.surface0,
-        highlightbackground=colors.surface2,
-        highlightthickness=1,
-        bd=0
+        parent, bg=colors.surface0, highlightbackground=colors.surface2, highlightthickness=1, bd=0
     )
     # Initially hidden — pack/forget based on toggle
 
@@ -227,7 +208,7 @@ def _create_multi_speaker_section_tk(window, parent):
         text="Multi-Speaker Config",
         font=("Segoe UI", 10, "bold"),
         bg=colors.surface0,
-        fg=colors.accent
+        fg=colors.accent,
     ).pack(anchor="w", padx=12, pady=(10, 5))
 
     ms_content = tk.Frame(window.multi_speaker_frame, bg=colors.surface0)
@@ -236,6 +217,7 @@ def _create_multi_speaker_section_tk(window, parent):
     # Build voice list for speaker dropdowns
     try:
         from ...audio.tts_constants import get_voice_details, get_voice_list
+
         voice_list = get_voice_list()
     except ImportError:
         voice_list = [window.selected_voice, "Puck"]
@@ -244,20 +226,23 @@ def _create_multi_speaker_section_tk(window, parent):
     s1_row = tk.Frame(ms_content, bg=colors.surface0)
     s1_row.pack(fill="x", pady=(0, 5))
 
-    tk.Label(s1_row, text="Speaker 1:", font=("Segoe UI", 9),
-             bg=colors.surface0, fg=colors.overlay0).pack(side="left", padx=(0, 5))
+    tk.Label(s1_row, text="Speaker 1:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0).pack(
+        side="left", padx=(0, 5)
+    )
 
     window.speaker1_name_entry = tk.Entry(
-        s1_row, font=("Segoe UI", 9), width=10,
-        bg=colors.surface1, fg=colors.text, relief="flat",
-        insertbackground=colors.text
+        s1_row,
+        font=("Segoe UI", 9),
+        width=10,
+        bg=colors.surface1,
+        fg=colors.text,
+        relief="flat",
+        insertbackground=colors.text,
     )
     window.speaker1_name_entry.insert(0, window.speaker1_name)
     window.speaker1_name_entry.pack(side="left", padx=(0, 5))
 
-    window.speaker1_voice_dropdown = TkOptionMenuWrapper(
-        s1_row, values=voice_list, width=18
-    )
+    window.speaker1_voice_dropdown = TkOptionMenuWrapper(s1_row, values=voice_list, width=18)
     try:
         s1_data = get_voice_details(window.speaker1_voice)
         if s1_data["style"] != "Unknown":
@@ -274,20 +259,23 @@ def _create_multi_speaker_section_tk(window, parent):
     s2_row = tk.Frame(ms_content, bg=colors.surface0)
     s2_row.pack(fill="x")
 
-    tk.Label(s2_row, text="Speaker 2:", font=("Segoe UI", 9),
-             bg=colors.surface0, fg=colors.overlay0).pack(side="left", padx=(0, 5))
+    tk.Label(s2_row, text="Speaker 2:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0).pack(
+        side="left", padx=(0, 5)
+    )
 
     window.speaker2_name_entry = tk.Entry(
-        s2_row, font=("Segoe UI", 9), width=10,
-        bg=colors.surface1, fg=colors.text, relief="flat",
-        insertbackground=colors.text
+        s2_row,
+        font=("Segoe UI", 9),
+        width=10,
+        bg=colors.surface1,
+        fg=colors.text,
+        relief="flat",
+        insertbackground=colors.text,
     )
     window.speaker2_name_entry.insert(0, window.speaker2_name)
     window.speaker2_name_entry.pack(side="left", padx=(0, 5))
 
-    window.speaker2_voice_dropdown = TkOptionMenuWrapper(
-        s2_row, values=voice_list, width=18
-    )
+    window.speaker2_voice_dropdown = TkOptionMenuWrapper(s2_row, values=voice_list, width=18)
     try:
         s2_data = get_voice_details(window.speaker2_voice)
         if s2_data["style"] != "Unknown":
@@ -311,24 +299,27 @@ def _create_preview_section_tk(window, parent):
 
     # Play/Pause button
     window.play_pause_btn = tk.Button(
-        row_frame, text="▶", font=("Segoe UI", 12),
-        bg=colors.green, fg=colors.accent_fg, relief="flat",
-        width=3, command=window._toggle_playback, state="disabled"
+        row_frame,
+        text="▶",
+        font=("Segoe UI", 12),
+        bg=colors.green,
+        fg=colors.accent_fg,
+        relief="flat",
+        width=3,
+        command=window._toggle_playback,
+        state="disabled",
     )
     window.play_pause_btn.pack(side="left", padx=(0, 8))
 
     # Seek slider
-    window.seek_slider = TkSliderWrapper(
-        row_frame, from_=0, to=100, command=window._on_seek
-    )
+    window.seek_slider = TkSliderWrapper(row_frame, from_=0, to=100, command=window._on_seek)
     window.seek_slider.set(0)
     window.seek_slider.configure(state="disabled")
     window.seek_slider.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
     # Position label
     window.position_label = tk.Label(
-        row_frame, text="00:00 / 00:00", font=("Segoe UI", 9),
-        bg=colors.surface0, fg=colors.overlay0
+        row_frame, text="00:00 / 00:00", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0
     )
     window.position_label.pack(side="left")
 
@@ -341,11 +332,7 @@ def _create_export_section_tk(window, parent):
     # Format info label (read from config)
     fmt = window.config.get("audio_output_format", "ogg").upper()
     tk.Label(
-        content,
-        text=f"Format: {fmt} (set in config)",
-        font=("Segoe UI", 9),
-        bg=colors.surface0,
-        fg=colors.overlay0
+        content, text=f"Format: {fmt} (set in config)", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0
     ).pack(fill="x", pady=(0, 5))
 
     # Save button
@@ -359,7 +346,7 @@ def _create_export_section_tk(window, parent):
         padx=10,
         pady=4,
         command=window._save_audio,
-        state="disabled"
+        state="disabled",
     )
     window.save_btn.pack(fill="x")
 
@@ -368,26 +355,17 @@ def _create_export_section_tk(window, parent):
 # Right Column Sections
 # =========================================================================
 
+
 def _create_input_text_section_tk(window, parent):
     """Create editable input text section."""
     colors = window.colors
 
-    frame = tk.Frame(
-        parent,
-        bg=colors.surface0,
-        highlightbackground=colors.surface2,
-        highlightthickness=1,
-        bd=0
-    )
+    frame = tk.Frame(parent, bg=colors.surface0, highlightbackground=colors.surface2, highlightthickness=1, bd=0)
     frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
 
-    tk.Label(
-        frame,
-        text="Input Text",
-        font=("Segoe UI", 10, "bold"),
-        bg=colors.surface0,
-        fg=colors.accent
-    ).pack(anchor="w", padx=12, pady=(10, 5))
+    tk.Label(frame, text="Input Text", font=("Segoe UI", 10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
+        anchor="w", padx=12, pady=(10, 5)
+    )
 
     window.input_textbox = tk.Text(
         frame,
@@ -398,7 +376,7 @@ def _create_input_text_section_tk(window, parent):
         insertbackground=colors.text,
         relief=tk.FLAT,
         padx=10,
-        pady=10
+        pady=10,
     )
     window.input_textbox.pack(fill="both", expand=True, padx=12, pady=(0, 10))
 
@@ -411,51 +389,33 @@ def _create_director_section_tk(window, parent):
     """Create AI Director panel."""
     colors = window.colors
 
-    frame = tk.Frame(
-        parent,
-        bg=colors.surface0,
-        highlightbackground=colors.surface2,
-        highlightthickness=1,
-        bd=0
-    )
+    frame = tk.Frame(parent, bg=colors.surface0, highlightbackground=colors.surface2, highlightthickness=1, bd=0)
     frame.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
 
     # Header row with title and auto toggle
     header = tk.Frame(frame, bg=colors.surface0)
     header.pack(fill="x", padx=12, pady=(10, 5))
 
-    tk.Label(
-        header,
-        text="AI Director",
-        font=("Segoe UI", 10, "bold"),
-        bg=colors.surface0,
-        fg=colors.accent
-    ).pack(side="left")
+    tk.Label(header, text="AI Director", font=("Segoe UI", 10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
+        side="left"
+    )
 
     # Auto/Manual toggle
     window.director_auto_var = tk.BooleanVar(value=window.director_auto_mode)
-    window.director_toggle = TkCheckBoxWrapper(
-        header,
-        text="Auto",
-        variable=window.director_auto_var
-    )
+    window.director_toggle = TkCheckBoxWrapper(header, text="Auto", variable=window.director_auto_var)
     window.director_toggle.pack(side="right")
     Tooltip(
         window.director_toggle.cb,
-        "Automatically generate style instructions when clicking 'Generate Audio' if the style box is empty or still has the default placeholder text."
+        "Automatically generate style instructions when clicking 'Generate Audio' if the style box is empty or still has the default placeholder text.",
     )
 
     # Director controls row
     controls = tk.Frame(frame, bg=colors.surface0)
     controls.pack(fill="x", padx=12, pady=(0, 5))
 
-    tk.Label(
-        controls,
-        text="Director Model:",
-        font=("Segoe UI", 9),
-        bg=colors.surface0,
-        fg=colors.overlay0
-    ).pack(side="left", padx=(0, 5))
+    tk.Label(controls, text="Director Model:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0).pack(
+        side="left", padx=(0, 5)
+    )
 
     window.director_model_entry = tk.Entry(
         controls,
@@ -464,7 +424,7 @@ def _create_director_section_tk(window, parent):
         bg=colors.surface1,
         fg=colors.text,
         relief="flat",
-        insertbackground=colors.text
+        insertbackground=colors.text,
     )
     if window.director_model:
         window.director_model_entry.insert(0, window.director_model)
@@ -480,7 +440,7 @@ def _create_director_section_tk(window, parent):
         relief="flat",
         padx=10,
         pady=2,
-        command=window._on_generate_style
+        command=window._on_generate_style,
     )
     window.generate_style_btn.pack(side="right")
 
@@ -495,19 +455,20 @@ def _create_director_section_tk(window, parent):
         relief=tk.FLAT,
         height=6,
         padx=10,
-        pady=10
+        pady=10,
     )
     window.style_textbox.pack(fill="both", expand=True, padx=12, pady=(0, 10))
     window.style_textbox.insert(
         "1.0",
         "(Style instructions will appear here after clicking 'Generate Style', or you can write your own) "
-        "\nClear this text or leave this text as is to have no style instructions applied to input text."
+        "\nClear this text or leave this text as is to have no style instructions applied to input text.",
     )
 
 
 # =========================================================================
 # Bottom Bar
 # =========================================================================
+
 
 def _create_bottom_bar_tk(window):
     """Create bottom bar with status."""
@@ -526,6 +487,6 @@ def _create_bottom_bar_tk(window):
         font=("Segoe UI", 9),
         bg=colors.surface0,
         fg=colors.overlay0,
-        anchor="w"
+        anchor="w",
     )
     window.status_label.pack(side="left")

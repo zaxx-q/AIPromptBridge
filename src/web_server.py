@@ -27,51 +27,52 @@ CACHED_MODELS = None
 app = Flask(__name__)
 
 
-@app.route('/')
+@app.route("/")
 def index():
     """Root endpoint with service information"""
     available_providers = [p for p, km in KEY_MANAGERS.items() if km.has_keys()]
-    return jsonify({
-        "service": "AIPromptBridge",
-        "status": "running",
-        "gui_available": HAVE_GUI,
-        "gui_running": get_gui_status()["running"],
-        "default_provider": get_active_setting("provider", "google"),
-        "available_providers": available_providers,
-        "sessions": len(list_sessions())
-    })
+    return jsonify(
+        {
+            "service": "AIPromptBridge",
+            "status": "running",
+            "gui_available": HAVE_GUI,
+            "gui_running": get_gui_status()["running"],
+            "default_provider": get_active_setting("provider", "google"),
+            "available_providers": available_providers,
+            "sessions": len(list_sessions()),
+        }
+    )
 
 
-@app.route('/health')
+@app.route("/health")
 def health():
     """Health check endpoint"""
     gui_status = get_gui_status()
-    return jsonify({
-        "status": "healthy",
-        "gui_available": HAVE_GUI,
-        "gui_running": gui_status["running"],
-        "providers": {p: km.get_key_count() for p, km in KEY_MANAGERS.items() if km.has_keys()},
-        "sessions_count": len(list_sessions())
-    })
+    return jsonify(
+        {
+            "status": "healthy",
+            "gui_available": HAVE_GUI,
+            "gui_running": gui_status["running"],
+            "providers": {p: km.get_key_count() for p, km in KEY_MANAGERS.items() if km.has_keys()},
+            "sessions_count": len(list_sessions()),
+        }
+    )
 
 
-@app.route('/models')
+@app.route("/models")
 def get_models():
     """Fetch available models from upstream API"""
     global CACHED_MODELS
 
     # Check for force refresh
-    force_refresh = request.args.get('refresh', 'false').lower() in ('true', '1', 'yes')
+    force_refresh = request.args.get("refresh", "false").lower() in ("true", "1", "yes")
 
     if not force_refresh and CACHED_MODELS is not None:
-        return jsonify({
-            "object": "list",
-            "data": CACHED_MODELS,
-            "cached": True
-        })
+        return jsonify({"object": "list", "data": CACHED_MODELS, "cached": True})
 
     # Resolve profile to get merged config with connection keys
     from .profile_resolver import resolve_profile
+
     resolved = resolve_profile(None, CONFIG, AI_PARAMS, KEY_MANAGERS)
     models, error = fetch_models(resolved.config, resolved.key_managers)
 
@@ -81,20 +82,16 @@ def get_models():
     # Cache the models
     CACHED_MODELS = models
 
-    return jsonify({
-        "object": "list",
-        "data": models,
-        "cached": False
-    })
+    return jsonify({"object": "list", "data": models, "cached": False})
 
 
-@app.route('/sessions')
+@app.route("/sessions")
 def sessions_list():
     """List all chat sessions"""
     return jsonify(list_sessions())
 
 
-@app.route('/sessions/<session_id>')
+@app.route("/sessions/<session_id>")
 def get_session_api(session_id):
     """Get a specific session"""
     session = get_session(session_id)
@@ -103,7 +100,7 @@ def get_session_api(session_id):
     return jsonify(session.to_dict())
 
 
-@app.route('/gui/browser')
+@app.route("/gui/browser")
 def open_browser_api():
     """Open the session browser via HTTP request"""
     if show_session_browser():
@@ -133,6 +130,7 @@ def init_web_server(config, ai_params, key_managers):
 
     # Set active profile from ProfileStore
     from .connection_profiles import ProfileStore
+
     ACTIVE_PROFILE = ProfileStore.get_instance().get_active_profile()
 
     return app

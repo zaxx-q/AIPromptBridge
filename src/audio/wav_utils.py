@@ -18,20 +18,17 @@ TTS_CHANNELS = 1  # Mono
 
 
 def pcm_to_wav(
-    pcm_data: bytes,
-    channels: int = TTS_CHANNELS,
-    rate: int = TTS_SAMPLE_RATE,
-    sample_width: int = TTS_SAMPLE_WIDTH
+    pcm_data: bytes, channels: int = TTS_CHANNELS, rate: int = TTS_SAMPLE_RATE, sample_width: int = TTS_SAMPLE_WIDTH
 ) -> bytes:
     """
     Convert raw PCM data to WAV format in memory.
-    
+
     Args:
         pcm_data: Raw PCM audio bytes
         channels: Number of audio channels (default: 1 mono)
         rate: Sample rate in Hz (default: 24000)
         sample_width: Sample width in bytes (default: 2 for 16-bit)
-        
+
     Returns:
         WAV file bytes (with proper header)
     """
@@ -49,18 +46,18 @@ def save_wav(
     pcm_data: bytes,
     channels: int = TTS_CHANNELS,
     rate: int = TTS_SAMPLE_RATE,
-    sample_width: int = TTS_SAMPLE_WIDTH
+    sample_width: int = TTS_SAMPLE_WIDTH,
 ) -> Optional[str]:
     """
     Save PCM data as a WAV file.
-    
+
     Args:
         filepath: Output file path (should end with .wav)
         pcm_data: Raw PCM audio bytes
         channels: Number of audio channels (default: 1 mono)
         rate: Sample rate in Hz (default: 24000)
         sample_width: Sample width in bytes (default: 2 for 16-bit)
-        
+
     Returns:
         None on success, error message string on failure
     """
@@ -76,20 +73,17 @@ def save_wav(
 
 
 def get_pcm_duration(
-    pcm_data: bytes,
-    channels: int = TTS_CHANNELS,
-    rate: int = TTS_SAMPLE_RATE,
-    sample_width: int = TTS_SAMPLE_WIDTH
+    pcm_data: bytes, channels: int = TTS_CHANNELS, rate: int = TTS_SAMPLE_RATE, sample_width: int = TTS_SAMPLE_WIDTH
 ) -> float:
     """
     Calculate duration of PCM audio data in seconds.
-    
+
     Args:
         pcm_data: Raw PCM audio bytes
         channels: Number of audio channels
         rate: Sample rate in Hz
         sample_width: Sample width in bytes
-        
+
     Returns:
         Duration in seconds
     """

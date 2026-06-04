@@ -13,15 +13,9 @@ Handles formats:
 import re
 from dataclasses import dataclass
 
-XML_THINKING_BLOCK_RE = re.compile(
-    r'^(\s*)<(think|thinking|thought)>([\s\S]*?)</\2>', re.IGNORECASE
-)
-PIPE_THINKING_BLOCK_RE = re.compile(
-    r'^(\s*)<\|think\|>([\s\S]*?)<\|/think\|>', re.IGNORECASE
-)
-CHANNEL_THINKING_BLOCK_RE = re.compile(
-    r'^(\s*)<\|channel>thought\b([\s\S]*?)<channel\|>', re.IGNORECASE
-)
+XML_THINKING_BLOCK_RE = re.compile(r"^(\s*)<(think|thinking|thought)>([\s\S]*?)</\2>", re.IGNORECASE)
+PIPE_THINKING_BLOCK_RE = re.compile(r"^(\s*)<\|think\|>([\s\S]*?)<\|/think\|>", re.IGNORECASE)
+CHANNEL_THINKING_BLOCK_RE = re.compile(r"^(\s*)<\|channel>thought\b([\s\S]*?)<channel\|>", re.IGNORECASE)
 
 
 @dataclass
@@ -44,7 +38,7 @@ def extract_leading_thinking_blocks(text: str) -> ThinkingExtraction:
             thinking = (match.group(3) or "").strip()
             if thinking:
                 chunks.append(thinking)
-            remaining = remaining[match.end():].lstrip()
+            remaining = remaining[match.end() :].lstrip()
             continue
 
         match = PIPE_THINKING_BLOCK_RE.match(remaining)
@@ -53,7 +47,7 @@ def extract_leading_thinking_blocks(text: str) -> ThinkingExtraction:
             thinking = (match.group(2) or "").strip()
             if thinking:
                 chunks.append(thinking)
-            remaining = remaining[match.end():].lstrip()
+            remaining = remaining[match.end() :].lstrip()
             continue
 
         match = CHANNEL_THINKING_BLOCK_RE.match(remaining)
@@ -62,7 +56,7 @@ def extract_leading_thinking_blocks(text: str) -> ThinkingExtraction:
             thinking = (match.group(2) or "").strip()
             if thinking:
                 chunks.append(thinking)
-            remaining = remaining[match.end():].lstrip()
+            remaining = remaining[match.end() :].lstrip()
             continue
 
         break

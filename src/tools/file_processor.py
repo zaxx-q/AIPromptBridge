@@ -20,6 +20,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 # Windows-specific non-blocking keyboard input
 try:
     import msvcrt
+
     HAVE_MSVCRT = True
 except ImportError:
     HAVE_MSVCRT = False
@@ -79,7 +80,7 @@ LARGE_FILE_MODE_SKIP = "skip"
 class FileProcessor(BaseTool):
     """
     File Processor Tool - Process files with AI prompts.
-    
+
     Supports:
     - Image files (via vision API)
     - Audio files (via audio API)
@@ -121,13 +122,15 @@ class FileProcessor(BaseTool):
         from src import web_server
         from src.profile_resolver import resolve_profile_by_name
 
-        resolved = resolve_profile_by_name(checkpoint.profile_name, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
+        resolved = resolve_profile_by_name(
+            checkpoint.profile_name, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS
+        )
         return resolved.provider, resolved.model, resolved
 
     def run_interactive(self) -> ToolResult:
         """
         Run the File Processor interactively in terminal.
-        
+
         Returns:
             ToolResult with processing outcome
         """
@@ -221,7 +224,7 @@ class FileProcessor(BaseTool):
                     skip_per_file_prompts=not self._ask_per_file,
                     include_filename=self._include_filename,
                     pdf_temp_dirs=[str(d) for d in self._pdf_temp_dirs],
-                    profile_name=exec_settings.get("profile_name")
+                    profile_name=exec_settings.get("profile_name"),
                 )
 
                 # Step 5: Execute processing
@@ -239,22 +242,16 @@ class FileProcessor(BaseTool):
                 print("💾 Progress saved. Resume with [X] Tools → File Processor")
             return ToolResult(success=False, message="Interrupted")
 
-    def run_batch(
-        self,
-        input_path: str,
-        prompt: str,
-        output_config: Dict[str, Any],
-        **kwargs
-    ) -> ToolResult:
+    def run_batch(self, input_path: str, prompt: str, output_config: Dict[str, Any], **kwargs) -> ToolResult:
         """
         Run in batch mode (non-interactive).
-        
+
         Args:
             input_path: Path to input file or folder
             prompt: Processing prompt
             output_config: Output configuration dict
             **kwargs: Additional options (provider, model, delay)
-        
+
         Returns:
             ToolResult
         """
@@ -267,6 +264,7 @@ class FileProcessor(BaseTool):
 
         # Create checkpoint
         from src.connection_profiles import ProfileStore
+
         active_profile = ProfileStore.get_instance().get_active_profile_name()
 
         input_files = [str(f.path) for f in scan_result.files]
@@ -281,7 +279,7 @@ class FileProcessor(BaseTool):
             output_extension=output_config.get("extension", ".txt"),
             delay=kwargs.get("delay", 1.0),
             use_batch=kwargs.get("use_batch", False),
-            profile_name=kwargs.get("profile_name", active_profile)
+            profile_name=kwargs.get("profile_name", active_profile),
         )
 
         return self._execute_processing(interactive=False)
@@ -293,7 +291,7 @@ class FileProcessor(BaseTool):
     def _step_input_selection(self) -> Optional[ScanResult]:
         """
         Step 1: Get input file or folder path from user.
-        
+
         Returns:
             ScanResult or None if cancelled
         """
@@ -306,7 +304,7 @@ class FileProcessor(BaseTool):
             except (EOFError, KeyboardInterrupt):
                 return None
 
-            if path_str.lower() == 'q':
+            if path_str.lower() == "q":
                 return None
 
             if not path_str:
@@ -328,7 +326,7 @@ class FileProcessor(BaseTool):
             if path.is_dir():
                 try:
                     recursive_input = input("Scan subdirectories? [y/N]: ").strip().lower()
-                    recursive = recursive_input == 'y'
+                    recursive = recursive_input == "y"
                 except (EOFError, KeyboardInterrupt):
                     return None
 
@@ -362,9 +360,9 @@ class FileProcessor(BaseTool):
                         except (EOFError, KeyboardInterrupt):
                             return None
 
-                        if choice == 'q':
+                        if choice == "q":
                             return None
-                        elif choice == '2':
+                        elif choice == "2":
                             scan_result = self._filter_by_type(scan_result)
                             if scan_result is None:
                                 return None
@@ -380,7 +378,7 @@ class FileProcessor(BaseTool):
             except (EOFError, KeyboardInterrupt):
                 return None
 
-            if confirm == 'n':
+            if confirm == "n":
                 self._cleanup_pdf_temp_dirs()
                 continue
 
@@ -396,11 +394,7 @@ class FileProcessor(BaseTool):
 
             for file_type, files in scan_result.by_type.items():
                 extensions = set(f.extension for f in files)
-                table.add_row(
-                    file_type,
-                    str(len(files)),
-                    ", ".join(sorted(extensions))
-                )
+                table.add_row(file_type, str(len(files)), ", ".join(sorted(extensions)))
 
             console.print(f"\n📊 Found {scan_result.total_count} files:")
             console.print(table)
@@ -428,7 +422,7 @@ class FileProcessor(BaseTool):
                     input_path=scan_result.input_path,
                     files=scan_result.by_type[selected_type],
                     by_type={selected_type: scan_result.by_type[selected_type]},
-                    warnings=[]
+                    warnings=[],
                 )
                 print(f"\n✅ Filtered to {len(filtered.files)} {selected_type} files")
                 return filtered
@@ -444,10 +438,10 @@ class FileProcessor(BaseTool):
     def _step_audio_preprocessing(self, scan_result: ScanResult) -> Optional[Dict[str, Any]]:
         """
         Optional step: Configure audio effects and cleanup.
-        
+
         Args:
             scan_result: Scan result with audio files
-            
+
         Returns:
             Preprocessing config dict (empty if skip), None if cancelled
         """
@@ -503,16 +497,16 @@ class FileProcessor(BaseTool):
             except (EOFError, KeyboardInterrupt):
                 return None
 
-            if choice == 'q':
+            if choice == "q":
                 return None
 
-            if choice == 'c' and current_config:
+            if choice == "c" and current_config:
                 return current_config
 
-            if choice == '1':
+            if choice == "1":
                 return {}
 
-            if choice == '2':
+            if choice == "2":
                 # Normalize only
                 current_config = {"type": "normalize"}
                 print("✅ Will normalize audio to optimal level (EBU R128)")
@@ -520,10 +514,10 @@ class FileProcessor(BaseTool):
 
             # Voice enhancement presets
             preset_map = {
-                '3': 'voice_clarity',
-                '4': 'noise_reduction',
-                '5': 'podcast',
-                '6': 'phone_recording',
+                "3": "voice_clarity",
+                "4": "noise_reduction",
+                "5": "podcast",
+                "6": "phone_recording",
             }
 
             if choice in preset_map:
@@ -535,7 +529,7 @@ class FileProcessor(BaseTool):
                     current_config = config
                 continue
 
-            if choice == '7':
+            if choice == "7":
                 # Show all presets
                 config = self._show_all_presets()
                 if config is None:
@@ -544,7 +538,7 @@ class FileProcessor(BaseTool):
                     current_config = config
                 continue
 
-            if choice == 'a':
+            if choice == "a":
                 # Advanced mode
                 config = self._advanced_effect_mode(sample_audio, has_ffplay)
                 if config is None:
@@ -553,7 +547,7 @@ class FileProcessor(BaseTool):
                     current_config = config
                 continue
 
-            if choice == 'p' and has_ffplay and sample_audio:
+            if choice == "p" and has_ffplay and sample_audio:
                 # Preview with current settings
                 self._preview_audio_settings(sample_audio, current_config)
                 continue
@@ -565,10 +559,10 @@ class FileProcessor(BaseTool):
     def _select_preset_intensity(self, preset_id: str) -> Optional[Dict[str, Any]]:
         """
         Select intensity level for a preset.
-        
+
         Args:
             preset_id: Preset ID to configure
-            
+
         Returns:
             Config dict, empty to skip, or None if cancelled
         """
@@ -590,29 +584,25 @@ class FileProcessor(BaseTool):
         except (EOFError, KeyboardInterrupt):
             return None
 
-        if choice.lower() == 'b':
+        if choice.lower() == "b":
             return {}
 
         intensity_map = {
-            '1': Intensity.LOW,
-            '2': Intensity.MEDIUM,
-            '3': Intensity.HIGH,
+            "1": Intensity.LOW,
+            "2": Intensity.MEDIUM,
+            "3": Intensity.HIGH,
         }
 
         intensity = intensity_map.get(choice, Intensity.MEDIUM)
 
         print(f"✅ Will apply {preset.name} ({intensity.value})")
 
-        return {
-            "type": "preset",
-            "preset_id": preset_id,
-            "intensity": intensity.value
-        }
+        return {"type": "preset", "preset_id": preset_id, "intensity": intensity.value}
 
     def _show_all_presets(self) -> Optional[Dict[str, Any]]:
         """
         Show all available presets organized by category.
-        
+
         Returns:
             Config dict, empty to go back, or None if cancelled
         """
@@ -649,7 +639,7 @@ class FileProcessor(BaseTool):
         except (EOFError, KeyboardInterrupt):
             return None
 
-        if choice == 'b':
+        if choice == "b":
             return {}
 
         try:
@@ -665,11 +655,11 @@ class FileProcessor(BaseTool):
     def _advanced_effect_mode(self, sample_audio: Optional[Path], has_ffplay: bool) -> Optional[Dict[str, Any]]:
         """
         Advanced mode for custom effect chain building.
-        
+
         Args:
             sample_audio: Path to sample file for preview
             has_ffplay: Whether FFplay is available
-            
+
         Returns:
             Config dict, empty to go back, or None if cancelled
         """
@@ -681,14 +671,18 @@ class FileProcessor(BaseTool):
 
         # Available individual effects
         available_effects = {
-            '1': ("highpass", "Remove low frequencies (rumble)", {"f": 80}),
-            '2': ("lowpass", "Remove high frequencies (hiss)", {"f": 12000}),
-            '3': ("afftdn", "FFT noise reduction", {"nr": 15, "nf": -40, "tn": 1}),
-            '4': ("speechnorm", "Speech normalization", {"e": 12.5, "r": 0.0001, "l": 1}),
-            '5': ("dynaudnorm", "Dynamic range normalizer", {"f": 300, "g": 10, "p": 0.9}),
-            '6': ("loudnorm", "EBU R128 loudness normalization", {"I": -16, "LRA": 11, "TP": -1.5}),
-            '7': ("equalizer", "Boost presence (3kHz)", {"f": 3000, "t": "q", "w": 1.5, "g": 3}),
-            '8': ("compand", "Voice compression", {"attacks": 0.1, "decays": 0.3, "points": "-80/-80|-45/-45|-30/-30|-20/-25|0/-10"}),
+            "1": ("highpass", "Remove low frequencies (rumble)", {"f": 80}),
+            "2": ("lowpass", "Remove high frequencies (hiss)", {"f": 12000}),
+            "3": ("afftdn", "FFT noise reduction", {"nr": 15, "nf": -40, "tn": 1}),
+            "4": ("speechnorm", "Speech normalization", {"e": 12.5, "r": 0.0001, "l": 1}),
+            "5": ("dynaudnorm", "Dynamic range normalizer", {"f": 300, "g": 10, "p": 0.9}),
+            "6": ("loudnorm", "EBU R128 loudness normalization", {"I": -16, "LRA": 11, "TP": -1.5}),
+            "7": ("equalizer", "Boost presence (3kHz)", {"f": 3000, "t": "q", "w": 1.5, "g": 3}),
+            "8": (
+                "compand",
+                "Voice compression",
+                {"attacks": 0.1, "decays": 0.3, "points": "-80/-80|-45/-45|-30/-30|-20/-25|0/-10"},
+            ),
         }
 
         while True:
@@ -714,36 +708,29 @@ class FileProcessor(BaseTool):
             except (EOFError, KeyboardInterrupt):
                 return None
 
-            if choice == 'b':
+            if choice == "b":
                 return {}
 
-            if choice == 'd':
+            if choice == "d":
                 if effects:
                     print(f"✅ Will apply custom chain: {', '.join(e.name for e in effects)}")
-                    return {
-                        "type": "custom",
-                        "effects": [{"name": e.name, "params": e.params} for e in effects]
-                    }
+                    return {"type": "custom", "effects": [{"name": e.name, "params": e.params} for e in effects]}
                 else:
                     print_warning("No effects in chain")
                     continue
 
-            if choice == 'r' and effects:
+            if choice == "r" and effects:
                 removed = effects.pop()
                 print(f"Removed: {removed.name}")
                 continue
 
-            if choice == 'x':
+            if choice == "x":
                 effects = []
                 print("Cleared all effects")
                 continue
 
-            if choice == 'p' and has_ffplay and sample_audio and effects:
-                self.audio_processor.preview_effects(
-                    sample_audio,
-                    effects,
-                    duration_seconds=10.0
-                )
+            if choice == "p" and has_ffplay and sample_audio and effects:
+                self.audio_processor.preview_effects(sample_audio, effects, duration_seconds=10.0)
                 continue
 
             if choice in available_effects:
@@ -763,11 +750,11 @@ class FileProcessor(BaseTool):
     def _customize_effect_params(self, effect_name: str, default_params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Allow user to customize effect parameters.
-        
+
         Args:
             effect_name: Name of the effect
             default_params: Default parameters
-            
+
         Returns:
             Customized parameters or None to cancel
         """
@@ -820,14 +807,16 @@ class FileProcessor(BaseTool):
         # Use defaults for other effects
         return default_params
 
-    def _step_audio_optimization(self, scan_result: ScanResult, current_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _step_audio_optimization(
+        self, scan_result: ScanResult, current_config: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """
         Step 1.6: Configure file size optimization.
-        
+
         Args:
             scan_result: Scan result with audio files
             current_config: Existing config from Step 1.5 (effects)
-            
+
         Returns:
             Updated config dict or None if cancelled
         """
@@ -837,9 +826,9 @@ class FileProcessor(BaseTool):
         sample_audio = audio_files[0].path if audio_files else None
         channel_count = 2
         if sample_audio:
-             audio_info = self.audio_processor.get_audio_info(sample_audio)
-             if audio_info and audio_info.channels:
-                 channel_count = audio_info.channels
+            audio_info = self.audio_processor.get_audio_info(sample_audio)
+            if audio_info and audio_info.channels:
+                channel_count = audio_info.channels
 
         while True:
             # Check current optimization status
@@ -873,40 +862,40 @@ class FileProcessor(BaseTool):
             except (EOFError, KeyboardInterrupt):
                 return None
 
-            if choice == 'q':
+            if choice == "q":
                 return None
 
-            if choice == 'c' or (choice == '3' and not opt_config):
+            if choice == "c" or (choice == "3" and not opt_config):
                 return current_config
 
-            if choice == '1':
+            if choice == "1":
                 # Quick presets
                 presets_config = self._show_optimization_presets(channel_count)
                 if presets_config == "custom":
-                     # Go to custom
-                     updated = self._step_file_optimization(audio_files, current_config)
-                     if updated:
-                         current_config = updated
+                    # Go to custom
+                    updated = self._step_file_optimization(audio_files, current_config)
+                    if updated:
+                        current_config = updated
                 elif presets_config:
                     current_config["optimization"] = presets_config
-                elif presets_config == {}: # Skip/Clear
+                elif presets_config == {}:  # Skip/Clear
                     current_config.pop("optimization", None)
                 continue
 
-            if choice == '2':
+            if choice == "2":
                 # Custom settings
                 updated = self._step_file_optimization(audio_files, current_config)
                 if updated:
                     current_config = updated
                 continue
 
-            if choice == '3':
+            if choice == "3":
                 # Clear optimization
                 current_config.pop("optimization", None)
                 print("✅ Optimization cleared")
                 continue
 
-            if choice == 'e':
+            if choice == "e":
                 self._preview_file_size(audio_files, current_config)
                 continue
 
@@ -956,7 +945,7 @@ class FileProcessor(BaseTool):
     def _preview_audio_settings(self, audio_path: Path, config: Dict[str, Any]):
         """
         Preview audio with current preprocessing settings.
-        
+
         Args:
             audio_path: Path to sample audio file
             config: Current preprocessing config
@@ -981,19 +970,11 @@ class FileProcessor(BaseTool):
         elif preprocess_type == "amplify":
             volume = config.get("volume_percent", 100)
             print(f"Playing with {volume - 100:+d}% volume...")
-            self.audio_processor.preview_with_effects(
-                audio_path,
-                volume_percent=volume,
-                duration_seconds=duration
-            )
+            self.audio_processor.preview_with_effects(audio_path, volume_percent=volume, duration_seconds=duration)
 
         elif preprocess_type == "normalize":
             print("Playing normalized audio...")
-            self.audio_processor.preview_with_effects(
-                audio_path,
-                normalize=True,
-                duration_seconds=duration
-            )
+            self.audio_processor.preview_with_effects(audio_path, normalize=True, duration_seconds=duration)
 
         elif preprocess_type == "amplify_normalize":
             # For combined, we need to create a temp file
@@ -1001,17 +982,12 @@ class FileProcessor(BaseTool):
             print(f"Playing with {volume - 100:+d}% volume + normalization...")
 
             # First amplify to temp file, then preview normalized
-            result = self.audio_processor.amplify_volume(
-                audio_path,
-                volume_percent=volume
-            )
+            result = self.audio_processor.amplify_volume(audio_path, volume_percent=volume)
 
             if result.success and result.output_path:
                 try:
                     self.audio_processor.preview_with_effects(
-                        result.output_path,
-                        normalize=True,
-                        duration_seconds=duration
+                        result.output_path, normalize=True, duration_seconds=duration
                     )
                 finally:
                     result.cleanup()
@@ -1028,10 +1004,7 @@ class FileProcessor(BaseTool):
             if preset:
                 print(f"Playing with {preset.name} ({intensity_str})...")
                 self.audio_processor.preview_preset(
-                    audio_path,
-                    preset_id,
-                    intensity=intensity,
-                    duration_seconds=duration
+                    audio_path, preset_id, intensity=intensity, duration_seconds=duration
                 )
             else:
                 print_error(f"Preset not found: {preset_id}")
@@ -1043,29 +1016,21 @@ class FileProcessor(BaseTool):
 
             if effects:
                 print("Playing with custom effects...")
-                self.audio_processor.preview_effects(
-                    audio_path,
-                    effects,
-                    duration_seconds=duration
-                )
+                self.audio_processor.preview_effects(audio_path, effects, duration_seconds=duration)
             else:
                 print_error("No effects configured")
 
         print("✅ Preview finished")
 
-    def _preview_file_size(
-        self,
-        audio_files: List[FileInfo],
-        current_config: Dict[str, Any]
-    ):
+    def _preview_file_size(self, audio_files: List[FileInfo], current_config: Dict[str, Any]):
         """
         Preview estimated file sizes after applying current settings.
-        
+
         Shows:
         - Original file sizes
         - Estimated sizes after processing
         - Whether files will need chunking
-        
+
         Args:
             audio_files: List of audio files to analyze
             current_config: Current preprocessing/optimization config
@@ -1142,7 +1107,7 @@ class FileProcessor(BaseTool):
                 audio_info,
                 convert_to_mono=convert_to_mono,
                 target_sample_rate=target_sample_rate,
-                target_bitrate=target_bitrate
+                target_bitrate=target_bitrate,
             )
             total_estimated += estimated_size
 
@@ -1212,22 +1177,22 @@ class FileProcessor(BaseTool):
 
     def _estimate_processed_size(
         self,
-        audio_info: 'AudioInfo',
+        audio_info: "AudioInfo",
         convert_to_mono: bool = False,
         target_sample_rate: Optional[int] = None,
-        target_bitrate: Optional[int] = None
+        target_bitrate: Optional[int] = None,
     ) -> int:
         """
         Estimate the output file size after processing.
-        
+
         Uses bitrate-based estimation for compressed formats.
-        
+
         Args:
             audio_info: Original audio information
             convert_to_mono: Whether converting to mono
             target_sample_rate: Target sample rate (Hz)
             target_bitrate: Target bitrate (kbps)
-            
+
         Returns:
             Estimated file size in bytes
         """
@@ -1269,7 +1234,7 @@ class FileProcessor(BaseTool):
                 sample_rate_ratio = target_sample_rate / orig_sample_rate
                 # Lower sample rate allows lower bitrate at same quality
                 # But the relationship isn't perfectly linear
-                estimated_bitrate *= (0.5 + 0.5 * sample_rate_ratio)
+                estimated_bitrate *= 0.5 + 0.5 * sample_rate_ratio
 
             estimated_bytes = (estimated_bitrate * 1000 / 8) * duration
 
@@ -1287,19 +1252,21 @@ class FileProcessor(BaseTool):
         else:
             return f"{size_bytes / (1024 * 1024):.1f} MB"
 
-    def _step_file_optimization(self, audio_files: List[FileInfo], current_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _step_file_optimization(
+        self, audio_files: List[FileInfo], current_config: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """
         File size optimization step for audio files.
-        
+
         Prompts user for:
         - Mono conversion (if stereo/multichannel)
         - Bitrate optimization
         - Sample rate downsampling
-        
+
         Args:
             audio_files: List of audio files to process
             current_config: Current preprocessing config (will be modified)
-            
+
         Returns:
             Updated config with optimization settings, empty to skip, or None if cancelled
         """
@@ -1320,7 +1287,9 @@ class FileProcessor(BaseTool):
                 duration = audio_info.duration_seconds
 
                 print("\n  Sample file info:")
-                channel_label = 'Mono' if channel_count == 1 else ('Stereo' if channel_count == 2 else f'{channel_count}-channel')
+                channel_label = (
+                    "Mono" if channel_count == 1 else ("Stereo" if channel_count == 2 else f"{channel_count}-channel")
+                )
                 print(f"    Channels:    {channel_count} ({channel_label})")
                 print(f"    Sample rate: {sample_rate:,} Hz")
                 if duration:
@@ -1435,15 +1404,16 @@ class FileProcessor(BaseTool):
         if optimization.bitrate_kbps:
             print(f"  • Bitrate: {optimization.bitrate_kbps} kbps")
 
-        if not any([optimization.convert_to_mono and channel_count >= 2,
-                    optimization.sample_rate, optimization.bitrate_kbps]):
+        if not any(
+            [optimization.convert_to_mono and channel_count >= 2, optimization.sample_rate, optimization.bitrate_kbps]
+        ):
             print("  (No optimization - keeping original format)")
 
         # Add optimization to config
         current_config["optimization"] = {
             "convert_to_mono": optimization.convert_to_mono,
             "sample_rate": optimization.sample_rate,
-            "bitrate_kbps": optimization.bitrate_kbps
+            "bitrate_kbps": optimization.bitrate_kbps,
         }
 
         return current_config
@@ -1451,10 +1421,10 @@ class FileProcessor(BaseTool):
     def _show_optimization_presets(self, channel_count: int) -> Optional[Dict[str, Any]]:
         """
         Show quick optimization presets.
-        
+
         Args:
             channel_count: Current audio channel count
-            
+
         Returns:
             Optimization dict or None if cancelled
         """
@@ -1484,7 +1454,7 @@ class FileProcessor(BaseTool):
             return {
                 "convert_to_mono": opt.convert_to_mono,
                 "sample_rate": opt.sample_rate,
-                "bitrate_kbps": opt.bitrate_kbps
+                "bitrate_kbps": opt.bitrate_kbps,
             }
         elif choice == "c":
             return "custom"  # Signal to run full customization
@@ -1500,7 +1470,7 @@ class FileProcessor(BaseTool):
     def _step_prompt_selection(self, scan_result: ScanResult) -> Tuple[Optional[str], Optional[str]]:
         """
         Step 2: Select processing prompt.
-        
+
         Returns:
             (prompt_key, prompt_text) or (None, None) if cancelled
         """
@@ -1530,9 +1500,9 @@ class FileProcessor(BaseTool):
             except (EOFError, KeyboardInterrupt):
                 return None, None
 
-            if choice == 'q':
+            if choice == "q":
                 return None, None
-            if choice == 'c':
+            if choice == "c":
                 # Custom prompt
                 print("\nEnter your custom prompt (end with empty line):")
                 lines = []
@@ -1551,7 +1521,7 @@ class FileProcessor(BaseTool):
 
                 return "Custom", "\n".join(lines)
 
-            if choice == 'f':
+            if choice == "f":
                 # Load prompt from file
                 print("\nEnter path to prompt file (or 'q' to cancel):")
                 try:
@@ -1559,7 +1529,7 @@ class FileProcessor(BaseTool):
                 except (EOFError, KeyboardInterrupt):
                     return None, None
 
-                if prompt_path_str.lower() == 'q':
+                if prompt_path_str.lower() == "q":
                     continue
 
                 if not prompt_path_str:
@@ -1639,13 +1609,13 @@ class FileProcessor(BaseTool):
     def _step_custom_instructions(self, prompt_key: str, file_count: int) -> Optional[Tuple[Optional[str], bool]]:
         """
         Step 2.5: Optional custom instructions for batch processing.
-        
+
         Allows users to add context like speaker names, abbreviations, etc.
-        
+
         Args:
             prompt_key: Selected prompt name (for display)
             file_count: Number of files to process
-            
+
         Returns:
             Tuple of (custom_instructions, ask_per_file) or None if cancelled
             - custom_instructions: Batch-wide instructions text (None if skipped)
@@ -1673,10 +1643,10 @@ class FileProcessor(BaseTool):
         except (EOFError, KeyboardInterrupt):
             return None
 
-        if choice == 'q':
+        if choice == "q":
             return None
 
-        if choice == '1':
+        if choice == "1":
             # Batch-wide instructions
             print("\nEnter your custom instructions (end with empty line):")
             print("Examples:")
@@ -1704,10 +1674,12 @@ class FileProcessor(BaseTool):
             # Ask about per-file
             if file_count > 1:
                 try:
-                    per_file_choice = input("\nAlso ask for file-specific instructions during processing? [y/N]: ").strip().lower()
+                    per_file_choice = (
+                        input("\nAlso ask for file-specific instructions during processing? [y/N]: ").strip().lower()
+                    )
                 except (EOFError, KeyboardInterrupt):
                     return None
-                ask_per_file = per_file_choice == 'y'
+                ask_per_file = per_file_choice == "y"
                 if ask_per_file:
                     print("✅ Will prompt for per-file instructions")
             else:
@@ -1715,7 +1687,7 @@ class FileProcessor(BaseTool):
 
             return (batch_instructions, ask_per_file)
 
-        elif choice == '2':
+        elif choice == "2":
             # Per-file only
             print("\n✅ Will prompt for per-file instructions during processing")
             return (None, True)
@@ -1728,7 +1700,7 @@ class FileProcessor(BaseTool):
     def _step_filename_context(self) -> bool:
         """
         Ask user whether to include filename in AI context.
-        
+
         Returns:
             True to include filename, False to exclude
         """
@@ -1744,7 +1716,7 @@ class FileProcessor(BaseTool):
         except (EOFError, KeyboardInterrupt):
             return True
 
-        include = choice != 'n'
+        include = choice != "n"
 
         if include:
             print("✅ Filename will be included in context")
@@ -1753,20 +1725,15 @@ class FileProcessor(BaseTool):
 
         return include
 
-    def _prompt_per_file_instructions(
-        self,
-        filepath: Path,
-        file_index: int,
-        total_files: int
-    ) -> Optional[str]:
+    def _prompt_per_file_instructions(self, filepath: Path, file_index: int, total_files: int) -> Optional[str]:
         """
         Prompt for per-file instructions during processing.
-        
+
         Args:
             filepath: Path to the current file
             file_index: Current file index (0-based)
             total_files: Total number of files
-            
+
         Returns:
             - str: Instructions for this file
             - "": Skip this file (use batch only)
@@ -1785,13 +1752,13 @@ class FileProcessor(BaseTool):
         except (EOFError, KeyboardInterrupt):
             return None
 
-        if choice == 'q':
+        if choice == "q":
             return None
 
-        if choice == 'a':
+        if choice == "a":
             return "SKIP_ALL"
 
-        if choice == 'y':
+        if choice == "y":
             print("\nEnter file-specific instructions (end with empty line):")
             lines = []
             try:
@@ -1813,22 +1780,19 @@ class FileProcessor(BaseTool):
         return ""
 
     def _build_final_prompt(
-        self,
-        base_prompt: str,
-        batch_instructions: Optional[str],
-        per_file_instructions: Optional[str]
+        self, base_prompt: str, batch_instructions: Optional[str], per_file_instructions: Optional[str]
     ) -> str:
         """
         Build the final prompt by injecting custom instructions.
-        
+
         Note: Filename context is handled by FileHandler.build_api_message()
         for text/code files, and is controlled by self._include_filename.
-        
+
         Args:
             base_prompt: The original prompt text
             batch_instructions: Batch-wide instructions (or None)
             per_file_instructions: File-specific instructions (or None)
-            
+
         Returns:
             Final prompt with instructions appended
         """
@@ -1854,7 +1818,7 @@ class FileProcessor(BaseTool):
     def _step_output_configuration(self, scan_result: ScanResult, prompt_key: str) -> Optional[Dict[str, Any]]:
         """
         Step 3: Configure output settings.
-        
+
         Returns:
             Output config dict or None if cancelled
         """
@@ -1883,7 +1847,9 @@ class FileProcessor(BaseTool):
             print("\n📄 Output Mode: Individual (single file)")
 
         # Output destination
-        default_output = str(scan_result.input_path if scan_result.input_path.is_dir() else scan_result.input_path.parent)
+        default_output = str(
+            scan_result.input_path if scan_result.input_path.is_dir() else scan_result.input_path.parent
+        )
         print("\nOutput destination (Enter for same as input):")
         try:
             output_path = input(f"> [{default_output}]: ").strip() or default_output
@@ -1897,7 +1863,7 @@ class FileProcessor(BaseTool):
                 create = input("Directory doesn't exist. Create? [Y/n]: ").strip().lower()
             except (EOFError, KeyboardInterrupt):
                 return None
-            if create != 'n':
+            if create != "n":
                 output_path_obj.mkdir(parents=True, exist_ok=True)
             else:
                 return None
@@ -1922,12 +1888,7 @@ class FileProcessor(BaseTool):
         if not extension.startswith("."):
             extension = "." + extension
 
-        config = {
-            "mode": output_mode,
-            "path": output_path,
-            "naming": naming,
-            "extension": extension
-        }
+        config = {"mode": output_mode, "path": output_path, "naming": naming, "extension": extension}
 
         print(f"\n✅ Output: {output_mode} files to {output_path}")
         return config
@@ -1939,13 +1900,14 @@ class FileProcessor(BaseTool):
     def _print_system_info(self):
         """Print current system/profile info (styled like 'i' command in terminal.py)"""
         from src.terminal import print_system_info
+
         default_delay = get_setting(self.tools_config, "default_delay_between_requests", 1.0)
         print_system_info(include_server_and_keys=False, delay_val=default_delay)
 
     def _step_execution_settings(self) -> Optional[Dict[str, Any]]:
         """
         Step 4: Configure execution settings (provider, model, etc.)
-        
+
         Returns:
             Settings dict or None if cancelled
         """
@@ -1973,17 +1935,17 @@ class FileProcessor(BaseTool):
         except (EOFError, KeyboardInterrupt):
             return None
 
-        if choice == 'q':
+        if choice == "q":
             return None
 
         if not choice:
-            choice = '1'
+            choice = "1"
 
-        if choice not in ['1', '2']:
+        if choice not in ["1", "2"]:
             print("\n⚠️ Invalid choice. Using active connection profile.")
-            choice = '1'
+            choice = "1"
 
-        if choice == '2':
+        if choice == "2":
             # Select different connection profile
             store = ProfileStore.get_instance()
             names = store.get_profile_names()
@@ -2001,7 +1963,7 @@ class FileProcessor(BaseTool):
 
             if not profile_choice:
                 profile_choice = active
-            elif profile_choice.lower() == 'q':
+            elif profile_choice.lower() == "q":
                 return None
 
             try:
@@ -2043,14 +2005,14 @@ class FileProcessor(BaseTool):
             "model": current_model,
             "delay": default_delay,
             "use_batch": False,
-            "profile_name": active_profile_name
+            "profile_name": active_profile_name,
         }
 
         # Batch API (Google/Gemini only)
         if current_provider.lower() == "google":
             try:
                 batch_input = input("\nUse Batch API (Async)? [y/N]: ").strip().lower()
-                settings["use_batch"] = batch_input == 'y'
+                settings["use_batch"] = batch_input == "y"
             except (EOFError, KeyboardInterrupt):
                 return None
 
@@ -2076,16 +2038,16 @@ class FileProcessor(BaseTool):
                     if msvcrt.kbhit():
                         key = msvcrt.getch()
                         # Handle special keys (arrows, function keys start with 0x00 or 0xE0)
-                        if key in (b'\x00', b'\xe0'):
+                        if key in (b"\x00", b"\xe0"):
                             msvcrt.getch()  # Consume the second byte
                             continue
 
                         key_lower = key.lower()
 
-                        if key_lower == b'p':
+                        if key_lower == b"p":
                             self.request_pause()
                             print("\n⏸️  Pause requested... (will pause after current file)")
-                        elif key_lower == b's':
+                        elif key_lower == b"s":
                             self.request_pause()  # Stop is implemented as pause + immediate exit
                             self._stop_requested = True  # Mark as stop (vs pause)
                             print("\n⏹️  Stop requested... (saving progress after current file)")
@@ -2101,16 +2063,16 @@ class FileProcessor(BaseTool):
 
     def _stop_keyboard_listener(self):
         """Stop the keyboard listener thread"""
-        if hasattr(self, '_keyboard_stop_event'):
+        if hasattr(self, "_keyboard_stop_event"):
             self._keyboard_stop_event.set()
 
     def _execute_processing(self, interactive: bool = True) -> ToolResult:
         """
         Execute the actual file processing.
-        
+
         Args:
             interactive: Whether to show interactive progress
-        
+
         Returns:
             ToolResult
         """
@@ -2138,6 +2100,7 @@ class FileProcessor(BaseTool):
             print(f"   Provider: {provider}")
             print(f"   Model:    {model}")
             from src import web_server
+
             current_thinking = web_server.get_active_setting("thinking", False)
             thinking_status = "ON" if current_thinking else "OFF"
             print(f"   Thinking: {thinking_status} (System Setting)")
@@ -2168,7 +2131,7 @@ class FileProcessor(BaseTool):
                     self._stop_keyboard_listener()
 
                     # If stop was requested (not just pause), exit immediately
-                    if getattr(self, '_stop_requested', False):
+                    if getattr(self, "_stop_requested", False):
                         if interactive:
                             print("\n⏹️  Stopped. Progress saved.")
                         result.message = "Stopped by user"
@@ -2178,7 +2141,7 @@ class FileProcessor(BaseTool):
                         print("\n⏸️  Paused. Press Enter to resume, 'q' to quit...")
                         try:
                             resume = input().strip().lower()
-                            if resume == 'q':
+                            if resume == "q":
                                 result.message = "Stopped by user"
                                 break
                             self.request_resume()
@@ -2206,9 +2169,7 @@ class FileProcessor(BaseTool):
                     if per_file_instructions is None and interactive:
                         # Need to prompt for instructions
                         per_file_result = self._prompt_per_file_instructions(
-                            file_path_obj,
-                            file_index=len(cp.completed_files) + len(cp.failed_files),
-                            total_files=total
+                            file_path_obj, file_index=len(cp.completed_files) + len(cp.failed_files), total_files=total
                         )
 
                         if per_file_result is None:
@@ -2229,9 +2190,7 @@ class FileProcessor(BaseTool):
 
                 # Build final prompt with custom instructions
                 final_prompt = self._build_final_prompt(
-                    cp.prompt_text,
-                    self._custom_instructions,
-                    per_file_instructions
+                    cp.prompt_text, self._custom_instructions, per_file_instructions
                 )
 
                 process_path = file_path_obj
@@ -2252,7 +2211,7 @@ class FileProcessor(BaseTool):
 
                     if is_large:
                         if interactive:
-                            print(f"   ⚠️ Large file: {file_size / (1024*1024):.1f} MB")
+                            print(f"   ⚠️ Large file: {file_size / (1024 * 1024):.1f} MB")
 
                         # Get handling mode (prompt if needed)
                         # Note: We pass original path for cache key/display, but logic uses is_audio
@@ -2267,27 +2226,25 @@ class FileProcessor(BaseTool):
                         elif mode == LARGE_FILE_MODE_CHUNKING and is_audio:
                             # Use FFmpeg chunking on the processed file
                             response = self._process_audio_with_chunking(
-                                process_path, final_prompt, cp, interactive,
+                                process_path,
+                                final_prompt,
+                                cp,
+                                interactive,
                                 skip_preprocessing=True,
-                                original_name=file_path_obj.name
+                                original_name=file_path_obj.name,
                             )
 
                         else:
                             # Use Files API with the processed file
-                            response = self._process_with_files_api(
-                                process_path, final_prompt, cp, interactive
-                            )
+                            response = self._process_with_files_api(process_path, final_prompt, cp, interactive)
 
                     # Check for Batch API
                     elif cp.use_batch and provider.lower() == "google":
-                         response = self._process_file_batch(
-                            process_path, final_prompt, cp, interactive
-                        )
+                        response = self._process_file_batch(process_path, final_prompt, cp, interactive)
                     else:
                         # Standard inline processing
                         response = self._process_file_inline(
-                            process_path, final_prompt, cp, interactive,
-                            original_name=file_path_obj.name
+                            process_path, final_prompt, cp, interactive, original_name=file_path_obj.name
                         )
 
                     if response is None:
@@ -2301,7 +2258,7 @@ class FileProcessor(BaseTool):
                             cp.naming_template,
                             cp.output_extension,
                             index=len(cp.completed_files),
-                            base_input_path=Path(cp.input_path) if cp.input_path else None
+                            base_input_path=Path(cp.input_path) if cp.input_path else None,
                         )
 
                         # Write output
@@ -2347,11 +2304,7 @@ class FileProcessor(BaseTool):
         # Handle combined output
         if cp.output_mode == "combined" and cp.combined_output_content:
             combined_path = self.file_handler.get_output_path(
-                Path(cp.input_path),
-                Path(cp.output_path),
-                "batch_output_{date}_{time}",
-                cp.output_extension,
-                index=0
+                Path(cp.input_path), Path(cp.output_path), "batch_output_{date}_{time}", cp.output_extension, index=0
             )
             combined_path.parent.mkdir(parents=True, exist_ok=True)
             with open(combined_path, "w", encoding="utf-8") as f:
@@ -2402,7 +2355,7 @@ class FileProcessor(BaseTool):
     def _prompt_resume_checkpoint(self) -> Optional[bool]:
         """
         Prompt user to resume from checkpoint.
-        
+
         Returns:
             True to resume, False to start new, None to cancel
         """
@@ -2427,9 +2380,9 @@ class FileProcessor(BaseTool):
         except (EOFError, KeyboardInterrupt):
             return None
 
-        if choice == 'r':
+        if choice == "r":
             return True
-        elif choice == 'n':
+        elif choice == "n":
             return False
         else:
             return None
@@ -2439,6 +2392,7 @@ class FileProcessor(BaseTool):
         Delete temporary directories created during PDF splitting.
         """
         import shutil
+
         dirs_to_clean = []
 
         if temp_dirs is not None:
@@ -2491,6 +2445,7 @@ class FileProcessor(BaseTool):
             return None
 
         import tempfile
+
         new_files = []
 
         for f in scan_result.files:
@@ -2557,7 +2512,7 @@ class FileProcessor(BaseTool):
     def _prompt_retry_failed(self) -> Optional[bool]:
         """
         Prompt user to retry failed files.
-        
+
         Returns:
             True to retry, False to start new (clears failed checkpoint), None to cancel
         """
@@ -2575,7 +2530,7 @@ class FileProcessor(BaseTool):
         print(f"Prompt: {summary['prompt_key']}")
         print(f"Output: {summary['output_path']}")
 
-        if summary.get('is_retry_checkpoint'):
+        if summary.get("is_retry_checkpoint"):
             print(f"Retry attempt: #{summary.get('retry_count', 1)}")
 
         # Show failed files with their original errors
@@ -2590,9 +2545,9 @@ class FileProcessor(BaseTool):
         except (EOFError, KeyboardInterrupt):
             return None
 
-        if choice == 'r':
+        if choice == "r":
             return True
-        elif choice == 'n':
+        elif choice == "n":
             return False
         else:
             return None
@@ -2629,7 +2584,7 @@ class FileProcessor(BaseTool):
     def _display_failed_files_summary(self, failed_files: list):
         """
         Display a summary of failed files with their errors.
-        
+
         Args:
             failed_files: List of {"path": str, "error": str} dicts
         """
@@ -2646,7 +2601,7 @@ class FileProcessor(BaseTool):
             # Truncate error if too long
             if len(error) > 50:
                 error = error[:47] + "..."
-            print(f"   {i+1}. {filepath.name}")
+            print(f"   {i + 1}. {filepath.name}")
             print(f"      Error: {error}")
 
         if len(failed_files) > 10:
@@ -2659,12 +2614,12 @@ class FileProcessor(BaseTool):
     def _get_large_file_mode(self, filepath: Path, is_audio: bool, interactive: bool) -> str:
         """
         Determine how to handle a large file.
-        
+
         Args:
             filepath: Path to the file
             is_audio: Whether file is audio
             interactive: Whether to prompt user
-            
+
         Returns:
             Mode string: LARGE_FILE_MODE_FILES_API, LARGE_FILE_MODE_CHUNKING, or LARGE_FILE_MODE_SKIP
         """
@@ -2710,7 +2665,7 @@ class FileProcessor(BaseTool):
         # Ask about applying to all similar files
         try:
             apply_all = input("   Apply to all large files? [y/N]: ").strip().lower()
-            if apply_all == 'y':
+            if apply_all == "y":
                 # Cache for all large files
                 self._large_file_mode["_default"] = mode
         except (EOFError, KeyboardInterrupt):
@@ -2725,18 +2680,18 @@ class FileProcessor(BaseTool):
         prompt: str,
         checkpoint: FileProcessorCheckpoint,
         interactive: bool,
-        original_name: Optional[str] = None
+        original_name: Optional[str] = None,
     ) -> Optional[str]:
         """
         Process a file using inline base64 data.
-        
+
         Args:
             filepath: Path to file (may be a temp processed file)
             prompt: Processing prompt
             checkpoint: Current checkpoint
             interactive: Show progress
             original_name: Original filename for context (when filepath is a temp file)
-            
+
         Returns:
             Response text or None on failure
         """
@@ -2747,9 +2702,7 @@ class FileProcessor(BaseTool):
         # Build message (respect user's filename context preference)
         # Pass original_name so the AI sees the real filename, not a temp processed one
         message = self.file_handler.build_api_message(
-            filepath, prompt,
-            include_filename=self._include_filename,
-            display_name=original_name
+            filepath, prompt, include_filename=self._include_filename, display_name=original_name
         )
 
         # Resolve effective settings using profile or checkpoint fallback
@@ -2762,7 +2715,7 @@ class FileProcessor(BaseTool):
             model_override=model_override if model_override else None,
             config=resolved.config,
             ai_params=resolved.ai_params,
-            key_managers=resolved.key_managers
+            key_managers=resolved.key_managers,
         )
 
         if error:
@@ -2771,21 +2724,17 @@ class FileProcessor(BaseTool):
         return response
 
     def _process_with_files_api(
-        self,
-        filepath: Path,
-        prompt: str,
-        checkpoint: FileProcessorCheckpoint,
-        interactive: bool
+        self, filepath: Path, prompt: str, checkpoint: FileProcessorCheckpoint, interactive: bool
     ) -> Optional[str]:
         """
         Process a file using the Gemini Files API.
-        
+
         Args:
             filepath: Path to file
             prompt: Processing prompt
             checkpoint: Current checkpoint
             interactive: Show progress
-            
+
         Returns:
             Response text or None on failure
         """
@@ -2826,7 +2775,7 @@ class FileProcessor(BaseTool):
             messages = build_file_message(
                 file_uri=uploaded.uri,
                 mime_type=uploaded.mime_type,
-                task=prompt
+                task=prompt,
                 # system_prompt is handled via checkpoint.prompt_text if it was part of it,
                 # FileProcessor just uses prompt as user prompt usually.
             )
@@ -2838,7 +2787,7 @@ class FileProcessor(BaseTool):
                 model_override=model_override if model_override else None,
                 config=resolved.config,
                 ai_params=resolved.ai_params,
-                key_managers=resolved.key_managers
+                key_managers=resolved.key_managers,
             )
 
             if error:
@@ -2853,17 +2802,15 @@ class FileProcessor(BaseTool):
             provider.delete_file(uploaded.name)
 
     def _preprocess_audio_if_needed(
-        self,
-        filepath: Path,
-        interactive: bool
-    ) -> Tuple[Path, Optional['ProcessingResult']]:
+        self, filepath: Path, interactive: bool
+    ) -> Tuple[Path, Optional["ProcessingResult"]]:
         """
         Apply audio preprocessing if configured.
-        
+
         Args:
             filepath: Original audio file path
             interactive: Show progress
-            
+
         Returns:
             Tuple of (path to use, ProcessingResult if temp file created)
         """
@@ -2881,7 +2828,7 @@ class FileProcessor(BaseTool):
             optimization = OutputOptimization(
                 convert_to_mono=opt_config.get("convert_to_mono", False),
                 sample_rate=opt_config.get("sample_rate"),
-                bitrate_kbps=opt_config.get("bitrate_kbps")
+                bitrate_kbps=opt_config.get("bitrate_kbps"),
             )
             if interactive and optimization.describe() != "No optimization":
                 print(f"   📦 Output optimization: {optimization.describe()}")
@@ -2911,19 +2858,14 @@ class FileProcessor(BaseTool):
                 boost = volume_percent - 100
                 print(f"   🔊 Amplifying volume by {boost:+d}%...")
 
-            result = self.audio_processor.amplify_volume(
-                filepath,
-                volume_percent=volume_percent
-            )
+            result = self.audio_processor.amplify_volume(filepath, volume_percent=volume_percent)
 
             if result.success:
                 if interactive:
                     print("   ✅ Volume adjusted")
                 # If we have optimization, apply it to the amplified result
                 if optimization:
-                    opt_result = self.audio_processor.apply_optimization_only(
-                        result.output_path, optimization
-                    )
+                    opt_result = self.audio_processor.apply_optimization_only(result.output_path, optimization)
                     result.cleanup()
                     if opt_result.success:
                         return opt_result.output_path, opt_result
@@ -2938,19 +2880,14 @@ class FileProcessor(BaseTool):
             if interactive:
                 print("   🔊 Normalizing audio...")
 
-            result = self.audio_processor.amplify_volume(
-                filepath,
-                normalize=True
-            )
+            result = self.audio_processor.amplify_volume(filepath, normalize=True)
 
             if result.success:
                 if interactive:
                     print("   ✅ Audio normalized")
                 # If we have optimization, apply it to the normalized result
                 if optimization:
-                    opt_result = self.audio_processor.apply_optimization_only(
-                        result.output_path, optimization
-                    )
+                    opt_result = self.audio_processor.apply_optimization_only(result.output_path, optimization)
                     result.cleanup()
                     if opt_result.success:
                         return opt_result.output_path, opt_result
@@ -2969,10 +2906,7 @@ class FileProcessor(BaseTool):
                 print(f"   🔊 Amplifying volume by {boost:+d}% + normalizing...")
 
             # Step 1: Amplify
-            amplify_result = self.audio_processor.amplify_volume(
-                filepath,
-                volume_percent=volume_percent
-            )
+            amplify_result = self.audio_processor.amplify_volume(filepath, volume_percent=volume_percent)
 
             if not amplify_result.success:
                 if interactive:
@@ -2980,10 +2914,7 @@ class FileProcessor(BaseTool):
                 return filepath, None
 
             # Step 2: Normalize the amplified audio
-            normalize_result = self.audio_processor.amplify_volume(
-                amplify_result.output_path,
-                normalize=True
-            )
+            normalize_result = self.audio_processor.amplify_volume(amplify_result.output_path, normalize=True)
 
             # Clean up intermediate file
             amplify_result.cleanup()
@@ -3023,10 +2954,7 @@ class FileProcessor(BaseTool):
 
             # Pass optimization directly to apply_preset
             result = self.audio_processor.apply_preset(
-                filepath,
-                preset_id,
-                intensity=intensity,
-                optimization=optimization
+                filepath, preset_id, intensity=intensity, optimization=optimization
             )
 
             if result.success:
@@ -3057,11 +2985,7 @@ class FileProcessor(BaseTool):
                 print(f"   🔧 Applying custom effects: {effect_names}...")
 
             # Pass optimization directly to apply_effects
-            result = self.audio_processor.apply_effects(
-                filepath,
-                effects,
-                optimization=optimization
-            )
+            result = self.audio_processor.apply_effects(filepath, effects, optimization=optimization)
 
             if result.success:
                 if interactive:
@@ -3081,11 +3005,11 @@ class FileProcessor(BaseTool):
         checkpoint: FileProcessorCheckpoint,
         interactive: bool,
         skip_preprocessing: bool = False,
-        original_name: Optional[str] = None
+        original_name: Optional[str] = None,
     ) -> Optional[str]:
         """
         Process audio file by splitting into chunks.
-        
+
         Args:
             filepath: Path to audio file (may be a temp processed file)
             prompt: Processing prompt
@@ -3093,7 +3017,7 @@ class FileProcessor(BaseTool):
             interactive: Show progress
             skip_preprocessing: Skip audio preprocessing (already done)
             original_name: Original filename for context (when filepath is a temp file)
-            
+
         Returns:
             Merged transcript or None on failure
         """
@@ -3132,22 +3056,20 @@ class FileProcessor(BaseTool):
 
             for i, chunk in enumerate(result.chunks):
                 if interactive:
-                    print(f"   [{i+1}/{len(result.chunks)}] Processing {chunk.time_range_str}...")
+                    print(f"   [{i + 1}/{len(result.chunks)}] Processing {chunk.time_range_str}...")
 
                 # Build message for chunk
                 # Use original filename with part number for context
                 total_chunks = len(result.chunks)
                 if original_name and total_chunks > 1:
                     # e.g., "interview.mp3 (Part 1/3)"
-                    chunk_display = f"{original_name} (Part {i+1}/{total_chunks})"
+                    chunk_display = f"{original_name} (Part {i + 1}/{total_chunks})"
                 elif original_name:
                     chunk_display = original_name
                 else:
                     chunk_display = None
                 message = self.file_handler.build_api_message(
-                    chunk.path, prompt,
-                    include_filename=self._include_filename,
-                    display_name=chunk_display
+                    chunk.path, prompt, include_filename=self._include_filename, display_name=chunk_display
                 )
 
                 # Call API (use resolved config from outer scope)
@@ -3157,11 +3079,11 @@ class FileProcessor(BaseTool):
                     model_override=model_override if model_override else None,
                     config=resolved.config,
                     ai_params=resolved.ai_params,
-                    key_managers=resolved.key_managers
+                    key_managers=resolved.key_managers,
                 )
 
                 if error:
-                    chunk_errors.append(f"Chunk {i+1}: {error}")
+                    chunk_errors.append(f"Chunk {i + 1}: {error}")
                     if interactive:
                         print(f"      ⚠️ Chunk error: {error[:50]}")
                     continue
@@ -3172,7 +3094,7 @@ class FileProcessor(BaseTool):
                         print("      ✅ Done")
                 else:
                     # Empty response is also an error
-                    chunk_errors.append(f"Chunk {i+1}: Empty response")
+                    chunk_errors.append(f"Chunk {i + 1}: Empty response")
 
                 # Delay between chunks
                 if i < len(result.chunks) - 1 and checkpoint.delay_between_requests > 0:
@@ -3219,24 +3141,18 @@ class FileProcessor(BaseTool):
         print(f" {title}")
         print(f"{'═' * 60}")
 
-
-
     def _process_file_batch(
-        self,
-        filepath: Path,
-        prompt: str,
-        checkpoint: FileProcessorCheckpoint,
-        interactive: bool
+        self, filepath: Path, prompt: str, checkpoint: FileProcessorCheckpoint, interactive: bool
     ) -> Optional[str]:
         """
         Process a file using Gemini Batch API.
-        
+
         Args:
             filepath: Path to the file
             prompt: Prompt text
             checkpoint: Checkpoint with content settings
             interactive: Whether to show output
-            
+
         Returns:
             String with Batch Operation details
         """
@@ -3260,48 +3176,42 @@ class FileProcessor(BaseTool):
         provider = create_provider("google", key_manager, resolved.config)
 
         if not hasattr(provider, "create_batch"):
-             raise ValueError(f"Provider {provider_name} does not support Batch API")
+            raise ValueError(f"Provider {provider_name} does not support Batch API")
 
         # 1. Check if file needs upload (Files API)
         is_large = False
         try:
-             is_large = filepath.stat().st_size > MAX_INLINE_SIZE
+            is_large = filepath.stat().st_size > MAX_INLINE_SIZE
         except Exception:
-             pass
+            pass
 
         # Detect mime type for constructing message
         import mimetypes
+
         mime_type = mimetypes.guess_type(filepath)[0] or "application/octet-stream"
 
         from src.messages import build_file_message, build_inline_message
 
         if is_large or "video" in mime_type:
-             # Upload first (Files API)
-             if hasattr(provider, "upload_file"):
-                 if interactive:
-                     print("   📤 Uploading to Files API (Batch requirement)...")
-                 uploaded, error = provider.upload_file(filepath)
-                 if error:
-                     raise Exception(error)
+            # Upload first (Files API)
+            if hasattr(provider, "upload_file"):
+                if interactive:
+                    print("   📤 Uploading to Files API (Batch requirement)...")
+                uploaded, error = provider.upload_file(filepath)
+                if error:
+                    raise Exception(error)
 
-                 msgs = build_file_message(
-                     file_uri=uploaded.uri,
-                     mime_type=uploaded.mime_type,
-                     task=prompt
-                 )
-             else:
-                 raise Exception("Provider does not support file upload")
+                msgs = build_file_message(file_uri=uploaded.uri, mime_type=uploaded.mime_type, task=prompt)
+            else:
+                raise Exception("Provider does not support file upload")
         else:
-             # Inline data
-             import base64
-             with open(filepath, "rb") as f:
-                 data = base64.b64encode(f.read()).decode("utf-8")
+            # Inline data
+            import base64
 
-             msgs = build_inline_message(
-                 data_b64=data,
-                 mime_type=mime_type,
-                 task=prompt
-             )
+            with open(filepath, "rb") as f:
+                data = base64.b64encode(f.read()).decode("utf-8")
+
+            msgs = build_inline_message(data_b64=data, mime_type=mime_type, task=prompt)
 
         if interactive:
             print("   ⏳ Submitting batch job...")
@@ -3309,8 +3219,8 @@ class FileProcessor(BaseTool):
         result, error = provider.create_batch(
             messages=msgs,
             model=model_override,
-            params={"temperature": 0.7}, # defaults?
-            display_name=f"Batch: {filepath.name}"
+            params={"temperature": 0.7},  # defaults?
+            display_name=f"Batch: {filepath.name}",
         )
 
         if error:
@@ -3323,7 +3233,7 @@ class FileProcessor(BaseTool):
         output = f"""--- BATCH JOB SUBMITTED ---
 File: {filepath.name}
 Batch Name: {op_name}
-Date: {time.strftime('%Y-%m-%d %H:%M:%S')}
+Date: {time.strftime("%Y-%m-%d %H:%M:%S")}
 
 Status: The job has been submitted to Gemini Batch API.
 You can check progress using the ID: {op_name}
@@ -3345,7 +3255,7 @@ def show_tools_menu() -> bool:
             "[2] 🔊 TTS Processor    Convert text files to speech audio\n\n"
             "[B] ← Back to main menu",
             title="🧰 TOOLS",
-            border_style="cyan"
+            border_style="cyan",
         )
     else:
         print(f"\n{'═' * 60}")
@@ -3363,7 +3273,7 @@ def show_tools_menu() -> bool:
     except (EOFError, KeyboardInterrupt):
         return False
 
-    if choice == '1':
+    if choice == "1":
         # Import web_server config
         from src import web_server
 
@@ -3380,7 +3290,7 @@ def show_tools_menu() -> bool:
 
         return True
 
-    elif choice == '2':
+    elif choice == "2":
         # Import TTSProcessor
         from src import web_server
         from src.gui.tts_tool import TTSToolApp
@@ -3390,11 +3300,10 @@ def show_tools_menu() -> bool:
         from src.gui.tts_tool import set_instance as set_tts_instance
 
         from .tts_processor import TTSProcessor
+
         if get_tts_instance() is None:
             tts_app = TTSToolApp(
-                config=web_server.CONFIG,
-                ai_params=web_server.AI_PARAMS,
-                key_managers=web_server.KEY_MANAGERS
+                config=web_server.CONFIG, ai_params=web_server.AI_PARAMS, key_managers=web_server.KEY_MANAGERS
             )
             set_tts_instance(tts_app)
 
@@ -3407,7 +3316,7 @@ def show_tools_menu() -> bool:
                 print_warning(f"\n{result.message}")
         return True
 
-    elif choice == 'b' or choice == '':
+    elif choice == "b" or choice == "":
         return False
 
     else:

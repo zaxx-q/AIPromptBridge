@@ -14,10 +14,12 @@ from .themes import ThemeColors, get_ctk_button_colors, get_ctk_combobox_colors,
 
 try:
     from .emoji_renderer import HAVE_PIL, get_emoji_renderer
+
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
     get_emoji_renderer = None
+
 
 class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
     """
@@ -32,7 +34,7 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
 
         self.buttons: Dict[str, Any] = {}  # id -> button
         self.selected_id: Optional[str] = None
-        self.items: List[str] = [] # ordered list of IDs
+        self.items: List[str] = []  # ordered list of IDs
 
         # Determine strict inner frame for buttons
         if HAVE_CTK:
@@ -44,18 +46,12 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
             self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
             self.inner_frame = tk.Frame(self.canvas, bg=colors.bg)
 
-            self.inner_frame.bind(
-                "<Configure>",
-                lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-            )
+            self.inner_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
 
             self.canvas_window = self.canvas.create_window((0, 0), window=self.inner_frame, anchor="nw")
 
             # Allow inner frame to expand to canvas width
-            self.canvas.bind(
-                "<Configure>",
-                lambda e: self.canvas.itemconfig(self.canvas_window, width=e.width)
-            )
+            self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(self.canvas_window, width=e.width))
 
             self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
@@ -69,7 +65,7 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
     def _on_mousewheel(self, event):
         """Handle mousewheel scrolling for standard Tk."""
         if not HAVE_CTK:
-            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def add_item(self, item_id: str, text: str, icon: str = None, font_weight: str = "normal"):
         """Add an item to the list."""
@@ -93,7 +89,7 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
                 display_text = f"{icon} {text}"
 
         # Determine styling
-        is_selected = (item_id == self.selected_id)
+        is_selected = item_id == self.selected_id
         variant = "primary" if is_selected else "secondary"
         color_kwargs = get_ctk_button_colors(self.colors, variant)
 
@@ -104,14 +100,14 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
                 "font": get_ctk_font(14, weight=font_weight),
                 "height": 38,
                 "command": lambda id=item_id: self.select(id),
-                **color_kwargs
+                **color_kwargs,
             }
             if img:
                 btn_kwargs["image"] = img
                 btn_kwargs["compound"] = "left"
 
             btn = ctk.CTkButton(self.inner_frame, **btn_kwargs)
-            btn.grid(row=len(self.items)-1, column=0, sticky="ew", padx=2, pady=2)
+            btn.grid(row=len(self.items) - 1, column=0, sticky="ew", padx=2, pady=2)
             self.buttons[item_id] = btn
         else:
             # Fallback for standard tk
@@ -124,7 +120,7 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
                 fg=self.colors.accent_fg if is_selected else self.colors.fg,
                 relief="flat",
                 padx=10,
-                pady=5
+                pady=5,
             )
             btn.pack(fill="x", padx=2, pady=1)
             self.buttons[item_id] = btn
@@ -136,7 +132,7 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
 
         old_id = self.selected_id
         if old_id == item_id:
-            return # Already selected
+            return  # Already selected
 
         self.selected_id = item_id
 
@@ -154,21 +150,19 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
             return
 
         btn = self.buttons[item_id]
-        is_selected = (item_id == self.selected_id)
+        is_selected = item_id == self.selected_id
         variant = "primary" if is_selected else "secondary"
 
         if HAVE_CTK:
             # Configure colors - exclude border_width as it causes flicker sometimes
             colors = get_ctk_button_colors(self.colors, variant)
             btn.configure(
-                fg_color=colors["fg_color"],
-                text_color=colors["text_color"],
-                hover_color=colors["hover_color"]
+                fg_color=colors["fg_color"], text_color=colors["text_color"], hover_color=colors["hover_color"]
             )
         else:
             btn.configure(
                 bg=self.colors.accent if is_selected else self.colors.surface0,
-                fg=self.colors.accent_fg if is_selected else self.colors.fg
+                fg=self.colors.accent_fg if is_selected else self.colors.fg,
             )
 
     def clear(self):
@@ -273,7 +267,7 @@ def create_section_header(parent, text: str, colors: ThemeColors, emoji: str = N
         kwargs = {
             "text": label_text if emoji_char else text,
             "font": get_ctk_font(15, "bold"),
-            "text_color": colors.accent
+            "text_color": colors.accent,
         }
 
         if emoji_char and HAVE_EMOJI:
@@ -291,16 +285,23 @@ def create_section_header(parent, text: str, colors: ThemeColors, emoji: str = N
     else:
         # Fallback tk
         full_text = f"{emoji} {text}" if emoji else text
-        lbl = tk.Label(parent, text=full_text, font=("Segoe UI", 11, "bold"),
-                bg=colors.bg, fg=colors.accent)
+        lbl = tk.Label(parent, text=full_text, font=("Segoe UI", 11, "bold"), bg=colors.bg, fg=colors.accent)
         lbl.pack(anchor="w", pady=(top_padding, 10))
         return lbl
 
 
-def create_emoji_button(parent, text: str, icon: str, colors: ThemeColors,
-                        variant: str = "primary", width: int = 140,
-                        height: int = 38, command: Callable = None,
-                        font_size: int = 13, **kwargs):
+def create_emoji_button(
+    parent,
+    text: str,
+    icon: str,
+    colors: ThemeColors,
+    variant: str = "primary",
+    width: int = 140,
+    height: int = 38,
+    command: Callable = None,
+    font_size: int = 13,
+    **kwargs,
+):
     """
     Create a styled button with optional emoji icon.
     Handles rendering emoji as image (CTk) or text fallback.
@@ -323,7 +324,7 @@ def create_emoji_button(parent, text: str, icon: str, colors: ThemeColors,
             "height": height,
             "command": command,
             **get_ctk_button_colors(colors, variant),
-            **kwargs
+            **kwargs,
         }
 
         if img:
@@ -348,14 +349,7 @@ def create_emoji_button(parent, text: str, icon: str, colors: ThemeColors,
             fg_color = colors.fg
 
         btn = tk.Button(
-            parent,
-            text=full_text,
-            command=command,
-            font=("Segoe UI", 9),
-            bg=bg_color,
-            fg=fg_color,
-            padx=10,
-            pady=5
+            parent, text=full_text, command=command, font=("Segoe UI", 9), bg=bg_color, fg=fg_color, padx=10, pady=5
         )
         return btn
 
@@ -364,7 +358,7 @@ class ScrollableComboBox:
     """
     A searchable combobox with scrollable dropdown for handling many items.
     Uses CTkEntry for typing and a Toplevel with tk.Text for high-performance dropdown.
-    
+
     Features:
     - Click arrow or field to open dropdown
     - Type to search/filter OR enter custom value
@@ -372,7 +366,7 @@ class ScrollableComboBox:
     - Press Enter to use typed text as custom value
     - Compatible interface with CTkComboBox
     - Closes when clicking outside or losing focus to other app
-    
+
     Compatible interface with CTkComboBox:
     - get() / set() for value
     - configure(values=[...]) to update options
@@ -383,10 +377,19 @@ class ScrollableComboBox:
     ITEM_HEIGHT = 22  # Line height in text widget
     DEBOUNCE_MS = 100  # Debounce delay for search filtering
 
-    def __init__(self, master, colors: ThemeColors, values: List[str] = None,
-                 variable: tk.StringVar = None, command: Callable[[str], None] = None,
-                 width: int = 220, height: int = 32, font_size: int = 13,
-                 state: str = "normal", **kwargs):
+    def __init__(
+        self,
+        master,
+        colors: ThemeColors,
+        values: List[str] = None,
+        variable: tk.StringVar = None,
+        command: Callable[[str], None] = None,
+        width: int = 220,
+        height: int = 32,
+        font_size: int = 13,
+        state: str = "normal",
+        **kwargs,
+    ):
         self.master = master
         self.colors = colors
         self.values = values or []
@@ -435,7 +438,7 @@ class ScrollableComboBox:
                 border_color=combo_colors.get("border_color", self.colors.border),
                 corner_radius=6,
                 height=self.height,
-                width=self.width
+                width=self.width,
             )
             self._container.pack(side="left")
             self._container.pack_propagate(False)
@@ -449,7 +452,7 @@ class ScrollableComboBox:
                 fg_color="transparent",
                 text_color=combo_colors.get("text_color", self.colors.fg),
                 border_width=0,
-                corner_radius=0
+                corner_radius=0,
             )
             self.entry.pack(side="left", fill="both", expand=True, padx=(8, 0), pady=2)
 
@@ -464,7 +467,7 @@ class ScrollableComboBox:
                 text_color=self.colors.fg,
                 hover_color=self.colors.surface2,
                 corner_radius=4,
-                command=self._on_arrow_click
+                command=self._on_arrow_click,
             )
             self._arrow_btn.pack(side="right", padx=2, pady=2)
 
@@ -479,10 +482,7 @@ class ScrollableComboBox:
         else:
             # Tk fallback
             self._container = tk.Frame(
-                self.frame,
-                bg=self.colors.input_bg,
-                highlightbackground=self.colors.border,
-                highlightthickness=1
+                self.frame, bg=self.colors.input_bg, highlightbackground=self.colors.border, highlightthickness=1
             )
             self._container.pack(side="left")
 
@@ -493,7 +493,7 @@ class ScrollableComboBox:
                 fg=self.colors.fg,
                 relief="flat",
                 highlightthickness=0,
-                width=max(1, (self.width - 32) // 8)
+                width=max(1, (self.width - 32) // 8),
             )
             self.entry.pack(side="left", fill="both", expand=True, padx=(8, 0), pady=4)
 
@@ -505,7 +505,7 @@ class ScrollableComboBox:
                 fg=self.colors.fg,
                 relief="flat",
                 width=3,
-                command=self._on_arrow_click
+                command=self._on_arrow_click,
             )
             self._arrow_btn.pack(side="right", padx=2, pady=2)
 
@@ -519,7 +519,7 @@ class ScrollableComboBox:
 
     def _compute_filtered_values(self):
         """Recompute _filtered_values from current entry text.
-        
+
         Ensures the filter is applied immediately when values are refreshed
         or the dropdown is opened while the entry already contains text.
         """
@@ -563,9 +563,7 @@ class ScrollableComboBox:
             # Capture the current generation so stale callbacks are ignored
             gen = self._selection_gen
             # Delay slightly to allow dropdown click to register first
-            self._focus_out_id = self.frame.after(
-                200, lambda: self._check_and_update_value(typed_text, gen)
-            )
+            self._focus_out_id = self.frame.after(200, lambda: self._check_and_update_value(typed_text, gen))
 
     def _cancel_focus_out(self):
         """Cancel any pending focus-out value application."""
@@ -593,9 +591,22 @@ class ScrollableComboBox:
     def _on_key_release(self, event):
         """Handle key release - filter the dropdown with debounce."""
         # Ignore navigation keys
-        if event.keysym in ('Up', 'Down', 'Left', 'Right', 'Shift_L', 'Shift_R',
-                           'Control_L', 'Control_R', 'Alt_L', 'Alt_R', 'Escape', 'Return',
-                           'Tab', 'Caps_Lock'):
+        if event.keysym in (
+            "Up",
+            "Down",
+            "Left",
+            "Right",
+            "Shift_L",
+            "Shift_R",
+            "Control_L",
+            "Control_R",
+            "Alt_L",
+            "Alt_R",
+            "Escape",
+            "Return",
+            "Tab",
+            "Caps_Lock",
+        ):
             return
 
         # Cancel previous debounce
@@ -687,7 +698,7 @@ class ScrollableComboBox:
             selectbackground=self.colors.accent,
             selectforeground=self.colors.accent_fg,
             padx=8,
-            pady=4
+            pady=4,
         )
 
         # Add scrollbar if needed
@@ -821,6 +832,7 @@ class ScrollableComboBox:
 
     def _start_focus_check(self):
         """Start periodic check for window focus."""
+
         def check_focus():
             if not self._dropdown_open or not self._dropdown_window:
                 return
@@ -881,7 +893,7 @@ class ScrollableComboBox:
 
     def _close_dropdown(self, _value_already_set: bool = False):
         """Close the dropdown.
-        
+
         Args:
             _value_already_set: Internal flag - True when called from _select_value
                                to skip redundant value application.
@@ -1023,11 +1035,13 @@ class ScrollableComboBox:
 # Tkinter Scrollable Frame (Fallback)
 # =============================================================================
 
+
 class TkScrollableFrame(tk.Frame):
     """
     A scrollable frame for standard Tkinter (fallback mode).
     Mimics ctk.CTkScrollableFrame interface partially.
     """
+
     def __init__(self, container, bg_color=None, *args, **kwargs):
         super().__init__(container, *args, **kwargs)
 
@@ -1044,12 +1058,7 @@ class TkScrollableFrame(tk.Frame):
         if bg_color:
             self.scrollable_frame.configure(bg=bg_color)
 
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(
-                scrollregion=self.canvas.bbox("all")
-            )
-        )
+        self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
 
         self.window_id = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
 
@@ -1081,16 +1090,18 @@ class TkScrollableFrame(tk.Frame):
         if self.canvas.winfo_exists():
             # Windows/MacOS
             if event.delta:
-                self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+                self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
             # Linux (Button-4/5)
             elif event.num == 5:
                 self.canvas.yview_scroll(1, "units")
             elif event.num == 4:
                 self.canvas.yview_scroll(-1, "units")
 
+
 # =============================================================================
 # Themed Input Dialog (CTk version)
 # =============================================================================
+
 
 class ThemedInputDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
     """Themed dialog for getting text input from user."""
@@ -1114,6 +1125,7 @@ class ThemedInputDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         self.withdraw()
         try:
             from .windows.utils import set_dark_titlebar, set_window_icon
+
             set_dark_titlebar(self)
             set_window_icon(self)
         except ImportError:
@@ -1132,32 +1144,28 @@ class ThemedInputDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         # Prompt label
         if self.use_ctk:
             from .themes import get_ctk_entry_colors, get_ctk_label_colors
-            ctk.CTkLabel(
-                main_frame,
-                text=prompt,
-                font=get_ctk_font(12),
-                **get_ctk_label_colors(colors)
-            ).pack(anchor="w", pady=(0, 10))
+
+            ctk.CTkLabel(main_frame, text=prompt, font=get_ctk_font(12), **get_ctk_label_colors(colors)).pack(
+                anchor="w", pady=(0, 10)
+            )
 
             self.entry = ctk.CTkEntry(
-                main_frame,
-                width=360,
-                height=36,
-                font=get_ctk_font(12),
-                **get_ctk_entry_colors(colors)
+                main_frame, width=360, height=36, font=get_ctk_font(12), **get_ctk_entry_colors(colors)
             )
             self.entry.pack(fill="x", pady=(0, 15))
         else:
-            tk.Label(main_frame, text=prompt, font=("Segoe UI", 11),
-                    bg=colors.bg, fg=colors.fg).pack(anchor="w", pady=(0, 10))
-            self.entry = tk.Entry(main_frame, font=("Segoe UI", 11),
-                                 bg=colors.input_bg, fg=colors.fg, width=40)
+            tk.Label(main_frame, text=prompt, font=("Segoe UI", 11), bg=colors.bg, fg=colors.fg).pack(
+                anchor="w", pady=(0, 10)
+            )
+            self.entry = tk.Entry(main_frame, font=("Segoe UI", 11), bg=colors.input_bg, fg=colors.fg, width=40)
             self.entry.pack(fill="x", pady=(0, 15), ipady=6)
 
         self.entry.focus_set()
 
         # Buttons
-        btn_frame = ctk.CTkFrame(main_frame, fg_color="transparent") if self.use_ctk else tk.Frame(main_frame, bg=colors.bg)
+        btn_frame = (
+            ctk.CTkFrame(main_frame, fg_color="transparent") if self.use_ctk else tk.Frame(main_frame, bg=colors.bg)
+        )
         btn_frame.pack()
 
         if self.use_ctk:
@@ -1167,7 +1175,7 @@ class ThemedInputDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 font=get_ctk_font(11),
                 width=80,
                 **get_ctk_button_colors(colors, "primary"),
-                command=self._ok
+                command=self._ok,
             ).pack(side="left", padx=5)
 
             ctk.CTkButton(
@@ -1176,17 +1184,19 @@ class ThemedInputDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 font=get_ctk_font(11),
                 width=80,
                 **get_ctk_button_colors(colors, "secondary"),
-                command=self._cancel
+                command=self._cancel,
             ).pack(side="left", padx=5)
         else:
-            tk.Button(btn_frame, text="OK", command=self._ok,
-                     bg=colors.accent, fg=colors.accent_fg).pack(side="left", padx=5)
-            tk.Button(btn_frame, text="Cancel", command=self._cancel,
-                     bg=colors.surface1, fg=colors.fg).pack(side="left", padx=5)
+            tk.Button(btn_frame, text="OK", command=self._ok, bg=colors.accent, fg=colors.accent_fg).pack(
+                side="left", padx=5
+            )
+            tk.Button(btn_frame, text="Cancel", command=self._cancel, bg=colors.surface1, fg=colors.fg).pack(
+                side="left", padx=5
+            )
 
         # Bindings
-        self.entry.bind('<Return>', lambda e: self._ok())
-        self.bind('<Escape>', lambda e: self._cancel())
+        self.entry.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self._cancel())
         self.protocol("WM_DELETE_WINDOW", self._cancel)
 
         self.deiconify()
@@ -1200,6 +1210,7 @@ class ThemedInputDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         """Cancel the dialog."""
         self.result = None
         self.destroy()
+
 
 def ask_themed_string(parent, title: str, prompt: str, colors: ThemeColors) -> Optional[str]:
     """Show a themed input dialog and return the result."""

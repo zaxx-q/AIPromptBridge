@@ -5,10 +5,7 @@ Contains static voice definitions and model lists.
 """
 
 # Gemini TTS Models
-TTS_MODELS = [
-    "gemini-2.5-flash-preview-tts",
-    "gemini-2.5-pro-preview-tts"
-]
+TTS_MODELS = ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"]
 
 # Gemini TTS Voices
 # Format: Name -> {style, gender}
@@ -42,15 +39,14 @@ TTS_VOICES = {
     "Vindemiatrix": {"style": "Gentle", "gender": "Female"},
     "Sadachbia": {"style": "Lively", "gender": "Male"},
     "Sadaltager": {"style": "Knowledgeable", "gender": "Male"},
-    "Sulafat": {"style": "Warm", "gender": "Female"}
+    "Sulafat": {"style": "Warm", "gender": "Female"},
 }
+
 
 def get_voice_list() -> list[str]:
     """Get formatted list of voices (Name - Gender, Style)."""
-    return [
-        f"{name} — {data['gender']}, {data['style']}"
-        for name, data in TTS_VOICES.items()
-    ]
+    return [f"{name} — {data['gender']}, {data['style']}" for name, data in TTS_VOICES.items()]
+
 
 def get_voice_details(name: str) -> dict:
     """Get details for a specific voice."""

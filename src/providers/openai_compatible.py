@@ -38,12 +38,12 @@ GOOGLE_SAFETY_SETTINGS = [
 class OpenAICompatibleProvider(BaseProvider):
     """
     Provider for OpenAI-compatible APIs.
-    
+
     Handles:
     - Custom endpoints (any OpenAI-compatible API)
     - OpenRouter (openrouter.ai)
     - Google's OpenAI-compatible endpoint (generativelanguage.googleapis.com/v1beta/openai)
-    
+
     Features:
     - Streaming with retry logic via BaseProvider
     - Empty response detection and retry via BaseProvider
@@ -56,13 +56,7 @@ class OpenAICompatibleProvider(BaseProvider):
     ENDPOINT_OPENROUTER = "openrouter"
     ENDPOINT_GOOGLE = "google"
 
-    def __init__(
-        self,
-        endpoint_type: str,
-        base_url: str,
-        key_manager=None,
-        config: Optional[Dict] = None
-    ):
+    def __init__(self, endpoint_type: str, base_url: str, key_manager=None, config: Optional[Dict] = None):
         """
         Initialize the OpenAI-compatible provider.
         """
@@ -99,10 +93,7 @@ class OpenAICompatibleProvider(BaseProvider):
 
     def _get_headers(self, api_key: str) -> Dict[str, str]:
         """Get request headers"""
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
         if self.endpoint_type == self.ENDPOINT_OPENROUTER:
             headers["HTTP-Referer"] = "https://github.com/zaxx-q/AIPromptBridge"
@@ -181,13 +172,9 @@ class OpenAICompatibleProvider(BaseProvider):
                             audio_data = b64
 
                     if audio_data:
-                        new_content.append({
-                            "type": "input_audio",
-                            "input_audio": {
-                                "data": audio_data,
-                                "format": audio_format
-                            }
-                        })
+                        new_content.append(
+                            {"type": "input_audio", "input_audio": {"data": audio_data, "format": audio_format}}
+                        )
                     else:
                         new_content.append(item)
 
@@ -195,19 +182,9 @@ class OpenAICompatibleProvider(BaseProvider):
                     file_info = item.get("file", {})
 
                     if not file_info and "url" in item:
-                        new_content.append({
-                            "type": "file",
-                            "file": {
-                                "url": item["url"]
-                            }
-                        })
+                        new_content.append({"type": "file", "file": {"url": item["url"]}})
                     elif not file_info and "data" in item:
-                        new_content.append({
-                            "type": "file",
-                            "file": {
-                                "file_data": item["data"]
-                            }
-                        })
+                        new_content.append({"type": "file", "file": {"file_data": item["data"]}})
                     else:
                         new_content.append(item)
 
@@ -226,34 +203,31 @@ class OpenAICompatibleProvider(BaseProvider):
                         }
                         audio_format = mime_to_format.get(audio_format, audio_format)
 
-                        new_content.append({
-                            "type": "input_audio",
-                            "input_audio": {
-                                "data": inline.get("data", ""),
-                                "format": audio_format
+                        new_content.append(
+                            {
+                                "type": "input_audio",
+                                "input_audio": {"data": inline.get("data", ""), "format": audio_format},
                             }
-                        })
+                        )
 
                     elif mime_type.startswith("image/"):
                         data_url = f"data:{mime_type};base64,{inline.get('data', '')}"
-                        new_content.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": data_url
-                            }
-                        })
+                        new_content.append({"type": "image_url", "image_url": {"url": data_url}})
 
                     elif mime_type.startswith("text/") or mime_type in (
-                        "application/json", "application/xml", "application/javascript",
-                        "application/x-python-code", "application/x-sh"
+                        "application/json",
+                        "application/xml",
+                        "application/javascript",
+                        "application/x-python-code",
+                        "application/x-sh",
                     ):
                         try:
                             import base64
+
                             text_content = base64.b64decode(inline.get("data", "")).decode("utf-8")
-                            new_content.append({
-                                "type": "text",
-                                "text": f"\n\n[File Content: {mime_type}]\n{text_content}"
-                            })
+                            new_content.append(
+                                {"type": "text", "text": f"\n\n[File Content: {mime_type}]\n{text_content}"}
+                            )
                         except Exception:
                             new_content.append(item)
 
@@ -263,21 +237,10 @@ class OpenAICompatibleProvider(BaseProvider):
 
                         if self._is_openrouter_endpoint():
                             data_url = f"data:application/pdf;base64,{b64_data}"
-                            new_content.append({
-                                "type": "file",
-                                "file": {
-                                    "filename": filename,
-                                    "file_data": data_url
-                                }
-                            })
+                            new_content.append({"type": "file", "file": {"filename": filename, "file_data": data_url}})
                         else:
                             data_url = f"data:application/pdf;base64,{b64_data}"
-                            new_content.append({
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": data_url
-                                }
-                            })
+                            new_content.append({"type": "image_url", "image_url": {"url": data_url}})
 
                     else:
                         new_content.append(item)
@@ -294,18 +257,10 @@ class OpenAICompatibleProvider(BaseProvider):
         return processed
 
     def _build_request_body(
-        self,
-        messages: List[Dict],
-        model: str,
-        params: Dict,
-        thinking_enabled: bool,
-        streaming: bool
+        self, messages: List[Dict], model: str, params: Dict, thinking_enabled: bool, streaming: bool
     ) -> Dict:
         """Build the request body with proper thinking/safety configuration."""
-        body = {
-            "model": model,
-            "messages": self._process_messages(messages)
-        }
+        body = {"model": model, "messages": self._process_messages(messages)}
 
         if streaming:
             body["stream"] = True
@@ -323,19 +278,10 @@ class OpenAICompatibleProvider(BaseProvider):
 
             if self._is_google_endpoint():
                 body["extra_body"] = {
-                    "google": {
-                        "thinking_config": {
-                            "include_thoughts": True
-                        },
-                        "safety_settings": GOOGLE_SAFETY_SETTINGS
-                    }
+                    "google": {"thinking_config": {"include_thoughts": True}, "safety_settings": GOOGLE_SAFETY_SETTINGS}
                 }
         elif self._is_google_endpoint():
-            body["extra_body"] = {
-                "google": {
-                    "safety_settings": GOOGLE_SAFETY_SETTINGS
-                }
-            }
+            body["extra_body"] = {"google": {"safety_settings": GOOGLE_SAFETY_SETTINGS}}
 
         return body
 
@@ -351,7 +297,7 @@ class OpenAICompatibleProvider(BaseProvider):
         callback: StreamCallback,
         thinking_enabled: bool,
         api_key: str,
-        abort_event: Optional[Any]
+        abort_event: Optional[Any],
     ) -> ProviderResult:
         timeout = self.config.get("request_timeout", 120)
         url = self._get_completions_url()
@@ -364,25 +310,15 @@ class OpenAICompatibleProvider(BaseProvider):
         accumulated_tool_calls = []
         usage_data = None
 
-        response = requests.post(
-            url,
-            headers=headers,
-            json=body,
-            timeout=timeout,
-            stream=True
-        )
+        response = requests.post(url, headers=headers, json=body, timeout=timeout, stream=True)
 
         # Handle error responses
         if response.status_code != 200:
             error_text = response.text
-            return ProviderResult(
-                success=False,
-                error=error_text,
-                status_code=response.status_code
-            )
+            return ProviderResult(success=False, error=error_text, status_code=response.status_code)
 
         # Process streaming response
-        response.encoding = 'utf-8'
+        response.encoding = "utf-8"
 
         chunk_count = 0
         last_content_time = time.time()  # Track last meaningful content for idle timeout
@@ -392,9 +328,7 @@ class OpenAICompatibleProvider(BaseProvider):
             # Content-idle timeout: detect hangs masked by SSE heartbeats
             if time.time() - last_content_time > timeout:
                 response.close()
-                raise requests.exceptions.Timeout(
-                    f"No content received for {timeout}s (content-idle timeout)"
-                )
+                raise requests.exceptions.Timeout(f"No content received for {timeout}s (content-idle timeout)")
 
             if not line:
                 continue
@@ -430,10 +364,7 @@ class OpenAICompatibleProvider(BaseProvider):
                         error_text = f"{prefix}: {error_message}" if prefix else error_message
                     else:
                         error_text = str(error_obj)
-                    return ProviderResult(
-                        success=False,
-                        error=error_text
-                    )
+                    return ProviderResult(success=False, error=error_text)
 
                 choices = data.get("choices", [])
                 if choices:
@@ -482,10 +413,7 @@ class OpenAICompatibleProvider(BaseProvider):
                         if not accumulated_content.strip() and not accumulated_tool_calls:
                             block_msg = f"Response blocked: {finish_reason}"
                             callback(CallbackType.ERROR, block_msg)
-                            return ProviderResult(
-                                success=False,
-                                error=block_msg
-                            )
+                            return ProviderResult(success=False, error=block_msg)
 
                 if "usage" in data:
                     usage = data["usage"]
@@ -493,7 +421,7 @@ class OpenAICompatibleProvider(BaseProvider):
                         usage_data = UsageData(
                             prompt_tokens=usage.get("prompt_tokens", 0),
                             completion_tokens=usage.get("completion_tokens", 0),
-                            total_tokens=usage.get("total_tokens", 0)
+                            total_tokens=usage.get("total_tokens", 0),
                         )
                         callback(CallbackType.USAGE, usage_data.to_dict())
 
@@ -504,6 +432,7 @@ class OpenAICompatibleProvider(BaseProvider):
         # Extract inline thinking if native reasoning is empty
         if not accumulated_thinking and accumulated_content:
             from .inline_thinking import extract_leading_thinking_blocks
+
             extracted = extract_leading_thinking_blocks(accumulated_content)
             if extracted.stripped:
                 accumulated_content = extracted.content
@@ -511,18 +440,10 @@ class OpenAICompatibleProvider(BaseProvider):
 
         # Check for empty response
         output_tokens = usage_data.completion_tokens if usage_data else 0
-        if self.detect_empty_response(
-            accumulated_content,
-            accumulated_thinking,
-            accumulated_tool_calls,
-            output_tokens
-        ):
+        if self.detect_empty_response(accumulated_content, accumulated_thinking, accumulated_tool_calls, output_tokens):
             thinking_note = f", thinking: {len(accumulated_thinking)} chars" if accumulated_thinking else ""
             self.log("warn", f"Empty response detected (no content{thinking_note})")
-            return ProviderResult(
-                success=False,
-                error="Empty response (0 output tokens, no content)"
-            )
+            return ProviderResult(success=False, error="Empty response (0 output tokens, no content)")
 
         if not usage_data:
             input_tokens = estimate_message_tokens(messages)
@@ -531,7 +452,7 @@ class OpenAICompatibleProvider(BaseProvider):
                 prompt_tokens=input_tokens,
                 completion_tokens=output_tokens,
                 total_tokens=input_tokens + output_tokens,
-                estimated=True
+                estimated=True,
             )
             callback(CallbackType.USAGE, usage_data.to_dict())
 
@@ -540,7 +461,7 @@ class OpenAICompatibleProvider(BaseProvider):
             content=accumulated_content,
             thinking_content=accumulated_thinking,
             tool_calls=accumulated_tool_calls,
-            usage=usage_data
+            usage=usage_data,
         )
 
     def _do_generate(
@@ -550,7 +471,7 @@ class OpenAICompatibleProvider(BaseProvider):
         params: Dict,
         thinking_enabled: bool,
         api_key: str,
-        abort_event: Optional[Any]
+        abort_event: Optional[Any],
     ) -> ProviderResult:
         timeout = self.config.get("request_timeout", 120)
         url = self._get_completions_url()
@@ -563,11 +484,7 @@ class OpenAICompatibleProvider(BaseProvider):
 
         if response.status_code != 200:
             error_text = response.text
-            return ProviderResult(
-                success=False,
-                error=error_text,
-                status_code=response.status_code
-            )
+            return ProviderResult(success=False, error=error_text, status_code=response.status_code)
 
         try:
             data = response.json()
@@ -595,19 +512,13 @@ class OpenAICompatibleProvider(BaseProvider):
                     error_text = f"{prefix}: {error_message}" if prefix else error_message
                 else:
                     error_text = str(error_obj)
-                return ProviderResult(
-                    success=False,
-                    error=error_text
-                )
+                return ProviderResult(success=False, error=error_text)
 
             if isinstance(choice, dict):
                 finish_reason = choice.get("finish_reason")
                 if finish_reason in ("content_filter", "blocked"):
                     block_msg = f"Response blocked: {finish_reason}"
-                    return ProviderResult(
-                        success=False,
-                        error=block_msg
-                    )
+                    return ProviderResult(success=False, error=block_msg)
 
         message = choice.get("message") if isinstance(choice, dict) else None
         if message is None or not isinstance(message, dict):
@@ -622,6 +533,7 @@ class OpenAICompatibleProvider(BaseProvider):
         # Extract inline thinking if native reasoning is empty
         if not reasoning and content:
             from .inline_thinking import extract_leading_thinking_blocks
+
             extracted = extract_leading_thinking_blocks(content)
             if extracted.stripped:
                 content = extracted.content
@@ -633,23 +545,16 @@ class OpenAICompatibleProvider(BaseProvider):
         usage_data = UsageData(
             prompt_tokens=usage.get("prompt_tokens", 0),
             completion_tokens=usage.get("completion_tokens", 0),
-            total_tokens=usage.get("total_tokens", 0)
+            total_tokens=usage.get("total_tokens", 0),
         )
 
         if self.detect_empty_response(content, reasoning, tool_calls, usage_data.completion_tokens):
             thinking_note = f", thinking: {len(reasoning)} chars" if reasoning else ""
             self.log("warn", f"Empty response detected (no content{thinking_note})")
-            return ProviderResult(
-                success=False,
-                error="Empty response (0 output tokens, no content)"
-            )
+            return ProviderResult(success=False, error="Empty response (0 output tokens, no content)")
 
         return ProviderResult(
-            success=True,
-            content=content,
-            thinking_content=reasoning,
-            tool_calls=tool_calls,
-            usage=usage_data
+            success=True, content=content, thinking_content=reasoning, tool_calls=tool_calls, usage=usage_data
         )
 
     # =========================================================================
@@ -677,7 +582,7 @@ class OpenAICompatibleProvider(BaseProvider):
         except (json.JSONDecodeError, TypeError, KeyError):
             pass
 
-        first_line = error_text.split('\n')[0][:100] if error_text else ""
+        first_line = error_text.split("\n")[0][:100] if error_text else ""
         if status_code:
             return f"HTTP {status_code}: {first_line[:80]}"
         return first_line or "Unknown error"
@@ -712,24 +617,24 @@ class OpenAICompatibleProvider(BaseProvider):
                         "name": model.get("name", model_id),
                         "owned_by": model.get("owned_by", "unknown"),
                         "context_length": (
-                            model.get("context_length") or
-                            model.get("context_window") or
-                            model.get("max_context_length")
+                            model.get("context_length")
+                            or model.get("context_window")
+                            or model.get("max_context_length")
                         ),
                         "description": model.get("description", ""),
                         "pricing": model.get("pricing"),
                         "architecture": model.get("architecture"),
                         "top_provider": model.get("top_provider"),
-                        "_raw": model
+                        "_raw": model,
                     }
 
                     if has_thinking_param:
                         model_info["thinking"] = True
                     else:
                         model_id_lower = model_id.lower()
-                        model_info["thinking"] = any(kw in model_id_lower for kw in [
-                            "thinking", "reason", "o1", "o3", "deepseek-r1"
-                        ])
+                        model_info["thinking"] = any(
+                            kw in model_id_lower for kw in ["thinking", "reason", "o1", "o3", "deepseek-r1"]
+                        )
 
                     models.append(model_info)
                 return models, None
@@ -738,19 +643,17 @@ class OpenAICompatibleProvider(BaseProvider):
                 models = []
                 for model in data:
                     if isinstance(model, str):
-                        models.append({
-                            "id": model,
-                            "name": model,
-                            "_raw": {"id": model}
-                        })
+                        models.append({"id": model, "name": model, "_raw": {"id": model}})
                     else:
                         model_id = model.get("id", str(model))
-                        models.append({
-                            "id": model_id,
-                            "name": model.get("name", model_id),
-                            "context_length": model.get("context_length"),
-                            "_raw": model
-                        })
+                        models.append(
+                            {
+                                "id": model_id,
+                                "name": model.get("name", model_id),
+                                "context_length": model.get("context_length"),
+                                "_raw": model,
+                            }
+                        )
                 return models, None
 
             return None, "Unknown models response format"

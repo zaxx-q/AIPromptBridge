@@ -29,124 +29,155 @@ class KeysTabMixin:
     def _create_keys_tab(self, frame):
         """Create the API Keys settings tab with pool-based layout."""
         from src.key_store import KeyStore
+
         self._key_store = KeyStore.get_instance()
 
         container = ctk.CTkFrame(frame, fg_color="transparent") if self.use_ctk else tk.Frame(frame, bg=self.colors.bg)
         container.pack(fill="both", expand=True, padx=15, pady=15)
 
         # --- Top area: Pool list (left) + Key list (right) ---
-        top_frame = ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
+        top_frame = (
+            ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
+        )
         top_frame.pack(fill="both", expand=True)
         top_frame.columnconfigure(1, weight=1)
         top_frame.rowconfigure(0, weight=1)
 
         # === Left panel: Pool list ===
-        left_frame = ctk.CTkFrame(top_frame, fg_color="transparent") if self.use_ctk else tk.Frame(top_frame, bg=self.colors.bg)
+        left_frame = (
+            ctk.CTkFrame(top_frame, fg_color="transparent") if self.use_ctk else tk.Frame(top_frame, bg=self.colors.bg)
+        )
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
         create_section_header(left_frame, "🗂️ Key Pools", self.colors)
 
         if self.use_ctk:
             pool_list = ScrollableButtonList(
-                left_frame, self.colors, command=self._on_pool_selected,
-                corner_radius=8, fg_color=self.colors.input_bg, width=180
+                left_frame,
+                self.colors,
+                command=self._on_pool_selected,
+                corner_radius=8,
+                fg_color=self.colors.input_bg,
+                width=180,
             )
         else:
             pool_list = ScrollableButtonList(
-                left_frame, self.colors, command=self._on_pool_selected,
-                bg=self.colors.input_bg, width=180
+                left_frame, self.colors, command=self._on_pool_selected, bg=self.colors.input_bg, width=180
             )
         pool_list.pack(fill="both", expand=True, pady=(6, 0))
         self.widgets["keys_pool_list"] = pool_list
 
         # Pool action buttons
-        pool_btn_frame = ctk.CTkFrame(left_frame, fg_color="transparent") if self.use_ctk else tk.Frame(left_frame, bg=self.colors.bg)
+        pool_btn_frame = (
+            ctk.CTkFrame(left_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(left_frame, bg=self.colors.bg)
+        )
         pool_btn_frame.pack(fill="x", pady=(8, 0))
 
-        create_emoji_button(pool_btn_frame, "Pool", "➕", self.colors, "success", 75, 32, self._add_pool).pack(side="left", padx=2)
-        create_emoji_button(pool_btn_frame, "", "✏️", self.colors, "secondary", 35, 32, self._rename_pool).pack(side="left", padx=2)
-        create_emoji_button(pool_btn_frame, "", "✕", self.colors, "danger", 35, 32, self._remove_pool).pack(side="left", padx=2)
+        create_emoji_button(pool_btn_frame, "Pool", "➕", self.colors, "success", 75, 32, self._add_pool).pack(
+            side="left", padx=2
+        )
+        create_emoji_button(pool_btn_frame, "", "✏️", self.colors, "secondary", 35, 32, self._rename_pool).pack(
+            side="left", padx=2
+        )
+        create_emoji_button(pool_btn_frame, "", "✕", self.colors, "danger", 35, 32, self._remove_pool).pack(
+            side="left", padx=2
+        )
 
         # === Right panel: Keys for selected pool ===
-        right_frame = ctk.CTkFrame(top_frame, fg_color="transparent") if self.use_ctk else tk.Frame(top_frame, bg=self.colors.bg)
+        right_frame = (
+            ctk.CTkFrame(top_frame, fg_color="transparent") if self.use_ctk else tk.Frame(top_frame, bg=self.colors.bg)
+        )
         right_frame.grid(row=0, column=1, sticky="nsew")
 
         self._keys_header_var = tk.StringVar(master=self.root, value="🔑 Keys")
         if self.use_ctk:
             self._keys_header_label = ctk.CTkLabel(
-                right_frame, textvariable=self._keys_header_var,
+                right_frame,
+                textvariable=self._keys_header_var,
                 font=get_ctk_font(14, "bold"),
-                **get_ctk_label_colors(self.colors)
+                **get_ctk_label_colors(self.colors),
             )
         else:
             self._keys_header_label = tk.Label(
-                right_frame, textvariable=self._keys_header_var,
+                right_frame,
+                textvariable=self._keys_header_var,
                 font=("Segoe UI", 11, "bold"),
-                bg=self.colors.bg, fg=self.colors.fg
+                bg=self.colors.bg,
+                fg=self.colors.fg,
             )
         self._keys_header_label.pack(anchor="w")
 
         if self.use_ctk:
             key_list = ScrollableButtonList(
-                right_frame, self.colors, command=None,
-                corner_radius=8, fg_color=self.colors.input_bg
+                right_frame, self.colors, command=None, corner_radius=8, fg_color=self.colors.input_bg
             )
         else:
-            key_list = ScrollableButtonList(
-                right_frame, self.colors, command=None,
-                bg=self.colors.input_bg
-            )
+            key_list = ScrollableButtonList(right_frame, self.colors, command=None, bg=self.colors.input_bg)
         key_list.pack(fill="both", expand=True, pady=(6, 0))
         self.widgets["keys_key_list"] = key_list
 
         # Key input row
-        input_frame = ctk.CTkFrame(right_frame, fg_color="transparent") if self.use_ctk else tk.Frame(right_frame, bg=self.colors.bg)
+        input_frame = (
+            ctk.CTkFrame(right_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(right_frame, bg=self.colors.bg)
+        )
         input_frame.pack(fill="x", pady=(10, 0))
 
         if self.use_ctk:
-            ctk.CTkLabel(
-                input_frame, text="Key:",
-                font=get_ctk_font(12),
-                **get_ctk_label_colors(self.colors)
-            ).pack(side="left", padx=(0, 4))
+            ctk.CTkLabel(input_frame, text="Key:", font=get_ctk_font(12), **get_ctk_label_colors(self.colors)).pack(
+                side="left", padx=(0, 4)
+            )
 
             key_var = tk.StringVar(master=self.root)
             key_entry = ctk.CTkEntry(
-                input_frame, textvariable=key_var,
-                font=get_ctk_font(12), width=260, height=36,
+                input_frame,
+                textvariable=key_var,
+                font=get_ctk_font(12),
+                width=260,
+                height=36,
                 placeholder_text="Paste API key…",
-                **get_ctk_entry_colors(self.colors)
+                **get_ctk_entry_colors(self.colors),
             )
             key_entry.pack(side="left", padx=(0, 10))
 
-            ctk.CTkLabel(
-                input_frame, text="Name:",
-                font=get_ctk_font(12),
-                **get_ctk_label_colors(self.colors)
-            ).pack(side="left", padx=(0, 4))
+            ctk.CTkLabel(input_frame, text="Name:", font=get_ctk_font(12), **get_ctk_label_colors(self.colors)).pack(
+                side="left", padx=(0, 4)
+            )
 
             name_var = tk.StringVar(master=self.root)
             name_entry = ctk.CTkEntry(
-                input_frame, textvariable=name_var,
-                font=get_ctk_font(12), width=130, height=36,
+                input_frame,
+                textvariable=name_var,
+                font=get_ctk_font(12),
+                width=130,
+                height=36,
                 placeholder_text="Optional…",
-                **get_ctk_entry_colors(self.colors)
+                **get_ctk_entry_colors(self.colors),
             )
             name_entry.pack(side="left", padx=(0, 8))
         else:
             key_var = tk.StringVar(master=self.root)
             key_entry = tk.Entry(
-                input_frame, textvariable=key_var,
-                font=("Consolas", 10), width=32,
-                bg=self.colors.input_bg, fg=self.colors.fg
+                input_frame,
+                textvariable=key_var,
+                font=("Consolas", 10),
+                width=32,
+                bg=self.colors.input_bg,
+                fg=self.colors.fg,
             )
             key_entry.pack(side="left", padx=(0, 6))
 
             name_var = tk.StringVar(master=self.root)
             name_entry = tk.Entry(
-                input_frame, textvariable=name_var,
-                font=("Segoe UI", 10), width=14,
-                bg=self.colors.input_bg, fg=self.colors.fg
+                input_frame,
+                textvariable=name_var,
+                font=("Segoe UI", 10),
+                width=14,
+                bg=self.colors.input_bg,
+                fg=self.colors.fg,
             )
             name_entry.pack(side="left", padx=(0, 6))
 
@@ -154,13 +185,25 @@ class KeysTabMixin:
         self.widgets["keys_name_var"] = name_var
 
         # Key action buttons
-        key_btn_frame = ctk.CTkFrame(right_frame, fg_color="transparent") if self.use_ctk else tk.Frame(right_frame, bg=self.colors.bg)
+        key_btn_frame = (
+            ctk.CTkFrame(right_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(right_frame, bg=self.colors.bg)
+        )
         key_btn_frame.pack(fill="x", pady=(8, 0))
 
-        create_emoji_button(key_btn_frame, "Add", "➕", self.colors, "success", 65, 32, self._add_key).pack(side="left", padx=2)
-        create_emoji_button(key_btn_frame, "Remove", "✕", self.colors, "danger", 85, 32, self._remove_key).pack(side="left", padx=2)
-        create_emoji_button(key_btn_frame, "", "⬆️", self.colors, "secondary", 35, 32, self._move_key_up).pack(side="left", padx=2)
-        create_emoji_button(key_btn_frame, "", "⬇️", self.colors, "secondary", 35, 32, self._move_key_down).pack(side="left", padx=2)
+        create_emoji_button(key_btn_frame, "Add", "➕", self.colors, "success", 65, 32, self._add_key).pack(
+            side="left", padx=2
+        )
+        create_emoji_button(key_btn_frame, "Remove", "✕", self.colors, "danger", 85, 32, self._remove_key).pack(
+            side="left", padx=2
+        )
+        create_emoji_button(key_btn_frame, "", "⬆️", self.colors, "secondary", 35, 32, self._move_key_up).pack(
+            side="left", padx=2
+        )
+        create_emoji_button(key_btn_frame, "", "⬇️", self.colors, "secondary", 35, 32, self._move_key_down).pack(
+            side="left", padx=2
+        )
 
         # Track selected pool
         self._selected_pool_id = None
@@ -222,7 +265,6 @@ class KeysTabMixin:
             masked = self._mask_key(kd)
             key_list.add_item(str(i), masked, "🔑")
 
-
     # ------------------------------------------------------------------ #
     # Pool CRUD
     # ------------------------------------------------------------------ #
@@ -230,6 +272,7 @@ class KeysTabMixin:
     def _add_pool(self):
         """Add a new custom pool."""
         from ...custom_widgets import ThemedInputDialog
+
         dialog = ThemedInputDialog(self.root, "New Key Pool", "Enter pool display name:", self.colors)
         self.root.wait_window(dialog)
         name = dialog.result
@@ -245,6 +288,7 @@ class KeysTabMixin:
             return
         current_name = self._key_store.get_pool_display_name(self._selected_pool_id)
         from ...custom_widgets import ThemedInputDialog
+
         dialog = ThemedInputDialog(self.root, "Rename Pool", "Enter new display name:", self.colors)
         dialog.entry.insert(0, current_name)
         self.root.wait_window(dialog)
@@ -334,8 +378,9 @@ class KeysTabMixin:
         Called by the settings window's save handler.
         """
         # Ensure _key_store is available even if the Keys tab was never loaded (lazy loading)
-        if not hasattr(self, '_key_store'):
+        if not hasattr(self, "_key_store"):
             from src.key_store import KeyStore
+
             self._key_store = KeyStore.get_instance()
 
         # Apply provider → pool assignments (dropdowns live in Provider tab)

@@ -34,13 +34,13 @@ class GroupsTabMixin:
             self.group_listbox.add_item(str(i), name, None)
 
         if selected:
-             # Try to restore selection if index valid
-             try:
-                 idx = int(selected)
-                 if idx < len(groups):
-                     self.group_listbox.select(selected)
-             except ValueError:
-                 pass
+            # Try to restore selection if index valid
+            try:
+                idx = int(selected)
+                if idx < len(groups):
+                    self.group_listbox.select(selected)
+            except ValueError:
+                pass
 
     def _on_group_tool_switch(self, value):
         """Handle tool switching in Groups tab."""
@@ -65,7 +65,11 @@ class GroupsTabMixin:
         container.pack(fill="both", expand=True, padx=15, pady=15)
 
         # Left panel: group list
-        left_panel = ctk.CTkFrame(container, fg_color="transparent", width=260) if self.use_ctk else tk.Frame(container, bg=self.colors.bg, width=260)
+        left_panel = (
+            ctk.CTkFrame(container, fg_color="transparent", width=260)
+            if self.use_ctk
+            else tk.Frame(container, bg=self.colors.bg, width=260)
+        )
         left_panel.pack(side="left", fill="y", padx=(0, 15))
         left_panel.pack_propagate(False)
 
@@ -84,7 +88,7 @@ class GroupsTabMixin:
                 unselected_color=self.colors.surface0,
                 unselected_hover_color=self.colors.surface1,
                 text_color=self.colors.fg,
-                text_color_disabled=self.colors.surface2
+                text_color_disabled=self.colors.surface2,
             )
             # Sync with current tool if possible, defaulting to Text Edit
             if self.current_tool == "text_edit_tool":
@@ -99,13 +103,11 @@ class GroupsTabMixin:
         # Group List - using ScrollableButtonList
         if self.use_ctk:
             self.group_listbox = ScrollableButtonList(
-                left_panel, self.colors, command=self._on_group_select,
-                corner_radius=8, fg_color=self.colors.input_bg
+                left_panel, self.colors, command=self._on_group_select, corner_radius=8, fg_color=self.colors.input_bg
             )
         else:
             self.group_listbox = ScrollableButtonList(
-                left_panel, self.colors, command=self._on_group_select,
-                bg=self.colors.input_bg
+                left_panel, self.colors, command=self._on_group_select, bg=self.colors.input_bg
             )
         self.group_listbox.pack(fill="both", expand=True)
 
@@ -113,16 +115,30 @@ class GroupsTabMixin:
         self._refresh_group_list()
 
         # Buttons
-        btn_frame = ctk.CTkFrame(left_panel, fg_color="transparent") if self.use_ctk else tk.Frame(left_panel, bg=self.colors.bg)
+        btn_frame = (
+            ctk.CTkFrame(left_panel, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(left_panel, bg=self.colors.bg)
+        )
         btn_frame.pack(fill="x", pady=(12, 0))
 
-        create_emoji_button(btn_frame, "Add", "➕", self.colors, "success", 70, 34, self._add_group).pack(side="left", padx=3)
-        create_emoji_button(btn_frame, "", "🗑️", self.colors, "danger", 40, 34, self._delete_group).pack(side="left", padx=3)
-        create_emoji_button(btn_frame, "⬆", "", self.colors, "secondary", 40, 34, self._move_group_up).pack(side="left", padx=3)
-        create_emoji_button(btn_frame, "⬇", "", self.colors, "secondary", 40, 34, self._move_group_down).pack(side="left", padx=3)
+        create_emoji_button(btn_frame, "Add", "➕", self.colors, "success", 70, 34, self._add_group).pack(
+            side="left", padx=3
+        )
+        create_emoji_button(btn_frame, "", "🗑️", self.colors, "danger", 40, 34, self._delete_group).pack(
+            side="left", padx=3
+        )
+        create_emoji_button(btn_frame, "⬆", "", self.colors, "secondary", 40, 34, self._move_group_up).pack(
+            side="left", padx=3
+        )
+        create_emoji_button(btn_frame, "⬇", "", self.colors, "secondary", 40, 34, self._move_group_down).pack(
+            side="left", padx=3
+        )
 
         # Right panel: group editor
-        right_panel = ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
+        right_panel = (
+            ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
+        )
         right_panel.pack(side="left", fill="both", expand=True)
 
         create_section_header(right_panel, "Edit Group", self.colors, "✏️")
@@ -130,62 +146,98 @@ class GroupsTabMixin:
         self.group_widgets = {}
 
         # Name field
-        row = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
+        row = (
+            ctk.CTkFrame(right_panel, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(right_panel, bg=self.colors.bg)
+        )
         row.pack(fill="x", pady=8)
 
         if self.use_ctk:
-            ctk.CTkLabel(row, text="Name:", font=get_ctk_font(13), width=100, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                row, text="Name:", font=get_ctk_font(13), width=100, anchor="w", **get_ctk_label_colors(self.colors)
+            ).pack(side="left")
             self.group_widgets["name_var"] = tk.StringVar(master=self.root)
-            ctk.CTkEntry(row, textvariable=self.group_widgets["name_var"],
-                        font=get_ctk_font(13), width=240, height=34,
-                        **get_ctk_entry_colors(self.colors)).pack(side="left", padx=(12, 0))
+            ctk.CTkEntry(
+                row,
+                textvariable=self.group_widgets["name_var"],
+                font=get_ctk_font(13),
+                width=240,
+                height=34,
+                **get_ctk_entry_colors(self.colors),
+            ).pack(side="left", padx=(12, 0))
         else:
-            tk.Label(row, text="Name:", font=("Segoe UI", 10), width=10, anchor="w",
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            tk.Label(
+                row, text="Name:", font=("Segoe UI", 10), width=10, anchor="w", bg=self.colors.bg, fg=self.colors.fg
+            ).pack(side="left")
             self.group_widgets["name_var"] = tk.StringVar()
-            tk.Entry(row, textvariable=self.group_widgets["name_var"],
-                    font=("Segoe UI", 10), width=25,
-                    bg=self.colors.input_bg, fg=self.colors.fg).pack(side="left", padx=(10, 0))
+            tk.Entry(
+                row,
+                textvariable=self.group_widgets["name_var"],
+                font=("Segoe UI", 10),
+                width=25,
+                bg=self.colors.input_bg,
+                fg=self.colors.fg,
+            ).pack(side="left", padx=(10, 0))
 
         # Enabled checkbox
-        row = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
+        row = (
+            ctk.CTkFrame(right_panel, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(right_panel, bg=self.colors.bg)
+        )
         row.pack(fill="x", pady=8)
 
         self.group_widgets["enabled_var"] = tk.BooleanVar(value=True)
         if self.use_ctk:
             self.group_widgets["enabled_checkbox"] = ctk.CTkCheckBox(
-                row, text="Enabled (show this group in the corresponding tool)",
+                row,
+                text="Enabled (show this group in the corresponding tool)",
                 variable=self.group_widgets["enabled_var"],
-                font=get_ctk_font(13), text_color=self.colors.fg,
-                fg_color=self.colors.accent
+                font=get_ctk_font(13),
+                text_color=self.colors.fg,
+                fg_color=self.colors.accent,
             )
         else:
             self.group_widgets["enabled_checkbox"] = tk.Checkbutton(
-                row, text="Enabled (show this group in the corresponding tool)",
+                row,
+                text="Enabled (show this group in the corresponding tool)",
                 variable=self.group_widgets["enabled_var"],
-                font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
-                selectcolor=self.colors.input_bg
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+                selectcolor=self.colors.input_bg,
             )
         self.group_widgets["enabled_checkbox"].pack(anchor="w")
 
         # Items (one per line)
-        row = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
+        row = (
+            ctk.CTkFrame(right_panel, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(right_panel, bg=self.colors.bg)
+        )
         row.pack(fill="both", expand=True, pady=8)
 
         if self.use_ctk:
-            ctk.CTkLabel(row, text="Items (one action name per line):", font=get_ctk_font(13),
-                        **get_ctk_label_colors(self.colors)).pack(anchor="w")
+            ctk.CTkLabel(
+                row,
+                text="Items (one action name per line):",
+                font=get_ctk_font(13),
+                **get_ctk_label_colors(self.colors),
+            ).pack(anchor="w")
             self.group_widgets["items"] = ctk.CTkTextbox(
-                row, font=get_ctk_font(12),
-                **get_ctk_textbox_colors(self.colors)
+                row, font=get_ctk_font(12), **get_ctk_textbox_colors(self.colors)
             )
         else:
-            tk.Label(row, text="Items (one action name per line):", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w")
+            tk.Label(
+                row,
+                text="Items (one action name per line):",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(anchor="w")
             self.group_widgets["items"] = tk.Text(
-                row, font=("Segoe UI", 10),
-                bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
+                row, font=("Segoe UI", 10), bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
             )
         self.group_widgets["items"].pack(fill="both", expand=True, pady=(2, 0))
 
@@ -224,10 +276,7 @@ class GroupsTabMixin:
             tool_data = self.options_data.setdefault(self.current_tool, {})
             settings = tool_data.setdefault("_settings", {})
             groups = settings.setdefault("popup_groups", [])
-            groups.append({
-                "name": name,
-                "items": []
-            })
+            groups.append({"name": name, "items": []})
             idx = len(groups) - 1
             self.group_listbox.add_item(str(idx), name, None)
 
@@ -252,6 +301,7 @@ class GroupsTabMixin:
 
                 # Check if it was a default group
                 from ...prompts import PromptsConfig
+
                 defaults = PromptsConfig.get_instance()._get_defaults()
                 tool_defaults = defaults.get(self.current_tool, {}).get("_settings", {}).get("popup_groups", [])
 
@@ -278,10 +328,10 @@ class GroupsTabMixin:
         groups = settings.get("popup_groups", [])
 
         if 0 < index < len(groups):
-            groups[index], groups[index-1] = groups[index-1], groups[index]
+            groups[index], groups[index - 1] = groups[index - 1], groups[index]
 
             self._refresh_group_list()
-            self.group_listbox.select(str(index-1))
+            self.group_listbox.select(str(index - 1))
 
     def _move_group_down(self):
         """Move selected group down."""
@@ -298,10 +348,10 @@ class GroupsTabMixin:
         groups = settings.get("popup_groups", [])
 
         if 0 <= index < len(groups) - 1:
-            groups[index], groups[index+1] = groups[index+1], groups[index]
+            groups[index], groups[index + 1] = groups[index + 1], groups[index]
 
             self._refresh_group_list()
-            self.group_listbox.select(str(index+1))
+            self.group_listbox.select(str(index + 1))
 
     def _save_current_group(self):
         """Save the currently edited group."""
@@ -328,14 +378,11 @@ class GroupsTabMixin:
             old_name = old_group.get("name")
             new_name = self.group_widgets["name_var"].get()
 
-            groups[index] = {
-                "name": new_name,
-                "enabled": self.group_widgets["enabled_var"].get(),
-                "items": items
-            }
+            groups[index] = {"name": new_name, "enabled": self.group_widgets["enabled_var"].get(), "items": items}
 
             # Check for deleted default items and name tracking
             from ...prompts import PromptsConfig
+
             defaults = PromptsConfig.get_instance()._get_defaults()
             tool_defaults = defaults.get(self.current_tool, {}).get("_settings", {}).get("popup_groups", [])
 

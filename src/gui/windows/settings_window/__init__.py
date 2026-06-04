@@ -28,8 +28,8 @@ from .core import (
 )
 
 __all__ = [
-    'AttachedSettingsWindow',
-    'SettingsWindow',
-    'create_attached_settings_window',
-    'show_settings_window',
+    "AttachedSettingsWindow",
+    "SettingsWindow",
+    "create_attached_settings_window",
+    "show_settings_window",
 ]

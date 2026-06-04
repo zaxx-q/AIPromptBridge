@@ -28,6 +28,7 @@ if sys.platform == "win32":
     try:
         import ctypes
         from ctypes import wintypes
+
         HAVE_WIN32 = True
     except ImportError:
         HAVE_WIN32 = False
@@ -58,6 +59,7 @@ from .utils import hide_from_taskbar
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
 try:
     from .emoji_renderer import HAVE_PIL, get_emoji_renderer
+
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
@@ -67,7 +69,7 @@ except ImportError:
 def get_colors() -> ThemeColors:
     """
     Get the current theme colors.
-    
+
     Returns ThemeColors dataclass based on current config and system theme.
     This function provides the same interface as before but now uses
     the centralized theme registry.
@@ -82,10 +84,10 @@ TRANSPARENCY_COLOR = "#010101"  # Near-black that won't appear in themes
 def setup_transparent_popup(window, colors: ThemeColors):
     """
     Set up a popup window with transparency for rounded corners.
-    
+
     On Windows, uses -transparentcolor attribute for the corners.
     Sets the root background to the transparency color.
-    
+
     Args:
         window: The Tk/CTk window
         colors: Theme colors for reference
@@ -93,7 +95,7 @@ def setup_transparent_popup(window, colors: ThemeColors):
     if sys.platform == "win32":
         try:
             # Set the transparency color - this color will be see-through
-            window.attributes('-transparentcolor', TRANSPARENCY_COLOR)
+            window.attributes("-transparentcolor", TRANSPARENCY_COLOR)
             # Configure root bg to transparency color (corners will be transparent)
             if HAVE_CTK:
                 window.configure(fg_color=TRANSPARENCY_COLOR)
@@ -117,6 +119,7 @@ def setup_transparent_popup(window, colors: ThemeColors):
 # Custom UI Components (CustomTkinter-based)
 # =============================================================================
 
+
 class SegmentedToggle:
     """
     A segmented control for selecting between options.
@@ -130,7 +133,7 @@ class SegmentedToggle:
         options: List[Tuple[str, str]],  # [(display_text, value), ...]
         default_value: str = None,
         on_change: Optional[Callable[[str], None]] = None,
-        tooltips: Optional[Dict[str, str]] = None
+        tooltips: Optional[Dict[str, str]] = None,
     ):
         self.parent = parent
         self.options = options
@@ -165,7 +168,7 @@ class SegmentedToggle:
                 unselected_color=self.colors.surface0,
                 unselected_hover_color=self.colors.surface1,
                 text_color=self.colors.fg,
-                text_color_disabled=self.colors.overlay0
+                text_color_disabled=self.colors.overlay0,
             )
 
             # Set initial value
@@ -174,10 +177,7 @@ class SegmentedToggle:
         else:
             # Fallback to tk.Frame with labels
             self.frame = tk.Frame(
-                self.parent,
-                bg=self.colors.surface0,
-                highlightbackground=self.colors.surface2,
-                highlightthickness=1
+                self.parent, bg=self.colors.surface0, highlightbackground=self.colors.surface2, highlightthickness=1
             )
 
             for i, (display_text, value) in enumerate(self.options):
@@ -191,12 +191,12 @@ class SegmentedToggle:
                     fg=self.colors.accent_fg if is_selected else self.colors.text,
                     padx=12,
                     pady=4,
-                    cursor="hand2"
+                    cursor="hand2",
                 )
                 segment.pack(side=tk.LEFT)
-                segment.bind('<Button-1>', lambda e, v=value: self._on_click(v))
-                segment.bind('<Enter>', lambda e, seg=segment, v=value: self._on_hover(seg, v, True))
-                segment.bind('<Leave>', lambda e, seg=segment, v=value: self._on_hover(seg, v, False))
+                segment.bind("<Button-1>", lambda e, v=value: self._on_click(v))
+                segment.bind("<Enter>", lambda e, seg=segment, v=value: self._on_hover(seg, v, True))
+                segment.bind("<Leave>", lambda e, seg=segment, v=value: self._on_hover(seg, v, False))
 
                 self.segments.append(segment)
 
@@ -208,7 +208,7 @@ class SegmentedToggle:
         if not self.tooltips_map:
             return
 
-        if HAVE_CTK and hasattr(self.frame, '_buttons_dict'):
+        if HAVE_CTK and hasattr(self.frame, "_buttons_dict"):
             # CTkSegmentedButton stores internal buttons in _buttons_dict
             for display_text, btn in self.frame._buttons_dict.items():
                 tip_text = self.tooltips_map.get(display_text, "")
@@ -253,7 +253,7 @@ class SegmentedToggle:
             is_selected = value == self.current_value
             segment.config(
                 bg=self.colors.blue if is_selected else self.colors.surface0,
-                fg=self.colors.accent_fg if is_selected else self.colors.text
+                fg=self.colors.accent_fg if is_selected else self.colors.text,
             )
 
     def get(self) -> str:
@@ -281,9 +281,9 @@ class Tooltip:
         self.after_id: Optional[str] = None
         self.colors = get_colors()
 
-        self.widget.bind('<Enter>', self._on_enter, add='+')
-        self.widget.bind('<Leave>', self._on_leave, add='+')
-        self.widget.bind('<Button-1>', self._on_leave, add='+')
+        self.widget.bind("<Enter>", self._on_enter, add="+")
+        self.widget.bind("<Leave>", self._on_leave, add="+")
+        self.widget.bind("<Button-1>", self._on_leave, add="+")
 
     def _on_enter(self, event):
         """Schedule tooltip display."""
@@ -315,12 +315,12 @@ class Tooltip:
         root = self.widget.winfo_toplevel()
         self.tooltip_window = tk.Toplevel(root)
         self.tooltip_window.wm_overrideredirect(True)
-        self.tooltip_window.wm_attributes('-topmost', True)
+        self.tooltip_window.wm_attributes("-topmost", True)
 
         # Apply transparency for rounded corners on Windows
         if sys.platform == "win32":
             try:
-                self.tooltip_window.attributes('-transparentcolor', TRANSPARENCY_COLOR)
+                self.tooltip_window.attributes("-transparentcolor", TRANSPARENCY_COLOR)
                 self.tooltip_window.configure(bg=TRANSPARENCY_COLOR)
             except tk.TclError:
                 pass
@@ -331,7 +331,7 @@ class Tooltip:
                 fg_color=self.colors.surface0,
                 border_color=self.colors.surface2,
                 border_width=1,
-                corner_radius=6
+                corner_radius=6,
             )
             frame.pack()
 
@@ -341,7 +341,7 @@ class Tooltip:
                 font=get_ctk_font(size=11),
                 text_color=self.colors.text,
                 wraplength=300,
-                justify="left"
+                justify="left",
             )
             label.pack(padx=10, pady=6)
         else:
@@ -349,7 +349,7 @@ class Tooltip:
                 self.tooltip_window,
                 bg=self.colors.surface0,
                 highlightbackground=self.colors.surface2,
-                highlightthickness=1
+                highlightthickness=1,
             )
             frame.pack()
 
@@ -362,7 +362,7 @@ class Tooltip:
                 padx=8,
                 pady=4,
                 wraplength=300,
-                justify=tk.LEFT
+                justify=tk.LEFT,
             )
             label.pack()
 
@@ -386,7 +386,7 @@ class ModifierBar:
         parent,
         modifiers: List[Dict],
         on_change: Optional[Callable[[List[str]], None]] = None,
-        default_active: Optional[List[str]] = None
+        default_active: Optional[List[str]] = None,
     ):
         self.parent = parent
         self.modifiers = modifiers
@@ -411,17 +411,14 @@ class ModifierBar:
                 corner_radius=8,
                 height=52,
                 border_color=self.colors.surface2,
-                border_width=1
+                border_width=1,
             )
             self.container.pack(fill="x", pady=(0, 8))
             self.container.pack_propagate(False)
 
             # Scrollable frame for buttons
             self.scroll_frame = ctk.CTkScrollableFrame(
-                self.container,
-                fg_color="transparent",
-                orientation="horizontal",
-                height=48
+                self.container, fg_color="transparent", orientation="horizontal", height=48
             )
             self.scroll_frame.pack(fill="both", expand=True, padx=4)
 
@@ -454,18 +451,12 @@ class ModifierBar:
                 bg=self.colors.mantle,
                 height=40,
                 highlightbackground=self.colors.surface2,
-                highlightthickness=1
+                highlightthickness=1,
             )
             self.container.pack(fill=tk.X, pady=(0, 8))
             self.container.pack_propagate(False)
 
-            self.canvas = tk.Canvas(
-                self.container,
-                bg=self.colors.mantle,
-                height=38,
-                highlightthickness=0,
-                bd=0
-            )
+            self.canvas = tk.Canvas(self.container, bg=self.colors.mantle, height=38, highlightthickness=0, bd=0)
             self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
             self.inner_frame = tk.Frame(self.canvas, bg=self.colors.mantle)
@@ -474,16 +465,16 @@ class ModifierBar:
             for mod in self.modifiers:
                 self._create_modifier_button_tk(mod)
 
-            self.inner_frame.bind('<Configure>', self._on_inner_configure)
-            self.canvas.bind('<Configure>', self._on_canvas_configure)
+            self.inner_frame.bind("<Configure>", self._on_inner_configure)
+            self.canvas.bind("<Configure>", self._on_canvas_configure)
 
             # Bind mousewheel to all components
-            self.canvas.bind('<MouseWheel>', self._on_mousewheel)
-            self.canvas.bind('<Button-4>', self._on_mousewheel)
-            self.canvas.bind('<Button-5>', self._on_mousewheel)
-            self.inner_frame.bind('<MouseWheel>', self._on_mousewheel)
-            self.inner_frame.bind('<Button-4>', self._on_mousewheel)
-            self.inner_frame.bind('<Button-5>', self._on_mousewheel)
+            self.canvas.bind("<MouseWheel>", self._on_mousewheel)
+            self.canvas.bind("<Button-4>", self._on_mousewheel)
+            self.canvas.bind("<Button-5>", self._on_mousewheel)
+            self.inner_frame.bind("<MouseWheel>", self._on_mousewheel)
+            self.inner_frame.bind("<Button-4>", self._on_mousewheel)
+            self.inner_frame.bind("<Button-5>", self._on_mousewheel)
 
         # Apply default-active button states and notify parent
         if self.active_modifiers:
@@ -496,11 +487,11 @@ class ModifierBar:
         if not hasattr(self.scroll_frame, "_parent_canvas"):
             return
 
-        if event.num == 4: # Linux scroll up/left
+        if event.num == 4:  # Linux scroll up/left
             delta = -1
-        elif event.num == 5: # Linux scroll down/right
+        elif event.num == 5:  # Linux scroll down/right
             delta = 1
-        else: # Windows/Mac
+        else:  # Windows/Mac
             # Depending on platform, delta might be 120 (windows) or smaller (mac)
             # Normalizing to direction roughly
             delta = -1 if event.delta > 0 else 1
@@ -525,14 +516,10 @@ class ModifierBar:
             width=80,
             height=32,
             font_size=10,
-            command=lambda k=key: self._toggle_modifier(k)
+            command=lambda k=key: self._toggle_modifier(k),
         )
         # Use surface1 for better contrast against surface0 containers
-        btn.configure(
-            fg_color=self.colors.surface1,
-            hover_color=self.colors.surface2,
-            text_color=self.colors.text
-        )
+        btn.configure(fg_color=self.colors.surface1, hover_color=self.colors.surface2, text_color=self.colors.text)
         btn.pack(side="left", padx=3, pady=2)
 
         # Bind scrolling to button
@@ -561,18 +548,18 @@ class ModifierBar:
             fg=self.colors.text,
             padx=10,
             pady=8,
-            cursor="hand2"
+            cursor="hand2",
         )
         btn.pack(side=tk.LEFT, padx=2, pady=4)
 
-        btn.bind('<Button-1>', lambda e, k=key: self._toggle_modifier(k))
-        btn.bind('<Enter>', lambda e, b=btn, k=key: self._on_hover_tk(b, k, True))
-        btn.bind('<Leave>', lambda e, b=btn, k=key: self._on_hover_tk(b, k, False))
+        btn.bind("<Button-1>", lambda e, k=key: self._toggle_modifier(k))
+        btn.bind("<Enter>", lambda e, b=btn, k=key: self._on_hover_tk(b, k, True))
+        btn.bind("<Leave>", lambda e, b=btn, k=key: self._on_hover_tk(b, k, False))
 
         # Enable scrolling while hovering over buttons
-        btn.bind('<MouseWheel>', self._on_mousewheel)
-        btn.bind('<Button-4>', self._on_mousewheel)
-        btn.bind('<Button-5>', self._on_mousewheel)
+        btn.bind("<MouseWheel>", self._on_mousewheel)
+        btn.bind("<Button-4>", self._on_mousewheel)
+        btn.bind("<Button-5>", self._on_mousewheel)
 
         self.buttons[key] = btn
 
@@ -600,12 +587,12 @@ class ModifierBar:
             if HAVE_CTK:
                 btn.configure(
                     fg_color=self.colors.blue if is_active else self.colors.surface0,
-                    text_color=self.colors.accent_fg if is_active else self.colors.text
+                    text_color=self.colors.accent_fg if is_active else self.colors.text,
                 )
             else:
                 btn.config(
                     bg=self.colors.blue if is_active else self.colors.surface0,
-                    fg=self.colors.accent_fg if is_active else self.colors.text
+                    fg=self.colors.accent_fg if is_active else self.colors.text,
                 )
 
     def _on_hover_tk(self, btn, key: str, entering: bool):
@@ -659,7 +646,7 @@ class GroupedButtonList:
         parent,
         groups: List[Dict],
         on_click: Callable[[str], None],
-        on_group_changed: Optional[Callable[[], None]] = None
+        on_group_changed: Optional[Callable[[], None]] = None,
     ):
         self.parent = parent
         self.groups = groups
@@ -697,7 +684,7 @@ class GroupedButtonList:
                     fg_color="transparent",
                     hover_color=self.colors.surface1,
                     text_color=self.colors.overlay0,
-                    command=self._prev_group
+                    command=self._prev_group,
                 )
                 self.left_arrow.pack(side="left", fill="y", padx=(0, 4))
 
@@ -714,7 +701,7 @@ class GroupedButtonList:
                     fg_color="transparent",
                     hover_color=self.colors.surface1,
                     text_color=self.colors.overlay0,
-                    command=self._next_group
+                    command=self._next_group,
                 )
                 self.right_arrow.pack(side="right", fill="y", padx=(4, 0))
 
@@ -729,10 +716,10 @@ class GroupedButtonList:
                         text="●" if i == 0 else "○",
                         font=get_ctk_font(size=10),
                         text_color=self.colors.blue if i == 0 else self.colors.overlay0,
-                        cursor="hand2"
+                        cursor="hand2",
                     )
                     dot.pack(side="left", padx=2)
-                    dot.bind('<Button-1>', lambda e, idx=i: self._go_to_group(idx))
+                    dot.bind("<Button-1>", lambda e, idx=i: self._go_to_group(idx))
                     self.dot_labels.append(dot)
         else:
             # Fallback to tk
@@ -742,24 +729,32 @@ class GroupedButtonList:
 
             if self.total_groups > 1:
                 self.left_arrow = tk.Label(
-                    self.content_frame, text="◀", font=("Arial", 12),
-                    bg=self.colors.base, fg=self.colors.overlay0,
-                    padx=8, cursor="hand2"
+                    self.content_frame,
+                    text="◀",
+                    font=("Arial", 12),
+                    bg=self.colors.base,
+                    fg=self.colors.overlay0,
+                    padx=8,
+                    cursor="hand2",
                 )
                 self.left_arrow.pack(side=tk.LEFT, fill=tk.Y)
-                self.left_arrow.bind('<Button-1>', lambda e: self._prev_group())
+                self.left_arrow.bind("<Button-1>", lambda e: self._prev_group())
 
             self.buttons_container = tk.Frame(self.content_frame, bg=self.colors.base)
             self.buttons_container.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
             if self.total_groups > 1:
                 self.right_arrow = tk.Label(
-                    self.content_frame, text="▶", font=("Arial", 12),
-                    bg=self.colors.base, fg=self.colors.overlay0,
-                    padx=8, cursor="hand2"
+                    self.content_frame,
+                    text="▶",
+                    font=("Arial", 12),
+                    bg=self.colors.base,
+                    fg=self.colors.overlay0,
+                    padx=8,
+                    cursor="hand2",
                 )
                 self.right_arrow.pack(side=tk.RIGHT, fill=tk.Y)
-                self.right_arrow.bind('<Button-1>', lambda e: self._next_group())
+                self.right_arrow.bind("<Button-1>", lambda e: self._next_group())
 
             # Dots (only if multiple groups)
             if self.total_groups > 1:
@@ -774,10 +769,10 @@ class GroupedButtonList:
                         bg=self.colors.base,
                         fg=self.colors.blue if i == 0 else self.colors.overlay0,
                         padx=2,
-                        cursor="hand2"
+                        cursor="hand2",
                     )
                     dot.pack(side=tk.LEFT)
-                    dot.bind('<Button-1>', lambda e, idx=i: self._go_to_group(idx))
+                    dot.bind("<Button-1>", lambda e, idx=i: self._go_to_group(idx))
                     self.dot_labels.append(dot)
 
         self._render_group()
@@ -803,7 +798,7 @@ class GroupedButtonList:
                     self.buttons_container,
                     text=f"── {group_name} ──",
                     font=get_ctk_font(size=10, weight="bold"),
-                    text_color=self.colors.overlay0
+                    text_color=self.colors.overlay0,
                 )
                 header.pack(pady=(0, 6))
 
@@ -823,13 +818,11 @@ class GroupedButtonList:
                     height=38,
                     font_size=11,
                     anchor="w",
-                    command=lambda k=key: self.on_click(k)
+                    command=lambda k=key: self.on_click(k),
                 )
                 # Override colors
                 btn.configure(
-                    fg_color=self.colors.surface1,
-                    hover_color=self.colors.surface2,
-                    text_color=self.colors.text
+                    fg_color=self.colors.surface1, hover_color=self.colors.surface2, text_color=self.colors.text
                 )
                 btn.pack(fill="x", pady=1)
 
@@ -844,7 +837,7 @@ class GroupedButtonList:
                     text=f"── {group_name} ──",
                     font=("Arial", 9, "bold"),
                     bg=self.colors.base,
-                    fg=self.colors.overlay0
+                    fg=self.colors.overlay0,
                 )
                 header.pack(pady=(0, 4))
 
@@ -860,19 +853,23 @@ class GroupedButtonList:
                 icon_lbl = tk.Label(row, text=icon, bg=self.colors.surface1, fg=self.colors.text, width=3, pady=8)
                 icon_lbl.pack(side=tk.LEFT, padx=(8, 0))
 
-                text_lbl = tk.Label(row, text=display_text, bg=self.colors.surface1, fg=self.colors.text, anchor=tk.W, pady=8)
+                text_lbl = tk.Label(
+                    row, text=display_text, bg=self.colors.surface1, fg=self.colors.text, anchor=tk.W, pady=8
+                )
                 text_lbl.pack(side=tk.LEFT, padx=(4, 8), fill=tk.X, expand=True)
 
                 def on_enter(e, widgets=[row, icon_lbl, text_lbl]):
-                    for w in widgets: w.configure(bg=self.colors.surface2)
+                    for w in widgets:
+                        w.configure(bg=self.colors.surface2)
 
                 def on_leave(e, widgets=[row, icon_lbl, text_lbl]):
-                    for w in widgets: w.configure(bg=self.colors.surface1)
+                    for w in widgets:
+                        w.configure(bg=self.colors.surface1)
 
                 for widget in (row, icon_lbl, text_lbl):
-                    widget.bind('<Button-1>', lambda e, k=key: self.on_click(k))
-                    widget.bind('<Enter>', on_enter)
-                    widget.bind('<Leave>', on_leave)
+                    widget.bind("<Button-1>", lambda e, k=key: self.on_click(k))
+                    widget.bind("<Enter>", on_enter)
+                    widget.bind("<Leave>", on_leave)
 
                 if tooltip_text:
                     tooltip = Tooltip(text_lbl, tooltip_text)
@@ -886,12 +883,12 @@ class GroupedButtonList:
             if HAVE_CTK:
                 dot.configure(
                     text="●" if i == self.current_group_idx else "○",
-                    text_color=self.colors.blue if i == self.current_group_idx else self.colors.overlay0
+                    text_color=self.colors.blue if i == self.current_group_idx else self.colors.overlay0,
                 )
             else:
                 dot.config(
                     text="●" if i == self.current_group_idx else "○",
-                    fg=self.colors.blue if i == self.current_group_idx else self.colors.overlay0
+                    fg=self.colors.blue if i == self.current_group_idx else self.colors.overlay0,
                 )
 
     def _next_group(self):
@@ -934,7 +931,7 @@ class CarouselButtonList:
         parent,
         items: List[Tuple[str, str, Optional[str], Optional[str]]],
         on_click: Callable[[str], None],
-        items_per_page: int = None
+        items_per_page: int = None,
     ):
         self.parent = parent
         self.items = items
@@ -971,7 +968,7 @@ class CarouselButtonList:
                     fg_color="transparent",
                     hover_color=self.colors.surface1,
                     text_color=self.colors.overlay0,
-                    command=self._prev_page
+                    command=self._prev_page,
                 )
                 self.left_arrow.pack(side="left", fill="y", padx=(0, 2))  # Reduced padding
 
@@ -988,7 +985,7 @@ class CarouselButtonList:
                     fg_color="transparent",
                     hover_color=self.colors.surface1,
                     text_color=self.colors.overlay0,
-                    command=self._next_page
+                    command=self._next_page,
                 )
                 self.right_arrow.pack(side="right", fill="y", padx=(2, 0))  # Reduced padding
 
@@ -1003,10 +1000,10 @@ class CarouselButtonList:
                         text="●" if i == 0 else "○",
                         font=get_ctk_font(size=10),
                         text_color=self.colors.blue if i == 0 else self.colors.overlay0,
-                        cursor="hand2"
+                        cursor="hand2",
                     )
                     dot.pack(side="left", padx=2)
-                    dot.bind('<Button-1>', lambda e, page=i: self._go_to_page(page))
+                    dot.bind("<Button-1>", lambda e, page=i: self._go_to_page(page))
                     self.dot_labels.append(dot)
         else:
             # Fallback
@@ -1016,22 +1013,32 @@ class CarouselButtonList:
 
             if self.total_pages > 1:
                 self.left_arrow = tk.Label(
-                    self.content_frame, text="◀", font=("Arial", 12),
-                    bg=self.colors.base, fg=self.colors.overlay0, padx=8, cursor="hand2"
+                    self.content_frame,
+                    text="◀",
+                    font=("Arial", 12),
+                    bg=self.colors.base,
+                    fg=self.colors.overlay0,
+                    padx=8,
+                    cursor="hand2",
                 )
                 self.left_arrow.pack(side=tk.LEFT, fill=tk.Y)
-                self.left_arrow.bind('<Button-1>', lambda e: self._prev_page())
+                self.left_arrow.bind("<Button-1>", lambda e: self._prev_page())
 
             self.buttons_frame = tk.Frame(self.content_frame, bg=self.colors.base)
             self.buttons_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
             if self.total_pages > 1:
                 self.right_arrow = tk.Label(
-                    self.content_frame, text="▶", font=("Arial", 12),
-                    bg=self.colors.base, fg=self.colors.overlay0, padx=8, cursor="hand2"
+                    self.content_frame,
+                    text="▶",
+                    font=("Arial", 12),
+                    bg=self.colors.base,
+                    fg=self.colors.overlay0,
+                    padx=8,
+                    cursor="hand2",
                 )
                 self.right_arrow.pack(side=tk.RIGHT, fill=tk.Y)
-                self.right_arrow.bind('<Button-1>', lambda e: self._next_page())
+                self.right_arrow.bind("<Button-1>", lambda e: self._next_page())
 
             if self.total_pages > 1:
                 self.nav_frame = tk.Frame(self.frame, bg=self.colors.base)
@@ -1039,12 +1046,16 @@ class CarouselButtonList:
 
                 for i in range(self.total_pages):
                     dot = tk.Label(
-                        self.nav_frame, text="●" if i == 0 else "○", font=("Arial", 8),
-                        bg=self.colors.base, fg=self.colors.blue if i == 0 else self.colors.overlay0,
-                        padx=2, cursor="hand2"
+                        self.nav_frame,
+                        text="●" if i == 0 else "○",
+                        font=("Arial", 8),
+                        bg=self.colors.base,
+                        fg=self.colors.blue if i == 0 else self.colors.overlay0,
+                        padx=2,
+                        cursor="hand2",
                     )
                     dot.pack(side=tk.LEFT)
-                    dot.bind('<Button-1>', lambda e, page=i: self._go_to_page(page))
+                    dot.bind("<Button-1>", lambda e, page=i: self._go_to_page(page))
                     self.dot_labels.append(dot)
 
         self._render_page()
@@ -1075,13 +1086,11 @@ class CarouselButtonList:
                     height=38,
                     font_size=11,
                     anchor="w",
-                    command=lambda k=key: self.on_click(k)
+                    command=lambda k=key: self.on_click(k),
                 )
                 # Override colors
                 btn.configure(
-                    fg_color=self.colors.surface1,
-                    hover_color=self.colors.surface2,
-                    text_color=self.colors.text
+                    fg_color=self.colors.surface1, hover_color=self.colors.surface2, text_color=self.colors.text
                 )
                 btn.pack(fill="x", pady=1)
 
@@ -1095,19 +1104,23 @@ class CarouselButtonList:
                 icon_lbl = tk.Label(row, text=icon, bg=self.colors.surface1, fg=self.colors.text, width=3, pady=10)
                 icon_lbl.pack(side=tk.LEFT, padx=(8, 0))
 
-                text_lbl = tk.Label(row, text=display_text, bg=self.colors.surface1, fg=self.colors.text, anchor=tk.W, pady=10)
+                text_lbl = tk.Label(
+                    row, text=display_text, bg=self.colors.surface1, fg=self.colors.text, anchor=tk.W, pady=10
+                )
                 text_lbl.pack(side=tk.LEFT, padx=(4, 8))
 
                 def on_enter(e, widgets=[row, icon_lbl, text_lbl]):
-                    for w in widgets: w.configure(bg=self.colors.surface2)
+                    for w in widgets:
+                        w.configure(bg=self.colors.surface2)
 
                 def on_leave(e, widgets=[row, icon_lbl, text_lbl]):
-                    for w in widgets: w.configure(bg=self.colors.surface1)
+                    for w in widgets:
+                        w.configure(bg=self.colors.surface1)
 
                 for widget in (row, icon_lbl, text_lbl):
-                    widget.bind('<Button-1>', lambda e, k=key: self.on_click(k))
-                    widget.bind('<Enter>', on_enter)
-                    widget.bind('<Leave>', on_leave)
+                    widget.bind("<Button-1>", lambda e, k=key: self.on_click(k))
+                    widget.bind("<Enter>", on_enter)
+                    widget.bind("<Leave>", on_leave)
 
                 if tooltip_text:
                     tooltip = Tooltip(text_lbl, tooltip_text)
@@ -1121,12 +1134,12 @@ class CarouselButtonList:
             if HAVE_CTK:
                 dot.configure(
                     text="●" if i == self.current_page else "○",
-                    text_color=self.colors.blue if i == self.current_page else self.colors.overlay0
+                    text_color=self.colors.blue if i == self.current_page else self.colors.overlay0,
                 )
             else:
                 dot.config(
                     text="●" if i == self.current_page else "○",
-                    fg=self.colors.blue if i == self.current_page else self.colors.overlay0
+                    fg=self.colors.blue if i == self.current_page else self.colors.overlay0,
                 )
 
     def _next_page(self):
@@ -1150,13 +1163,15 @@ class CarouselButtonList:
 # Profile Dropdown Helpers
 # =============================================================================
 
+
 def create_profile_dropdown_ctk(parent, colors):
     """
     Create a connection profile override dropdown (CTk version).
-    
+
     Returns (profile_var, dropdown_widget, frame). Caller must pack the frame.
     """
     from ..connection_profiles import ProfileStore
+
     profile_names = ProfileStore.get_instance().get_profile_names()
 
     frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -1175,7 +1190,7 @@ def create_profile_dropdown_ctk(parent, colors):
         dropdown_fg_color=colors.surface0,
         dropdown_hover_color=colors.surface1,
         text_color=colors.text,
-        font=get_ctk_font(size=11)
+        font=get_ctk_font(size=11),
     )
     dropdown.pack(side="left", fill="x", expand=True)
     Tooltip(dropdown, "Override connection profile for this request")
@@ -1186,21 +1201,17 @@ def create_profile_dropdown_ctk(parent, colors):
 def create_profile_dropdown_tk(parent, root, colors):
     """
     Create a connection profile override dropdown (Tk fallback).
-    
+
     Returns (profile_var, dropdown_widget, frame). Caller must pack the frame.
     """
     from ..connection_profiles import ProfileStore
+
     profile_names = ProfileStore.get_instance().get_profile_names()
 
     frame = tk.Frame(parent, bg=colors.base)
 
     profile_var = tk.StringVar(master=root, value="(Default)")
-    dropdown = tk.OptionMenu(
-        frame,
-        profile_var,
-        "(Default)",
-        *profile_names
-    )
+    dropdown = tk.OptionMenu(frame, profile_var, "(Default)", *profile_names)
     dropdown.config(
         bg=colors.surface0,
         fg=colors.text,
@@ -1208,7 +1219,7 @@ def create_profile_dropdown_tk(parent, root, colors):
         highlightthickness=0,
         relief=tk.FLAT,
         activebackground=colors.surface1,
-        activeforeground=colors.text
+        activeforeground=colors.text,
     )
     dropdown.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
@@ -1230,6 +1241,7 @@ def get_profile_override_value(profile_var):
 # =============================================================================
 # Base Popup Class
 # =============================================================================
+
 
 class BasePopup:
     """Base class for popup windows"""
@@ -1268,11 +1280,7 @@ class InputPopup(BasePopup):
     Uses CTk for modern look when available.
     """
 
-    def __init__(
-        self,
-        on_submit: Callable[[str, str], None],
-        on_close: Optional[Callable[[], None]] = None
-    ):
+    def __init__(self, on_submit: Callable[[str, str], None], on_close: Optional[Callable[[], None]] = None):
         super().__init__()
         self.on_submit = on_submit
         self.on_close_callback = on_close
@@ -1290,7 +1298,7 @@ class InputPopup(BasePopup):
         self.root.withdraw()
         self.root.title("AI Chat")
         self.root.overrideredirect(True)
-        self.root.attributes('-topmost', True)
+        self.root.attributes("-topmost", True)
 
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
@@ -1304,7 +1312,7 @@ class InputPopup(BasePopup):
                 corner_radius=10,
                 fg_color=self.colors.base,
                 border_color=self.colors.surface2,
-                border_width=1
+                border_width=1,
             )
             main_frame.pack(fill="both", expand=True, padx=1, pady=1)
 
@@ -1325,7 +1333,7 @@ class InputPopup(BasePopup):
                 hover_color=self.colors.red,
                 text_color=self.colors.overlay0,
                 font=get_ctk_font(size=14, weight="bold"),
-                command=self._close
+                command=self._close,
             )
             close_btn.pack(side="right")
 
@@ -1341,8 +1349,8 @@ class InputPopup(BasePopup):
                     "Default": "Use the action's configured response mode",
                     "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
-                    "Show": "Show the response in a chat window"
-                }
+                    "Show": "Show the response in a chat window",
+                },
             )
             self.response_toggle.pack(anchor="center")
 
@@ -1360,10 +1368,10 @@ class InputPopup(BasePopup):
                 border_color=self.colors.surface2,
                 text_color=self.colors.text,
                 placeholder_text_color=self.colors.overlay0,
-                width=280
+                width=280,
             )
             self.input_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            self.input_entry.bind('<Return>', lambda e: self._submit())
+            self.input_entry.bind("<Return>", lambda e: self._submit())
 
             send_btn = ctk.CTkButton(
                 input_frame,
@@ -1375,13 +1383,15 @@ class InputPopup(BasePopup):
                 hover_color=self.colors.lavender,
                 text_color=self.colors.accent_fg,
                 font=get_ctk_font(size=14),
-                command=self._submit
+                command=self._submit,
             )
             send_btn.pack(side="right")
         else:
             # Fallback to tk
             self.root.configure(bg=self.bg_color)
-            main_frame = tk.Frame(self.root, bg=self.bg_color, highlightbackground=self.border_color, highlightthickness=1)
+            main_frame = tk.Frame(
+                self.root, bg=self.bg_color, highlightbackground=self.border_color, highlightthickness=1
+            )
             main_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
 
             content_frame = tk.Frame(main_frame, bg=self.bg_color)
@@ -1400,7 +1410,7 @@ class InputPopup(BasePopup):
                 activebackground=self.button_hover,
                 relief=tk.FLAT,
                 bd=0,
-                command=self._close
+                command=self._close,
             )
             close_btn.pack(side=tk.RIGHT)
 
@@ -1416,8 +1426,8 @@ class InputPopup(BasePopup):
                     "Default": "Use the action's configured response mode",
                     "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
-                    "Show": "Show the response in a chat window"
-                }
+                    "Show": "Show the response in a chat window",
+                },
             )
             self.response_toggle.pack(anchor=tk.CENTER)
 
@@ -1438,11 +1448,11 @@ class InputPopup(BasePopup):
                 relief=tk.FLAT,
                 highlightbackground=self.border_color,
                 highlightthickness=1,
-                width=40
+                width=40,
             )
             self.input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5), ipady=8)
             self.input_entry.insert(0, placeholder)
-            self.input_entry.config(fg='gray')
+            self.input_entry.config(fg="gray")
 
             def on_focus_in(event):
                 if self.input_entry.get() == placeholder:
@@ -1452,11 +1462,11 @@ class InputPopup(BasePopup):
             def on_focus_out(event):
                 if not self.input_entry.get():
                     self.input_entry.insert(0, placeholder)
-                    self.input_entry.config(fg='gray')
+                    self.input_entry.config(fg="gray")
 
-            self.input_entry.bind('<FocusIn>', on_focus_in)
-            self.input_entry.bind('<FocusOut>', on_focus_out)
-            self.input_entry.bind('<Return>', lambda e: self._submit())
+            self.input_entry.bind("<FocusIn>", on_focus_in)
+            self.input_entry.bind("<FocusOut>", on_focus_out)
+            self.input_entry.bind("<Return>", lambda e: self._submit())
 
             # Send button
             send_btn = tk.Button(
@@ -1470,7 +1480,7 @@ class InputPopup(BasePopup):
                 bd=0,
                 padx=10,
                 pady=5,
-                command=self._submit
+                command=self._submit,
             )
             send_btn.pack(side=tk.RIGHT)
 
@@ -1478,7 +1488,7 @@ class InputPopup(BasePopup):
         self._position_window(x, y)
         self.root.update_idletasks()
         self.root.deiconify()
-        self.root.bind('<Escape>', lambda e: self._close())
+        self.root.bind("<Escape>", lambda e: self._close())
         self.root.lift()
         self.root.focus_force()
         self.input_entry.focus_set()
@@ -1546,7 +1556,7 @@ class PromptSelectionPopup(BasePopup):
         self,
         options: Dict,
         on_option_selected: Callable[[str, str, Optional[str]], None],
-        on_close: Optional[Callable[[], None]] = None
+        on_close: Optional[Callable[[], None]] = None,
     ):
         super().__init__()
         self.options = options
@@ -1568,7 +1578,7 @@ class PromptSelectionPopup(BasePopup):
         self.root.withdraw()
         self.root.title("Text Edit Tool")
         self.root.overrideredirect(True)
-        self.root.attributes('-topmost', True)
+        self.root.attributes("-topmost", True)
 
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
@@ -1582,7 +1592,7 @@ class PromptSelectionPopup(BasePopup):
                 corner_radius=10,
                 fg_color=self.colors.base,
                 border_color=self.colors.surface2,
-                border_width=1
+                border_width=1,
             )
             main_frame.pack(fill="both", expand=True, padx=1, pady=1)
 
@@ -1603,7 +1613,7 @@ class PromptSelectionPopup(BasePopup):
                 hover_color=self.colors.red,
                 text_color=self.colors.overlay0,
                 font=get_ctk_font(size=14, weight="bold"),
-                command=self._close
+                command=self._close,
             )
             close_btn.pack(side="right")
 
@@ -1619,8 +1629,8 @@ class PromptSelectionPopup(BasePopup):
                     "Default": "Use the action's configured response mode",
                     "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
-                    "Show": "Show the response in a chat window"
-                }
+                    "Show": "Show the response in a chat window",
+                },
             )
             self.response_toggle.pack(anchor="center")
 
@@ -1637,10 +1647,10 @@ class PromptSelectionPopup(BasePopup):
                 fg_color=self.colors.surface0,
                 border_color=self.colors.surface2,
                 text_color=self.colors.text,
-                placeholder_text_color=self.colors.overlay0
+                placeholder_text_color=self.colors.overlay0,
             )
             self.input_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            self.input_entry.bind('<Return>', lambda e: self._on_custom_submit())
+            self.input_entry.bind("<Return>", lambda e: self._on_custom_submit())
 
             send_btn = ctk.CTkButton(
                 input_frame,
@@ -1652,7 +1662,7 @@ class PromptSelectionPopup(BasePopup):
                 hover_color=self.colors.lavender,
                 text_color=self.colors.accent_fg,
                 font=get_ctk_font(size=14),
-                command=self._on_custom_submit
+                command=self._on_custom_submit,
             )
             send_btn.pack(side="right")
 
@@ -1662,10 +1672,7 @@ class PromptSelectionPopup(BasePopup):
             # Fallback to tk
             self.root.configure(bg=self.bg_color)
             main_frame = tk.Frame(
-                self.root,
-                bg=self.bg_color,
-                highlightbackground=self.border_color,
-                highlightthickness=1
+                self.root, bg=self.bg_color, highlightbackground=self.border_color, highlightthickness=1
             )
             main_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
 
@@ -1685,7 +1692,7 @@ class PromptSelectionPopup(BasePopup):
                 activebackground=self.button_hover,
                 relief=tk.FLAT,
                 bd=0,
-                command=self._close
+                command=self._close,
             )
             close_btn.pack(side=tk.RIGHT)
 
@@ -1701,8 +1708,8 @@ class PromptSelectionPopup(BasePopup):
                     "Default": "Use the action's configured response mode",
                     "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
-                    "Show": "Show the response in a chat window"
-                }
+                    "Show": "Show the response in a chat window",
+                },
             )
             self.response_toggle.pack(anchor=tk.CENTER)
 
@@ -1722,11 +1729,11 @@ class PromptSelectionPopup(BasePopup):
                 insertbackground=self.fg_color,
                 relief=tk.FLAT,
                 highlightbackground=self.border_color,
-                highlightthickness=1
+                highlightthickness=1,
             )
             self.input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5), ipady=8)
             self.input_entry.insert(0, placeholder)
-            self.input_entry.config(fg='gray')
+            self.input_entry.config(fg="gray")
 
             def on_focus_in(event):
                 if self.input_entry.get() == placeholder:
@@ -1736,11 +1743,11 @@ class PromptSelectionPopup(BasePopup):
             def on_focus_out(event):
                 if not self.input_entry.get():
                     self.input_entry.insert(0, placeholder)
-                    self.input_entry.config(fg='gray')
+                    self.input_entry.config(fg="gray")
 
-            self.input_entry.bind('<FocusIn>', on_focus_in)
-            self.input_entry.bind('<FocusOut>', on_focus_out)
-            self.input_entry.bind('<Return>', lambda e: self._on_custom_submit())
+            self.input_entry.bind("<FocusIn>", on_focus_in)
+            self.input_entry.bind("<FocusOut>", on_focus_out)
+            self.input_entry.bind("<Return>", lambda e: self._on_custom_submit())
 
             # Send button
             send_btn = tk.Button(
@@ -1754,7 +1761,7 @@ class PromptSelectionPopup(BasePopup):
                 bd=0,
                 padx=10,
                 pady=5,
-                command=self._on_custom_submit
+                command=self._on_custom_submit,
             )
             send_btn.pack(side=tk.RIGHT)
 
@@ -1765,7 +1772,7 @@ class PromptSelectionPopup(BasePopup):
         self._position_window(x, y)
         self.root.update_idletasks()
         self.root.deiconify()
-        self.root.bind('<Escape>', lambda e: self._close())
+        self.root.bind("<Escape>", lambda e: self._close())
         self.root.lift()
         self.root.focus_force()
         self.input_entry.focus_set()
@@ -1792,13 +1799,10 @@ class PromptSelectionPopup(BasePopup):
                 height=36,
                 font_size=11,
                 anchor="w",
-                command=lambda k=key: self._on_option_click(k)
+                command=lambda k=key: self._on_option_click(k),
             )
             # Override colors to match design
-            btn.configure(
-                fg_color=self.colors.surface0,
-                text_color=self.colors.text
-            )
+            btn.configure(fg_color=self.colors.surface0, text_color=self.colors.text)
             btn.pack(fill="x", pady=1)
 
     def _position_window(self, x, y):
@@ -1860,12 +1864,12 @@ class PromptSelectionPopup(BasePopup):
                 pady=8,
                 width=12,
                 anchor=tk.W,
-                command=lambda k=key: self._on_option_click(k)
+                command=lambda k=key: self._on_option_click(k),
             )
             btn.grid(row=row, column=col, padx=3, pady=3, sticky=tk.EW)
 
-            btn.bind('<Enter>', lambda e, b=btn: b.config(bg=self.button_hover))
-            btn.bind('<Leave>', lambda e, b=btn: b.config(bg=self.button_bg))
+            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=self.button_hover))
+            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=self.button_bg))
 
             col += 1
             if col > 1:
@@ -1905,6 +1909,7 @@ class PromptSelectionPopup(BasePopup):
 # Attached Popups for GUICoordinator (CTkToplevel versions)
 # =============================================================================
 
+
 class AttachedInputPopup:
     """
     Input popup as CTkToplevel attached to coordinator's root.
@@ -1920,7 +1925,7 @@ class AttachedInputPopup:
         on_close: Optional[Callable[[], None]] = None,
         x: Optional[int] = None,
         y: Optional[int] = None,
-        on_tts: Optional[Callable[[str], None]] = None
+        on_tts: Optional[Callable[[str], None]] = None,
     ):
         self.parent_root = parent_root
         self.on_submit = on_submit
@@ -1949,7 +1954,7 @@ class AttachedInputPopup:
 
         self.root.title("AI Chat")
         self.root.overrideredirect(True)
-        self.root.attributes('-topmost', True)
+        self.root.attributes("-topmost", True)
 
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
@@ -1963,7 +1968,7 @@ class AttachedInputPopup:
                 corner_radius=10,
                 fg_color=self.colors.base,
                 border_color=self.colors.surface2,
-                border_width=1
+                border_width=1,
             )
             main_frame.pack(fill="both", expand=True, padx=1, pady=1)
 
@@ -1984,7 +1989,7 @@ class AttachedInputPopup:
                 hover_color=self.colors.red,
                 text_color=self.colors.overlay0,
                 font=get_ctk_font(size=14, weight="bold"),
-                command=self._close
+                command=self._close,
             )
             close_btn.pack(side="right")
 
@@ -1999,13 +2004,9 @@ class AttachedInputPopup:
                     width=24,
                     height=24,
                     font_size=12,
-                    command=self._on_tts
+                    command=self._on_tts,
                 )
-                tts_btn.configure(
-                    corner_radius=6,
-                    fg_color="transparent",
-                    hover_color=self.colors.surface1
-                )
+                tts_btn.configure(corner_radius=6, fg_color="transparent", hover_color=self.colors.surface1)
                 tts_btn.pack(side="left", padx=(4, 0))
                 self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window")
                 self.tts_btn = tts_btn
@@ -2026,8 +2027,8 @@ class AttachedInputPopup:
                     "Default": "Use the action's configured response mode",
                     "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
-                    "Show": "Show the response in a chat window"
-                }
+                    "Show": "Show the response in a chat window",
+                },
             )
             self.response_toggle.pack(anchor="center")
 
@@ -2045,10 +2046,10 @@ class AttachedInputPopup:
                 border_color=self.colors.surface2,
                 text_color=self.colors.text,
                 placeholder_text_color=self.colors.overlay0,
-                width=280
+                width=280,
             )
             self.input_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            self.input_entry.bind('<Return>', lambda e: self._submit())
+            self.input_entry.bind("<Return>", lambda e: self._submit())
 
             send_btn = ctk.CTkButton(
                 input_frame,
@@ -2060,7 +2061,7 @@ class AttachedInputPopup:
                 hover_color=self.colors.lavender,
                 text_color=self.colors.accent_fg,
                 font=get_ctk_font(size=14),
-                command=self._submit
+                command=self._submit,
             )
             send_btn.pack(side="right")
         else:
@@ -2068,10 +2069,7 @@ class AttachedInputPopup:
             self.root.configure(bg=self.colors.base)
 
             main_frame = tk.Frame(
-                self.root,
-                bg=self.colors.base,
-                highlightbackground=self.colors.surface2,
-                highlightthickness=1
+                self.root, bg=self.colors.base, highlightbackground=self.colors.surface2, highlightthickness=1
             )
             main_frame.pack(fill=tk.BOTH, expand=True)
 
@@ -2088,32 +2086,29 @@ class AttachedInputPopup:
                 font=("Arial", 16, "bold"),
                 bg=self.colors.base,
                 fg=self.colors.overlay0,
-                cursor="hand2"
+                cursor="hand2",
             )
             close_btn.pack(side=tk.RIGHT)
-            close_btn.bind('<Button-1>', lambda e: self._close())
-            close_btn.bind('<Enter>', lambda e: close_btn.config(fg=self.colors.red))
-            close_btn.bind('<Leave>', lambda e: close_btn.config(fg=self.colors.overlay0))
+            close_btn.bind("<Button-1>", lambda e: self._close())
+            close_btn.bind("<Enter>", lambda e: close_btn.config(fg=self.colors.red))
+            close_btn.bind("<Leave>", lambda e: close_btn.config(fg=self.colors.overlay0))
 
             # TTS button in top bar (only if callback provided) - pack before profile so order is: TTS | Profile | Close
             if self.on_tts_callback:
                 tts_btn = tk.Label(
-                    top_bar,
-                    text="🔊",
-                    font=("Arial", 12),
-                    bg=self.colors.base,
-                    fg=self.colors.overlay0,
-                    cursor="hand2"
+                    top_bar, text="🔊", font=("Arial", 12), bg=self.colors.base, fg=self.colors.overlay0, cursor="hand2"
                 )
                 tts_btn.pack(side=tk.LEFT, padx=(6, 0))
-                tts_btn.bind('<Button-1>', lambda e: self._on_tts())
-                tts_btn.bind('<Enter>', lambda e: tts_btn.config(fg=self.colors.text))
-                tts_btn.bind('<Leave>', lambda e: tts_btn.config(fg=self.colors.overlay0))
+                tts_btn.bind("<Button-1>", lambda e: self._on_tts())
+                tts_btn.bind("<Enter>", lambda e: tts_btn.config(fg=self.colors.text))
+                tts_btn.bind("<Leave>", lambda e: tts_btn.config(fg=self.colors.overlay0))
                 self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window")
                 self.tts_btn = tts_btn
 
             # Connection profile dropdown in top bar
-            self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_tk(top_bar, self.root, self.colors)
+            self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_tk(
+                top_bar, self.root, self.colors
+            )
             profile_frame.pack(side=tk.LEFT, expand=True)
 
             # Response mode toggle
@@ -2128,8 +2123,8 @@ class AttachedInputPopup:
                     "Default": "Use the action's configured response mode",
                     "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
-                    "Show": "Show the response in a chat window"
-                }
+                    "Show": "Show the response in a chat window",
+                },
             )
             self.response_toggle.pack(anchor=tk.CENTER)
 
@@ -2139,10 +2134,7 @@ class AttachedInputPopup:
 
             # Input container with border
             input_container = tk.Frame(
-                input_frame,
-                bg=self.colors.surface0,
-                highlightbackground=self.colors.surface2,
-                highlightthickness=1
+                input_frame, bg=self.colors.surface0, highlightbackground=self.colors.surface2, highlightthickness=1
             )
             input_container.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
 
@@ -2157,15 +2149,15 @@ class AttachedInputPopup:
                 insertbackground=self.colors.text,
                 relief=tk.FLAT,
                 bd=0,
-                width=35
+                width=35,
             )
             self.input_entry.pack(fill=tk.X, padx=10, pady=10)
             self.input_entry.insert(0, self.PLACEHOLDER)
             self.input_entry.config(fg=self.colors.overlay0)
 
-            self.input_entry.bind('<FocusIn>', self._on_focus_in)
-            self.input_entry.bind('<FocusOut>', self._on_focus_out)
-            self.input_entry.bind('<Return>', lambda e: self._submit())
+            self.input_entry.bind("<FocusIn>", self._on_focus_in)
+            self.input_entry.bind("<FocusOut>", self._on_focus_out)
+            self.input_entry.bind("<Return>", lambda e: self._submit())
 
             # Send button
             send_btn = tk.Label(
@@ -2176,12 +2168,12 @@ class AttachedInputPopup:
                 fg=self.colors.accent_fg,
                 padx=14,
                 pady=8,
-                cursor="hand2"
+                cursor="hand2",
             )
             send_btn.pack(side=tk.RIGHT)
-            send_btn.bind('<Button-1>', lambda e: self._submit())
-            send_btn.bind('<Enter>', lambda e: send_btn.config(bg=self.colors.lavender))
-            send_btn.bind('<Leave>', lambda e: send_btn.config(bg=self.colors.blue))
+            send_btn.bind("<Button-1>", lambda e: self._submit())
+            send_btn.bind("<Enter>", lambda e: send_btn.config(bg=self.colors.lavender))
+            send_btn.bind("<Leave>", lambda e: send_btn.config(bg=self.colors.blue))
 
         # Force Tk to process all pending drawing commands before showing
         self._position_window()
@@ -2195,7 +2187,7 @@ class AttachedInputPopup:
             return
         try:
             self.root.deiconify()
-            self.root.bind('<Escape>', lambda e: self._close())
+            self.root.bind("<Escape>", lambda e: self._close())
             self.root.lift()
             self.root.focus_force()
             self.input_entry.focus_set()
@@ -2302,7 +2294,7 @@ class AttachedInputPopup:
         # is GC'd on a background thread (the Toplevel shares the parent's
         # live Tcl interpreter, so Variable.__del__ would still attempt
         # a real Tcl call).
-        for attr_name in ('input_var', 'profile_var'):
+        for attr_name in ("input_var", "profile_var"):
             var = getattr(self, attr_name, None)
             if isinstance(var, tk.Variable):
                 try:
@@ -2317,7 +2309,7 @@ class AttachedInputPopup:
         self.input_var = None
         self.profile_var = None
         self.profile_dropdown = None
-        if hasattr(self, 'tts_btn'):
+        if hasattr(self, "tts_btn"):
             self.tts_btn = None
         gc.collect()
 
@@ -2344,7 +2336,7 @@ class AttachedPromptPopup:
         x: Optional[int] = None,
         y: Optional[int] = None,
         on_tts: Optional[Callable[[str], None]] = None,
-        on_request_compare_text: Optional[Callable] = None
+        on_request_compare_text: Optional[Callable] = None,
     ):
         self.parent_root = parent_root
         self.options = options
@@ -2382,7 +2374,7 @@ class AttachedPromptPopup:
 
         self.root.title("Text Edit Tool")
         self.root.overrideredirect(True)
-        self.root.attributes('-topmost', True)
+        self.root.attributes("-topmost", True)
 
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
@@ -2396,7 +2388,7 @@ class AttachedPromptPopup:
                 corner_radius=10,
                 fg_color=self.colors.base,
                 border_color=self.colors.surface2,
-                border_width=1
+                border_width=1,
             )
             main_frame.pack(fill="both", expand=True, padx=1, pady=1)
 
@@ -2417,7 +2409,7 @@ class AttachedPromptPopup:
                 hover_color=self.colors.red,
                 text_color=self.colors.overlay0,
                 font=get_ctk_font(size=14, weight="bold"),
-                command=self._close
+                command=self._close,
             )
             close_btn.pack(side="right")
 
@@ -2432,13 +2424,9 @@ class AttachedPromptPopup:
                     width=24,
                     height=24,
                     font_size=12,
-                    command=self._on_tts
+                    command=self._on_tts,
                 )
-                tts_btn.configure(
-                    corner_radius=6,
-                    fg_color="transparent",
-                    hover_color=self.colors.surface1
-                )
+                tts_btn.configure(corner_radius=6, fg_color="transparent", hover_color=self.colors.surface1)
                 tts_btn.pack(side="left", padx=(4, 0))
                 self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window with selected text")
 
@@ -2454,17 +2442,20 @@ class AttachedPromptPopup:
                     "Default": "Use the action's configured response mode",
                     "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
-                    "Show": "Show the response in a chat window"
-                }
+                    "Show": "Show the response in a chat window",
+                },
             )
             self.response_toggle.pack(anchor="center")
 
             # Connection profile dropdown
-            self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_ctk(content_frame, self.colors)
+            self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_ctk(
+                content_frame, self.colors
+            )
             profile_frame.pack(anchor="center", pady=(0, 8))
 
             # Modifier bar - get from global settings
             from .prompts import get_prompts_config
+
             modifiers = get_prompts_config().get_modifiers()
             default_active = get_prompts_config().get_default_modifier_keys_for_tool("text_edit_tool")
             if modifiers:
@@ -2472,7 +2463,7 @@ class AttachedPromptPopup:
                     content_frame,
                     modifiers=modifiers,
                     on_change=self._on_modifiers_changed,
-                    default_active=default_active
+                    default_active=default_active,
                 )
                 self.modifier_bar.pack(fill="x")
 
@@ -2482,7 +2473,7 @@ class AttachedPromptPopup:
                 fg_color=self.colors.surface0,
                 corner_radius=8,
                 border_color=self.colors.surface2,
-                border_width=1
+                border_width=1,
             )
             edit_frame.pack(fill="x", pady=(0, 6))
 
@@ -2495,15 +2486,10 @@ class AttachedPromptPopup:
                 fg_color="transparent",
                 border_width=0,
                 text_color=self.colors.text,
-                placeholder_text_color=self.colors.overlay0
+                placeholder_text_color=self.colors.overlay0,
             )
             # Create a fixed-size container for the button to prevent scaling issues
-            edit_btn_container = ctk.CTkFrame(
-                edit_frame,
-                width=40,
-                height=40,
-                fg_color="transparent"
-            )
+            edit_btn_container = ctk.CTkFrame(edit_frame, width=40, height=40, fg_color="transparent")
             edit_btn_container.pack(side="right")
             edit_btn_container.pack_propagate(False)
 
@@ -2517,7 +2503,7 @@ class AttachedPromptPopup:
                 width=40,
                 height=40,
                 font_size=14,
-                command=self._on_custom_submit
+                command=self._on_custom_submit,
             )
             # Ensure proper styling
             edit_btn.configure(corner_radius=8)
@@ -2532,10 +2518,10 @@ class AttachedPromptPopup:
                 fg_color="transparent",
                 border_width=0,
                 text_color=self.colors.text,
-                placeholder_text_color=self.colors.overlay0
+                placeholder_text_color=self.colors.overlay0,
             )
             self.edit_input.pack(side="left", fill="x", expand=True, padx=(10, 0))
-            self.edit_input.bind('<Return>', lambda e: self._on_custom_submit())
+            self.edit_input.bind("<Return>", lambda e: self._on_custom_submit())
             Tooltip(edit_btn, "Edit text with custom instructions")
 
             # Ask input with split buttons (Ask + Compare)
@@ -2544,24 +2530,16 @@ class AttachedPromptPopup:
                 fg_color=self.colors.surface0,
                 corner_radius=8,
                 border_color=self.colors.surface2,
-                border_width=1
+                border_width=1,
             )
             ask_frame.pack(fill="x", pady=(0, 8))
 
             # Container for both buttons
-            ask_btns_container = ctk.CTkFrame(
-                ask_frame,
-                fg_color="transparent"
-            )
+            ask_btns_container = ctk.CTkFrame(ask_frame, fg_color="transparent")
             ask_btns_container.pack(side="right")
 
             # Compare button (left of Ask button)
-            compare_btn_container = ctk.CTkFrame(
-                ask_btns_container,
-                width=32,
-                height=40,
-                fg_color="transparent"
-            )
+            compare_btn_container = ctk.CTkFrame(ask_btns_container, width=32, height=40, fg_color="transparent")
             compare_btn_container.pack(side="left", padx=(0, 1))
             compare_btn_container.pack_propagate(False)
 
@@ -2574,19 +2552,14 @@ class AttachedPromptPopup:
                 width=32,
                 height=40,
                 font_size=12,
-                command=self._on_ask_compare_submit
+                command=self._on_ask_compare_submit,
             )
             compare_btn.configure(corner_radius=8)
             compare_btn.pack(fill="both", expand=True)
             Tooltip(compare_btn, "Compare with another text selection")
 
             # Ask button (right)
-            ask_btn_container = ctk.CTkFrame(
-                ask_btns_container,
-                width=40,
-                height=40,
-                fg_color="transparent"
-            )
+            ask_btn_container = ctk.CTkFrame(ask_btns_container, width=40, height=40, fg_color="transparent")
             ask_btn_container.pack(side="right")
             ask_btn_container.pack_propagate(False)
 
@@ -2599,7 +2572,7 @@ class AttachedPromptPopup:
                 width=40,
                 height=40,
                 font_size=14,
-                command=self._on_ask_submit
+                command=self._on_ask_submit,
             )
             ask_btn.configure(corner_radius=8)
             ask_btn.pack(fill="both", expand=True)
@@ -2614,10 +2587,10 @@ class AttachedPromptPopup:
                 fg_color="transparent",
                 border_width=0,
                 text_color=self.colors.text,
-                placeholder_text_color=self.colors.overlay0
+                placeholder_text_color=self.colors.overlay0,
             )
             self.ask_input.pack(side="left", fill="x", expand=True, padx=(10, 0))
-            self.ask_input.bind('<Return>', lambda e: self._on_ask_submit())
+            self.ask_input.bind("<Return>", lambda e: self._on_ask_submit())
 
             # Action buttons
             self._create_carousel(content_frame)
@@ -2626,10 +2599,7 @@ class AttachedPromptPopup:
             self.root.configure(bg=self.colors.base)
 
             main_frame = tk.Frame(
-                self.root,
-                bg=self.colors.base,
-                highlightbackground=self.colors.surface2,
-                highlightthickness=1
+                self.root, bg=self.colors.base, highlightbackground=self.colors.surface2, highlightthickness=1
             )
             main_frame.pack(fill=tk.BOTH, expand=True)
 
@@ -2646,27 +2616,22 @@ class AttachedPromptPopup:
                 font=("Arial", 16, "bold"),
                 bg=self.colors.base,
                 fg=self.colors.overlay0,
-                cursor="hand2"
+                cursor="hand2",
             )
             close_btn.pack(side=tk.RIGHT)
-            close_btn.bind('<Button-1>', lambda e: self._close())
-            close_btn.bind('<Enter>', lambda e: close_btn.config(fg=self.colors.red))
-            close_btn.bind('<Leave>', lambda e: close_btn.config(fg=self.colors.overlay0))
+            close_btn.bind("<Button-1>", lambda e: self._close())
+            close_btn.bind("<Enter>", lambda e: close_btn.config(fg=self.colors.red))
+            close_btn.bind("<Leave>", lambda e: close_btn.config(fg=self.colors.overlay0))
 
             # TTS button in top bar (only if callback provided)
             if self.on_tts_callback:
                 tts_btn = tk.Label(
-                    top_bar,
-                    text="🔊",
-                    font=("Arial", 12),
-                    bg=self.colors.base,
-                    fg=self.colors.overlay0,
-                    cursor="hand2"
+                    top_bar, text="🔊", font=("Arial", 12), bg=self.colors.base, fg=self.colors.overlay0, cursor="hand2"
                 )
                 tts_btn.pack(side=tk.LEFT, padx=(6, 0))
-                tts_btn.bind('<Button-1>', lambda e: self._on_tts())
-                tts_btn.bind('<Enter>', lambda e: tts_btn.config(fg=self.colors.text))
-                tts_btn.bind('<Leave>', lambda e: tts_btn.config(fg=self.colors.overlay0))
+                tts_btn.bind("<Button-1>", lambda e: self._on_tts())
+                tts_btn.bind("<Enter>", lambda e: tts_btn.config(fg=self.colors.text))
+                tts_btn.bind("<Leave>", lambda e: tts_btn.config(fg=self.colors.overlay0))
                 self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window with selected text")
 
             # Response mode toggle
@@ -2681,17 +2646,20 @@ class AttachedPromptPopup:
                     "Default": "Use the action's configured response mode",
                     "Copy": "Copy the response to clipboard",
                     "Replace": "Replace the selected text with the response",
-                    "Show": "Show the response in a chat window"
-                }
+                    "Show": "Show the response in a chat window",
+                },
             )
             self.response_toggle.pack(anchor=tk.CENTER)
 
             # Connection profile dropdown
-            self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_tk(content_frame, self.root, self.colors)
+            self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_tk(
+                content_frame, self.root, self.colors
+            )
             profile_frame.pack(anchor=tk.CENTER, pady=(0, 8))
 
             # Modifier bar - get from global settings
             from .prompts import get_prompts_config
+
             modifiers = get_prompts_config().get_modifiers()
             default_active = get_prompts_config().get_default_modifier_keys_for_tool("text_edit_tool")
             if modifiers:
@@ -2699,16 +2667,13 @@ class AttachedPromptPopup:
                     content_frame,
                     modifiers=modifiers,
                     on_change=self._on_modifiers_changed,
-                    default_active=default_active
+                    default_active=default_active,
                 )
                 self.modifier_bar.pack(fill=tk.X)
 
             # Edit input area
             edit_container = tk.Frame(
-                content_frame,
-                bg=self.colors.surface0,
-                highlightbackground=self.colors.surface2,
-                highlightthickness=1
+                content_frame, bg=self.colors.surface0, highlightbackground=self.colors.surface2, highlightthickness=1
             )
             edit_container.pack(fill=tk.X, pady=(0, 8))
 
@@ -2721,12 +2686,12 @@ class AttachedPromptPopup:
                 fg=self.colors.accent_fg,
                 width=4,
                 pady=8,
-                cursor="hand2"
+                cursor="hand2",
             )
             edit_send_btn.pack(side=tk.RIGHT, fill=tk.Y)
-            edit_send_btn.bind('<Button-1>', lambda e: self._on_custom_submit())
-            edit_send_btn.bind('<Enter>', lambda e: edit_send_btn.config(bg=self.colors.lavender))
-            edit_send_btn.bind('<Leave>', lambda e: edit_send_btn.config(bg=self.colors.blue))
+            edit_send_btn.bind("<Button-1>", lambda e: self._on_custom_submit())
+            edit_send_btn.bind("<Enter>", lambda e: edit_send_btn.config(bg=self.colors.lavender))
+            edit_send_btn.bind("<Leave>", lambda e: edit_send_btn.config(bg=self.colors.blue))
             Tooltip(edit_send_btn, "Edit text with custom instructions")
 
             self.edit_input_var = tk.StringVar(master=self.root)
@@ -2739,22 +2704,19 @@ class AttachedPromptPopup:
                 fg=self.colors.text,
                 insertbackground=self.colors.text,
                 relief=tk.FLAT,
-                bd=0
+                bd=0,
             )
             self.edit_input.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
             self.edit_input.insert(0, self.PLACEHOLDER_EDIT)
             self.edit_input.config(fg=self.colors.overlay0)
 
-            self.edit_input.bind('<FocusIn>', lambda e: self._on_edit_focus_in())
-            self.edit_input.bind('<FocusOut>', lambda e: self._on_edit_focus_out())
-            self.edit_input.bind('<Return>', lambda e: self._on_custom_submit())
+            self.edit_input.bind("<FocusIn>", lambda e: self._on_edit_focus_in())
+            self.edit_input.bind("<FocusOut>", lambda e: self._on_edit_focus_out())
+            self.edit_input.bind("<Return>", lambda e: self._on_custom_submit())
 
             # Ask input area with split buttons (Ask + Compare)
             ask_container = tk.Frame(
-                content_frame,
-                bg=self.colors.surface0,
-                highlightbackground=self.colors.surface2,
-                highlightthickness=1
+                content_frame, bg=self.colors.surface0, highlightbackground=self.colors.surface2, highlightthickness=1
             )
             ask_container.pack(fill=tk.X, pady=(0, 12))
 
@@ -2767,12 +2729,12 @@ class AttachedPromptPopup:
                 fg=self.colors.text,
                 width=3,
                 pady=8,
-                cursor="hand2"
+                cursor="hand2",
             )
             compare_btn.pack(side=tk.RIGHT, fill=tk.Y)
-            compare_btn.bind('<Button-1>', lambda e: self._on_ask_compare_submit())
-            compare_btn.bind('<Enter>', lambda e: compare_btn.config(bg=self.colors.surface2))
-            compare_btn.bind('<Leave>', lambda e: compare_btn.config(bg=self.colors.surface1))
+            compare_btn.bind("<Button-1>", lambda e: self._on_ask_compare_submit())
+            compare_btn.bind("<Enter>", lambda e: compare_btn.config(bg=self.colors.surface2))
+            compare_btn.bind("<Leave>", lambda e: compare_btn.config(bg=self.colors.surface1))
             Tooltip(compare_btn, "Compare with another text selection")
 
             # Ask send button
@@ -2784,12 +2746,12 @@ class AttachedPromptPopup:
                 fg=self.colors.accent_fg,
                 width=3,
                 pady=8,
-                cursor="hand2"
+                cursor="hand2",
             )
             ask_send_btn.pack(side=tk.RIGHT, fill=tk.Y)
-            ask_send_btn.bind('<Button-1>', lambda e: self._on_ask_submit())
-            ask_send_btn.bind('<Enter>', lambda e: ask_send_btn.config(bg=self.colors.peach))
-            ask_send_btn.bind('<Leave>', lambda e: ask_send_btn.config(bg=self.colors.green))
+            ask_send_btn.bind("<Button-1>", lambda e: self._on_ask_submit())
+            ask_send_btn.bind("<Enter>", lambda e: ask_send_btn.config(bg=self.colors.peach))
+            ask_send_btn.bind("<Leave>", lambda e: ask_send_btn.config(bg=self.colors.green))
             Tooltip(ask_send_btn, "Ask a question about the text")
 
             self.ask_input_var = tk.StringVar(master=self.root)
@@ -2802,15 +2764,15 @@ class AttachedPromptPopup:
                 fg=self.colors.text,
                 insertbackground=self.colors.text,
                 relief=tk.FLAT,
-                bd=0
+                bd=0,
             )
             self.ask_input.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
             self.ask_input.insert(0, self.PLACEHOLDER_ASK)
             self.ask_input.config(fg=self.colors.overlay0)
 
-            self.ask_input.bind('<FocusIn>', lambda e: self._on_ask_focus_in())
-            self.ask_input.bind('<FocusOut>', lambda e: self._on_ask_focus_out())
-            self.ask_input.bind('<Return>', lambda e: self._on_ask_submit())
+            self.ask_input.bind("<FocusIn>", lambda e: self._on_ask_focus_in())
+            self.ask_input.bind("<FocusOut>", lambda e: self._on_ask_focus_out())
+            self.ask_input.bind("<Return>", lambda e: self._on_ask_submit())
 
             # Action buttons carousel
             self._create_carousel_tk(content_frame)
@@ -2827,7 +2789,7 @@ class AttachedPromptPopup:
             return
         try:
             self.root.deiconify()
-            self.root.bind('<Escape>', lambda e: self._close())
+            self.root.bind("<Escape>", lambda e: self._close())
             self.root.lift()
             self.root.focus_force()
             if HAVE_CTK:
@@ -2863,10 +2825,7 @@ class AttachedPromptPopup:
 
                 if groups:
                     self.grouped_list = GroupedButtonList(
-                        parent,
-                        groups=groups,
-                        on_click=self._on_option_click,
-                        on_group_changed=self._reposition_window
+                        parent, groups=groups, on_click=self._on_option_click, on_group_changed=self._reposition_window
                     )
                     self.grouped_list.pack(fill="x")
                     return
@@ -2883,10 +2842,7 @@ class AttachedPromptPopup:
 
         if items:
             carousel = CarouselButtonList(
-                parent,
-                items=items,
-                on_click=self._on_option_click,
-                items_per_page=items_per_page
+                parent, items=items, on_click=self._on_option_click, items_per_page=items_per_page
             )
             carousel.pack(fill="x")
 
@@ -2918,10 +2874,7 @@ class AttachedPromptPopup:
 
                 if groups:
                     self.grouped_list = GroupedButtonList(
-                        parent,
-                        groups=groups,
-                        on_click=self._on_option_click,
-                        on_group_changed=self._reposition_window
+                        parent, groups=groups, on_click=self._on_option_click, on_group_changed=self._reposition_window
                     )
                     self.grouped_list.pack(fill=tk.X)
                     return
@@ -2938,10 +2891,7 @@ class AttachedPromptPopup:
 
         if items:
             carousel = CarouselButtonList(
-                parent,
-                items=items,
-                on_click=self._on_option_click,
-                items_per_page=items_per_page
+                parent, items=items, on_click=self._on_option_click, items_per_page=items_per_page
             )
             carousel.pack(fill=tk.X)
 
@@ -3025,7 +2975,7 @@ class AttachedPromptPopup:
 
     def _on_option_click(self, option_key: str):
         """Handle action button click.
-        
+
         If the action has compare_prompts=True and a compare text callback is
         registered, the popup hides and waits for the user to select a second
         text snippet before executing.
@@ -3040,7 +2990,9 @@ class AttachedPromptPopup:
         response_mode = self._get_effective_response_mode(option_key)
         profile_override = get_profile_override_value(self.profile_var)
         self._close()
-        self.on_option_selected(option_key, self.selected_text, None, response_mode, self.active_modifiers, None, profile_override)
+        self.on_option_selected(
+            option_key, self.selected_text, None, response_mode, self.active_modifiers, None, profile_override
+        )
 
     def _initiate_compare_text(self):
         """Hide popup and request a second text selection from the user."""
@@ -3051,10 +3003,7 @@ class AttachedPromptPopup:
         except tk.TclError:
             pass
 
-        self.on_request_compare_text(
-            self._on_compare_text_captured,
-            self._on_compare_text_cancelled
-        )
+        self.on_request_compare_text(self._on_compare_text_captured, self._on_compare_text_cancelled)
 
     def _on_compare_text_captured(self, text: str):
         """Handle second text capture - execute pending action with compare text."""
@@ -3067,7 +3016,15 @@ class AttachedPromptPopup:
             response_mode = self._get_effective_response_mode(option_key)
             profile_override = get_profile_override_value(self.profile_var)
             self._close()
-            self.on_option_selected(option_key, self.selected_text, custom_input, response_mode, self.active_modifiers, text, profile_override)
+            self.on_option_selected(
+                option_key,
+                self.selected_text,
+                custom_input,
+                response_mode,
+                self.active_modifiers,
+                text,
+                profile_override,
+            )
         else:
             # No pending action (shouldn't happen), just close
             self._close()
@@ -3090,7 +3047,9 @@ class AttachedPromptPopup:
         if HAVE_CTK:
             custom_text = self.edit_input.get().strip()
         else:
-            custom_text = self.edit_input_var.get().strip() if hasattr(self, 'edit_input_var') and self.edit_input_var else ""
+            custom_text = (
+                self.edit_input_var.get().strip() if hasattr(self, "edit_input_var") and self.edit_input_var else ""
+            )
 
         if not custom_text or custom_text == self.PLACEHOLDER_EDIT:
             return
@@ -3098,14 +3057,16 @@ class AttachedPromptPopup:
         response_mode = self._get_effective_response_mode("_Custom")
         profile_override = get_profile_override_value(self.profile_var)
         self._close()
-        self.on_option_selected("_Custom", self.selected_text, custom_text, response_mode, self.active_modifiers, None, profile_override)
+        self.on_option_selected(
+            "_Custom", self.selected_text, custom_text, response_mode, self.active_modifiers, None, profile_override
+        )
 
     def _on_ask_submit(self):
         """Handle ask submission."""
         if HAVE_CTK:
             ask_text = self.ask_input.get().strip()
         else:
-            ask_text = self.ask_input_var.get().strip() if hasattr(self, 'ask_input_var') and self.ask_input_var else ""
+            ask_text = self.ask_input_var.get().strip() if hasattr(self, "ask_input_var") and self.ask_input_var else ""
 
         if not ask_text or ask_text == self.PLACEHOLDER_ASK:
             return
@@ -3113,14 +3074,16 @@ class AttachedPromptPopup:
         response_mode = self._get_effective_response_mode("_Ask")
         profile_override = get_profile_override_value(self.profile_var)
         self._close()
-        self.on_option_selected("_Ask", self.selected_text, ask_text, response_mode, self.active_modifiers, None, profile_override)
+        self.on_option_selected(
+            "_Ask", self.selected_text, ask_text, response_mode, self.active_modifiers, None, profile_override
+        )
 
     def _on_ask_compare_submit(self):
         """Handle ask with compare mode - triggers second text selection."""
         if HAVE_CTK:
             ask_text = self.ask_input.get().strip()
         else:
-            ask_text = self.ask_input_var.get().strip() if hasattr(self, 'ask_input_var') and self.ask_input_var else ""
+            ask_text = self.ask_input_var.get().strip() if hasattr(self, "ask_input_var") and self.ask_input_var else ""
 
         if not ask_text or ask_text == self.PLACEHOLDER_ASK:
             return
@@ -3136,6 +3099,7 @@ class AttachedPromptPopup:
         if self.active_modifiers:
             # Get modifiers from global settings
             from .prompts import get_prompts_config
+
             modifiers = get_prompts_config().get_modifiers()
             for mod in modifiers:
                 if mod.get("key") in self.active_modifiers:
@@ -3165,7 +3129,7 @@ class AttachedPromptPopup:
         # is GC'd on a background thread (the Toplevel shares the parent's
         # live Tcl interpreter, so Variable.__del__ would still attempt
         # a real Tcl call).
-        for attr_name in ('edit_input_var', 'ask_input_var', 'profile_var'):
+        for attr_name in ("edit_input_var", "ask_input_var", "profile_var"):
             var = getattr(self, attr_name, None)
             if isinstance(var, tk.Variable):
                 try:
@@ -3184,7 +3148,7 @@ class AttachedPromptPopup:
         self.ask_input_var = None
         self.profile_var = None
         self.profile_dropdown = None
-        if hasattr(self, 'tts_btn'):
+        if hasattr(self, "tts_btn"):
             self.tts_btn = None
         gc.collect()
 
@@ -3198,7 +3162,7 @@ def create_attached_input_popup(
     on_close: Optional[Callable[[], None]],
     x: Optional[int] = None,
     y: Optional[int] = None,
-    on_tts: Optional[Callable[[str], None]] = None
+    on_tts: Optional[Callable[[str], None]] = None,
 ):
     """Create an input popup as Toplevel attached to parent root."""
     AttachedInputPopup(parent_root, on_submit, on_close, x, y, on_tts)
@@ -3213,15 +3177,18 @@ def create_attached_prompt_popup(
     x: Optional[int] = None,
     y: Optional[int] = None,
     on_tts: Optional[Callable[[str], None]] = None,
-    on_request_compare_text: Optional[Callable] = None
+    on_request_compare_text: Optional[Callable] = None,
 ):
     """Create a prompt selection popup as Toplevel attached to parent root."""
-    AttachedPromptPopup(parent_root, options, on_option_selected, on_close, selected_text, x, y, on_tts, on_request_compare_text)
+    AttachedPromptPopup(
+        parent_root, options, on_option_selected, on_close, selected_text, x, y, on_tts, on_request_compare_text
+    )
 
 
 # =============================================================================
 # Typing Indicator - Floating tooltip during streaming
 # =============================================================================
+
 
 class TypingIndicator:
     """
@@ -3233,12 +3200,7 @@ class TypingIndicator:
     OFFSET_X = 20
     OFFSET_Y = 20
 
-    def __init__(
-        self,
-        parent_root,
-        abort_hotkey: str = "Escape",
-        on_dismiss: Optional[Callable[[], None]] = None
-    ):
+    def __init__(self, parent_root, abort_hotkey: str = "Escape", on_dismiss: Optional[Callable[[], None]] = None):
         self.parent_root = parent_root
         self.abort_hotkey = abort_hotkey
         self.on_dismiss = on_dismiss
@@ -3260,10 +3222,10 @@ class TypingIndicator:
         self.root.withdraw()
 
         self.root.overrideredirect(True)
-        self.root.attributes('-topmost', True)
+        self.root.attributes("-topmost", True)
 
         try:
-            self.root.attributes('-alpha', 0.95)
+            self.root.attributes("-alpha", 0.95)
         except tk.TclError:
             pass
 
@@ -3275,11 +3237,7 @@ class TypingIndicator:
 
         if HAVE_CTK:
             main_frame = ctk.CTkFrame(
-                self.root,
-                corner_radius=8,
-                fg_color=self.colors.surface0,
-                border_color=self.colors.blue,
-                border_width=2
+                self.root, corner_radius=8, fg_color=self.colors.surface0, border_color=self.colors.blue, border_width=2
             )
             main_frame.pack(fill="both", expand=True)
 
@@ -3299,7 +3257,7 @@ class TypingIndicator:
             typing_label_kwargs = {
                 "text": typing_text,
                 "font": get_ctk_font(size=11, weight="bold"),
-                "text_color": self.colors.text
+                "text_color": self.colors.text,
             }
             if typing_emoji_img:
                 typing_label_kwargs["image"] = typing_emoji_img
@@ -3313,16 +3271,13 @@ class TypingIndicator:
                 content_frame,
                 text=f" [{hotkey_display} to abort]",
                 font=get_ctk_font(size=10),
-                text_color=self.colors.overlay0
+                text_color=self.colors.overlay0,
             )
             abort_label.pack(side="left")
         else:
             # Fallback
             main_frame = tk.Frame(
-                self.root,
-                bg=self.colors.surface0,
-                highlightbackground=self.colors.blue,
-                highlightthickness=2
+                self.root, bg=self.colors.surface0, highlightbackground=self.colors.blue, highlightthickness=2
             )
             main_frame.pack(fill=tk.BOTH, expand=True)
 
@@ -3334,7 +3289,7 @@ class TypingIndicator:
                 text="✍️ Typing...",
                 font=("Arial", 10, "bold"),
                 bg=self.colors.surface0,
-                fg=self.colors.text
+                fg=self.colors.text,
             ).pack(side=tk.LEFT)
 
             hotkey_display = self.abort_hotkey.title() if self.abort_hotkey else "Escape"
@@ -3343,7 +3298,7 @@ class TypingIndicator:
                 text=f" [{hotkey_display} to abort]",
                 font=("Arial", 9),
                 bg=self.colors.surface0,
-                fg=self.colors.overlay0
+                fg=self.colors.overlay0,
             ).pack(side=tk.LEFT)
 
         # Force Tk to process all pending drawing commands before showing
@@ -3411,9 +3366,7 @@ _current_typing_indicator: Optional[TypingIndicator] = None
 
 
 def create_typing_indicator(
-    parent_root,
-    abort_hotkey: str = "Escape",
-    on_dismiss: Optional[Callable[[], None]] = None
+    parent_root, abort_hotkey: str = "Escape", on_dismiss: Optional[Callable[[], None]] = None
 ) -> TypingIndicator:
     """Create and show a typing indicator."""
     global _current_typing_indicator
@@ -3438,6 +3391,7 @@ def dismiss_typing_indicator():
 # Error Popup - Display API errors to user
 # =============================================================================
 
+
 class ErrorPopup:
     """
     Error dialog popup for displaying API failures.
@@ -3450,7 +3404,7 @@ class ErrorPopup:
         title: str,
         message: str,
         details: Optional[str] = None,
-        on_close: Optional[Callable[[], None]] = None
+        on_close: Optional[Callable[[], None]] = None,
     ):
         self.parent_root = parent_root
         self.title = title
@@ -3473,18 +3427,14 @@ class ErrorPopup:
         self.root.withdraw()
         self.root.title("Error")
         self.root.overrideredirect(True)
-        self.root.attributes('-topmost', True)
+        self.root.attributes("-topmost", True)
 
         setup_transparent_popup(self.root, self.colors)
         hide_from_taskbar(self.root)
 
         if HAVE_CTK:
             main_frame = ctk.CTkFrame(
-                self.root,
-                corner_radius=10,
-                fg_color=self.colors.base,
-                border_color=self.colors.red,
-                border_width=2
+                self.root, corner_radius=10, fg_color=self.colors.base, border_color=self.colors.red, border_width=2
             )
             main_frame.pack(fill="both", expand=True, padx=1, pady=1)
 
@@ -3510,7 +3460,7 @@ class ErrorPopup:
                             image=error_img,
                             compound="left",
                             font=get_ctk_font(size=14, weight="bold"),
-                            text_color=self.colors.red
+                            text_color=self.colors.red,
                         ).pack(side="left")
                         header_label_created = True
                 except Exception:
@@ -3521,7 +3471,7 @@ class ErrorPopup:
                     header_frame,
                     text=error_icon_text,
                     font=get_ctk_font(size=14, weight="bold"),
-                    text_color=self.colors.red
+                    text_color=self.colors.red,
                 ).pack(side="left")
 
             # Close button
@@ -3535,7 +3485,7 @@ class ErrorPopup:
                 hover_color=self.colors.red,
                 text_color=self.colors.overlay0,
                 font=get_ctk_font(size=14, weight="bold"),
-                command=self._close
+                command=self._close,
             )
             close_btn.pack(side="right")
 
@@ -3546,7 +3496,7 @@ class ErrorPopup:
                     text=self.title,
                     font=get_ctk_font(size=13, weight="bold"),
                     text_color=self.colors.text,
-                    wraplength=350
+                    wraplength=350,
                 ).pack(anchor="w", pady=(0, 4))
 
             # Message
@@ -3556,16 +3506,12 @@ class ErrorPopup:
                 font=get_ctk_font(size=12),
                 text_color=self.colors.text,
                 wraplength=350,
-                justify="left"
+                justify="left",
             ).pack(anchor="w", pady=(0, 8))
 
             # Details (scrollable)
             if self.details:
-                details_frame = ctk.CTkFrame(
-                    content_frame,
-                    fg_color=self.colors.surface0,
-                    corner_radius=6
-                )
+                details_frame = ctk.CTkFrame(content_frame, fg_color=self.colors.surface0, corner_radius=6)
                 details_frame.pack(fill="x", pady=(0, 8))
 
                 details_text = ctk.CTkTextbox(
@@ -3574,7 +3520,7 @@ class ErrorPopup:
                     font=get_ctk_font(size=10),
                     fg_color=self.colors.surface0,
                     text_color=self.colors.overlay0,
-                    wrap="word"
+                    wrap="word",
                 )
                 details_text.pack(fill="x", padx=8, pady=8)
                 details_text.insert("0.0", self.details)
@@ -3596,7 +3542,7 @@ class ErrorPopup:
                     width=80,
                     height=32,
                     font_size=11,
-                    command=self._copy_to_clipboard
+                    command=self._copy_to_clipboard,
                 )
                 # Override to match surface0 background of details area
                 copy_btn.configure(fg_color=self.colors.surface0)
@@ -3613,7 +3559,7 @@ class ErrorPopup:
                 hover_color=self.colors.accent_green,
                 text_color=self.colors.accent_fg,
                 font=get_ctk_font(size=11),
-                command=self._close
+                command=self._close,
             )
             ok_btn.pack(side="right")
 
@@ -3622,10 +3568,7 @@ class ErrorPopup:
             self.root.configure(bg=self.colors.base)
 
             main_frame = tk.Frame(
-                self.root,
-                bg=self.colors.base,
-                highlightbackground=self.colors.red,
-                highlightthickness=2
+                self.root, bg=self.colors.base, highlightbackground=self.colors.red, highlightthickness=2
             )
             main_frame.pack(fill=tk.BOTH, expand=True)
 
@@ -3637,11 +3580,7 @@ class ErrorPopup:
             header_frame.pack(fill=tk.X, pady=(0, 8))
 
             tk.Label(
-                header_frame,
-                text="❌ Error",
-                font=("Arial", 12, "bold"),
-                bg=self.colors.base,
-                fg=self.colors.red
+                header_frame, text="❌ Error", font=("Arial", 12, "bold"), bg=self.colors.base, fg=self.colors.red
             ).pack(side=tk.LEFT)
 
             close_btn = tk.Label(
@@ -3650,10 +3589,10 @@ class ErrorPopup:
                 font=("Arial", 14, "bold"),
                 bg=self.colors.base,
                 fg=self.colors.overlay0,
-                cursor="hand2"
+                cursor="hand2",
             )
             close_btn.pack(side=tk.RIGHT)
-            close_btn.bind('<Button-1>', lambda e: self._close())
+            close_btn.bind("<Button-1>", lambda e: self._close())
 
             # Title
             if self.title:
@@ -3665,7 +3604,7 @@ class ErrorPopup:
                     fg=self.colors.text,
                     wraplength=350,
                     anchor="w",
-                    justify=tk.LEFT
+                    justify=tk.LEFT,
                 ).pack(anchor="w", pady=(0, 4))
 
             # Message
@@ -3677,7 +3616,7 @@ class ErrorPopup:
                 fg=self.colors.text,
                 wraplength=350,
                 anchor="w",
-                justify=tk.LEFT
+                justify=tk.LEFT,
             ).pack(anchor="w", pady=(0, 8))
 
             # Details
@@ -3686,7 +3625,7 @@ class ErrorPopup:
                     content_frame,
                     bg=self.colors.surface0,
                     highlightbackground=self.colors.surface2,
-                    highlightthickness=1
+                    highlightthickness=1,
                 )
                 details_frame.pack(fill=tk.X, pady=(0, 8))
 
@@ -3698,7 +3637,7 @@ class ErrorPopup:
                     fg=self.colors.overlay0,
                     wrap=tk.WORD,
                     relief=tk.FLAT,
-                    bd=0
+                    bd=0,
                 )
                 details_text.pack(fill=tk.X, padx=8, pady=8)
                 details_text.insert("1.0", self.details)
@@ -3717,10 +3656,10 @@ class ErrorPopup:
                     fg=self.colors.text,
                     padx=12,
                     pady=6,
-                    cursor="hand2"
+                    cursor="hand2",
                 )
                 copy_btn.pack(side=tk.LEFT, padx=(0, 8))
-                copy_btn.bind('<Button-1>', lambda e: self._copy_to_clipboard())
+                copy_btn.bind("<Button-1>", lambda e: self._copy_to_clipboard())
 
             ok_btn = tk.Label(
                 btn_frame,
@@ -3730,10 +3669,10 @@ class ErrorPopup:
                 fg=self.colors.accent_fg,
                 padx=16,
                 pady=6,
-                cursor="hand2"
+                cursor="hand2",
             )
             ok_btn.pack(side=tk.RIGHT)
-            ok_btn.bind('<Button-1>', lambda e: self._close())
+            ok_btn.bind("<Button-1>", lambda e: self._close())
 
         self._position_window()
         self.root.update_idletasks()
@@ -3744,8 +3683,8 @@ class ErrorPopup:
             return
         try:
             self.root.deiconify()
-            self.root.bind('<Escape>', lambda e: self._close())
-            self.root.bind('<Return>', lambda e: self._close())
+            self.root.bind("<Escape>", lambda e: self._close())
+            self.root.bind("<Return>", lambda e: self._close())
             self.root.lift()
             self.root.focus_force()
         except tk.TclError:
@@ -3768,6 +3707,7 @@ class ErrorPopup:
     def _copy_to_clipboard(self):
         """Copy error details to clipboard."""
         import pyperclip
+
         text = f"{self.title}\n\n{self.message}"
         if self.details:
             text += f"\n\nDetails:\n{self.details}"
@@ -3788,11 +3728,7 @@ class ErrorPopup:
 
 
 def create_error_popup(
-    parent_root,
-    title: str,
-    message: str,
-    details: Optional[str] = None,
-    on_close: Optional[Callable[[], None]] = None
+    parent_root, title: str, message: str, details: Optional[str] = None, on_close: Optional[Callable[[], None]] = None
 ):
     """Create and show an error popup."""
     ErrorPopup(parent_root, title, message, details, on_close)
@@ -3801,29 +3737,26 @@ def create_error_popup(
 def show_error_popup(title: str, message: str, details: Optional[str] = None):
     """
     Show an error popup via GUICoordinator - thread-safe.
-    
+
     This can be called from any thread and will show the error popup
     on the main GUI thread.
-    
+
     Args:
         title: Error title (e.g., "API Request Failed")
         message: User-friendly message describing the error
         details: Optional detailed error information (technical details)
     """
     from .core import GUICoordinator
+
     coordinator = GUICoordinator.get_instance()
     coordinator.ensure_running()
-    coordinator._request_queue.put({
-        'type': 'error_popup',
-        'title': title,
-        'message': message,
-        'details': details
-    })
+    coordinator._request_queue.put({"type": "error_popup", "title": title, "message": message, "details": details})
 
 
 # =============================================================================
 # Toast Notification - Temporary bottom-right message
 # =============================================================================
+
 
 class ToastNotification:
     """
@@ -3843,7 +3776,7 @@ class ToastNotification:
         title: str,
         message: str,
         timeout_ms: int = DEFAULT_TIMEOUT_MS,
-        on_dismiss: Optional[Callable[[], None]] = None
+        on_dismiss: Optional[Callable[[], None]] = None,
     ):
         self.parent_root = parent_root
         self.title = title
@@ -3874,11 +3807,11 @@ class ToastNotification:
         self.root.withdraw()
 
         self.root.overrideredirect(True)
-        self.root.attributes('-topmost', True)
+        self.root.attributes("-topmost", True)
 
         # Start transparent for fade-in
         try:
-            self.root.attributes('-alpha', 0.0)
+            self.root.attributes("-alpha", 0.0)
         except tk.TclError:
             pass
 
@@ -3905,12 +3838,14 @@ class ToastNotification:
             corner_radius=10,
             fg_color=self.colors.surface0,
             border_color=self.colors.green,  # Green border for success
-            border_width=2
+            border_width=2,
         )
         main_frame.pack(fill="both", expand=True, padx=1, pady=1)
 
         # Bind verify hover to main elements to be responsive
-        def on_click(e): self.dismiss()
+        def on_click(e):
+            self.dismiss()
+
         main_frame.bind("<Button-1>", on_click)
 
         content = ctk.CTkFrame(main_frame, fg_color="transparent")
@@ -3929,11 +3864,7 @@ class ToastNotification:
 
         # Try to use emoji image
         icon_text = "📋 " + self.title
-        label_kwargs = {
-            "text": icon_text,
-            "font": get_ctk_font(size=12, weight="bold"),
-            "text_color": self.colors.text
-        }
+        label_kwargs = {"text": icon_text, "font": get_ctk_font(size=12, weight="bold"), "text_color": self.colors.text}
 
         if HAVE_EMOJI:
             try:
@@ -3955,7 +3886,7 @@ class ToastNotification:
         # Message preview
         preview_text = self.message
         if len(preview_text) > self.PREVIEW_MAX_CHARS:
-            preview_text = preview_text[:self.PREVIEW_MAX_CHARS] + "..."
+            preview_text = preview_text[: self.PREVIEW_MAX_CHARS] + "..."
 
         msg_lbl = ctk.CTkLabel(
             content,
@@ -3963,17 +3894,14 @@ class ToastNotification:
             font=get_ctk_font(size=11),
             text_color=self.colors.overlay0,
             wraplength=300,
-            justify="left"
+            justify="left",
         )
         msg_lbl.pack(anchor="w")
         msg_lbl.bind("<Button-1>", on_click)
 
         # Footer text (click to dismiss)
         footer = ctk.CTkLabel(
-            content,
-            text="Click to dismiss",
-            font=get_ctk_font(size=9),
-            text_color=self.colors.surface2
+            content, text="Click to dismiss", font=get_ctk_font(size=9), text_color=self.colors.surface2
         )
         footer.pack(anchor="e", pady=(4, 0))
         footer.bind("<Button-1>", on_click)
@@ -3983,10 +3911,7 @@ class ToastNotification:
         self.root.configure(bg=self.colors.base)
 
         main_frame = tk.Frame(
-            self.root,
-            bg=self.colors.surface0,
-            highlightbackground=self.colors.green,
-            highlightthickness=2
+            self.root, bg=self.colors.surface0, highlightbackground=self.colors.green, highlightthickness=2
         )
         main_frame.pack(fill=tk.BOTH, expand=True)
         main_frame.bind("<Button-1>", lambda e: self.dismiss())
@@ -4001,17 +3926,13 @@ class ToastNotification:
         header.bind("<Button-1>", lambda e: self.dismiss())
 
         tk.Label(
-            header,
-            text="✅ " + self.title,
-            font=("Arial", 11, "bold"),
-            bg=self.colors.surface0,
-            fg=self.colors.text
+            header, text="✅ " + self.title, font=("Arial", 11, "bold"), bg=self.colors.surface0, fg=self.colors.text
         ).pack(side=tk.LEFT)
 
         # Message preview
         preview_text = self.message
         if len(preview_text) > self.PREVIEW_MAX_CHARS:
-            preview_text = preview_text[:self.PREVIEW_MAX_CHARS] + "..."
+            preview_text = preview_text[: self.PREVIEW_MAX_CHARS] + "..."
 
         msg_lbl = tk.Label(
             content,
@@ -4020,7 +3941,7 @@ class ToastNotification:
             bg=self.colors.surface0,
             fg=self.colors.overlay0,
             wraplength=300,
-            justify=tk.LEFT
+            justify=tk.LEFT,
         )
         msg_lbl.pack(anchor="w")
         msg_lbl.bind("<Button-1>", lambda e: self.dismiss())
@@ -4037,7 +3958,7 @@ class ToastNotification:
         # Position with margin from bottom-right corner
         self.target_x = screen_width - window_width - self.MARGIN_X
         # Target Y is the final resting position
-        self.target_y = screen_height - window_height - self.MARGIN_Y - 40 # Account for taskbar
+        self.target_y = screen_height - window_height - self.MARGIN_Y - 40  # Account for taskbar
 
         # Start from bottom of screen (off-screen)
         self.start_rise_y = screen_height
@@ -4064,15 +3985,17 @@ class ToastNotification:
 
     def _animate_entry(self, step=0):
         """Animate window entering (rise up from bottom)."""
-        if not self.root: return
+        if not self.root:
+            return
 
         total_steps = 15
         progress = (step + 1) / total_steps
-        if progress > 1.0: progress = 1.0
+        if progress > 1.0:
+            progress = 1.0
 
         try:
             # Fade in (Alpha 0 -> 1)
-            self.root.attributes('-alpha', progress)
+            self.root.attributes("-alpha", progress)
 
             # Rise up (from bottom screen to target)
             # Use sinusoidal easing for smooth pop-up
@@ -4098,17 +4021,19 @@ class ToastNotification:
         # Update every 50ms
         interval = 50
         total_steps = int(self.timeout_ms / interval)
-        if total_steps < 1: total_steps = 1
+        if total_steps < 1:
+            total_steps = 1
 
         self._run_fade_step(total_steps, total_steps)
 
     def _run_fade_step(self, remaining_steps, total_steps):
         """Run single step of fade out."""
-        if not self.root: return
+        if not self.root:
+            return
 
         try:
             alpha = remaining_steps / total_steps
-            self.root.attributes('-alpha', alpha)
+            self.root.attributes("-alpha", alpha)
 
             if remaining_steps > 0:
                 self.fade_job = self.root.after(50, lambda: self._run_fade_step(remaining_steps - 1, total_steps))
@@ -4119,13 +4044,15 @@ class ToastNotification:
 
     def _start_hover_monitor(self):
         """Start checking for mouse hover position."""
-        if not self.root: return
+        if not self.root:
+            return
         self._check_hover()
         self.hover_job = self.root.after(100, self._start_hover_monitor)
 
     def _check_hover(self):
         """Check if mouse is over window and manage state."""
-        if not self.root: return
+        if not self.root:
+            return
 
         try:
             x, y = self.root.winfo_pointerxy()
@@ -4142,9 +4069,9 @@ class ToastNotification:
                 if self.fade_job:
                     self.root.after_cancel(self.fade_job)
                     self.fade_job = None
-                    self.root.attributes('-alpha', 1.0)
-                elif self.root.attributes('-alpha') < 1.0:
-                    self.root.attributes('-alpha', 1.0)
+                    self.root.attributes("-alpha", 1.0)
+                elif self.root.attributes("-alpha") < 1.0:
+                    self.root.attributes("-alpha", 1.0)
             else:
                 # If not hovering and no fade job, start fading
                 if self.fade_job is None:
@@ -4156,9 +4083,12 @@ class ToastNotification:
     def dismiss(self):
         """Dismiss the toast immediately."""
         # Cancel all jobs
-        if self.timeout_job: self.root.after_cancel(self.timeout_job)
-        if self.fade_job: self.root.after_cancel(self.fade_job)
-        if self.hover_job: self.root.after_cancel(self.hover_job)
+        if self.timeout_job:
+            self.root.after_cancel(self.timeout_job)
+        if self.fade_job:
+            self.root.after_cancel(self.fade_job)
+        if self.hover_job:
+            self.root.after_cancel(self.hover_job)
 
         self.timeout_job = None
         self.fade_job = None
@@ -4182,12 +4112,7 @@ class ToastNotification:
 _current_toast: Optional[ToastNotification] = None
 
 
-def create_toast_notification(
-    parent_root,
-    title: str,
-    message: str,
-    timeout_ms: int = 4000
-):
+def create_toast_notification(parent_root, title: str, message: str, timeout_ms: int = 4000):
     """Create and show a toast notification."""
     global _current_toast
 

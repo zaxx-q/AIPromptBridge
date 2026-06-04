@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 class FileProcessorCheckpoint:
     """
     Checkpoint state for File Processor.
-    
+
     Stores all information needed to resume a batch processing session.
     """
 
@@ -134,6 +134,7 @@ class FileProcessorCheckpoint:
     def from_dict(cls, data: Dict[str, Any]) -> "FileProcessorCheckpoint":
         """Create from dictionary (filters out unknown arguments for compatibility)"""
         import inspect
+
         sig = inspect.signature(cls)
         valid_args = {k: v for k, v in data.items() if k in sig.parameters}
         return cls(**valid_args)
@@ -141,6 +142,7 @@ class FileProcessorCheckpoint:
     def get_summary(self) -> Dict[str, Any]:
         """Get a summary of checkpoint state"""
         from src.connection_profiles import ProfileStore
+
         profile = ProfileStore.get_instance().get_profile(self.profile_name)
         provider = profile.provider if profile else "unknown"
         model = profile.model if profile else "unknown"
@@ -180,17 +182,15 @@ class FileProcessorCheckpoint:
 
     @classmethod
     def create_retry_checkpoint(
-        cls,
-        original: "FileProcessorCheckpoint",
-        failed_only: bool = True
+        cls, original: "FileProcessorCheckpoint", failed_only: bool = True
     ) -> Optional["FileProcessorCheckpoint"]:
         """
         Create a new checkpoint for retrying failed files.
-        
+
         Args:
             original: The original checkpoint with failed files
             failed_only: If True, only include failed files
-            
+
         Returns:
             New checkpoint for retrying, or None if no files to retry
         """
@@ -210,9 +210,7 @@ class FileProcessorCheckpoint:
 
         # Filter per_file_instructions to only include failed files
         failed_per_file_instructions = {
-            path: instructions
-            for path, instructions in original.per_file_instructions.items()
-            if path in failed_paths
+            path: instructions for path, instructions in original.per_file_instructions.items() if path in failed_paths
         }
 
         return cls(
@@ -243,14 +241,14 @@ class FileProcessorCheckpoint:
             is_retry_checkpoint=True,
             original_session_id=original.session_id,
             retry_count=original.retry_count + 1,
-            original_errors=original_errors  # Preserve original errors for display
+            original_errors=original_errors,  # Preserve original errors for display
         )
 
 
 class CheckpointManager:
     """
     Manage checkpoint persistence for File Processor.
-    
+
     Features:
     - Save/load checkpoint to JSON file
     - Create new checkpoints
@@ -265,7 +263,7 @@ class CheckpointManager:
     def __init__(self, checkpoint_file: str = None, checkpoint_dir: Path = None):
         """
         Initialize CheckpointManager.
-        
+
         Args:
             checkpoint_file: Checkpoint filename (default: .file_processor_checkpoint.json)
             checkpoint_dir: Directory for checkpoint file (default: current directory)
@@ -294,7 +292,7 @@ class CheckpointManager:
     def load(self) -> Optional[FileProcessorCheckpoint]:
         """
         Load checkpoint from file.
-        
+
         Returns:
             FileProcessorCheckpoint if exists and valid, None otherwise
         """
@@ -312,7 +310,7 @@ class CheckpointManager:
     def save(self, checkpoint: FileProcessorCheckpoint):
         """
         Save checkpoint to file.
-        
+
         Args:
             checkpoint: Checkpoint to save
         """
@@ -332,7 +330,7 @@ class CheckpointManager:
     def load_failed(self) -> Optional[FileProcessorCheckpoint]:
         """
         Load failed files checkpoint.
-        
+
         Returns:
             FileProcessorCheckpoint if exists and valid, None otherwise
         """
@@ -350,7 +348,7 @@ class CheckpointManager:
     def save_failed(self, checkpoint: FileProcessorCheckpoint):
         """
         Save failed files checkpoint.
-        
+
         Args:
             checkpoint: Checkpoint to save (should be a retry checkpoint)
         """
@@ -367,16 +365,13 @@ class CheckpointManager:
         if self.failed_exists():
             self.failed_checkpoint_path.unlink()
 
-    def create_failed_checkpoint(
-        self,
-        original: FileProcessorCheckpoint
-    ) -> Optional[FileProcessorCheckpoint]:
+    def create_failed_checkpoint(self, original: FileProcessorCheckpoint) -> Optional[FileProcessorCheckpoint]:
         """
         Create and save a checkpoint for retrying failed files.
-        
+
         Args:
             original: The original checkpoint with failed files
-            
+
         Returns:
             The retry checkpoint, or None if no failed files
         """
@@ -390,7 +385,7 @@ class CheckpointManager:
     def get_failed_summary(self) -> Optional[Dict[str, Any]]:
         """
         Get summary of failed files checkpoint.
-        
+
         Returns:
             Summary dict if failed checkpoint exists, None otherwise
         """
@@ -402,7 +397,7 @@ class CheckpointManager:
     def has_any_checkpoint(self) -> Tuple[bool, bool]:
         """
         Check for any checkpoint existence.
-        
+
         Returns:
             Tuple of (has_main_checkpoint, has_failed_checkpoint)
         """
@@ -425,11 +420,11 @@ class CheckpointManager:
         skip_per_file_prompts: bool = False,
         include_filename: bool = True,
         pdf_temp_dirs: Optional[List[str]] = None,
-        profile_name: Optional[str] = None
+        profile_name: Optional[str] = None,
     ) -> FileProcessorCheckpoint:
         """
         Create a new checkpoint.
-        
+
         Args:
             input_path: Input file or directory path
             input_files: List of file paths to process
@@ -447,7 +442,7 @@ class CheckpointManager:
             include_filename: Whether to include filename in AI context
             pdf_temp_dirs: PDF temporary directories to clean up
             profile_name: Connection profile name used
-        
+
         Returns:
             New FileProcessorCheckpoint
         """
@@ -455,6 +450,7 @@ class CheckpointManager:
 
         if profile_name is None:
             from src.connection_profiles import ProfileStore
+
             profile_name = ProfileStore.get_instance().get_active_profile_name()
 
         return FileProcessorCheckpoint(
@@ -481,13 +477,13 @@ class CheckpointManager:
             completed_files=[],
             failed_files=[],
             current_index=0,
-            combined_output_content=""
+            combined_output_content="",
         )
 
     def get_summary(self) -> Optional[Dict[str, Any]]:
         """
         Get summary of existing checkpoint without loading full data.
-        
+
         Returns:
             Summary dict if checkpoint exists, None otherwise
         """
@@ -499,10 +495,10 @@ class CheckpointManager:
     def can_resume(self, input_path: str = None) -> bool:
         """
         Check if checkpoint can be resumed.
-        
+
         Args:
             input_path: Optional - verify checkpoint is for this input path
-        
+
         Returns:
             True if checkpoint exists and is resumable
         """
@@ -521,7 +517,7 @@ class CheckpointManager:
     def can_retry_failed(self) -> bool:
         """
         Check if there's a failed checkpoint that can be retried.
-        
+
         Returns:
             True if failed checkpoint exists with files to retry
         """
@@ -536,11 +532,12 @@ class CheckpointManager:
 # TTS Processor Checkpoint
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class TTSCheckpoint:
     """
     Checkpoint state for TTS Processor.
-    
+
     Stores all information needed to resume a batch TTS processing session.
     """
 
@@ -550,30 +547,30 @@ class TTSCheckpoint:
     updated_at: str
 
     # Input
-    input_path: str                      # Path to source text file
-    segments: List[str]                  # Ordered list of text segments to synthesize
-    split_mode: str                      # "lines", "paragraphs", "sentences", "whole"
+    input_path: str  # Path to source text file
+    segments: List[str]  # Ordered list of text segments to synthesize
+    split_mode: str  # "lines", "paragraphs", "sentences", "whole"
 
     # Voice configuration
     voice_name: str
     model: str
-    style_instructions: str              # Global style/tone for all segments
-    speaker_mode: str                    # "single" or "multi"
+    style_instructions: str  # Global style/tone for all segments
+    speaker_mode: str  # "single" or "multi"
     multi_speaker_config: Optional[List[Dict[str, str]]] = None  # [{name, voice}, ...]
     per_segment_styles: Dict[int, str] = field(default_factory=dict)  # idx -> style string
 
     # Output configuration
-    output_mode: str = "individual"      # "individual" or "merge"
-    output_path: str = ""                # Output directory
+    output_mode: str = "individual"  # "individual" or "merge"
+    output_path: str = ""  # Output directory
     naming_template: str = "{filename}_{index:03d}"
 
     # Execution settings
     delay_between_requests: float = 1.0
 
     # Progress tracking
-    completed_segments: List[int] = field(default_factory=list)   # 0-based indices
-    failed_segments: List[Dict] = field(default_factory=list)     # {idx, error}
-    output_files: List[str] = field(default_factory=list)         # Paths of generated WAVs
+    completed_segments: List[int] = field(default_factory=list)  # 0-based indices
+    failed_segments: List[Dict] = field(default_factory=list)  # {idx, error}
+    output_files: List[str] = field(default_factory=list)  # Paths of generated WAVs
 
     # Retry metadata
     is_retry_checkpoint: bool = False
@@ -626,6 +623,7 @@ class TTSCheckpoint:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TTSCheckpoint":
         import inspect
+
         sig = inspect.signature(cls)
         valid_args = {k: v for k, v in data.items() if k in sig.parameters}
         return cls(**valid_args)

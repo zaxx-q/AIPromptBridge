@@ -13,6 +13,7 @@ from typing import List, Optional
 # Try to import PyAudioWPatch
 try:
     import pyaudiowpatch as pyaudio
+
     HAVE_PYAUDIO = True
 except ImportError:
     HAVE_PYAUDIO = False
@@ -22,6 +23,7 @@ except ImportError:
 @dataclass
 class AudioDevice:
     """Represents an audio input device."""
+
     name: str
     index: int
     is_loopback: bool
@@ -52,7 +54,7 @@ def is_pyaudio_available() -> bool:
 def list_input_devices() -> List[AudioDevice]:
     """
     List all available input devices (microphones).
-    
+
     Returns:
         List of AudioDevice objects for input devices.
     """
@@ -70,14 +72,16 @@ def list_input_devices() -> List[AudioDevice]:
 
                     # Only include devices with input channels that aren't loopback
                     if info.get("maxInputChannels", 0) > 0 and not info.get("isLoopbackDevice", False):
-                        devices.append(AudioDevice(
-                            name=info.get("name", f"Device {i}"),
-                            index=info.get("index", i),
-                            is_loopback=False,
-                            channels=int(info.get("maxInputChannels", 1)),
-                            sample_rate=int(info.get("defaultSampleRate", 44100)),
-                            host_api=int(info.get("hostApi", 0))
-                        ))
+                        devices.append(
+                            AudioDevice(
+                                name=info.get("name", f"Device {i}"),
+                                index=info.get("index", i),
+                                is_loopback=False,
+                                channels=int(info.get("maxInputChannels", 1)),
+                                sample_rate=int(info.get("defaultSampleRate", 44100)),
+                                host_api=int(info.get("hostApi", 0)),
+                            )
+                        )
                 except Exception as e:
                     logging.debug(f"[AudioDevices] Error reading device {i}: {e}")
                     continue
@@ -91,7 +95,7 @@ def list_input_devices() -> List[AudioDevice]:
 def list_loopback_devices() -> List[AudioDevice]:
     """
     List all available WASAPI loopback devices (system audio capture).
-    
+
     Returns:
         List of AudioDevice objects for loopback devices.
     """
@@ -106,14 +110,16 @@ def list_loopback_devices() -> List[AudioDevice]:
             # Use the loopback device generator
             for info in p.get_loopback_device_info_generator():
                 try:
-                    devices.append(AudioDevice(
-                        name=info.get("name", "Unknown Loopback"),
-                        index=info.get("index", -1),
-                        is_loopback=True,
-                        channels=int(info.get("maxInputChannels", 2)),
-                        sample_rate=int(info.get("defaultSampleRate", 44100)),
-                        host_api=int(info.get("hostApi", 0))
-                    ))
+                    devices.append(
+                        AudioDevice(
+                            name=info.get("name", "Unknown Loopback"),
+                            index=info.get("index", -1),
+                            is_loopback=True,
+                            channels=int(info.get("maxInputChannels", 2)),
+                            sample_rate=int(info.get("defaultSampleRate", 44100)),
+                            host_api=int(info.get("hostApi", 0)),
+                        )
+                    )
                 except Exception as e:
                     logging.debug(f"[AudioDevices] Error reading loopback device: {e}")
                     continue
@@ -127,7 +133,7 @@ def list_loopback_devices() -> List[AudioDevice]:
 def get_default_input_device() -> Optional[AudioDevice]:
     """
     Get the default input device (microphone).
-    
+
     Returns:
         AudioDevice for the default input, or None if not available.
     """
@@ -144,7 +150,7 @@ def get_default_input_device() -> Optional[AudioDevice]:
                     is_loopback=False,
                     channels=int(info.get("maxInputChannels", 1)),
                     sample_rate=int(info.get("defaultSampleRate", 44100)),
-                    host_api=int(info.get("hostApi", 0))
+                    host_api=int(info.get("hostApi", 0)),
                 )
             except OSError:
                 # No default input device
@@ -159,7 +165,7 @@ def get_default_input_device() -> Optional[AudioDevice]:
 def get_default_loopback_device() -> Optional[AudioDevice]:
     """
     Get the default WASAPI loopback device (system audio).
-    
+
     Returns:
         AudioDevice for the default loopback, or None if not available.
     """
@@ -176,7 +182,7 @@ def get_default_loopback_device() -> Optional[AudioDevice]:
                     is_loopback=True,
                     channels=int(info.get("maxInputChannels", 2)),
                     sample_rate=int(info.get("defaultSampleRate", 44100)),
-                    host_api=int(info.get("hostApi", 0))
+                    host_api=int(info.get("hostApi", 0)),
                 )
             except (OSError, LookupError):
                 # WASAPI not available or no loopback device
@@ -191,7 +197,7 @@ def get_default_loopback_device() -> Optional[AudioDevice]:
 def get_all_devices() -> List[AudioDevice]:
     """
     Get all available audio devices (both input and loopback).
-    
+
     Returns:
         Combined list of input and loopback devices.
     """
@@ -203,11 +209,11 @@ def get_all_devices() -> List[AudioDevice]:
 def find_device_by_name(name: str, prefer_loopback: bool = False) -> Optional[AudioDevice]:
     """
     Find a device by name.
-    
+
     Args:
         name: Device name to search for (partial match supported)
         prefer_loopback: If True, search loopback devices first
-        
+
     Returns:
         Matching AudioDevice or None
     """

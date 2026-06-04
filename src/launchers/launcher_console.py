@@ -39,6 +39,7 @@ ROOT_UPDATE_ALLOWLIST = [
 
 # ─── Update Functions (stdlib only) ────────────────────────────────────────────
 
+
 def cleanup_old_files(root_dir):
     """Remove .old files left by a previous update. Called at launcher startup."""
     for name in ROOT_UPDATE_ALLOWLIST:
@@ -58,6 +59,7 @@ def wait_for_process_exit(pid, timeout=30):
         # Use ctypes to wait on the process handle
         try:
             import ctypes
+
             kernel32 = ctypes.windll.kernel32
             SYNCHRONIZE = 0x00100000
             WAIT_TIMEOUT = 0x00000102
@@ -273,7 +275,7 @@ def ensure_windows_terminal() -> bool:
         return False
 
     # Only applies to Windows
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
         return False
 
     # Check if already running in Windows Terminal
@@ -300,7 +302,7 @@ def ensure_windows_terminal() -> bool:
         cmd = [wt_path, "-w", "0", "-d", os.getcwd()]
 
         # Determine self path
-        if getattr(sys, 'frozen', False):
+        if getattr(sys, "frozen", False):
             # Compiled (Onefile): sys.argv[0] is usually the full path to the exe
             self_exe = sys.argv[0]
             cmd.append(self_exe)
@@ -318,9 +320,10 @@ def ensure_windows_terminal() -> bool:
         print(f"⚠️  Failed to relaunch in Windows Terminal: {e}")
         return False
 
+
 def main():
     # 0. Determine Root Directory (needed early for update checks)
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         try:
             root_dir = __compiled__.containing_dir
         except NameError:
@@ -427,6 +430,7 @@ def main():
                 )
             except Exception:
                 pass
+
 
 if __name__ == "__main__":
     main()

@@ -33,78 +33,128 @@ class TTSPlaygroundMixin:
         create_section_header(parent, "TTS Mode", self.colors, "🔊")
 
         self.tts_pg_mode_var = tk.StringVar(master=self.root, value="direct")
-        tts_mode_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        tts_mode_frame = (
+            ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        )
         tts_mode_frame.pack(fill="x", pady=(0, 10))
 
         if self.use_ctk:
-            ctk.CTkRadioButton(tts_mode_frame, text="Direct Speech",
-                              variable=self.tts_pg_mode_var, value="direct",
-                              font=get_ctk_font(13), text_color=self.colors.fg,
-                              fg_color=self.colors.accent,
-                              command=self._on_tts_mode_toggle).pack(side="left", padx=(0, 15))
-            ctk.CTkRadioButton(tts_mode_frame, text="AI Director",
-                              variable=self.tts_pg_mode_var, value="director",
-                              font=get_ctk_font(13), text_color=self.colors.fg,
-                              fg_color=self.colors.accent,
-                              command=self._on_tts_mode_toggle).pack(side="left")
+            ctk.CTkRadioButton(
+                tts_mode_frame,
+                text="Direct Speech",
+                variable=self.tts_pg_mode_var,
+                value="direct",
+                font=get_ctk_font(13),
+                text_color=self.colors.fg,
+                fg_color=self.colors.accent,
+                command=self._on_tts_mode_toggle,
+            ).pack(side="left", padx=(0, 15))
+            ctk.CTkRadioButton(
+                tts_mode_frame,
+                text="AI Director",
+                variable=self.tts_pg_mode_var,
+                value="director",
+                font=get_ctk_font(13),
+                text_color=self.colors.fg,
+                fg_color=self.colors.accent,
+                command=self._on_tts_mode_toggle,
+            ).pack(side="left")
         else:
-            tk.Radiobutton(tts_mode_frame, text="Direct Speech",
-                          variable=self.tts_pg_mode_var, value="direct",
-                          font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
-                          command=self._on_tts_mode_toggle).pack(side="left", padx=(0, 15))
-            tk.Radiobutton(tts_mode_frame, text="AI Director",
-                          variable=self.tts_pg_mode_var, value="director",
-                          font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
-                          command=self._on_tts_mode_toggle).pack(side="left")
+            tk.Radiobutton(
+                tts_mode_frame,
+                text="Direct Speech",
+                variable=self.tts_pg_mode_var,
+                value="direct",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+                command=self._on_tts_mode_toggle,
+            ).pack(side="left", padx=(0, 15))
+            tk.Radiobutton(
+                tts_mode_frame,
+                text="AI Director",
+                variable=self.tts_pg_mode_var,
+                value="director",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+                command=self._on_tts_mode_toggle,
+            ).pack(side="left")
 
         # --- Model Selection ---
-        model_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        model_frame = (
+            ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        )
         model_frame.pack(fill="x", pady=(0, 8))
 
         if self.use_ctk:
-            ctk.CTkLabel(model_frame, text="TTS Model:", font=get_ctk_font(12), width=80, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                model_frame,
+                text="TTS Model:",
+                font=get_ctk_font(12),
+                width=80,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
             self.tts_pg_model_var = tk.StringVar(master=self.root, value=TTS_MODELS[0])
             ctk.CTkComboBox(
-                model_frame, variable=self.tts_pg_model_var,
+                model_frame,
+                variable=self.tts_pg_model_var,
                 values=TTS_MODELS,
-                width=280, height=32, state="readonly", font=get_ctk_font(12),
-                **get_ctk_combobox_colors(self.colors)
+                width=280,
+                height=32,
+                state="readonly",
+                font=get_ctk_font(12),
+                **get_ctk_combobox_colors(self.colors),
             ).pack(side="left", padx=(8, 0), fill="x", expand=True)
         else:
-            tk.Label(model_frame, text="TTS Model:", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            tk.Label(model_frame, text="TTS Model:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(
+                side="left"
+            )
             self.tts_pg_model_var = tk.StringVar(value=TTS_MODELS[0])
             from tkinter import ttk
+
             ttk.Combobox(
-                model_frame, textvariable=self.tts_pg_model_var,
-                values=TTS_MODELS, state="readonly", width=35
+                model_frame, textvariable=self.tts_pg_model_var, values=TTS_MODELS, state="readonly", width=35
             ).pack(side="left", padx=(8, 0), fill="x", expand=True)
 
         # --- Voice Selection ---
-        voice_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        voice_frame = (
+            ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        )
         voice_frame.pack(fill="x", pady=(0, 10))
 
         voice_list = get_voice_list()
 
         if self.use_ctk:
-            ctk.CTkLabel(voice_frame, text="Voice:", font=get_ctk_font(12), width=80, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                voice_frame,
+                text="Voice:",
+                font=get_ctk_font(12),
+                width=80,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
             self.tts_pg_voice_var = tk.StringVar(master=self.root, value=voice_list[0] if voice_list else "")
             ctk.CTkComboBox(
-                voice_frame, variable=self.tts_pg_voice_var,
+                voice_frame,
+                variable=self.tts_pg_voice_var,
                 values=voice_list,
-                width=280, height=32, state="readonly", font=get_ctk_font(12),
-                **get_ctk_combobox_colors(self.colors)
+                width=280,
+                height=32,
+                state="readonly",
+                font=get_ctk_font(12),
+                **get_ctk_combobox_colors(self.colors),
             ).pack(side="left", padx=(8, 0), fill="x", expand=True)
         else:
-            tk.Label(voice_frame, text="Voice:", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            tk.Label(voice_frame, text="Voice:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(
+                side="left"
+            )
             self.tts_pg_voice_var = tk.StringVar(value=voice_list[0] if voice_list else "")
             from tkinter import ttk
+
             ttk.Combobox(
-                voice_frame, textvariable=self.tts_pg_voice_var,
-                values=voice_list, state="readonly", width=35
+                voice_frame, textvariable=self.tts_pg_voice_var, values=voice_list, state="readonly", width=35
             ).pack(side="left", padx=(8, 0), fill="x", expand=True)
 
         # --- TTS Input Text ---
@@ -112,97 +162,114 @@ class TTSPlaygroundMixin:
 
         if self.use_ctk:
             self.tts_pg_input_text = ctk.CTkTextbox(
-                parent, height=120, font=get_ctk_font(12),
-                **get_ctk_textbox_colors(self.colors)
+                parent, height=120, font=get_ctk_font(12), **get_ctk_textbox_colors(self.colors)
             )
         else:
             self.tts_pg_input_text = tk.Text(
-                parent, height=5, font=("Segoe UI", 10),
-                bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
+                parent, height=5, font=("Segoe UI", 10), bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
             )
         self.tts_pg_input_text.pack(fill="x", pady=(0, 10))
-        self.tts_pg_input_text.bind('<KeyRelease>', lambda e: self._update_tts_playground_preview())
+        self.tts_pg_input_text.bind("<KeyRelease>", lambda e: self._update_tts_playground_preview())
 
         # --- Director Section (shown only in AI Director mode) ---
-        self.tts_pg_director_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        self.tts_pg_director_frame = (
+            ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        )
         # Initially hidden (shown in director mode)
 
         create_section_header(self.tts_pg_director_frame, "AI Director", self.colors, "🎬")
 
         # Generate Style button
-        dir_btn_frame = ctk.CTkFrame(self.tts_pg_director_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self.tts_pg_director_frame, bg=self.colors.bg)
+        dir_btn_frame = (
+            ctk.CTkFrame(self.tts_pg_director_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self.tts_pg_director_frame, bg=self.colors.bg)
+        )
         dir_btn_frame.pack(fill="x", pady=(0, 8))
 
         self.tts_pg_director_btn = create_emoji_button(
-            dir_btn_frame, "Generate Style", "🎬", self.colors, "primary", 160, 36,
-            self._run_tts_director_playground
+            dir_btn_frame, "Generate Style", "🎬", self.colors, "primary", 160, 36, self._run_tts_director_playground
         )
         self.tts_pg_director_btn.pack(side="left")
 
         # Director status
         if self.use_ctk:
-            self.tts_pg_director_status = ctk.CTkLabel(dir_btn_frame, text="", font=get_ctk_font(11),
-                                                        text_color=self.colors.blockquote)
+            self.tts_pg_director_status = ctk.CTkLabel(
+                dir_btn_frame, text="", font=get_ctk_font(11), text_color=self.colors.blockquote
+            )
         else:
-            self.tts_pg_director_status = tk.Label(dir_btn_frame, text="", font=("Segoe UI", 9),
-                                                    bg=self.colors.bg, fg=self.colors.blockquote)
+            self.tts_pg_director_status = tk.Label(
+                dir_btn_frame, text="", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote
+            )
         self.tts_pg_director_status.pack(side="left", padx=(10, 0))
 
         # Director output textbox
         if self.use_ctk:
             self.tts_pg_director_output = ctk.CTkTextbox(
-                self.tts_pg_director_frame, height=100, font=get_ctk_font(11),
-                **get_ctk_textbox_colors(self.colors)
+                self.tts_pg_director_frame, height=100, font=get_ctk_font(11), **get_ctk_textbox_colors(self.colors)
             )
         else:
             self.tts_pg_director_output = tk.Text(
-                self.tts_pg_director_frame, height=5, font=("Segoe UI", 10),
-                bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
+                self.tts_pg_director_frame,
+                height=5,
+                font=("Segoe UI", 10),
+                bg=self.colors.input_bg,
+                fg=self.colors.fg,
+                wrap="word",
             )
         self.tts_pg_director_output.pack(fill="x", pady=(0, 10))
 
         # --- Generate Audio Button ---
-        gen_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        gen_frame = (
+            ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        )
         gen_frame.pack(fill="x", pady=(0, 8))
 
         self.tts_pg_generate_btn = create_emoji_button(
-            gen_frame, "Generate Audio", "🔊", self.colors, "success", 170, 42,
-            self._run_tts_generation_playground
+            gen_frame, "Generate Audio", "🔊", self.colors, "success", 170, 42, self._run_tts_generation_playground
         )
         self.tts_pg_generate_btn.pack(side="left")
 
         if self.use_ctk:
-            self.tts_pg_gen_status = ctk.CTkLabel(gen_frame, text="", font=get_ctk_font(11),
-                                                   text_color=self.colors.blockquote)
+            self.tts_pg_gen_status = ctk.CTkLabel(
+                gen_frame, text="", font=get_ctk_font(11), text_color=self.colors.blockquote
+            )
         else:
-            self.tts_pg_gen_status = tk.Label(gen_frame, text="", font=("Segoe UI", 9),
-                                              bg=self.colors.bg, fg=self.colors.blockquote)
+            self.tts_pg_gen_status = tk.Label(
+                gen_frame, text="", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote
+            )
         self.tts_pg_gen_status.pack(side="left", padx=(10, 0))
 
         # --- Audio Playback Controls ---
         create_section_header(parent, "Audio Preview", self.colors, "🎧")
 
-        playback_frame = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        playback_frame = (
+            ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        )
         playback_frame.pack(fill="x", pady=(0, 8))
 
         self.tts_pg_play_btn = create_emoji_button(
-            playback_frame, "▶", "", self.colors, "success", 50, 34,
-            self._toggle_tts_playback
+            playback_frame, "▶", "", self.colors, "success", 50, 34, self._toggle_tts_playback
         )
         self.tts_pg_play_btn.pack(side="left", padx=(0, 8))
 
         if self.use_ctk:
-            self.tts_pg_position_label = ctk.CTkLabel(playback_frame, text="00:00 / 00:00",
-                                                       font=get_ctk_font(12), text_color=self.colors.blockquote)
+            self.tts_pg_position_label = ctk.CTkLabel(
+                playback_frame, text="00:00 / 00:00", font=get_ctk_font(12), text_color=self.colors.blockquote
+            )
         else:
-            self.tts_pg_position_label = tk.Label(playback_frame, text="00:00 / 00:00",
-                                                   font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.blockquote)
+            self.tts_pg_position_label = tk.Label(
+                playback_frame,
+                text="00:00 / 00:00",
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.blockquote,
+            )
         self.tts_pg_position_label.pack(side="left", padx=(0, 15))
 
         # Save button
         self.tts_pg_save_btn = create_emoji_button(
-            playback_frame, "Save WAV", "💾", self.colors, "secondary", 110, 34,
-            self._save_tts_audio
+            playback_frame, "Save WAV", "💾", self.colors, "secondary", 110, 34, self._save_tts_audio
         )
         self.tts_pg_save_btn.pack(side="left")
 
@@ -217,7 +284,7 @@ class TTSPlaygroundMixin:
 
     def _update_tts_playground_preview(self):
         """Update the right pane preview for TTS mode."""
-        if not hasattr(self, 'tts_pg_input_text'):
+        if not hasattr(self, "tts_pg_input_text"):
             return
 
         # Get input text
@@ -235,7 +302,9 @@ class TTSPlaygroundMixin:
             meta_text = "🔊 Mode: Direct Speech | No AI processing"
         else:
             # AI Director mode: show director prompt in preview
-            system_text = self._get_current_setting("tts_tool", "director_system_prompt", "(Could not load director prompts)")
+            system_text = self._get_current_setting(
+                "tts_tool", "director_system_prompt", "(Could not load director prompts)"
+            )
             task_template = self._get_current_setting("tts_tool", "director_task_template", "")
             user_text = task_template.replace("{text}", input_text) if input_text else task_template
 
@@ -287,15 +356,13 @@ class TTSPlaygroundMixin:
                 from ....key_store import KeyStore
                 from ....profile_resolver import resolve_profile
                 from ....request_pipeline import RequestContext, RequestOrigin, RequestPipeline
+
                 key_store = KeyStore.get_instance()
                 key_managers = key_store.build_key_managers()
 
                 task = task_template.replace("{text}", input_text)
 
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": task}
-                ]
+                messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": task}]
 
                 provider = _ws.get_active_setting("provider", "google")
                 model = _ws.get_active_setting("model", "")
@@ -305,8 +372,10 @@ class TTSPlaygroundMixin:
 
                 ctx = RequestContext(
                     origin=RequestOrigin.TTS_TOOL,
-                    provider=provider, model=model,
-                    streaming=False, thinking_enabled=False
+                    provider=provider,
+                    model=model,
+                    streaming=False,
+                    thinking_enabled=False,
                 )
                 ctx = RequestPipeline.execute_simple(
                     ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers
@@ -330,16 +399,19 @@ class TTSPlaygroundMixin:
                         self._set_tts_status(
                             self.tts_pg_director_status,
                             f"✅ Style generated ({ctx.total_tokens} tokens)",
-                            self.colors.green
+                            self.colors.green,
                         )
+
                 self.queue.put(_update)
 
             except Exception as e:
+
                 def _err():
                     if not self._destroyed:
                         self.tts_pg_is_directing = False
                         self.tts_pg_director_btn.configure(state="normal")
                         self._set_tts_status(self.tts_pg_director_status, f"❌ {e}", self.colors.accent_red)
+
                 self.queue.put(_err)
 
         threading.Thread(target=_target, daemon=True).start()
@@ -397,6 +469,7 @@ class TTSPlaygroundMixin:
                 resolved = resolve_profile(None, _ws.CONFIG, _ws.AI_PARAMS, _ws.KEY_MANAGERS)
 
                 from ....key_store import KeyStore
+
                 key_store = KeyStore.get_instance()
                 keys_data = key_store.get_pool_for_provider("google")
                 key_strings = [kd["key"] for kd in keys_data if kd.get("key")]
@@ -404,18 +477,17 @@ class TTSPlaygroundMixin:
 
                 provider = create_provider("google", key_manager, resolved.config)
                 pcm_data, error = provider.generate_tts(
-                    text=full_prompt,
-                    model=model,
-                    voice_name=voice_name,
-                    multi_speaker_config=None
+                    text=full_prompt, model=model, voice_name=voice_name, multi_speaker_config=None
                 )
 
                 if error:
+
                     def _err():
                         if not self._destroyed:
                             self.tts_pg_is_generating = False
                             self.tts_pg_generate_btn.configure(state="normal")
                             self._set_tts_status(self.tts_pg_gen_status, f"❌ {error}", self.colors.accent_red)
+
                     self.queue.put(_err)
                     return
 
@@ -433,7 +505,7 @@ class TTSPlaygroundMixin:
                     self._set_tts_status(
                         self.tts_pg_gen_status,
                         f"✅ Audio generated — {dur_str}",
-                        self.colors.green if hasattr(self.colors, 'green') else self.colors.fg
+                        self.colors.green if hasattr(self.colors, "green") else self.colors.fg,
                     )
 
                     # Update position label
@@ -441,16 +513,20 @@ class TTSPlaygroundMixin:
                         self.tts_pg_position_label.configure(text=f"00:00 / {dur_str}")
                     else:
                         self.tts_pg_position_label.configure(text=f"00:00 / {dur_str}")
+
                 self.queue.put(_update)
 
             except Exception as e:
                 import traceback
+
                 traceback.print_exc()
+
                 def _err():
                     if not self._destroyed:
                         self.tts_pg_is_generating = False
                         self.tts_pg_generate_btn.configure(state="normal")
                         self._set_tts_status(self.tts_pg_gen_status, f"❌ {e}", self.colors.accent_red)
+
                 self.queue.put(_err)
 
         threading.Thread(target=_target, daemon=True).start()
@@ -473,6 +549,7 @@ class TTSPlaygroundMixin:
 
         try:
             from ....audio.recorder import AudioRecorder
+
             if not self.tts_pg_recorder:
                 self.tts_pg_recorder = AudioRecorder()
 
@@ -551,16 +628,14 @@ class TTSPlaygroundMixin:
             return
 
         filepath = filedialog.asksaveasfilename(
-            title="Save TTS Audio",
-            defaultextension=".wav",
-            filetypes=[("WAV Audio", "*.wav")],
-            parent=self.root
+            title="Save TTS Audio", defaultextension=".wav", filetypes=[("WAV Audio", "*.wav")], parent=self.root
         )
         if not filepath:
             return
 
         try:
             from ....audio.wav_utils import save_wav
+
             error = save_wav(filepath, self.tts_pg_pcm_data)
             if error:
                 self._set_tts_status(self.tts_pg_gen_status, f"❌ Save failed: {error}", self.colors.accent_red)
@@ -569,7 +644,7 @@ class TTSPlaygroundMixin:
                 self._set_tts_status(
                     self.tts_pg_gen_status,
                     f"✅ Saved: {filename}",
-                    self.colors.green if hasattr(self.colors, 'green') else self.colors.fg
+                    self.colors.green if hasattr(self.colors, "green") else self.colors.fg,
                 )
         except Exception as e:
             self._set_tts_status(self.tts_pg_gen_status, f"❌ {e}", self.colors.accent_red)

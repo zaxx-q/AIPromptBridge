@@ -37,7 +37,11 @@ class ActionsTabMixin:
         container.pack(fill="both", expand=True, padx=15, pady=15)
 
         # Left panel: action list (fixed width)
-        left_panel = ctk.CTkFrame(container, fg_color="transparent", width=260) if self.use_ctk else tk.Frame(container, bg=self.colors.bg, width=260)
+        left_panel = (
+            ctk.CTkFrame(container, fg_color="transparent", width=260)
+            if self.use_ctk
+            else tk.Frame(container, bg=self.colors.bg, width=260)
+        )
         left_panel.pack(side="left", fill="y", padx=(0, 15))
         left_panel.pack_propagate(False)
 
@@ -56,7 +60,7 @@ class ActionsTabMixin:
                 unselected_color=self.colors.surface0,
                 unselected_hover_color=self.colors.surface1,
                 text_color=self.colors.fg,
-                text_color_disabled=self.colors.surface2
+                text_color_disabled=self.colors.surface2,
             )
             self.tool_switcher.set("Text Edit Tool")
             self.tool_switcher.pack(fill="x", pady=(0, 10))
@@ -64,29 +68,43 @@ class ActionsTabMixin:
         # List container - using ScrollableButtonList
         if self.use_ctk:
             self.action_listbox = ScrollableButtonList(
-                left_panel, self.colors, command=self._on_action_select,
-                corner_radius=8, fg_color=self.colors.input_bg
+                left_panel, self.colors, command=self._on_action_select, corner_radius=8, fg_color=self.colors.input_bg
             )
         else:
             self.action_listbox = ScrollableButtonList(
-                left_panel, self.colors, command=self._on_action_select,
-                bg=self.colors.input_bg
+                left_panel, self.colors, command=self._on_action_select, bg=self.colors.input_bg
             )
         self.action_listbox.pack(fill="both", expand=True)
 
         # Action buttons
-        btn_frame = ctk.CTkFrame(left_panel, fg_color="transparent") if self.use_ctk else tk.Frame(left_panel, bg=self.colors.bg)
+        btn_frame = (
+            ctk.CTkFrame(left_panel, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(left_panel, bg=self.colors.bg)
+        )
         btn_frame.pack(fill="x", pady=(12, 0))
 
         # Buttons using shared helper
-        create_emoji_button(btn_frame, "Add", "➕", self.colors, "success", 70, 34, self._add_action).pack(side="left", padx=3)
-        create_emoji_button(btn_frame, "", "📋", self.colors, "secondary", 40, 34, self._duplicate_action).pack(side="left", padx=3)
-        create_emoji_button(btn_frame, "", "🗑️", self.colors, "danger", 40, 34, self._delete_action).pack(side="left", padx=3)
-        create_emoji_button(btn_frame, "⬆", "", self.colors, "secondary", 40, 34, self._move_action_up).pack(side="left", padx=3)
-        create_emoji_button(btn_frame, "⬇", "", self.colors, "secondary", 40, 34, self._move_action_down).pack(side="left", padx=3)
+        create_emoji_button(btn_frame, "Add", "➕", self.colors, "success", 70, 34, self._add_action).pack(
+            side="left", padx=3
+        )
+        create_emoji_button(btn_frame, "", "📋", self.colors, "secondary", 40, 34, self._duplicate_action).pack(
+            side="left", padx=3
+        )
+        create_emoji_button(btn_frame, "", "🗑️", self.colors, "danger", 40, 34, self._delete_action).pack(
+            side="left", padx=3
+        )
+        create_emoji_button(btn_frame, "⬆", "", self.colors, "secondary", 40, 34, self._move_action_up).pack(
+            side="left", padx=3
+        )
+        create_emoji_button(btn_frame, "⬇", "", self.colors, "secondary", 40, 34, self._move_action_down).pack(
+            side="left", padx=3
+        )
 
         # Right panel: action editor
-        right_panel = ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
+        right_panel = (
+            ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
+        )
         right_panel.pack(side="left", fill="both", expand=True)
 
         create_section_header(right_panel, "Edit Action", self.colors, "✏️")
@@ -101,161 +119,282 @@ class ActionsTabMixin:
         editor_container.pack(fill="both", expand=True)
 
         # Action name (read-only label)
-        row_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        row_frame = (
+            ctk.CTkFrame(editor_scroll, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(editor_scroll, bg=self.colors.bg)
+        )
         row_frame.pack(fill="x", pady=8)
 
         if self.use_ctk:
-            ctk.CTkLabel(row_frame, text="Name:", font=get_ctk_font(13), width=120, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                row_frame,
+                text="Name:",
+                font=get_ctk_font(13),
+                width=120,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
             self.editor_widgets["name"] = ctk.CTkLabel(
-                row_frame, text="(select an action)", font=get_ctk_font(13, "bold"),
-                **get_ctk_label_colors(self.colors)
+                row_frame, text="(select an action)", font=get_ctk_font(13, "bold"), **get_ctk_label_colors(self.colors)
             )
         else:
-            tk.Label(row_frame, text="Name:", font=("Segoe UI", 10), width=12, anchor="w",
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
-            self.editor_widgets["name"] = tk.Label(row_frame, text="(select an action)",
-                                                   font=("Segoe UI", 10, "bold"),
-                                                   bg=self.colors.bg, fg=self.colors.fg)
+            tk.Label(
+                row_frame,
+                text="Name:",
+                font=("Segoe UI", 10),
+                width=12,
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(side="left")
+            self.editor_widgets["name"] = tk.Label(
+                row_frame,
+                text="(select an action)",
+                font=("Segoe UI", 10, "bold"),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            )
         self.editor_widgets["name"].pack(side="left", padx=(10, 0))
 
         # Icon field
-        row_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        row_frame = (
+            ctk.CTkFrame(editor_scroll, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(editor_scroll, bg=self.colors.bg)
+        )
         row_frame.pack(fill="x", pady=8)
 
         if self.use_ctk:
-            ctk.CTkLabel(row_frame, text="Icon:", font=get_ctk_font(13), width=120, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                row_frame,
+                text="Icon:",
+                font=get_ctk_font(13),
+                width=120,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
             self.editor_widgets["icon_var"] = tk.StringVar(master=self.root)
             self.editor_widgets["icon_entry"] = ctk.CTkEntry(
-                row_frame, textvariable=self.editor_widgets["icon_var"],
-                font=get_ctk_font(16), width=70, height=34,
+                row_frame,
+                textvariable=self.editor_widgets["icon_var"],
+                font=get_ctk_font(16),
+                width=70,
+                height=34,
                 placeholder_text="📋",
-                **get_ctk_entry_colors(self.colors)
+                **get_ctk_entry_colors(self.colors),
             )
             self.editor_widgets["icon_entry"].pack(side="left", padx=(12, 8))
-            ctk.CTkLabel(row_frame, text="(paste emoji here — Ctrl+V)", font=get_ctk_font(11),
-                        text_color=self.colors.surface2).pack(side="left", padx=(4, 0))
+            ctk.CTkLabel(
+                row_frame, text="(paste emoji here — Ctrl+V)", font=get_ctk_font(11), text_color=self.colors.surface2
+            ).pack(side="left", padx=(4, 0))
         else:
-            tk.Label(row_frame, text="Icon:", font=("Segoe UI", 10), width=12, anchor="w",
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            tk.Label(
+                row_frame,
+                text="Icon:",
+                font=("Segoe UI", 10),
+                width=12,
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(side="left")
             self.editor_widgets["icon_var"] = tk.StringVar(master=self.root)
             self.editor_widgets["icon_entry"] = tk.Entry(
-                row_frame, textvariable=self.editor_widgets["icon_var"],
-                font=("Segoe UI", 12), width=5, bg=self.colors.input_bg, fg=self.colors.fg
+                row_frame,
+                textvariable=self.editor_widgets["icon_var"],
+                font=("Segoe UI", 12),
+                width=5,
+                bg=self.colors.input_bg,
+                fg=self.colors.fg,
             )
             self.editor_widgets["icon_entry"].pack(side="left", padx=(10, 5))
-            tk.Label(row_frame, text="(paste emoji here — Ctrl+V)", font=("Segoe UI", 9),
-                    bg=self.colors.bg, fg=self.colors.surface2).pack(side="left", padx=(4, 0))
+            tk.Label(
+                row_frame,
+                text="(paste emoji here — Ctrl+V)",
+                font=("Segoe UI", 9),
+                bg=self.colors.bg,
+                fg=self.colors.surface2,
+            ).pack(side="left", padx=(4, 0))
 
         # Prompt type dropdown (Text Edit Tool only)
-        self.prompt_type_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        self.prompt_type_frame = (
+            ctk.CTkFrame(editor_scroll, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(editor_scroll, bg=self.colors.bg)
+        )
         self.prompt_type_frame.pack(fill="x", pady=8)
 
         if self.use_ctk:
-            ctk.CTkLabel(self.prompt_type_frame, text="Type:", font=get_ctk_font(13), width=120, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                self.prompt_type_frame,
+                text="Type:",
+                font=get_ctk_font(13),
+                width=120,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
             self.editor_widgets["prompt_type_var"] = tk.StringVar(master=self.root, value="edit")
             self.editor_widgets["prompt_type"] = ctk.CTkComboBox(
-                self.prompt_type_frame, variable=self.editor_widgets["prompt_type_var"],
-                values=["edit", "general"], width=180, height=34, state="readonly",
-                font=get_ctk_font(13), **get_ctk_combobox_colors(self.colors)
+                self.prompt_type_frame,
+                variable=self.editor_widgets["prompt_type_var"],
+                values=["edit", "general"],
+                width=180,
+                height=34,
+                state="readonly",
+                font=get_ctk_font(13),
+                **get_ctk_combobox_colors(self.colors),
             )
             self.editor_widgets["prompt_type"].pack(side="left", padx=(12, 0))
         else:
             from tkinter import ttk
-            tk.Label(self.prompt_type_frame, text="Type:", font=("Segoe UI", 10), width=12, anchor="w",
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+
+            tk.Label(
+                self.prompt_type_frame,
+                text="Type:",
+                font=("Segoe UI", 10),
+                width=12,
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(side="left")
             self.editor_widgets["prompt_type_var"] = tk.StringVar(master=self.root, value="edit")
             self.editor_widgets["prompt_type"] = ttk.Combobox(
-                self.prompt_type_frame, textvariable=self.editor_widgets["prompt_type_var"],
-                values=["edit", "general"], state="readonly", width=15
+                self.prompt_type_frame,
+                textvariable=self.editor_widgets["prompt_type_var"],
+                values=["edit", "general"],
+                state="readonly",
+                width=15,
             )
             self.editor_widgets["prompt_type"].pack(side="left", padx=(10, 0))
 
         # System prompt (multiline)
-        row_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        row_frame = (
+            ctk.CTkFrame(editor_scroll, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(editor_scroll, bg=self.colors.bg)
+        )
         row_frame.pack(fill="x", pady=8)
 
         if self.use_ctk:
-            ctk.CTkLabel(row_frame, text="System Prompt:", font=get_ctk_font(13), anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(anchor="w")
+            ctk.CTkLabel(
+                row_frame, text="System Prompt:", font=get_ctk_font(13), anchor="w", **get_ctk_label_colors(self.colors)
+            ).pack(anchor="w")
             self.editor_widgets["system_prompt"] = ctk.CTkTextbox(
-                row_frame, height=140, font=get_ctk_font(12),
-                **get_ctk_textbox_colors(self.colors)
+                row_frame, height=140, font=get_ctk_font(12), **get_ctk_textbox_colors(self.colors)
             )
             self.editor_widgets["system_prompt"].pack(fill="x", pady=(8, 0))
         else:
-            tk.Label(row_frame, text="System Prompt:", font=("Segoe UI", 10),
-                    bg=self.colors.bg, fg=self.colors.fg).pack(anchor="w")
+            tk.Label(
+                row_frame, text="System Prompt:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg
+            ).pack(anchor="w")
             self.editor_widgets["system_prompt"] = tk.Text(
-                row_frame, font=("Consolas", 10), height=6,
-                bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
+                row_frame, font=("Consolas", 10), height=6, bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
             )
             self.editor_widgets["system_prompt"].pack(fill="x", pady=(5, 0))
 
         # Task field
-        row_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        row_frame = (
+            ctk.CTkFrame(editor_scroll, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(editor_scroll, bg=self.colors.bg)
+        )
         row_frame.pack(fill="x", pady=8)
 
         if self.use_ctk:
-            ctk.CTkLabel(row_frame, text="Task:", font=get_ctk_font(13), width=120, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                row_frame,
+                text="Task:",
+                font=get_ctk_font(13),
+                width=120,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
             self.editor_widgets["task_var"] = tk.StringVar()
             self.editor_widgets["task"] = ctk.CTkEntry(
-                row_frame, textvariable=self.editor_widgets["task_var"],
-                font=get_ctk_font(13), height=34, **get_ctk_entry_colors(self.colors)
+                row_frame,
+                textvariable=self.editor_widgets["task_var"],
+                font=get_ctk_font(13),
+                height=34,
+                **get_ctk_entry_colors(self.colors),
             )
             self.editor_widgets["task"].pack(side="left", fill="x", expand=True, padx=(12, 0))
         else:
-            tk.Label(row_frame, text="Task:", font=("Segoe UI", 10), width=12, anchor="w",
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            tk.Label(
+                row_frame,
+                text="Task:",
+                font=("Segoe UI", 10),
+                width=12,
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(side="left")
             self.editor_widgets["task_var"] = tk.StringVar()
             self.editor_widgets["task"] = tk.Entry(
-                row_frame, textvariable=self.editor_widgets["task_var"],
-                font=("Segoe UI", 10), bg=self.colors.input_bg, fg=self.colors.fg
+                row_frame,
+                textvariable=self.editor_widgets["task_var"],
+                font=("Segoe UI", 10),
+                bg=self.colors.input_bg,
+                fg=self.colors.fg,
             )
             self.editor_widgets["task"].pack(side="left", fill="x", expand=True, padx=(10, 0))
 
         # Show in chat checkbox (label varies by tool)
-        self.show_chat_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        self.show_chat_frame = (
+            ctk.CTkFrame(editor_scroll, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(editor_scroll, bg=self.colors.bg)
+        )
         self.show_chat_frame.pack(fill="x", pady=10)
 
         self.editor_widgets["show_chat_var"] = tk.BooleanVar()
         if self.use_ctk:
             self.editor_widgets["show_chat"] = ctk.CTkCheckBox(
-                self.show_chat_frame, text="Show response in chat window instead of typing/replacing text",
+                self.show_chat_frame,
+                text="Show response in chat window instead of typing/replacing text",
                 variable=self.editor_widgets["show_chat_var"],
-                font=get_ctk_font(13), text_color=self.colors.fg,
-                fg_color=self.colors.accent
+                font=get_ctk_font(13),
+                text_color=self.colors.fg,
+                fg_color=self.colors.accent,
             )
         else:
             self.editor_widgets["show_chat"] = tk.Checkbutton(
-                self.show_chat_frame, text="Show response in chat window instead of typing/replacing text",
+                self.show_chat_frame,
+                text="Show response in chat window instead of typing/replacing text",
                 variable=self.editor_widgets["show_chat_var"],
-                font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
-                selectcolor=self.colors.input_bg
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+                selectcolor=self.colors.input_bg,
             )
         self.editor_widgets["show_chat"].pack(anchor="w")
 
         # Compare prompts checkbox (Text Edit Tool and Snip Tool)
-        self.compare_prompts_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        self.compare_prompts_frame = (
+            ctk.CTkFrame(editor_scroll, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(editor_scroll, bg=self.colors.bg)
+        )
         # Initially shown for text_edit_tool (the default)
 
         self.editor_widgets["compare_prompts_var"] = tk.BooleanVar()
         if self.use_ctk:
             self.editor_widgets["compare_prompts"] = ctk.CTkCheckBox(
-                self.compare_prompts_frame, text="Compare mode",
+                self.compare_prompts_frame,
+                text="Compare mode",
                 variable=self.editor_widgets["compare_prompts_var"],
-                font=get_ctk_font(13), text_color=self.colors.fg,
-                fg_color=self.colors.accent
+                font=get_ctk_font(13),
+                text_color=self.colors.fg,
+                fg_color=self.colors.accent,
             )
         else:
             self.editor_widgets["compare_prompts"] = tk.Checkbutton(
-                self.compare_prompts_frame, text="Compare mode",
+                self.compare_prompts_frame,
+                text="Compare mode",
                 variable=self.editor_widgets["compare_prompts_var"],
-                font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg,
-                selectcolor=self.colors.input_bg
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+                selectcolor=self.colors.input_bg,
             )
         self.editor_widgets["compare_prompts"].pack(anchor="w")
 
@@ -263,44 +402,83 @@ class ActionsTabMixin:
         self.compare_prompts_frame.pack(fill="x", pady=10)
 
         # Connection Profile dropdown (all tools)
-        self.profile_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
+        self.profile_frame = (
+            ctk.CTkFrame(editor_scroll, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(editor_scroll, bg=self.colors.bg)
+        )
         self.profile_frame.pack(fill="x", pady=8)
 
         if self.use_ctk:
-            ctk.CTkLabel(self.profile_frame, text="Connection Profile:", font=get_ctk_font(13), width=120, anchor="w",
-                        **get_ctk_label_colors(self.colors)).pack(side="left")
+            ctk.CTkLabel(
+                self.profile_frame,
+                text="Connection Profile:",
+                font=get_ctk_font(13),
+                width=120,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
             self.editor_widgets["profile_var"] = tk.StringVar(master=self.root, value="(None)")
             self.editor_widgets["profile_combo"] = ctk.CTkComboBox(
-                self.profile_frame, variable=self.editor_widgets["profile_var"],
-                values=["(None)"], width=220, height=34, state="readonly",
-                font=get_ctk_font(13), **get_ctk_combobox_colors(self.colors)
+                self.profile_frame,
+                variable=self.editor_widgets["profile_var"],
+                values=["(None)"],
+                width=220,
+                height=34,
+                state="readonly",
+                font=get_ctk_font(13),
+                **get_ctk_combobox_colors(self.colors),
             )
             self.editor_widgets["profile_combo"].pack(side="left", padx=(12, 8))
             ctk.CTkButton(
-                self.profile_frame, text="Manage...", font=get_ctk_font(12),
-                width=90, height=34, **get_ctk_button_colors(self.colors, "secondary"),
-                command=self._open_profile_manager
+                self.profile_frame,
+                text="Manage...",
+                font=get_ctk_font(12),
+                width=90,
+                height=34,
+                **get_ctk_button_colors(self.colors, "secondary"),
+                command=self._open_profile_manager,
             ).pack(side="left")
         else:
             from tkinter import ttk
-            tk.Label(self.profile_frame, text="Connection Profile:", font=("Segoe UI", 10), width=12, anchor="w",
-                    bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+
+            tk.Label(
+                self.profile_frame,
+                text="Connection Profile:",
+                font=("Segoe UI", 10),
+                width=12,
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(side="left")
             self.editor_widgets["profile_var"] = tk.StringVar(master=self.root, value="(None)")
             self.editor_widgets["profile_combo"] = ttk.Combobox(
-                self.profile_frame, textvariable=self.editor_widgets["profile_var"],
-                values=["(None)"], state="readonly", width=20
+                self.profile_frame,
+                textvariable=self.editor_widgets["profile_var"],
+                values=["(None)"],
+                state="readonly",
+                width=20,
             )
             self.editor_widgets["profile_combo"].pack(side="left", padx=(10, 5))
-            tk.Button(self.profile_frame, text="Manage...", font=("Segoe UI", 9),
-                     bg=self.colors.surface1, fg=self.colors.fg,
-                     command=self._open_profile_manager).pack(side="left")
+            tk.Button(
+                self.profile_frame,
+                text="Manage...",
+                font=("Segoe UI", 9),
+                bg=self.colors.surface1,
+                fg=self.colors.fg,
+                command=self._open_profile_manager,
+            ).pack(side="left")
 
         # Refresh profile dropdown values
         self._refresh_profile_dropdown()
         self._refresh_action_list()
 
         # Save action button - OUTSIDE scrollable frame so it's always visible
-        btn_frame = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
+        btn_frame = (
+            ctk.CTkFrame(right_panel, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(right_panel, bg=self.colors.bg)
+        )
         btn_frame.pack(fill="x", pady=(10, 0), side="bottom")
 
         create_emoji_button(
@@ -309,13 +487,11 @@ class ActionsTabMixin:
 
         if self.use_ctk:
             self.editor_widgets["save_status"] = ctk.CTkLabel(
-                btn_frame, text="", font=get_ctk_font(12),
-                text_color=self.colors.accent_green
+                btn_frame, text="", font=get_ctk_font(12), text_color=self.colors.accent_green
             )
         else:
             self.editor_widgets["save_status"] = tk.Label(
-                btn_frame, text="", font=("Segoe UI", 9),
-                bg=self.colors.bg, fg=self.colors.accent_green
+                btn_frame, text="", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.accent_green
             )
         self.editor_widgets["save_status"].pack(side="left", padx=15)
 
@@ -343,7 +519,7 @@ class ActionsTabMixin:
 
     def _clear_editor(self):
         """Clear the editor fields."""
-        if not hasattr(self, 'editor_widgets') or not self.editor_widgets:
+        if not hasattr(self, "editor_widgets") or not self.editor_widgets:
             return
 
         self.editor_widgets["icon_var"].set("")
@@ -360,7 +536,7 @@ class ActionsTabMixin:
 
     def _update_editor_visibility(self):
         """Show/hide editor fields based on current tool."""
-        if not hasattr(self, 'prompt_type_frame'):
+        if not hasattr(self, "prompt_type_frame"):
             return
 
         is_text_edit = self.current_tool == "text_edit_tool"
@@ -374,14 +550,14 @@ class ActionsTabMixin:
             self.prompt_type_frame.pack_forget()
 
         # compare_prompts: Text Edit and Snip Tool
-        if hasattr(self, 'compare_prompts_frame'):
+        if hasattr(self, "compare_prompts_frame"):
             if is_text_edit or is_snip:
                 self.compare_prompts_frame.pack(fill="x", pady=10)
             else:
                 self.compare_prompts_frame.pack_forget()
 
         # Update checkbox label based on tool (per user requirement)
-        if hasattr(self, 'editor_widgets') and "show_chat" in self.editor_widgets:
+        if hasattr(self, "editor_widgets") and "show_chat" in self.editor_widgets:
             if is_text_edit:
                 new_text = "Show response in chat window instead of typing/replacing text"
             elif is_snip:
@@ -437,22 +613,14 @@ class ActionsTabMixin:
         # Handle different field names per tool
         if self.current_tool == "text_edit_tool":
             self.editor_widgets["prompt_type_var"].set(action_data.get("prompt_type", "edit"))
-            self.editor_widgets["show_chat_var"].set(
-                action_data.get("show_chat_window_instead_of_replace", False)
-            )
+            self.editor_widgets["show_chat_var"].set(action_data.get("show_chat_window_instead_of_replace", False))
             if "compare_prompts_var" in self.editor_widgets:
-                self.editor_widgets["compare_prompts_var"].set(
-                    action_data.get("compare_prompts", False)
-                )
+                self.editor_widgets["compare_prompts_var"].set(action_data.get("compare_prompts", False))
         else:  # snip_tool or audio_tool
             self.editor_widgets["prompt_type_var"].set("edit")  # Not used but keep default
-            self.editor_widgets["show_chat_var"].set(
-                action_data.get("show_chat_window", True)
-            )
+            self.editor_widgets["show_chat_var"].set(action_data.get("show_chat_window", True))
             if self.current_tool == "snip_tool" and "compare_prompts_var" in self.editor_widgets:
-                self.editor_widgets["compare_prompts_var"].set(
-                    action_data.get("compare_prompts", False)
-                )
+                self.editor_widgets["compare_prompts_var"].set(action_data.get("compare_prompts", False))
 
         # Load connection profile (all tools)
         if "profile_var" in self.editor_widgets:
@@ -465,6 +633,7 @@ class ActionsTabMixin:
     def _refresh_profile_dropdown(self):
         """Refresh the connection profile dropdown values from profile store."""
         from ....connection_profiles import ProfileStore
+
         profile_names = ProfileStore.get_instance().get_profile_names()
         values = ["(None)"] + profile_names
 
@@ -479,8 +648,8 @@ class ActionsTabMixin:
         """Open the Manage Profiles dialog."""
         try:
             from ..connection_manager import ConnectionProfileManager
-            ConnectionProfileManager(self.root, colors=self.colors,
-                                     on_close=self._refresh_profile_dropdown)
+
+            ConnectionProfileManager(self.root, colors=self.colors, on_close=self._refresh_profile_dropdown)
         except Exception as e:
             print(f"[PromptEditor] Error opening connection manager: {e}")
 
@@ -496,7 +665,7 @@ class ActionsTabMixin:
                 "prompt_type": "edit",
                 "system_prompt": "",
                 "task": "",
-                "show_chat_window_instead_of_replace": False
+                "show_chat_window_instead_of_replace": False,
             }
             self.action_listbox.add_item(name, name, "⚡")
             self.action_listbox.select(name)
@@ -566,7 +735,7 @@ class ActionsTabMixin:
         idx = display_keys.index(self.current_action)
         if idx > 0:
             # Swap
-            display_keys[idx], display_keys[idx-1] = display_keys[idx-1], display_keys[idx]
+            display_keys[idx], display_keys[idx - 1] = display_keys[idx - 1], display_keys[idx]
 
             # Reconstruct dictionary
             new_data = {}
@@ -594,7 +763,7 @@ class ActionsTabMixin:
         idx = display_keys.index(self.current_action)
         if idx < len(display_keys) - 1:
             # Swap
-            display_keys[idx], display_keys[idx+1] = display_keys[idx+1], display_keys[idx]
+            display_keys[idx], display_keys[idx + 1] = display_keys[idx + 1], display_keys[idx]
 
             # Reconstruct dictionary
             new_data = {}
@@ -653,11 +822,9 @@ class ActionsTabMixin:
 
         if self.use_ctk:
             self.editor_widgets["save_status"].configure(
-                text=f"✅ Saved '{self.current_action}'",
-                text_color=self.colors.accent_green
+                text=f"✅ Saved '{self.current_action}'", text_color=self.colors.accent_green
             )
         else:
             self.editor_widgets["save_status"].configure(
-                text=f"✅ Saved '{self.current_action}'",
-                fg=self.colors.accent_green
+                text=f"✅ Saved '{self.current_action}'", fg=self.colors.accent_green
             )

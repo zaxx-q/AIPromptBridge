@@ -43,7 +43,7 @@ from .utils import set_window_icon
 class AudioAnalyzerWindow:
     """
     Full window for audio recording and AI analysis.
-    
+
     Features:
     - Audio device selection (microphone or system loopback)
     - Recording with real-time level meter (always active)
@@ -67,11 +67,11 @@ class AudioAnalyzerWindow:
         ai_params: Dict[str, Any],
         key_managers: Dict[str, Any],
         on_close: Optional[Callable[[], None]] = None,
-        on_action: Optional[Callable] = None
+        on_action: Optional[Callable] = None,
     ):
         """
         Initialize the audio analyzer window.
-        
+
         Args:
             parent_root: Parent Tk root (from GUICoordinator)
             config: Application configuration dictionary
@@ -113,6 +113,7 @@ class AudioAnalyzerWindow:
         # Compression settings (always enabled with recommended preset by default)
         try:
             from ...audio.ffmpeg_utils import is_ffmpeg_available
+
             self.compression_enabled = is_ffmpeg_available()
         except ImportError:
             self.compression_enabled = False
@@ -121,6 +122,7 @@ class AudioAnalyzerWindow:
 
         # Provider/Model state
         from ... import web_server as _ws
+
         self.provider = _ws.get_active_setting("provider", "google")
         self.model = _ws.get_active_setting("model", "")
         self.available_models: List[str] = []
@@ -192,6 +194,7 @@ class AudioAnalyzerWindow:
         """Get sorted profile names from ProfileStore."""
         try:
             from ...connection_profiles import ProfileStore
+
             return ProfileStore.get_instance().get_profile_names()
         except Exception:
             return []
@@ -247,10 +250,7 @@ class AudioAnalyzerWindow:
         self._create_bottom_bar()
 
         # Main container (no scroll)
-        main_frame = ctk.CTkFrame(
-            self.root,
-            fg_color="transparent"
-        )
+        main_frame = ctk.CTkFrame(self.root, fg_color="transparent")
         main_frame.pack(fill="both", expand=True, padx=15, pady=15)
 
         # Configure grid weights for two-column layout
@@ -291,26 +291,20 @@ class AudioAnalyzerWindow:
     def _build_tk_ui(self):
         """Build standard Tkinter UI (fallback)."""
         from .audio_analyzer_tk import build_tk_ui
+
         build_tk_ui(self)
 
     def _create_section_frame_grid(self, parent, title: str, row: int, col: int, rowspan: int = 1) -> Any:
         """Create a titled section frame using grid layout."""
         frame = ctk.CTkFrame(
-            parent,
-            fg_color=self.colors.surface0,
-            corner_radius=10,
-            border_color=self.colors.surface2,
-            border_width=1
+            parent, fg_color=self.colors.surface0, corner_radius=10, border_color=self.colors.surface2, border_width=1
         )
         frame.grid(row=row, column=col, rowspan=rowspan, sticky="nsew", padx=5, pady=5)
 
         # Section title
-        ctk.CTkLabel(
-            frame,
-            text=title,
-            font=get_ctk_font(size=12, weight="bold"),
-            text_color=self.colors.accent
-        ).pack(anchor="w", padx=12, pady=(10, 5))
+        ctk.CTkLabel(frame, text=title, font=get_ctk_font(size=12, weight="bold"), text_color=self.colors.accent).pack(
+            anchor="w", padx=12, pady=(10, 5)
+        )
 
         # Content container
         content = ctk.CTkFrame(frame, fg_color="transparent")
@@ -329,10 +323,7 @@ class AudioAnalyzerWindow:
 
         # Provider dropdown (hidden in profile mode)
         self.provider_label_widget = ctk.CTkLabel(
-            left_frame,
-            text="Provider:",
-            font=get_ctk_font(size=11),
-            text_color=self.colors.text
+            left_frame, text="Provider:", font=get_ctk_font(size=11), text_color=self.colors.text
         )
 
         providers = ["google", "openrouter", "custom"]
@@ -349,7 +340,7 @@ class AudioAnalyzerWindow:
             dropdown_fg_color=self.colors.surface0,
             dropdown_hover_color=self.colors.surface1,
             text_color=self.colors.text,
-            font=get_ctk_font(size=11)
+            font=get_ctk_font(size=11),
         )
         self.provider_dropdown.set(self.provider)
 
@@ -360,10 +351,7 @@ class AudioAnalyzerWindow:
         # Model/Profile dropdown
         dropdown_label = "Profile:" if self._use_profile_mode else "Model:"
         self.model_label_widget = ctk.CTkLabel(
-            left_frame,
-            text=dropdown_label,
-            font=get_ctk_font(size=11),
-            text_color=self.colors.text
+            left_frame, text=dropdown_label, font=get_ctk_font(size=11), text_color=self.colors.text
         )
         self.model_label_widget.pack(side="left", padx=(0, 5))
 
@@ -375,12 +363,7 @@ class AudioAnalyzerWindow:
             initial_display = self.model or "(loading...)"
 
         self.model_dropdown = ScrollableComboBox(
-            left_frame,
-            colors=self.colors,
-            values=initial_values,
-            width=200,
-            height=32,
-            command=self._on_model_changed
+            left_frame, colors=self.colors, values=initial_values, width=200, height=32, command=self._on_model_changed
         )
         self.model_dropdown.pack(side="left")
         self.model_dropdown.set(initial_display)
@@ -400,7 +383,7 @@ class AudioAnalyzerWindow:
             corner_radius=8,
             command=self._send_audio,
             state="disabled",
-            **get_ctk_button_colors(self.colors, "success")
+            **get_ctk_button_colors(self.colors, "success"),
         )
         self.send_btn.pack(side="left", padx=(0, 10))
 
@@ -415,7 +398,7 @@ class AudioAnalyzerWindow:
             corner_radius=8,
             command=self._save_audio,
             state="disabled",
-            **get_ctk_button_colors(self.colors, "secondary")
+            **get_ctk_button_colors(self.colors, "secondary"),
         )
         self.save_btn.pack(side="left")
 
@@ -426,21 +409,14 @@ class AudioAnalyzerWindow:
     def _create_section_frame_pack(self, parent, title: str) -> Any:
         """Create a titled section frame using pack layout."""
         frame = ctk.CTkFrame(
-            parent,
-            fg_color=self.colors.surface0,
-            corner_radius=10,
-            border_color=self.colors.surface2,
-            border_width=1
+            parent, fg_color=self.colors.surface0, corner_radius=10, border_color=self.colors.surface2, border_width=1
         )
         frame.pack(fill="x", pady=(0, 8))
 
         # Section title
-        ctk.CTkLabel(
-            frame,
-            text=title,
-            font=get_ctk_font(size=12, weight="bold"),
-            text_color=self.colors.accent
-        ).pack(anchor="w", padx=12, pady=(10, 5))
+        ctk.CTkLabel(frame, text=title, font=get_ctk_font(size=12, weight="bold"), text_color=self.colors.accent).pack(
+            anchor="w", padx=12, pady=(10, 5)
+        )
 
         # Content container
         content = ctk.CTkFrame(frame, fg_color="transparent")
@@ -456,12 +432,9 @@ class AudioAnalyzerWindow:
         device_row = ctk.CTkFrame(content, fg_color="transparent")
         device_row.pack(fill="x", pady=(0, 8))
 
-        ctk.CTkLabel(
-            device_row,
-            text="Device:",
-            font=get_ctk_font(size=11),
-            text_color=self.colors.text
-        ).pack(side="left", padx=(0, 5))
+        ctk.CTkLabel(device_row, text="Device:", font=get_ctk_font(size=11), text_color=self.colors.text).pack(
+            side="left", padx=(0, 5)
+        )
 
         self.device_dropdown = ctk.CTkOptionMenu(
             device_row,
@@ -476,7 +449,7 @@ class AudioAnalyzerWindow:
             dropdown_fg_color=self.colors.surface0,
             dropdown_hover_color=self.colors.surface1,
             text_color=self.colors.text,
-            font=get_ctk_font(size=10)
+            font=get_ctk_font(size=10),
         )
         self.device_dropdown.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
@@ -489,7 +462,7 @@ class AudioAnalyzerWindow:
             height=28,
             corner_radius=6,
             command=self._refresh_devices,
-            **get_ctk_button_colors(self.colors, "secondary")
+            **get_ctk_button_colors(self.colors, "secondary"),
         )
         refresh_btn.pack(side="left")
         Tooltip(refresh_btn, "Refresh device list")
@@ -498,7 +471,9 @@ class AudioAnalyzerWindow:
         type_row = ctk.CTkFrame(content, fg_color="transparent")
         type_row.pack(fill="x")
 
-        self.device_type_var = tk.StringVar(value="loopback" if self.config.get("audio_default_loopback", True) else "input")
+        self.device_type_var = tk.StringVar(
+            value="loopback" if self.config.get("audio_default_loopback", True) else "input"
+        )
 
         ctk.CTkRadioButton(
             type_row,
@@ -510,7 +485,7 @@ class AudioAnalyzerWindow:
             text_color=self.colors.text,
             fg_color=self.colors.accent,
             hover_color=self.colors.lavender,
-            border_color=self.colors.surface2
+            border_color=self.colors.surface2,
         ).pack(side="left", padx=(0, 15))
 
         ctk.CTkRadioButton(
@@ -523,7 +498,7 @@ class AudioAnalyzerWindow:
             text_color=self.colors.text,
             fg_color=self.colors.accent,
             hover_color=self.colors.lavender,
-            border_color=self.colors.surface2
+            border_color=self.colors.surface2,
         ).pack(side="left")
 
     def _create_recording_section_pack(self, parent):
@@ -545,16 +520,13 @@ class AudioAnalyzerWindow:
             height=32,
             corner_radius=6,
             command=self._toggle_recording,
-            **get_ctk_button_colors(self.colors, "danger")
+            **get_ctk_button_colors(self.colors, "danger"),
         )
         self.record_btn.pack(side="left", padx=(0, 10))
 
         # Duration display
         self.duration_label = ctk.CTkLabel(
-            controls_row,
-            text="00:00:00",
-            font=get_ctk_font(size=12, weight="bold"),
-            text_color=self.colors.text
+            controls_row, text="00:00:00", font=get_ctk_font(size=12, weight="bold"), text_color=self.colors.text
         )
         self.duration_label.pack(side="left")
 
@@ -568,7 +540,7 @@ class AudioAnalyzerWindow:
             height=32,
             corner_radius=6,
             command=self._upload_audio_file,
-            **get_ctk_button_colors(self.colors, "secondary")
+            **get_ctk_button_colors(self.colors, "secondary"),
         )
         upload_btn.pack(side="right", padx=(5, 0))
 
@@ -592,19 +564,17 @@ class AudioAnalyzerWindow:
             hover_color=self.colors.lavender,
             border_color=self.colors.surface2,
             checkmark_color=self.colors.base,
-            width=24
+            width=24,
         )
         compression_cb.pack(side="left", padx=(0, 10))
 
         # Preset dropdown
-        ctk.CTkLabel(
-            row_frame,
-            text="Preset:",
-            font=get_ctk_font(size=11),
-            text_color=self.colors.overlay0
-        ).pack(side="left", padx=(0, 5))
+        ctk.CTkLabel(row_frame, text="Preset:", font=get_ctk_font(size=11), text_color=self.colors.overlay0).pack(
+            side="left", padx=(0, 5)
+        )
 
         from ...audio.recorder import COMPRESSION_PRESETS
+
         preset_names = [p["name"] for p in COMPRESSION_PRESETS.values()]
 
         self.compression_preset_dropdown = ctk.CTkOptionMenu(
@@ -620,7 +590,7 @@ class AudioAnalyzerWindow:
             dropdown_fg_color=self.colors.surface0,
             dropdown_hover_color=self.colors.surface1,
             text_color=self.colors.text,
-            font=get_ctk_font(size=10)
+            font=get_ctk_font(size=10),
         )
         # Set current preset
         current_preset = COMPRESSION_PRESETS.get(self.compression_preset, {})
@@ -632,21 +602,13 @@ class AudioAnalyzerWindow:
         info_row.pack(fill="x")
 
         # Size estimation
-        self.size_label = ctk.CTkLabel(
-            info_row,
-            text="",
-            font=get_ctk_font(size=10),
-            text_color=self.colors.overlay0
-        )
+        self.size_label = ctk.CTkLabel(info_row, text="", font=get_ctk_font(size=10), text_color=self.colors.overlay0)
         self.size_label.pack(side="left")
 
         # Preset description
         desc = current_preset.get("description", "")
         self.preset_desc_label = ctk.CTkLabel(
-            info_row,
-            text=f"• {desc}" if desc else "",
-            font=get_ctk_font(size=9),
-            text_color=self.colors.overlay0
+            info_row, text=f"• {desc}" if desc else "", font=get_ctk_font(size=9), text_color=self.colors.overlay0
         )
         self.preset_desc_label.pack(side="right")
 
@@ -667,7 +629,7 @@ class AudioAnalyzerWindow:
             corner_radius=6,
             command=self._toggle_playback,
             state="disabled",
-            **get_ctk_button_colors(self.colors, "success")
+            **get_ctk_button_colors(self.colors, "success"),
         )
         self.play_pause_btn.pack(side="left", padx=(0, 8))
 
@@ -684,7 +646,7 @@ class AudioAnalyzerWindow:
             progress_color=self.colors.accent,
             button_color=self.colors.accent,
             button_hover_color=self.colors.lavender,
-            command=self._on_seek
+            command=self._on_seek,
         )
         self.seek_slider.set(0)
         self.seek_slider.configure(state="disabled")
@@ -692,10 +654,7 @@ class AudioAnalyzerWindow:
 
         # Position label
         self.position_label = ctk.CTkLabel(
-            row_frame,
-            text="00:00",
-            font=get_ctk_font(size=10),
-            text_color=self.colors.overlay0
+            row_frame, text="00:00", font=get_ctk_font(size=10), text_color=self.colors.overlay0
         )
         self.position_label.pack(side="left")
 
@@ -707,7 +666,7 @@ class AudioAnalyzerWindow:
         self.response_mode_toggle = SegmentedToggle(
             content,
             options=[("Default", "default"), ("Result Panel", "result"), ("Chat Window", "show")],
-            default_value="default"
+            default_value="default",
         )
         self.response_mode_toggle.pack(pady=(0, 5))
 
@@ -718,7 +677,7 @@ class AudioAnalyzerWindow:
             font=get_ctk_font(size=10),
             text_color=self.colors.overlay0,
             justify="center",
-            wraplength=200
+            wraplength=200,
         ).pack(fill="x", padx=5)
 
     # =========================================================================
@@ -738,15 +697,15 @@ class AudioAnalyzerWindow:
             placeholder_text="Custom task or question...",
             font=get_ctk_font(size=12),
             height=32,
-            border_color=self.colors.surface2
+            border_color=self.colors.surface2,
         )
         self.custom_input.pack(side="left", fill="x", expand=True, padx=(0, 5))
-        self.custom_input.bind('<Return>', self._on_custom_input_set)
+        self.custom_input.bind("<Return>", self._on_custom_input_set)
 
         from ..custom_widgets import create_emoji_button
+
         create_emoji_button(
-            input_frame, "Set", "⚡", self.colors, "secondary", width=60, height=32,
-            command=self._on_custom_input_set
+            input_frame, "Set", "⚡", self.colors, "secondary", width=60, height=32, command=self._on_custom_input_set
         ).pack(side="right")
 
         settings = self.prompts.get_audio_tool().get("_settings", {})
@@ -777,11 +736,7 @@ class AudioAnalyzerWindow:
 
             if groups:
                 # Use GroupedButtonList instead of flat CarouselButtonList
-                self.carousel = GroupedButtonList(
-                    content,
-                    groups=groups,
-                    on_click=self._on_action_click
-                )
+                self.carousel = GroupedButtonList(content, groups=groups, on_click=self._on_action_click)
                 self.carousel.pack(fill="x", pady=(0, 8))
         else:
             # Flat list fallback
@@ -798,10 +753,7 @@ class AudioAnalyzerWindow:
 
             if items:
                 self.carousel = CarouselButtonList(
-                    content,
-                    items=items,
-                    on_click=self._on_action_click,
-                    items_per_page=items_per_page
+                    content, items=items, on_click=self._on_action_click, items_per_page=items_per_page
                 )
                 self.carousel.pack(fill="x", pady=(0, 8))
 
@@ -810,21 +762,14 @@ class AudioAnalyzerWindow:
         default_active = self.prompts.get_default_modifier_keys_for_tool("audio_tool")
         if global_modifiers:
             self.modifier_bar = ModifierBar(
-                content,
-                modifiers=global_modifiers,
-                on_change=self._on_modifiers_changed,
-                default_active=default_active
+                content, modifiers=global_modifiers, on_change=self._on_modifiers_changed, default_active=default_active
             )
             self.modifier_bar.pack(fill="x")
 
     def _create_result_section_grid(self, parent, row: int, col: int, rowspan: int = 1):
         """Create result display section."""
         frame = ctk.CTkFrame(
-            parent,
-            fg_color=self.colors.surface0,
-            corner_radius=10,
-            border_color=self.colors.surface2,
-            border_width=1
+            parent, fg_color=self.colors.surface0, corner_radius=10, border_color=self.colors.surface2, border_width=1
         )
         frame.grid(row=row, column=col, rowspan=rowspan, sticky="nsew", padx=5, pady=5)
 
@@ -833,10 +778,7 @@ class AudioAnalyzerWindow:
         header.pack(fill="x", padx=12, pady=(10, 5))
 
         ctk.CTkLabel(
-            header,
-            text="Result",
-            font=get_ctk_font(size=12, weight="bold"),
-            text_color=self.colors.accent
+            header, text="Result", font=get_ctk_font(size=12, weight="bold"), text_color=self.colors.accent
         ).pack(side="left")
 
         # Copy button
@@ -850,7 +792,7 @@ class AudioAnalyzerWindow:
             corner_radius=6,
             command=self._copy_result,
             state="disabled",
-            **get_ctk_button_colors(self.colors, "secondary")
+            **get_ctk_button_colors(self.colors, "secondary"),
         )
         self.copy_btn.pack(side="right")
 
@@ -869,7 +811,7 @@ class AudioAnalyzerWindow:
             highlightthickness=0,
             padx=10,
             pady=10,
-            state=tk.DISABLED
+            state=tk.DISABLED,
         )
         self.result_text_widget.pack(fill="both", expand=True, padx=2, pady=2)
 
@@ -880,12 +822,7 @@ class AudioAnalyzerWindow:
 
     def _create_bottom_bar(self):
         """Create bottom bar with level meter and status."""
-        bottom_frame = ctk.CTkFrame(
-            self.root,
-            fg_color=self.colors.surface0,
-            corner_radius=0,
-            height=60
-        )
+        bottom_frame = ctk.CTkFrame(self.root, fg_color=self.colors.surface0, corner_radius=0, height=60)
         bottom_frame.pack(fill="x", side="bottom")
         bottom_frame.pack_propagate(False)
 
@@ -893,21 +830,15 @@ class AudioAnalyzerWindow:
         meter_container = ctk.CTkFrame(bottom_frame, fg_color="transparent")
         meter_container.pack(fill="x", padx=15, pady=(8, 0))
 
-        ctk.CTkLabel(
-            meter_container,
-            text="Level:",
-            font=get_ctk_font(size=10),
-            text_color=self.colors.overlay0
-        ).pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(meter_container, text="Level:", font=get_ctk_font(size=10), text_color=self.colors.overlay0).pack(
+            side="left", padx=(0, 8)
+        )
 
         # Check config for meter style
         if self.meter_style == "progressbar":
             # Simple CTkProgressBar
             self.level_bar = ctk.CTkProgressBar(
-                meter_container,
-                height=12,
-                progress_color=self.colors.accent,
-                fg_color=self.colors.surface1
+                meter_container, height=12, progress_color=self.colors.accent, fg_color=self.colors.surface1
             )
             self.level_bar.pack(side="left", fill="x", expand=True)
             self.level_bar.set(0)
@@ -919,7 +850,7 @@ class AudioAnalyzerWindow:
                 height=12,
                 bg=self.colors.surface1,
                 highlightthickness=1,
-                highlightbackground=self.colors.surface2
+                highlightbackground=self.colors.surface2,
             )
             self.level_canvas.pack(side="left", fill="x", expand=True)
             self.level_bar = None
@@ -932,10 +863,7 @@ class AudioAnalyzerWindow:
         status_container.pack(fill="x", padx=15, pady=(4, 8))
 
         self.status_label = ctk.CTkLabel(
-            status_container,
-            text="Ready",
-            font=get_ctk_font(size=10),
-            text_color=self.colors.overlay0
+            status_container, text="Ready", font=get_ctk_font(size=10), text_color=self.colors.overlay0
         )
         self.status_label.pack(side="left")
 
@@ -944,7 +872,7 @@ class AudioAnalyzerWindow:
             status_container,
             text=f"Action: {self.selected_action_key}",
             font=get_ctk_font(size=10, weight="bold"),
-            text_color=self.colors.accent
+            text_color=self.colors.accent,
         )
         self.action_indicator_label.pack(side="right")
 
@@ -1084,10 +1012,11 @@ class AudioAnalyzerWindow:
 
     def _create_level_callback(self):
         """Create the level callback function (simplified like transcription_popup.py).
-        
+
         Uses GUICoordinator for thread-safe UI updates and simple progressbar.set().
         The polling in _start_continuous_level_updates handles amplification/smoothing.
         """
+
         def level_callback(level: float):
             """Handle audio level update (called from audio thread)."""
             if self._destroyed:
@@ -1099,12 +1028,14 @@ class AudioAnalyzerWindow:
             # Update via GUICoordinator (thread-safe like transcription_popup.py)
             try:
                 if self.meter_style == "progressbar" and self.level_bar:
+
                     def _set_level(l=amplified):
                         if not self._destroyed and self.level_bar:
                             try:
                                 self.level_bar.set(l)
                             except tk.TclError:
                                 pass
+
                     GUICoordinator.get_instance().run_on_gui_thread(_set_level)
             except Exception:
                 pass  # Window may be closing
@@ -1113,7 +1044,7 @@ class AudioAnalyzerWindow:
 
     def _start_continuous_level_updates(self):
         """Start continuous polling of level (works before and during recording).
-        
+
         This is used with the unified stream architecture where the stream
         is always active and we just need to poll the level value.
         """
@@ -1128,8 +1059,7 @@ class AudioAnalyzerWindow:
 
             # Apply amplification and smoothing
             amplified = min(1.0, level * self.LEVEL_AMPLIFICATION)
-            smoothed = (self._current_level * self.LEVEL_SMOOTHING +
-                       amplified * (1.0 - self.LEVEL_SMOOTHING))
+            smoothed = self._current_level * self.LEVEL_SMOOTHING + amplified * (1.0 - self.LEVEL_SMOOTHING)
             self._current_level = smoothed
 
             # Update display
@@ -1148,8 +1078,8 @@ class AudioAnalyzerWindow:
 
     def _hex_to_rgb(self, hex_color: str) -> tuple:
         """Convert hex color to RGB tuple."""
-        hex_color = hex_color.lstrip('#')
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        hex_color = hex_color.lstrip("#")
+        return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
 
     def _rgb_to_hex(self, rgb: tuple) -> str:
         """Convert RGB tuple to hex color."""
@@ -1178,7 +1108,7 @@ class AudioAnalyzerWindow:
 
     def _draw_level_grid(self):
         """Draw gradient background and grid lines on canvas (called once or on resize).
-        
+
         Uses pre-rendered gradient rectangles for efficient updates.
         The gradient goes: green (0%) -> yellow (50%) -> red (100%)
         A cover rectangle is moved during updates to reveal the gradient.
@@ -1217,44 +1147,31 @@ class AudioAnalyzerWindow:
             ratio = x / max(canvas_width - 1, 1)
             if ratio < 0.5:
                 # Green to Yellow (0-50%)
-                color = self._interpolate_color(
-                    self.colors.green,
-                    self.colors.accent_yellow,
-                    ratio * 2
-                )
+                color = self._interpolate_color(self.colors.green, self.colors.accent_yellow, ratio * 2)
             else:
                 # Yellow to Red (50-100%)
-                color = self._interpolate_color(
-                    self.colors.accent_yellow,
-                    self.colors.red,
-                    (ratio - 0.5) * 2
-                )
+                color = self._interpolate_color(self.colors.accent_yellow, self.colors.red, (ratio - 0.5) * 2)
 
             # Draw rectangle for this segment
             # Extend width by step to fill gaps
             self.level_canvas.create_rectangle(
-                x, bar_top, x + step, bar_bottom,
-                fill=color, outline="", tags="gradient"
+                x, bar_top, x + step, bar_bottom, fill=color, outline="", tags="gradient"
             )
 
         # Create cover rectangle (initially covers everything - shows no level)
         self.level_canvas.create_rectangle(
-            0, bar_top, canvas_width, bar_bottom,
-            fill=self.colors.surface1, outline="", tags="level_cover"
+            0, bar_top, canvas_width, bar_bottom, fill=self.colors.surface1, outline="", tags="level_cover"
         )
 
         # Draw grid lines on top of everything
         segment_width = canvas_width // 10
         for i in range(11):  # 11 lines for 10 segments (0 to 10 inclusive)
             x = i * segment_width
-            self.level_canvas.create_line(
-                x, 0, x, canvas_height,
-                fill=self.colors.surface2, width=1, tags="grid"
-            )
+            self.level_canvas.create_line(x, 0, x, canvas_height, fill=self.colors.surface2, width=1, tags="grid")
 
     def _update_level_display(self, level: float):
         """Update the level meter display.
-        
+
         For canvas style: Uses efficient cover-moving approach.
         The gradient is pre-rendered once in _draw_level_grid().
         We just move the cover rectangle to reveal the appropriate portion.
@@ -1281,10 +1198,7 @@ class AudioAnalyzerWindow:
 
                 # Move cover to reveal the gradient up to reveal_x
                 # Cover starts at reveal_x and goes to canvas_width
-                self.level_canvas.coords(
-                    "level_cover",
-                    reveal_x, bar_top, canvas_width, bar_bottom
-                )
+                self.level_canvas.coords("level_cover", reveal_x, bar_top, canvas_width, bar_bottom)
 
         except Exception:
             pass
@@ -1295,7 +1209,7 @@ class AudioAnalyzerWindow:
 
     def _set_record_button_icon(self, mode: str):
         """Set record button icon, handling both CTk and Tk widgets.
-        
+
         Args:
             mode: "record" for 🔴 or "stop" for ⏹
         """
@@ -1305,30 +1219,16 @@ class AudioAnalyzerWindow:
         if HAVE_CTK and isinstance(self.record_btn, ctk.CTkButton):
             if mode == "stop":
                 content = prepare_emoji_content("⏹ Stop", size=14)
-                self.record_btn.configure(
-                    **content,
-                    **get_ctk_button_colors(self.colors, "secondary")
-                )
+                self.record_btn.configure(**content, **get_ctk_button_colors(self.colors, "secondary"))
             else:
                 content = prepare_emoji_content("🔴 Record", size=14)
-                self.record_btn.configure(
-                    **content,
-                    **get_ctk_button_colors(self.colors, "danger")
-                )
+                self.record_btn.configure(**content, **get_ctk_button_colors(self.colors, "danger"))
         else:
             # Standard Tk button fallback
             if mode == "stop":
-                self.record_btn.configure(
-                    text="⏹ Stop",
-                    bg=self.colors.surface1,
-                    fg=self.colors.text
-                )
+                self.record_btn.configure(text="⏹ Stop", bg=self.colors.surface1, fg=self.colors.text)
             else:
-                self.record_btn.configure(
-                    text="🔴 Record",
-                    bg=self.colors.red,
-                    fg=self.colors.accent_fg
-                )
+                self.record_btn.configure(text="🔴 Record", bg=self.colors.red, fg=self.colors.accent_fg)
 
     def _toggle_recording(self):
         """Toggle recording state."""
@@ -1381,8 +1281,7 @@ class AudioAnalyzerWindow:
 
             # Apply our amplification and smoothing
             amplified = min(1.0, level * self.LEVEL_AMPLIFICATION)
-            smoothed = (self._current_level * self.LEVEL_SMOOTHING +
-                       amplified * (1.0 - self.LEVEL_SMOOTHING))
+            smoothed = self._current_level * self.LEVEL_SMOOTHING + amplified * (1.0 - self.LEVEL_SMOOTHING)
             self._current_level = smoothed
 
             # Update display
@@ -1412,9 +1311,12 @@ class AudioAnalyzerWindow:
 
                 # Calculate duration from data
                 from ...audio.ffmpeg_utils import get_audio_duration
+
                 self.audio_duration = get_audio_duration(wav_data)
 
-                logging.info(f"[AudioAnalyzer] Recording stopped (unified): {len(wav_data)} bytes, {self.audio_duration:.1f}s")
+                logging.info(
+                    f"[AudioAnalyzer] Recording stopped (unified): {len(wav_data)} bytes, {self.audio_duration:.1f}s"
+                )
                 print(f"[AudioAnalyzer] Recording stopped: {len(wav_data)} bytes, {self.audio_duration:.1f}s")
 
                 # Update compression estimate
@@ -1441,8 +1343,7 @@ class AudioAnalyzerWindow:
         from tkinter import filedialog
 
         file_path = filedialog.askopenfilename(
-            title="Select Audio File",
-            filetypes=[("Audio Files", "*.wav *.mp3 *.ogg *.m4a *.aac *.flac")]
+            title="Select Audio File", filetypes=[("Audio Files", "*.wav *.mp3 *.ogg *.m4a *.aac *.flac")]
         )
 
         if not file_path:
@@ -1453,10 +1354,11 @@ class AudioAnalyzerWindow:
                 data = f.read()
 
             self.recorded_wav = data
-            self.compressed_audio = None # Clear previous compression cache
+            self.compressed_audio = None  # Clear previous compression cache
 
             # Determine duration
             from ...audio.ffmpeg_utils import get_audio_duration
+
             self.audio_duration = get_audio_duration(data)
 
             # Update UI
@@ -1499,10 +1401,14 @@ class AudioAnalyzerWindow:
 
     def _enable_audio_controls(self):
         """Enable playback and send controls after recording."""
-        if self.play_pause_btn: self.play_pause_btn.configure(state="normal")
-        if self.seek_slider: self.seek_slider.configure(state="normal")
-        if self.send_btn: self.send_btn.configure(state="normal")
-        if self.save_btn: self.save_btn.configure(state="normal")
+        if self.play_pause_btn:
+            self.play_pause_btn.configure(state="normal")
+        if self.seek_slider:
+            self.seek_slider.configure(state="normal")
+        if self.send_btn:
+            self.send_btn.configure(state="normal")
+        if self.save_btn:
+            self.save_btn.configure(state="normal")
 
         # Update position label
         if self.position_label:
@@ -1530,7 +1436,8 @@ class AudioAnalyzerWindow:
         self.play_pause_btn.configure(state="disabled")
         self.seek_slider.configure(state="disabled")
         self.send_btn.configure(state="disabled")
-        if self.save_btn: self.save_btn.configure(state="disabled")
+        if self.save_btn:
+            self.save_btn.configure(state="disabled")
 
         # Clear result
         self.result_text_widget.configure(state=tk.NORMAL)
@@ -1543,7 +1450,7 @@ class AudioAnalyzerWindow:
 
     def _save_audio(self):
         """Save recorded/compressed audio to the audio_output folder.
-        
+
         Uses the compression preset to process the audio, reads output format
         from config, and embeds result text as metadata if available.
         Delegates to centralized export utilities in src/audio/export.py.
@@ -1564,10 +1471,7 @@ class AudioAnalyzerWindow:
         # Build filename: result text → device name → timestamp only
         device_name = self.current_device.name if self.current_device else None
         filename = build_output_filename(
-            prefix="audio",
-            text_source=self.result_text,
-            fallback_name=device_name,
-            format_ext=ext
+            prefix="audio", text_source=self.result_text, fallback_name=device_name, format_ext=ext
         )
 
         save_dir = "audio_output"
@@ -1579,9 +1483,7 @@ class AudioAnalyzerWindow:
         def _save_thread():
             try:
                 # Get compression preset config
-                preset_config = COMPRESSION_PRESETS.get(
-                    self.compression_preset, COMPRESSION_PRESETS["recommended"]
-                )
+                preset_config = COMPRESSION_PRESETS.get(self.compression_preset, COMPRESSION_PRESETS["recommended"])
                 preset_args = preset_config.get("ffmpeg_args", "")
 
                 # Extract filter args (-af ...) from preset for non-ogg formats
@@ -1609,7 +1511,7 @@ class AudioAnalyzerWindow:
                             format_ext=ext,
                             ffmpeg_filter_args=preset_args,
                             codec_override=[],  # Preset already has codec
-                            metadata_comment=self.result_text or None
+                            metadata_comment=self.result_text or None,
                         )
                     else:
                         # For other formats, use extracted filters + CODEC_MAP codec
@@ -1618,20 +1520,20 @@ class AudioAnalyzerWindow:
                             output_path=filepath,
                             format_ext=ext,
                             ffmpeg_filter_args=filter_args,
-                            metadata_comment=self.result_text or None
+                            metadata_comment=self.result_text or None,
                         )
 
                     if error:
                         GUICoordinator.get_instance().run_on_gui_thread(
-                            lambda e=error: self._update_status(
-                                f"Save failed: {e[:80]}", self.colors.red
-                            )
+                            lambda e=error: self._update_status(f"Save failed: {e[:80]}", self.colors.red)
                         )
                     else:
                         file_size = os.path.getsize(filepath)
-                        size_str = (f"{file_size / 1024:.0f} KB"
-                                   if file_size < 1024 * 1024
-                                   else f"{file_size / (1024*1024):.1f} MB")
+                        size_str = (
+                            f"{file_size / 1024:.0f} KB"
+                            if file_size < 1024 * 1024
+                            else f"{file_size / (1024 * 1024):.1f} MB"
+                        )
                         GUICoordinator.get_instance().run_on_gui_thread(
                             lambda fn=filename, ss=size_str: self._update_status(
                                 f"✅ Saved: {fn} ({ss})", self.colors.green
@@ -1657,7 +1559,7 @@ class AudioAnalyzerWindow:
 
     def _set_play_button_icon(self, mode: str):
         """Set play/pause button icon, handling both CTk and Tk widgets.
-        
+
         Args:
             mode: "play" for ▶ or "pause" for ⏸
         """
@@ -1667,30 +1569,16 @@ class AudioAnalyzerWindow:
         if HAVE_CTK and isinstance(self.play_pause_btn, ctk.CTkButton):
             if mode == "pause":
                 content = prepare_emoji_content("⏸", size=14)
-                self.play_pause_btn.configure(
-                    **content,
-                    **get_ctk_button_colors(self.colors, "secondary")
-                )
+                self.play_pause_btn.configure(**content, **get_ctk_button_colors(self.colors, "secondary"))
             else:
                 content = prepare_emoji_content("▶", size=14)
-                self.play_pause_btn.configure(
-                    **content,
-                    **get_ctk_button_colors(self.colors, "success")
-                )
+                self.play_pause_btn.configure(**content, **get_ctk_button_colors(self.colors, "success"))
         else:
             # Standard Tk button fallback
             if mode == "pause":
-                self.play_pause_btn.configure(
-                    text="⏸",
-                    bg=self.colors.surface1,
-                    fg=self.colors.text
-                )
+                self.play_pause_btn.configure(text="⏸", bg=self.colors.surface1, fg=self.colors.text)
             else:
-                self.play_pause_btn.configure(
-                    text="▶",
-                    bg=self.colors.green,
-                    fg=self.colors.accent_fg
-                )
+                self.play_pause_btn.configure(text="▶", bg=self.colors.green, fg=self.colors.accent_fg)
 
     def _toggle_playback(self):
         """Toggle playback state."""
@@ -1810,10 +1698,7 @@ class AudioAnalyzerWindow:
         if self.compression_enabled:
             if not self.compressed_audio:
                 # Compress on first playback
-                self.compressed_audio = self.recorder.compress_audio(
-                    self.recorded_wav,
-                    self.compression_preset
-                )
+                self.compressed_audio = self.recorder.compress_audio(self.recorded_wav, self.compression_preset)
             return self.compressed_audio or self.recorded_wav
 
         return self.recorded_wav
@@ -1827,6 +1712,7 @@ class AudioAnalyzerWindow:
         if self.compression_var.get():
             try:
                 from ...audio.ffmpeg_utils import is_ffmpeg_available
+
                 if not is_ffmpeg_available():
                     self.compression_var.set(False)
                     self.compression_enabled = False
@@ -1867,13 +1753,11 @@ class AudioAnalyzerWindow:
 
         text = ""
         if self.compression_enabled and self.recorder:
-            estimated = self.recorder.estimate_compressed_size(
-                self.recorded_wav,
-                self.compression_preset
-            )
+            estimated = self.recorder.estimate_compressed_size(self.recorded_wav, self.compression_preset)
             estimated_mb = estimated / (1024 * 1024)
 
             from ...audio.recorder import COMPRESSION_PRESETS
+
             preset = COMPRESSION_PRESETS.get(self.compression_preset, {})
             ext = preset.get("output_ext", ".ogg").upper().lstrip(".")
 
@@ -1895,9 +1779,10 @@ class AudioAnalyzerWindow:
     def _on_provider_changed(self, provider: str):
         """Handle provider dropdown change."""
         if self._use_profile_mode:
-            return # Provider is determined by the profile
+            return  # Provider is determined by the profile
         self.provider = provider
         from ... import web_server as _ws
+
         # When user manually switches provider in non-profile mode,
         # get the model for that provider from the active profile
         if _ws.ACTIVE_PROFILE and _ws.ACTIVE_PROFILE.provider == provider:
@@ -1925,7 +1810,7 @@ class AudioAnalyzerWindow:
 
     def _on_device_changed(self, device_name: str):
         """Handle device dropdown change."""
-        if hasattr(self, '_device_map') and device_name in self._device_map:
+        if hasattr(self, "_device_map") and device_name in self._device_map:
             self.current_device = self._device_map[device_name]
             # _update_recorder_device now handles starting level monitoring
             self._update_recorder_device()
@@ -1985,11 +1870,7 @@ class AudioAnalyzerWindow:
 
             try:
                 # Pass current provider to fetch correct models
-                models, error = fetch_models(
-                    self.config,
-                    self.key_managers,
-                    provider_override=self.provider
-                )
+                models, error = fetch_models(self.config, self.key_managers, provider_override=self.provider)
             except Exception as e:
                 logging.error(f"[AudioAnalyzer] fetch_models failed: {e}")
                 error = str(e)
@@ -2000,7 +1881,7 @@ class AudioAnalyzerWindow:
                 if self.provider == "openrouter":
                     models = self._filter_audio_models(models)
 
-                self.available_models = [m['id'] for m in models]
+                self.available_models = [m["id"] for m in models]
 
                 # If no models found (e.g. filtered out), show indicator
                 if not self.available_models:
@@ -2053,11 +1934,13 @@ class AudioAnalyzerWindow:
         except Exception as e:
             logging.error(f"[AudioAnalyzer] Model loading error: {e}")
             import traceback
+
             traceback.print_exc()
 
             # Fallback
             if self.model:
                 self.available_models = [self.model]
+
                 def set_fallback_exc():
                     if self.model_dropdown:
                         try:
@@ -2070,10 +1953,7 @@ class AudioAnalyzerWindow:
 
     def _filter_audio_models(self, models: List[Dict]) -> List[Dict]:
         """Filter OpenRouter models to those supporting audio input."""
-        return [
-            m for m in models
-            if 'audio' in m.get('architecture', {}).get('input_modalities', [])
-        ]
+        return [m for m in models if "audio" in m.get("architecture", {}).get("input_modalities", [])]
 
     # =========================================================================
     # Send Audio for Analysis
@@ -2109,31 +1989,23 @@ class AudioAnalyzerWindow:
 
         if self.compression_enabled:
             # Compress in background if needed
-            threading.Thread(
-                target=self._prepare_and_send_audio,
-                args=(action_key, custom_text),
-                daemon=True
-            ).start()
+            threading.Thread(target=self._prepare_and_send_audio, args=(action_key, custom_text), daemon=True).start()
         else:
             # Run in background thread
             threading.Thread(
-                target=self._process_or_callback,
-                args=(action_key, audio_data, mime_type, custom_text),
-                daemon=True
+                target=self._process_or_callback, args=(action_key, audio_data, mime_type, custom_text), daemon=True
             ).start()
 
     def _prepare_and_send_audio(self, action_key: str, custom_text: Optional[str] = None):
         """Compress audio then process."""
         try:
             if not self.compressed_audio:
-                self.compressed_audio = self.recorder.compress_audio(
-                    self.recorded_wav,
-                    self.compression_preset
-                )
+                self.compressed_audio = self.recorder.compress_audio(self.recorded_wav, self.compression_preset)
 
             audio_data = self.compressed_audio or self.recorded_wav
 
             from ...audio.recorder import COMPRESSION_PRESETS
+
             preset = COMPRESSION_PRESETS.get(self.compression_preset, {})
             mime_type = "audio/ogg" if preset.get("output_ext", ".ogg") == ".ogg" else "audio/mpeg"
 
@@ -2145,9 +2017,7 @@ class AudioAnalyzerWindow:
                 lambda: self._update_status(f"Compression error: {e}", self.colors.red)
             )
             self.is_processing = False
-            GUICoordinator.get_instance().run_on_gui_thread(
-                lambda: self.send_btn.configure(state="normal")
-            )
+            GUICoordinator.get_instance().run_on_gui_thread(lambda: self.send_btn.configure(state="normal"))
 
     def _process_or_callback(self, action_key, audio_data, mime_type, custom_text: Optional[str] = None):
         """Delegate to callback or process internally."""
@@ -2156,7 +2026,7 @@ class AudioAnalyzerWindow:
         action = actions.get(action_key, {})
 
         # Determine strict response mode
-        show_chat = True # Default fallback
+        show_chat = True  # Default fallback
 
         mode = "default"
         if self.response_mode_toggle:
@@ -2177,9 +2047,9 @@ class AudioAnalyzerWindow:
             effective_profile = None
             if self._use_profile_mode and self.selected_profile:
                 from ...profile_resolver import resolve_profile_by_name
+
                 resolved = resolve_profile_by_name(
-                    self.selected_profile, self.config,
-                    self.ai_params, self.key_managers
+                    self.selected_profile, self.config, self.ai_params, self.key_managers
                 )
                 effective_provider = resolved.provider
                 effective_model = resolved.model
@@ -2196,14 +2066,12 @@ class AudioAnalyzerWindow:
                     compressed=self.compression_enabled,
                     provider=effective_provider,
                     model=effective_model,
-                    profile_name=effective_profile
+                    profile_name=effective_profile,
                 )
 
                 # Reset processing state
                 self.is_processing = False
-                GUICoordinator.get_instance().run_on_gui_thread(
-                    lambda: self.send_btn.configure(state="normal")
-                )
+                GUICoordinator.get_instance().run_on_gui_thread(lambda: self.send_btn.configure(state="normal"))
                 GUICoordinator.get_instance().run_on_gui_thread(
                     lambda: self._update_status("Sent to AI", self.colors.green)
                 )
@@ -2211,9 +2079,7 @@ class AudioAnalyzerWindow:
             except Exception as e:
                 logging.error(f"[AudioAnalyzer] Callback error: {e}")
                 self.is_processing = False
-                GUICoordinator.get_instance().run_on_gui_thread(
-                    lambda: self.send_btn.configure(state="normal")
-                )
+                GUICoordinator.get_instance().run_on_gui_thread(lambda: self.send_btn.configure(state="normal"))
                 GUICoordinator.get_instance().run_on_gui_thread(
                     lambda: self._update_status(f"Error: {e}", self.colors.red)
                 )
@@ -2221,7 +2087,9 @@ class AudioAnalyzerWindow:
             # Process internally (Standalone mode OR show_chat_window=False)
             self._process_audio_internal(action_key, audio_data, mime_type, custom_text)
 
-    def _process_audio_internal(self, action_key: str, audio_data: bytes, mime_type: str, custom_text: Optional[str] = None):
+    def _process_audio_internal(
+        self, action_key: str, audio_data: bytes, mime_type: str, custom_text: Optional[str] = None
+    ):
         """Process audio internally."""
         from ...gui.audio_tool import get_instance as get_audio_tool
 
@@ -2233,13 +2101,13 @@ class AudioAnalyzerWindow:
             return
 
         def on_progress(msg):
-            if self._destroyed: return
-            GUICoordinator.get_instance().run_on_gui_thread(
-                lambda: self._update_status(msg, self.colors.accent)
-            )
+            if self._destroyed:
+                return
+            GUICoordinator.get_instance().run_on_gui_thread(lambda: self._update_status(msg, self.colors.accent))
 
         def on_success(response_text, tokens):
-            if self._destroyed: return
+            if self._destroyed:
+                return
 
             def update():
                 self.result_text = response_text
@@ -2256,7 +2124,8 @@ class AudioAnalyzerWindow:
             GUICoordinator.get_instance().run_on_gui_thread(update)
 
         def on_error(error_msg):
-            if self._destroyed: return
+            if self._destroyed:
+                return
 
             def update():
                 self._update_status(f"Error: {error_msg}", self.colors.red)
@@ -2276,10 +2145,8 @@ class AudioAnalyzerWindow:
         effective_profile = None
         if self._use_profile_mode and self.selected_profile:
             from ...profile_resolver import resolve_profile_by_name
-            resolved = resolve_profile_by_name(
-                self.selected_profile, self.config,
-                self.ai_params, self.key_managers
-            )
+
+            resolved = resolve_profile_by_name(self.selected_profile, self.config, self.ai_params, self.key_managers)
             effective_provider = resolved.provider
             effective_model = resolved.model
             effective_profile = self.selected_profile
@@ -2295,7 +2162,7 @@ class AudioAnalyzerWindow:
             profile_name=effective_profile,
             callback_progress=on_progress,
             callback_success=on_success,
-            callback_error=on_error
+            callback_error=on_error,
         )
 
     def _build_modifier_injections(self) -> str:
@@ -2384,11 +2251,11 @@ def create_audio_analyzer_window(
     ai_params: Dict[str, Any],
     key_managers: Dict[str, Any],
     on_close: Optional[Callable[[], None]] = None,
-    on_action: Optional[Callable] = None
+    on_action: Optional[Callable] = None,
 ) -> AudioAnalyzerWindow:
     """
     Create an audio analyzer window.
-    
+
     Args:
         parent_root: Parent Tk root
         config: Application configuration
@@ -2396,10 +2263,8 @@ def create_audio_analyzer_window(
         key_managers: Key manager instances
         on_close: Optional close callback
         on_action: Optional action callback
-        
+
     Returns:
         The created window instance
     """
-    return AudioAnalyzerWindow(
-        parent_root, config, ai_params, key_managers, on_close, on_action
-    )
+    return AudioAnalyzerWindow(parent_root, config, ai_params, key_managers, on_close, on_action)

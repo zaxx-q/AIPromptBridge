@@ -34,6 +34,7 @@ from .ffmpeg_utils import (
 # Try to import PyAudioWPatch
 try:
     import pyaudiowpatch as pyaudio
+
     HAVE_PYAUDIO = True
 except ImportError:
     HAVE_PYAUDIO = False
@@ -49,44 +50,43 @@ COMPRESSION_PRESETS = {
         "name": "Recommended",
         "description": "Best for speech with silence removal",
         "ffmpeg_args": "-af silenceremove=start_periods=1:start_duration=0.1:start_threshold=-50dB:detection=peak,aformat=sample_fmts=s16:sample_rates=16000:channel_layouts=mono -c:a libopus -b:a 32k -ar 16000 -ac 1 -compression_level 10",
-        "output_ext": ".ogg"
+        "output_ext": ".ogg",
     },
     "preserve_audio": {
         "name": "Preserve Audio",
         "description": "Compress but no silence removal, preserves original audio",
         "ffmpeg_args": "-c:a libopus -b:a 32k -ar 16000 -ac 1 -compression_level 10",
-        "output_ext": ".ogg"
+        "output_ext": ".ogg",
     },
     "smallest": {
         "name": "Smallest",
         "description": "Maximum compression with silence removal",
         "ffmpeg_args": "-af silenceremove=start_periods=1:start_duration=0.1:start_threshold=-50dB:detection=peak,aformat=sample_fmts=s16:sample_rates=16000:channel_layouts=mono -c:a libopus -b:a 16k -ar 16000 -ac 1 -compression_level 10",
-        "output_ext": ".ogg"
+        "output_ext": ".ogg",
     },
     "mp3_compat": {
         "name": "MP3 Compatible",
         "description": "MP3 format for maximum compatibility",
         "ffmpeg_args": "-c:a libmp3lame -b:a 32k -ar 16000 -ac 1 -q:a 9",
-        "output_ext": ".mp3"
+        "output_ext": ".mp3",
     },
     "music": {
         "name": "Music",
         "description": "Higher quality for music content",
         "ffmpeg_args": "-c:a libopus -b:a 96k -ar 48000 -ac 2 -compression_level 10",
-        "output_ext": ".ogg"
-    }
+        "output_ext": ".ogg",
+    },
 }
-
 
 
 def get_rms_level(audio_chunk: bytes, sample_width: int = 2) -> float:
     """
     Calculate RMS level from audio chunk.
-    
+
     Args:
         audio_chunk: Raw audio bytes
         sample_width: Bytes per sample (2 for 16-bit)
-        
+
     Returns:
         Normalized RMS level between 0.0 and 1.0
     """
@@ -97,7 +97,7 @@ def get_rms_level(audio_chunk: bytes, sample_width: int = 2) -> float:
         if sample_width == 2:  # 16-bit audio
             num_samples = len(audio_chunk) // 2
             fmt = f"<{num_samples}h"  # Little-endian signed shorts
-            samples = struct.unpack(fmt, audio_chunk[:num_samples * 2])
+            samples = struct.unpack(fmt, audio_chunk[: num_samples * 2])
 
             # Calculate RMS
             sum_squares = sum(s * s for s in samples)
@@ -108,7 +108,7 @@ def get_rms_level(audio_chunk: bytes, sample_width: int = 2) -> float:
         elif sample_width == 4:  # 32-bit float
             num_samples = len(audio_chunk) // 4
             fmt = f"<{num_samples}f"
-            samples = struct.unpack(fmt, audio_chunk[:num_samples * 4])
+            samples = struct.unpack(fmt, audio_chunk[: num_samples * 4])
 
             sum_squares = sum(s * s for s in samples)
             rms = math.sqrt(sum_squares / len(samples))
@@ -122,7 +122,7 @@ def get_rms_level(audio_chunk: bytes, sample_width: int = 2) -> float:
 class AudioRecorder:
     """
     Audio recorder with unified stream architecture for recording, playback, and level monitoring.
-    
+
     Key features:
     - Single unified stream handles both level monitoring and recording
     - Records from microphones or WASAPI loopback devices
@@ -130,7 +130,7 @@ class AudioRecorder:
     - Recording is flag-based (instant start/stop, no stream conflicts)
     - Supports audio playback with seek/pause
     - Compresses audio using FFmpeg (Opus/OGG or MP3)
-    
+
     Architecture:
     - Call start_stream() when device is selected - opens WASAPI input once
     - Recording is controlled via start_recording()/stop_recording() flags
@@ -145,7 +145,7 @@ class AudioRecorder:
     def __init__(self, device: Optional[AudioDevice] = None):
         """
         Initialize the recorder.
-        
+
         Args:
             device: Audio device to use. If None, uses default.
         """
@@ -224,14 +224,14 @@ class AudioRecorder:
     def start_stream(self, level_callback: Optional[Callable[[float], None]] = None) -> bool:
         """
         Start the audio input stream for level monitoring and recording.
-        
+
         Opens a PyAudio stream with a callback. The callback is invoked by the audio
         driver at the appropriate rate. For WASAPI loopback, this is typically once
         per second with a large buffer of audio data.
-        
+
         Args:
             level_callback: Optional callback for level updates (0.0-1.0)
-            
+
         Returns:
             True if stream started successfully
         """
@@ -276,7 +276,7 @@ class AudioRecorder:
                     return (in_data, pyaudio.paContinue)
 
                 # Detect if this is a loopback device (they have different buffering behavior)
-                is_loopback = 'loopback' in self._device.name.lower()
+                is_loopback = "loopback" in self._device.name.lower()
 
                 # For loopback devices, use larger buffer to get more data per callback
                 # WASAPI loopback typically buffers internally and delivers data less frequently
@@ -295,7 +295,7 @@ class AudioRecorder:
                     input=True,
                     input_device_index=self._device.index,
                     frames_per_buffer=chunk_size,
-                    stream_callback=stream_callback
+                    stream_callback=stream_callback,
                 )
 
                 self._stream_active = True
@@ -336,10 +336,10 @@ class AudioRecorder:
     def start_recording_unified(self) -> bool:
         """
         Start recording audio (unified stream version).
-        
+
         Note: Stream must be started first via start_stream().
         This sets a flag and clears the queue - the callback queues audio data.
-        
+
         Returns:
             True if recording started
         """
@@ -367,14 +367,14 @@ class AudioRecorder:
     def stop_recording_unified(self) -> Optional[bytes]:
         """
         Stop recording and return WAV data (unified stream version).
-        
+
         Uses queue-based approach to prevent data loss:
         1. Set flag to stop queueing new data
         2. Drain all remaining data from queue
         3. Build WAV from collected frames
-        
+
         Note: Stream continues running for level monitoring.
-        
+
         Returns:
             WAV audio data, or None if not recording
         """
@@ -402,11 +402,11 @@ class AudioRecorder:
 
         try:
             wav_buffer = io.BytesIO()
-            with wave.open(wav_buffer, 'wb') as wf:
+            with wave.open(wav_buffer, "wb") as wf:
                 wf.setnchannels(self._channels)
                 wf.setsampwidth(self._sample_width)
                 wf.setframerate(self._sample_rate)
-                wf.writeframes(b''.join(frames))
+                wf.writeframes(b"".join(frames))
 
             wav_data = wav_buffer.getvalue()
 
@@ -415,7 +415,9 @@ class AudioRecorder:
             bytes_per_second = self._sample_rate * self._channels * self._sample_width
             duration = total_bytes / bytes_per_second if bytes_per_second > 0 else 0.0
 
-            logging.info(f"[AudioRecorder] Recording stopped: {len(wav_data)} bytes, {duration:.1f}s, {len(frames)} chunks")
+            logging.info(
+                f"[AudioRecorder] Recording stopped: {len(wav_data)} bytes, {duration:.1f}s, {len(frames)} chunks"
+            )
 
             return wav_data
 
@@ -430,7 +432,7 @@ class AudioRecorder:
     def get_duration_unified(self) -> float:
         """
         Get current recording duration in seconds (unified stream version).
-        
+
         Returns:
             Duration in seconds (0.0 if not recording).
         """
@@ -443,7 +445,7 @@ class AudioRecorder:
     def get_level(self) -> float:
         """
         Get current audio level.
-        
+
         Returns:
             Level between 0.0 and 1.0
         """
@@ -456,11 +458,11 @@ class AudioRecorder:
     def play(self, audio_data: bytes, start_position: float = 0.0) -> bool:
         """
         Start playing audio data.
-        
+
         Args:
             audio_data: WAV or compressed audio data
             start_position: Position to start from (seconds)
-            
+
         Returns:
             True if playback started, False otherwise.
         """
@@ -485,11 +487,7 @@ class AudioRecorder:
                 self._paused = False
 
                 # Start playback thread
-                self._playback_thread = threading.Thread(
-                    target=self._playback_loop,
-                    daemon=True,
-                    name="AudioPlayback"
-                )
+                self._playback_thread = threading.Thread(target=self._playback_loop, daemon=True, name="AudioPlayback")
                 self._playback_thread.start()
 
                 logging.debug(f"[AudioRecorder] Playback started at {start_position:.1f}s")
@@ -502,14 +500,14 @@ class AudioRecorder:
     def _decode_audio(self, audio_data: bytes) -> tuple:
         """
         Decode audio data to raw PCM.
-        
+
         Returns:
             Tuple of (pcm_data, sample_rate, channels, sample_width)
         """
         # Try WAV first
         try:
             wav_buffer = io.BytesIO(audio_data)
-            with wave.open(wav_buffer, 'rb') as wf:
+            with wave.open(wav_buffer, "rb") as wf:
                 pcm_data = wf.readframes(wf.getnframes())
                 return (pcm_data, wf.getframerate(), wf.getnchannels(), wf.getsampwidth())
         except Exception:
@@ -527,21 +525,17 @@ class AudioRecorder:
 
                 try:
                     result = subprocess.run(
-                        [
-                            get_ffmpeg_path(), "-y", "-i", tmp_in_path,
-                            "-f", "wav", "-acodec", "pcm_s16le",
-                            tmp_out_path
-                        ],
+                        [get_ffmpeg_path(), "-y", "-i", tmp_in_path, "-f", "wav", "-acodec", "pcm_s16le", tmp_out_path],
                         capture_output=True,
-                        creationflags=get_creation_flags()
+                        creationflags=get_creation_flags(),
                     )
 
                     if result.returncode == 0 and Path(tmp_out_path).exists():
-                        with open(tmp_out_path, 'rb') as f:
+                        with open(tmp_out_path, "rb") as f:
                             wav_data = f.read()
 
                         wav_buffer = io.BytesIO(wav_data)
-                        with wave.open(wav_buffer, 'rb') as wf:
+                        with wave.open(wav_buffer, "rb") as wf:
                             pcm_data = wf.readframes(wf.getnframes())
                             return (pcm_data, wf.getframerate(), wf.getnchannels(), wf.getsampwidth())
                 finally:
@@ -577,7 +571,7 @@ class AudioRecorder:
                 format=p.get_format_from_width(self._playback_sample_width),
                 channels=self._playback_channels,
                 rate=self._playback_sample_rate,
-                output=True
+                output=True,
             )
 
             while self._playing and current_byte < len(self._playback_data):
@@ -647,7 +641,7 @@ class AudioRecorder:
     def seek(self, position: float):
         """
         Seek to position in current audio.
-        
+
         Args:
             position: Position in seconds
         """
@@ -676,18 +670,14 @@ class AudioRecorder:
     # Compression
     # =========================================================================
 
-    def compress_audio(
-        self,
-        wav_data: bytes,
-        preset: str = "recommended"
-    ) -> Optional[bytes]:
+    def compress_audio(self, wav_data: bytes, preset: str = "recommended") -> Optional[bytes]:
         """
         Compress WAV audio using FFmpeg.
-        
+
         Args:
             wav_data: Input WAV data
             preset: Compression preset name (from COMPRESSION_PRESETS)
-            
+
         Returns:
             Compressed audio bytes, or None if compression failed
         """
@@ -713,11 +703,7 @@ class AudioRecorder:
                 cmd.extend(ffmpeg_args.split())
                 cmd.append(tmp_out_path)
 
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    creationflags=get_creation_flags()
-                )
+                result = subprocess.run(cmd, capture_output=True, creationflags=get_creation_flags())
 
                 if result.returncode != 0:
                     logging.error(f"[AudioRecorder] FFmpeg error: {result.stderr.decode()}")
@@ -727,7 +713,7 @@ class AudioRecorder:
                     logging.error("[AudioRecorder] FFmpeg output file not created")
                     return None
 
-                with open(tmp_out_path, 'rb') as f:
+                with open(tmp_out_path, "rb") as f:
                     compressed_data = f.read()
 
                 logging.info(f"[AudioRecorder] Compressed: {len(wav_data)} -> {len(compressed_data)} bytes")
@@ -748,11 +734,11 @@ class AudioRecorder:
     def estimate_compressed_size(self, wav_data: bytes, preset: str = "recommended") -> int:
         """
         Estimate compressed size without actually compressing.
-        
+
         Args:
             wav_data: Input WAV data
             preset: Compression preset name
-            
+
         Returns:
             Estimated size in bytes
         """
@@ -778,7 +764,7 @@ class AudioRecorder:
         # Estimate duration from WAV
         try:
             wav_buffer = io.BytesIO(wav_data)
-            with wave.open(wav_buffer, 'rb') as wf:
+            with wave.open(wav_buffer, "rb") as wf:
                 duration = wf.getnframes() / wf.getframerate()
         except Exception:
             # Rough estimate: assume 44100Hz, 16-bit, stereo
@@ -811,5 +797,3 @@ class AudioRecorder:
     def __del__(self):
         """Destructor."""
         self.cleanup()
-
-

@@ -24,6 +24,7 @@ from flask import Flask, abort, jsonify, request
 # GUI support with Dear PyGui
 try:
     import dearpygui.dearpygui as dpg
+
     HAVE_GUI = True
 except ImportError:
     print("[Warning] Dear PyGui not installed. GUI features disabled.")
@@ -34,6 +35,7 @@ except ImportError:
 # Optional: Load .env file
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -100,13 +102,14 @@ FONTS = {
     "bold_italic": None,
     "header1": None,
     "header2": None,
-    "code": None
+    "code": None,
 }
 
 
 # ============================================================================
 # SESSION MANAGEMENT
 # ============================================================================
+
 
 class ChatSession:
     """Represents a chat session with history"""
@@ -124,11 +127,7 @@ class ChatSession:
         self.title = None
 
     def add_message(self, role, content):
-        self.messages.append({
-            "role": role,
-            "content": content,
-            "timestamp": datetime.now().isoformat()
-        })
+        self.messages.append({"role": role, "content": content, "timestamp": datetime.now().isoformat()})
         self.updated_at = datetime.now().isoformat()
         if not self.title and role == "user":
             self.title = content[:50] + ("..." if len(content) > 50 else "")
@@ -158,7 +157,7 @@ class ChatSession:
             "title": self.title,
             "messages": self.messages,
             "has_image": bool(self.image_base64),
-            "mime_type": self.mime_type
+            "mime_type": self.mime_type,
         }
 
     @classmethod
@@ -181,7 +180,7 @@ def save_sessions():
     with SESSION_LOCK:
         try:
             data = {sid: session.to_dict() for sid, session in CHAT_SESSIONS.items()}
-            with open(SESSIONS_FILE, 'w', encoding='utf-8') as f:
+            with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception as e:
             print(f"[Warning] Failed to save sessions: {e}")
@@ -191,7 +190,7 @@ def load_sessions():
     global CHAT_SESSIONS
     try:
         if Path(SESSIONS_FILE).exists():
-            with open(SESSIONS_FILE, encoding='utf-8') as f:
+            with open(SESSIONS_FILE, encoding="utf-8") as f:
                 data = json.load(f)
             with SESSION_LOCK:
                 for sid, session_data in data.items():
@@ -220,15 +219,17 @@ def list_sessions():
     with SESSION_LOCK:
         sessions = []
         for sid, session in reversed(list(CHAT_SESSIONS.items())):
-            sessions.append({
-                "id": sid,
-                "title": session.title or "(No title)",
-                "endpoint": session.endpoint,
-                "provider": session.provider,
-                "messages": len(session.messages),
-                "updated": session.updated_at,
-                "created": session.created_at
-            })
+            sessions.append(
+                {
+                    "id": sid,
+                    "title": session.title or "(No title)",
+                    "endpoint": session.endpoint,
+                    "provider": session.provider,
+                    "messages": len(session.messages),
+                    "updated": session.updated_at,
+                    "created": session.created_at,
+                }
+            )
         return sessions
 
 
@@ -236,22 +237,24 @@ def list_sessions():
 # UTILITY FUNCTIONS
 # ============================================================================
 
+
 def parse_config_value(value_str):
     value_str = value_str.strip()
-    if value_str.lower() in ['none', 'null', '']:
+    if value_str.lower() in ["none", "null", ""]:
         return None
-    if value_str.lower() in ['true', 'yes', 'on', '1']:
+    if value_str.lower() in ["true", "yes", "on", "1"]:
         return True
-    if value_str.lower() in ['false', 'no', 'off', '0']:
+    if value_str.lower() in ["false", "no", "off", "0"]:
         return False
     try:
-        if '.' not in value_str:
+        if "." not in value_str:
             return int(value_str)
         return float(value_str)
     except ValueError:
         pass
-    if (value_str.startswith('"') and value_str.endswith('"')) or \
-       (value_str.startswith("'") and value_str.endswith("'")):
+    if (value_str.startswith('"') and value_str.endswith('"')) or (
+        value_str.startswith("'") and value_str.endswith("'")
+    ):
         return value_str[1:-1]
     return value_str
 
@@ -267,7 +270,7 @@ def load_config(filepath=CONFIG_FILE):
         return config, ai_params, endpoints, keys
 
     try:
-        with open(filepath, encoding='utf-8') as f:
+        with open(filepath, encoding="utf-8") as f:
             lines = f.readlines()
 
         current_section = None
@@ -275,23 +278,23 @@ def load_config(filepath=CONFIG_FILE):
         multiline_value = []
 
         for line in lines:
-            raw_line = line.rstrip('\n\r')
+            raw_line = line.rstrip("\n\r")
             stripped = raw_line.strip()
 
-            if not stripped or stripped.startswith('#'):
+            if not stripped or stripped.startswith("#"):
                 continue
 
-            if stripped.startswith('[') and stripped.endswith(']'):
-                if multiline_key and current_section == 'endpoints':
-                    endpoints[multiline_key] = ' '.join(multiline_value)
+            if stripped.startswith("[") and stripped.endswith("]"):
+                if multiline_key and current_section == "endpoints":
+                    endpoints[multiline_key] = " ".join(multiline_value)
                     multiline_key = None
                     multiline_value = []
                 current_section = stripped[1:-1].lower()
                 continue
 
-            if current_section == 'config':
-                if '=' in stripped:
-                    key, value = stripped.split('=', 1)
+            if current_section == "config":
+                if "=" in stripped:
+                    key, value = stripped.split("=", 1)
                     key = key.strip().lower()
                     value = parse_config_value(value)
                     if key in DEFAULT_CONFIG:
@@ -299,17 +302,18 @@ def load_config(filepath=CONFIG_FILE):
                     elif value is not None:
                         ai_params[key] = value
 
-            elif current_section == 'endpoints':
-                if '=' in stripped:
+            elif current_section == "endpoints":
+                if "=" in stripped:
                     if multiline_key:
-                        endpoints[multiline_key] = ' '.join(multiline_value)
-                    endpoint_name, prompt = stripped.split('=', 1)
+                        endpoints[multiline_key] = " ".join(multiline_value)
+                    endpoint_name, prompt = stripped.split("=", 1)
                     endpoint_name = endpoint_name.strip().lower()
                     prompt = prompt.strip()
-                    if (prompt.startswith('"') and prompt.endswith('"')) or \
-                       (prompt.startswith("'") and prompt.endswith("'")):
+                    if (prompt.startswith('"') and prompt.endswith('"')) or (
+                        prompt.startswith("'") and prompt.endswith("'")
+                    ):
                         prompt = prompt[1:-1]
-                    if prompt.endswith('\\'):
+                    if prompt.endswith("\\"):
                         multiline_key = endpoint_name
                         multiline_value = [prompt[:-1].strip()]
                     else:
@@ -317,20 +321,20 @@ def load_config(filepath=CONFIG_FILE):
                         multiline_key = None
                         multiline_value = []
                 elif multiline_key:
-                    if stripped.endswith('\\'):
+                    if stripped.endswith("\\"):
                         multiline_value.append(stripped[:-1].strip())
                     else:
                         multiline_value.append(stripped)
-                        endpoints[multiline_key] = ' '.join(multiline_value)
+                        endpoints[multiline_key] = " ".join(multiline_value)
                         multiline_key = None
                         multiline_value = []
 
             elif current_section in keys:
-                if stripped and not stripped.startswith('#'):
+                if stripped and not stripped.startswith("#"):
                     keys[current_section].append(stripped)
 
-        if multiline_key and current_section == 'endpoints':
-            endpoints[multiline_key] = ' '.join(multiline_value)
+        if multiline_key and current_section == "endpoints":
+            endpoints[multiline_key] = " ".join(multiline_value)
 
         if not keys["google"] and os.getenv("GEMINI_API_KEY"):
             keys["google"].append(os.getenv("GEMINI_API_KEY"))
@@ -355,6 +359,7 @@ def get_next_window_id():
 # ============================================================================
 # KEY MANAGER
 # ============================================================================
+
 
 class KeyManager:
     def __init__(self, keys, provider_name):
@@ -409,20 +414,37 @@ class KeyManager:
 # ERROR DETECTION
 # ============================================================================
 
+
 def is_rate_limit_error(error_msg, status_code=None):
     if status_code == 429:
         return True
     error_str = str(error_msg).lower()
-    patterns = ["too many requests", "rate limit", "rate_limit", "quota exceeded",
-                "429", "throttl", "resource exhausted", "resource_exhausted"]
+    patterns = [
+        "too many requests",
+        "rate limit",
+        "rate_limit",
+        "quota exceeded",
+        "429",
+        "throttl",
+        "resource exhausted",
+        "resource_exhausted",
+    ]
     return any(p in error_str for p in patterns)
 
 
 def is_insufficient_credits_error(error_msg, response_json=None):
     error_str = str(error_msg).lower()
-    patterns = ["insufficient credits", "insufficient funds", "not enough credits",
-                "credit balance", "out of credits", "no credits", "payment required",
-                "billing", "exceeded your current quota"]
+    patterns = [
+        "insufficient credits",
+        "insufficient funds",
+        "not enough credits",
+        "credit balance",
+        "out of credits",
+        "no credits",
+        "payment required",
+        "billing",
+        "exceeded your current quota",
+    ]
     if any(p in error_str for p in patterns):
         return True
     if response_json and isinstance(response_json, dict):
@@ -439,14 +461,22 @@ def is_invalid_key_error(error_msg, status_code=None):
     if status_code in [401, 403]:
         return True
     error_str = str(error_msg).lower()
-    patterns = ["invalid api key", "invalid key", "api key invalid",
-                "unauthorized", "authentication", "forbidden", "not authorized"]
+    patterns = [
+        "invalid api key",
+        "invalid key",
+        "api key invalid",
+        "unauthorized",
+        "authentication",
+        "forbidden",
+        "not authorized",
+    ]
     return any(p in error_str for p in patterns)
 
 
 # ============================================================================
 # API CALLERS
 # ============================================================================
+
 
 def call_openrouter_api(key_manager, model, messages, ai_params, timeout):
     current_key = key_manager.get_current_key()
@@ -538,6 +568,7 @@ def extract_text_from_response(response_json, provider):
 # ============================================================================
 # MAIN API CALLER WITH RETRY LOGIC
 # ============================================================================
+
 
 def call_api_with_retry(provider, messages, model_override=None):
     global CONFIG, AI_PARAMS, KEY_MANAGERS
@@ -658,13 +689,12 @@ def call_api_with_retry(provider, messages, model_override=None):
 
 def call_api_simple(provider, prompt, image_base64, mime_type, model_override=None):
     data_url = f"data:{mime_type};base64,{image_base64}"
-    messages = [{
-        "role": "user",
-        "content": [
-            {"type": "image_url", "image_url": {"url": data_url}},
-            {"type": "text", "text": prompt}
-        ]
-    }]
+    messages = [
+        {
+            "role": "user",
+            "content": [{"type": "image_url", "image_url": {"url": data_url}}, {"type": "text", "text": prompt}],
+        }
+    ]
     return call_api_with_retry(provider, messages, model_override)
 
 
@@ -677,6 +707,7 @@ def call_api_chat(session):
 # MARKDOWN UTILITIES
 # ============================================================================
 
+
 def strip_markdown(text):
     """Convert markdown to plain text by stripping formatting"""
     if not text:
@@ -685,47 +716,47 @@ def strip_markdown(text):
     result = text
 
     # Remove code blocks (``` ... ```)
-    result = re.sub(r'```[\s\S]*?```', lambda m: m.group(0).replace('```', '').strip(), result)
+    result = re.sub(r"```[\s\S]*?```", lambda m: m.group(0).replace("```", "").strip(), result)
 
     # Remove inline code (`code`)
-    result = re.sub(r'`([^`]+)`', r'\1', result)
+    result = re.sub(r"`([^`]+)`", r"\1", result)
 
     # Remove bold (**text** or __text__)
-    result = re.sub(r'\*\*([^*]+)\*\*', r'\1', result)
-    result = re.sub(r'__([^_]+)__', r'\1', result)
+    result = re.sub(r"\*\*([^*]+)\*\*", r"\1", result)
+    result = re.sub(r"__([^_]+)__", r"\1", result)
 
     # Remove italic (*text* or _text_)
-    result = re.sub(r'\*([^*]+)\*', r'\1', result)
-    result = re.sub(r'(?<!\w)_([^_]+)_(?!\w)', r'\1', result)
+    result = re.sub(r"\*([^*]+)\*", r"\1", result)
+    result = re.sub(r"(?<!\w)_([^_]+)_(?!\w)", r"\1", result)
 
     # Remove strikethrough (~~text~~)
-    result = re.sub(r'~~([^~]+)~~', r'\1', result)
+    result = re.sub(r"~~([^~]+)~~", r"\1", result)
 
     # Remove headers (# Header)
-    result = re.sub(r'^#{1,6}\s+', '', result, flags=re.MULTILINE)
+    result = re.sub(r"^#{1,6}\s+", "", result, flags=re.MULTILINE)
 
     # Remove blockquotes (> text)
-    result = re.sub(r'^>\s+', '', result, flags=re.MULTILINE)
+    result = re.sub(r"^>\s+", "", result, flags=re.MULTILINE)
 
     # Remove horizontal rules
-    result = re.sub(r'^[-*_]{3,}\s*$', '', result, flags=re.MULTILINE)
+    result = re.sub(r"^[-*_]{3,}\s*$", "", result, flags=re.MULTILINE)
 
     # Remove link formatting [text](url) -> text
-    result = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', result)
+    result = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", result)
 
     # Remove image formatting ![alt](url) -> alt
-    result = re.sub(r'!\[([^\]]*)\]\([^)]+\)', r'\1', result)
+    result = re.sub(r"!\[([^\]]*)\]\([^)]+\)", r"\1", result)
 
     # Remove list markers
-    result = re.sub(r'^[\s]*[-*+]\s+', '• ', result, flags=re.MULTILINE)
-    result = re.sub(r'^[\s]*\d+\.\s+', '', result, flags=re.MULTILINE)
+    result = re.sub(r"^[\s]*[-*+]\s+", "• ", result, flags=re.MULTILINE)
+    result = re.sub(r"^[\s]*\d+\.\s+", "", result, flags=re.MULTILINE)
 
     return result
 
 
 def render_markdown(text, parent, wrap_width=-1):
     """Render markdown text to DPG items"""
-    lines = text.split('\n')
+    lines = text.split("\n")
     in_code_block = False
     code_block_lines = []
     code_lang = ""
@@ -734,11 +765,12 @@ def render_markdown(text, parent, wrap_width=-1):
     def flush_code_block():
         nonlocal code_block_lines, code_lang
         if code_block_lines:
-            code_text = '\n'.join(code_block_lines)
+            code_text = "\n".join(code_block_lines)
             # Estimate height: lines * 18 pixels + padding
             height = max(60, len(code_block_lines) * 18 + 20)
-            dpg.add_input_text(default_value=code_text, multiline=True, readonly=True,
-                              width=-1, height=height, parent=parent)
+            dpg.add_input_text(
+                default_value=code_text, multiline=True, readonly=True, width=-1, height=height, parent=parent
+            )
             code_block_lines = []
             code_lang = ""
 
@@ -746,7 +778,7 @@ def render_markdown(text, parent, wrap_width=-1):
         stripped_line = line.strip()
 
         # Code Block Detection
-        if stripped_line.startswith('```'):
+        if stripped_line.startswith("```"):
             if in_code_block:
                 # End of code block
                 flush_code_block()
@@ -762,41 +794,47 @@ def render_markdown(text, parent, wrap_width=-1):
             continue
 
         # Headers
-        if stripped_line.startswith('#'):
-            level = len(stripped_line.split(' ')[0])
-            content = stripped_line.lstrip('#').strip()
+        if stripped_line.startswith("#"):
+            level = len(stripped_line.split(" ")[0])
+            content = stripped_line.lstrip("#").strip()
             if level == 1:
                 item = dpg.add_text(content, parent=parent, wrap=wrap_width, color=(255, 200, 100))
-                if FONTS.get("header1"): dpg.bind_item_font(item, FONTS.get("header1"))
+                if FONTS.get("header1"):
+                    dpg.bind_item_font(item, FONTS.get("header1"))
             elif level == 2:
                 item = dpg.add_text(content, parent=parent, wrap=wrap_width, color=(200, 200, 255))
-                if FONTS.get("header2"): dpg.bind_item_font(item, FONTS.get("header2"))
+                if FONTS.get("header2"):
+                    dpg.bind_item_font(item, FONTS.get("header2"))
             else:
                 item = dpg.add_text(content, parent=parent, wrap=wrap_width, color=(180, 220, 255))
-                if FONTS.get("bold"): dpg.bind_item_font(item, FONTS.get("bold"))
+                if FONTS.get("bold"):
+                    dpg.bind_item_font(item, FONTS.get("bold"))
             continue
 
         # Bullet Points
-        if stripped_line.startswith('- ') or stripped_line.startswith('* '):
+        if stripped_line.startswith("- ") or stripped_line.startswith("* "):
             content = stripped_line[2:].strip()
             # Clean up bold markers for cleaner bullet display
-            content = content.replace('**', '').replace('__', '')
+            content = content.replace("**", "").replace("__", "")
             dpg.add_text(content, parent=parent, wrap=wrap_width, bullet=True)
             continue
 
         # Bold Line (whole line)
-        if stripped_line.startswith('**') and stripped_line.endswith('**') and len(stripped_line) > 4:
+        if stripped_line.startswith("**") and stripped_line.endswith("**") and len(stripped_line) > 4:
             content = stripped_line[2:-2]
             item = dpg.add_text(content, parent=parent, wrap=wrap_width)
-            if FONTS.get("bold"): dpg.bind_item_font(item, FONTS.get("bold"))
+            if FONTS.get("bold"):
+                dpg.bind_item_font(item, FONTS.get("bold"))
             continue
 
         # Italic Line (whole line)
-        if (stripped_line.startswith('*') and stripped_line.endswith('*') and len(stripped_line) > 2) or \
-           (stripped_line.startswith('_') and stripped_line.endswith('_') and len(stripped_line) > 2):
+        if (stripped_line.startswith("*") and stripped_line.endswith("*") and len(stripped_line) > 2) or (
+            stripped_line.startswith("_") and stripped_line.endswith("_") and len(stripped_line) > 2
+        ):
             content = stripped_line[1:-1]
             item = dpg.add_text(content, parent=parent, wrap=wrap_width)
-            if FONTS.get("italic"): dpg.bind_item_font(item, FONTS.get("italic"))
+            if FONTS.get("italic"):
+                dpg.bind_item_font(item, FONTS.get("italic"))
             continue
 
         # Regular Text (with simple inline stripping for display)
@@ -819,25 +857,29 @@ def render_markdown(text, parent, wrap_width=-1):
 # DEAR PYGUI GUI FUNCTIONS - ON-DEMAND CREATION
 # ============================================================================
 
+
 def copy_to_clipboard(text):
     """Cross-platform clipboard copy"""
     try:
-        if sys.platform == 'win32':
+        if sys.platform == "win32":
             import subprocess
-            process = subprocess.Popen(['clip'], stdin=subprocess.PIPE)
-            process.communicate(text.encode('utf-16le'))
-        elif sys.platform == 'darwin':
+
+            process = subprocess.Popen(["clip"], stdin=subprocess.PIPE)
+            process.communicate(text.encode("utf-16le"))
+        elif sys.platform == "darwin":
             import subprocess
-            process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
-            process.communicate(text.encode('utf-8'))
+
+            process = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
+            process.communicate(text.encode("utf-8"))
         else:
             try:
                 import subprocess
-                process = subprocess.Popen(['xclip', '-selection', 'clipboard'], stdin=subprocess.PIPE)
-                process.communicate(text.encode('utf-8'))
+
+                process = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE)
+                process.communicate(text.encode("utf-8"))
             except:
-                process = subprocess.Popen(['xsel', '--clipboard', '--input'], stdin=subprocess.PIPE)
-                process.communicate(text.encode('utf-8'))
+                process = subprocess.Popen(["xsel", "--clipboard", "--input"], stdin=subprocess.PIPE)
+                process.communicate(text.encode("utf-8"))
         return True
     except Exception as e:
         print(f"[Clipboard Error] {e}")
@@ -871,7 +913,7 @@ def init_dearpygui():
 
     try:
         dpg.create_context()
-        dpg.create_viewport(title='ShareX Middleman', width=900, height=700, decorated=True)
+        dpg.create_viewport(title="ShareX Middleman", width=900, height=700, decorated=True)
 
         # Create a font registry with a larger default font and styles
         with dpg.font_registry():
@@ -1039,17 +1081,17 @@ def create_result_window(text, endpoint=None, title=None):
 
     # State for toggles
     state = {
-        'wrapped': True,
-        'mode': 'rich',  # 'rich' (markdown) or 'text' (selectable)
-        'original_text': text
+        "wrapped": True,
+        "mode": "rich",  # 'rich' (markdown) or 'text' (selectable)
+        "original_text": text,
     }
 
     def get_display_text():
         """Get text based on current display mode"""
-        if state['mode'] == 'rich':
-            return state['original_text']
+        if state["mode"] == "rich":
+            return state["original_text"]
         else:
-            return strip_markdown(state['original_text'])
+            return strip_markdown(state["original_text"])
 
     def update_display():
         """Update the text display"""
@@ -1061,29 +1103,35 @@ def create_result_window(text, endpoint=None, title=None):
         dpg.configure_item(mode_btn_tag, label=f"Mode: {'Rich' if state['mode'] == 'rich' else 'Text'}")
 
         # Configure parent scrollbar
-        if state['wrapped']:
+        if state["wrapped"]:
             dpg.configure_item(scroll_area_tag, horizontal_scrollbar=False)
         else:
             dpg.configure_item(scroll_area_tag, horizontal_scrollbar=True)
 
         # Add content based on mode
-        if state['mode'] == 'text':
+        if state["mode"] == "text":
             # Use InputText for selection (monochrome)
-            width = -1 if state['wrapped'] else 3000
-            dpg.add_input_text(default_value=get_display_text(), parent=content_group_tag,
-                              multiline=True, readonly=True, width=width, height=-1)
+            width = -1 if state["wrapped"] else 3000
+            dpg.add_input_text(
+                default_value=get_display_text(),
+                parent=content_group_tag,
+                multiline=True,
+                readonly=True,
+                width=width,
+                height=-1,
+            )
         else:
             # Use Text for rich display (colored potential, clean wrapping)
-            wrap_width = 0 if state['wrapped'] else -1
-            render_markdown(state['original_text'], parent=content_group_tag, wrap_width=wrap_width)
+            wrap_width = 0 if state["wrapped"] else -1
+            render_markdown(state["original_text"], parent=content_group_tag, wrap_width=wrap_width)
 
     def toggle_wrap():
-        state['wrapped'] = not state['wrapped']
+        state["wrapped"] = not state["wrapped"]
         update_display()
         dpg.set_value(status_tag, f"Wrap: {'ON' if state['wrapped'] else 'OFF'}")
 
     def toggle_mode():
-        state['mode'] = 'text' if state['mode'] == 'rich' else 'rich'
+        state["mode"] = "text" if state["mode"] == "rich" else "rich"
         update_display()
         dpg.set_value(status_tag, f"Mode: {state['mode'].title()}")
 
@@ -1099,10 +1147,14 @@ def create_result_window(text, endpoint=None, title=None):
 
     register_window(window_tag)
 
-    with dpg.window(label=title, tag=window_tag, width=700, height=500,
-                    pos=[100 + (window_id % 5) * 30, 100 + (window_id % 5) * 30],
-                    on_close=close_callback):
-
+    with dpg.window(
+        label=title,
+        tag=window_tag,
+        width=700,
+        height=500,
+        pos=[100 + (window_id % 5) * 30, 100 + (window_id % 5) * 30],
+        on_close=close_callback,
+    ):
         if endpoint:
             dpg.add_text(f"Endpoint: /{endpoint}")
             dpg.add_separator()
@@ -1143,20 +1195,15 @@ def create_chat_window(session, initial_response=None):
     scroll_area_tag = f"scroll_area_{window_id}"
 
     # State for toggles
-    state = {
-        'wrapped': True,
-        'markdown': True,
-        'selectable': False,
-        'last_response': initial_response or ""
-    }
+    state = {"wrapped": True, "markdown": True, "selectable": False, "last_response": initial_response or ""}
 
     def get_conversation_text():
         """Build conversation text based on current display mode (for clipboard)"""
         parts = []
         for msg in session.messages:
             role = "You" if msg["role"] == "user" else "Assistant"
-            content = msg['content']
-            if state['mode'] == 'text':
+            content = msg["content"]
+            if state["mode"] == "text":
                 content = strip_markdown(content)
             parts.append(f"[{role}]\n{content}\n")
         return "\n".join(parts)
@@ -1171,24 +1218,30 @@ def create_chat_window(session, initial_response=None):
         dpg.configure_item(select_btn_tag, label=f"Select: {'ON' if state['selectable'] else 'OFF'}")
 
         # Handle wrapping
-        wrap_width = 0 if state['wrapped'] else -1
+        wrap_width = 0 if state["wrapped"] else -1
 
-        if state['wrapped']:
+        if state["wrapped"]:
             dpg.configure_item(scroll_area_tag, horizontal_scrollbar=False)
         else:
             dpg.configure_item(scroll_area_tag, horizontal_scrollbar=True)
 
-        if state['selectable']:
+        if state["selectable"]:
             # Selectable mode: One big text box (monochrome)
-            width = -1 if state['wrapped'] else 3000
-            dpg.add_input_text(default_value=get_conversation_text(), parent=chat_log_group,
-                              multiline=True, readonly=True, width=width, height=-1)
+            width = -1 if state["wrapped"] else 3000
+            dpg.add_input_text(
+                default_value=get_conversation_text(),
+                parent=chat_log_group,
+                multiline=True,
+                readonly=True,
+                width=width,
+                height=-1,
+            )
         else:
             # Rich mode: Colored text blocks
             for i, msg in enumerate(session.messages):
                 role = msg["role"]
                 content = msg["content"]
-                if not state['markdown']:
+                if not state["markdown"]:
                     content = strip_markdown(content)
 
                 if role == "user":
@@ -1196,7 +1249,7 @@ def create_chat_window(session, initial_response=None):
                 else:
                     dpg.add_text("Assistant:", color=(150, 255, 150), parent=chat_log_group)
 
-                if state['markdown']:
+                if state["markdown"]:
                     render_markdown(content, parent=chat_log_group, wrap_width=wrap_width)
                 else:
                     dpg.add_text(content, parent=chat_log_group, wrap=wrap_width, bullet=True)
@@ -1208,17 +1261,17 @@ def create_chat_window(session, initial_response=None):
         # dpg.set_y_scroll(scroll_area_tag, dpg.get_y_scroll_max(scroll_area_tag))
 
     def toggle_wrap():
-        state['wrapped'] = not state['wrapped']
+        state["wrapped"] = not state["wrapped"]
         update_chat_display()
         dpg.set_value(status_tag, f"Wrap: {'ON' if state['wrapped'] else 'OFF'}")
 
     def toggle_markdown():
-        state['markdown'] = not state['markdown']
+        state["markdown"] = not state["markdown"]
         update_chat_display()
         dpg.set_value(status_tag, f"Mode: {'Markdown' if state['markdown'] else 'Plain Text'}")
 
     def toggle_selectable():
-        state['selectable'] = not state['selectable']
+        state["selectable"] = not state["selectable"]
         update_chat_display()
         dpg.set_value(status_tag, f"Selectable: {'ON' if state['selectable'] else 'OFF'}")
 
@@ -1244,7 +1297,7 @@ def create_chat_window(session, initial_response=None):
                 session.messages.pop()  # Remove failed user message
             else:
                 session.add_message("assistant", response_text)
-                state['last_response'] = response_text
+                state["last_response"] = response_text
                 update_chat_display()
                 dpg.set_value(status_tag, "✓ Response received")
                 add_session(session)
@@ -1261,8 +1314,8 @@ def create_chat_window(session, initial_response=None):
             dpg.set_value(status_tag, "✗ Failed to copy")
 
     def copy_last_callback():
-        text = state['last_response']
-        if not state['markdown']:
+        text = state["last_response"]
+        if not state["markdown"]:
             text = strip_markdown(text)
         if copy_to_clipboard(text):
             dpg.set_value(status_tag, "✓ Copied last response!")
@@ -1277,12 +1330,18 @@ def create_chat_window(session, initial_response=None):
 
     title = f"Chat - {session.title or session.session_id}"
 
-    with dpg.window(label=title, tag=window_tag, width=750, height=600,
-                    pos=[80 + (window_id % 5) * 30, 80 + (window_id % 5) * 30],
-                    on_close=close_callback):
-
-        dpg.add_text(f"Session: {session.session_id} | Endpoint: /{session.endpoint} | Provider: {session.provider}",
-                    color=(150, 150, 200))
+    with dpg.window(
+        label=title,
+        tag=window_tag,
+        width=750,
+        height=600,
+        pos=[80 + (window_id % 5) * 30, 80 + (window_id % 5) * 30],
+        on_close=close_callback,
+    ):
+        dpg.add_text(
+            f"Session: {session.session_id} | Endpoint: /{session.endpoint} | Provider: {session.provider}",
+            color=(150, 150, 200),
+        )
         dpg.add_separator()
 
         # Toggle buttons row
@@ -1302,8 +1361,9 @@ def create_chat_window(session, initial_response=None):
 
         dpg.add_separator()
         dpg.add_text("Your message:", color=(150, 200, 255))
-        dpg.add_input_text(tag=input_tag, multiline=True, width=-1, height=60,
-                          hint="Type your follow-up message here...")
+        dpg.add_input_text(
+            tag=input_tag, multiline=True, width=-1, height=60, hint="Type your follow-up message here..."
+        )
 
         with dpg.group(horizontal=True):
             dpg.add_button(label="Send", tag=send_btn_tag, callback=send_callback)
@@ -1322,7 +1382,7 @@ def create_session_browser_window():
     status_tag = f"browser_status_{window_id}"
 
     sessions = list_sessions()
-    selected_session = {'id': None}
+    selected_session = {"id": None}
 
     def refresh_table():
         nonlocal sessions
@@ -1334,25 +1394,27 @@ def create_session_browser_window():
 
         # Add rows
         for s in sessions:
-            sid = s['id']
+            sid = s["id"]
             with dpg.table_row(parent=table_tag):
+
                 def make_callback(session_id):
                     return lambda *args: select_session(session_id)
+
                 dpg.add_selectable(label=sid, callback=make_callback(sid))
-                dpg.add_text(s['title'][:35] + ('...' if len(s['title']) > 35 else ''))
-                dpg.add_text(s['endpoint'])
-                dpg.add_text(s['provider'])
-                dpg.add_text(str(s['messages']))
-                updated = s['updated'][:16].replace('T', ' ') if s['updated'] else ''
+                dpg.add_text(s["title"][:35] + ("..." if len(s["title"]) > 35 else ""))
+                dpg.add_text(s["endpoint"])
+                dpg.add_text(s["provider"])
+                dpg.add_text(str(s["messages"]))
+                updated = s["updated"][:16].replace("T", " ") if s["updated"] else ""
                 dpg.add_text(updated)
 
     def select_session(session_id):
-        selected_session['id'] = session_id
+        selected_session["id"] = session_id
         dpg.set_value(status_tag, f"Selected: {session_id}")
 
     def open_callback():
-        if selected_session['id']:
-            session = get_session(selected_session['id'])
+        if selected_session["id"]:
+            session = get_session(selected_session["id"])
             if session:
                 create_chat_window(session)
                 dpg.set_value(status_tag, f"Opened session {selected_session['id']}")
@@ -1360,13 +1422,13 @@ def create_session_browser_window():
             dpg.set_value(status_tag, "No session selected")
 
     def delete_callback():
-        if selected_session['id']:
-            sid = selected_session['id']
+        if selected_session["id"]:
+            sid = selected_session["id"]
             with SESSION_LOCK:
                 if sid in CHAT_SESSIONS:
                     del CHAT_SESSIONS[sid]
             save_sessions()
-            selected_session['id'] = None
+            selected_session["id"] = None
             refresh_table()
             dpg.set_value(status_tag, f"Deleted session {sid}")
         else:
@@ -1378,17 +1440,27 @@ def create_session_browser_window():
 
     register_window(window_tag)
 
-    with dpg.window(label="Session Browser", tag=window_tag, width=850, height=500,
-                    pos=[50 + (window_id % 3) * 30, 50 + (window_id % 3) * 30],
-                    on_close=close_callback):
-
+    with dpg.window(
+        label="Session Browser",
+        tag=window_tag,
+        width=850,
+        height=500,
+        pos=[50 + (window_id % 3) * 30, 50 + (window_id % 3) * 30],
+        on_close=close_callback,
+    ):
         dpg.add_text("Saved Chat Sessions", color=(200, 200, 255))
         dpg.add_separator()
 
-        with dpg.table(tag=table_tag, header_row=True, borders_innerH=True,
-                       borders_outerH=True, borders_innerV=True, borders_outerV=True,
-                       scrollY=True, height=-60):
-
+        with dpg.table(
+            tag=table_tag,
+            header_row=True,
+            borders_innerH=True,
+            borders_outerH=True,
+            borders_innerV=True,
+            borders_outerV=True,
+            scrollY=True,
+            height=-60,
+        ):
             dpg.add_table_column(label="ID", width_fixed=True, init_width_or_weight=70)
             dpg.add_table_column(label="Title", width_stretch=True)
             dpg.add_table_column(label="Endpoint", width_fixed=True, init_width_or_weight=80)
@@ -1397,16 +1469,18 @@ def create_session_browser_window():
             dpg.add_table_column(label="Updated", width_fixed=True, init_width_or_weight=130)
 
             for s in sessions:
-                sid = s['id']
+                sid = s["id"]
                 with dpg.table_row():
+
                     def make_callback(session_id):
                         return lambda *args: select_session(session_id)
+
                     dpg.add_selectable(label=sid, callback=make_callback(sid))
-                    dpg.add_text(s['title'][:35] + ('...' if len(s['title']) > 35 else ''))
-                    dpg.add_text(s['endpoint'])
-                    dpg.add_text(s['provider'])
-                    dpg.add_text(str(s['messages']))
-                    updated = s['updated'][:16].replace('T', ' ') if s['updated'] else ''
+                    dpg.add_text(s["title"][:35] + ("..." if len(s["title"]) > 35 else ""))
+                    dpg.add_text(s["endpoint"])
+                    dpg.add_text(s["provider"])
+                    dpg.add_text(str(s["messages"]))
+                    updated = s["updated"][:16].replace("T", " ") if s["updated"] else ""
                     dpg.add_text(updated)
 
         dpg.add_separator()
@@ -1474,43 +1548,43 @@ def create_endpoint_handler(endpoint_name, prompt_template):
         start_time = time.time()
 
         image_bytes = None
-        mime_type = 'image/png'
+        mime_type = "image/png"
 
-        if 'image' in request.files:
-            image_file = request.files['image']
+        if "image" in request.files:
+            image_file = request.files["image"]
             image_bytes = image_file.read()
-            mime_type = image_file.mimetype or 'image/png'
-        elif request.content_type and 'image' in request.content_type:
+            mime_type = image_file.mimetype or "image/png"
+        elif request.content_type and "image" in request.content_type:
             image_bytes = request.get_data()
-            mime_type = request.content_type.split(';')[0]
+            mime_type = request.content_type.split(";")[0]
         elif request.data:
             image_bytes = request.data
 
         if not image_bytes:
-            abort(400, description='No image found in request.')
+            abort(400, description="No image found in request.")
 
-        base64_image = base64.b64encode(image_bytes).decode('utf-8')
+        base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
         # Parse provider override
         provider = CONFIG.get("default_provider", "google")
-        if request.args.get('provider'):
-            provider = request.args.get('provider').lower()
-        elif request.headers.get('X-API-Provider'):
-            provider = request.headers.get('X-API-Provider').lower()
+        if request.args.get("provider"):
+            provider = request.args.get("provider").lower()
+        elif request.headers.get("X-API-Provider"):
+            provider = request.headers.get("X-API-Provider").lower()
 
         # Parse prompt override
         prompt = prompt_template
-        if request.args.get('prompt'):
-            prompt = request.args.get('prompt')
-        elif request.headers.get('X-Custom-Prompt'):
-            prompt = request.headers.get('X-Custom-Prompt')
+        if request.args.get("prompt"):
+            prompt = request.args.get("prompt")
+        elif request.headers.get("X-Custom-Prompt"):
+            prompt = request.headers.get("X-Custom-Prompt")
 
         # Parse model override
         model_override = None
-        if request.args.get('model'):
-            model_override = request.args.get('model')
-        elif request.headers.get('X-API-Model'):
-            model_override = request.headers.get('X-API-Model')
+        if request.args.get("model"):
+            model_override = request.args.get("model")
+        elif request.headers.get("X-API-Model"):
+            model_override = request.headers.get("X-API-Model")
 
         # Determine the effective model for logging
         if model_override:
@@ -1524,10 +1598,10 @@ def create_endpoint_handler(endpoint_name, prompt_template):
         else:
             effective_model = "unknown"
 
-        show_mode = request.args.get('show', CONFIG.get('default_show', 'no')).lower()
+        show_mode = request.args.get("show", CONFIG.get("default_show", "no")).lower()
 
         # Enhanced request logging
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"[{endpoint_name.upper()}] New request")
         print(f"  Provider: {provider}")
         print(f"  Model: {effective_model}{' (override)' if model_override else ' (default)'}")
@@ -1540,80 +1614,85 @@ def create_endpoint_handler(endpoint_name, prompt_template):
 
         if error:
             print(f"  [FAILED] {error} ({elapsed:.1f}s)")
-            print(f"{'='*60}\n")
+            print(f"{'=' * 60}\n")
 
-            if show_mode in ('gui', 'chatgui') and HAVE_GUI:
+            if show_mode in ("gui", "chatgui") and HAVE_GUI:
                 show_result_gui(f"Error: {error}", title="Error", endpoint=endpoint_name)
 
             return jsonify({"error": error, "elapsed": elapsed}), 500
 
         print(f"  [SUCCESS] {len(result)} chars ({elapsed:.1f}s)")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
-        if show_mode == 'gui' and HAVE_GUI:
+        if show_mode == "gui" and HAVE_GUI:
             show_result_gui(result, title=f"Response - /{endpoint_name}", endpoint=endpoint_name)
 
-        elif show_mode == 'chatgui' and HAVE_GUI:
+        elif show_mode == "chatgui" and HAVE_GUI:
             session = ChatSession(
                 endpoint=endpoint_name,
                 provider=provider,
                 model=model_override,
                 image_base64=base64_image,
-                mime_type=mime_type
+                mime_type=mime_type,
             )
             session.add_message("user", prompt)
             session.add_message("assistant", result)
             add_session(session)
             show_chat_gui(session, initial_response=result)
 
-        if request.headers.get('Accept') == 'application/json':
+        if request.headers.get("Accept") == "application/json":
             return jsonify({"text": result, "elapsed": elapsed})
 
-        return result, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+        return result, 200, {"Content-Type": "text/plain; charset=utf-8"}
 
     handler.__name__ = f"handle_{endpoint_name}"
     return handler
 
 
-@app.route('/')
+@app.route("/")
 def index():
     available_providers = [p for p, km in KEY_MANAGERS.items() if km.has_keys()]
-    return jsonify({
-        "service": "Universal ShareX Middleman",
-        "status": "running",
-        "gui_available": HAVE_GUI,
-        "gui_running": GUI_RUNNING,
-        "default_provider": CONFIG.get("default_provider", "google"),
-        "available_providers": available_providers,
-        "endpoints": {f"/{name}": prompt[:100] + "..." if len(prompt) > 100 else prompt
-                     for name, prompt in ENDPOINTS.items()},
-        "show_modes": {
-            "no": "Return text only (default)",
-            "gui": "Show result in a GUI window",
-            "chatgui": "Show result in a chat GUI with input for follow-up"
-        },
-        "sessions": len(CHAT_SESSIONS)
-    })
+    return jsonify(
+        {
+            "service": "Universal ShareX Middleman",
+            "status": "running",
+            "gui_available": HAVE_GUI,
+            "gui_running": GUI_RUNNING,
+            "default_provider": CONFIG.get("default_provider", "google"),
+            "available_providers": available_providers,
+            "endpoints": {
+                f"/{name}": prompt[:100] + "..." if len(prompt) > 100 else prompt for name, prompt in ENDPOINTS.items()
+            },
+            "show_modes": {
+                "no": "Return text only (default)",
+                "gui": "Show result in a GUI window",
+                "chatgui": "Show result in a chat GUI with input for follow-up",
+            },
+            "sessions": len(CHAT_SESSIONS),
+        }
+    )
 
 
-@app.route('/health')
+@app.route("/health")
 def health():
-    return jsonify({
-        "status": "healthy",
-        "gui_available": HAVE_GUI,
-        "gui_running": GUI_RUNNING,
-        "providers": {p: km.get_key_count() for p, km in KEY_MANAGERS.items() if km.has_keys()},
-        "endpoints_count": len(ENDPOINTS),
-        "sessions_count": len(CHAT_SESSIONS)
-    })
+    return jsonify(
+        {
+            "status": "healthy",
+            "gui_available": HAVE_GUI,
+            "gui_running": GUI_RUNNING,
+            "providers": {p: km.get_key_count() for p, km in KEY_MANAGERS.items() if km.has_keys()},
+            "endpoints_count": len(ENDPOINTS),
+            "sessions_count": len(CHAT_SESSIONS),
+        }
+    )
 
 
-@app.route('/sessions')
+@app.route("/sessions")
 def sessions_api():
     return jsonify({"sessions": list_sessions()})
 
 
-@app.route('/sessions/<session_id>')
+@app.route("/sessions/<session_id>")
 def get_session_api(session_id):
     session = get_session(session_id)
     if not session:
@@ -1621,7 +1700,7 @@ def get_session_api(session_id):
     return jsonify(session.to_dict())
 
 
-@app.route('/gui/browser')
+@app.route("/gui/browser")
 def open_browser_api():
     """Open the session browser via HTTP request"""
     if show_session_browser():
@@ -1644,25 +1723,28 @@ def server_error(e):
 # TERMINAL SESSION MANAGER
 # ============================================================================
 
+
 def terminal_session_manager():
-    print("\n" + "─"*60)
+    print("\n" + "─" * 60)
     print("TERMINAL COMMANDS (press key anytime):")
     print("  [L] List sessions       [O] Open session browser (GUI)")
     print("  [S] Show session        [D] Delete session")
     print("  [C] Clear all sessions  [H] Help")
     print("  [G] Toggle GUI status")
-    print("─"*60 + "\n")
+    print("─" * 60 + "\n")
 
     def get_input_nonblocking():
-        if sys.platform == 'win32':
+        if sys.platform == "win32":
             import msvcrt
+
             if msvcrt.kbhit():
-                return msvcrt.getch().decode('utf-8', errors='ignore').lower()
+                return msvcrt.getch().decode("utf-8", errors="ignore").lower()
             return None
         else:
             import select
             import termios
             import tty
+
             old_settings = None
             try:
                 old_settings = termios.tcgetattr(sys.stdin)
@@ -1683,11 +1765,11 @@ def terminal_session_manager():
         try:
             key = get_input_nonblocking()
 
-            if key == 'l':
+            if key == "l":
                 sessions = list_sessions()
-                print(f"\n{'─'*60}")
+                print(f"\n{'─' * 60}")
                 print(f"SAVED SESSIONS ({len(sessions)} total):")
-                print(f"{'─'*60}")
+                print(f"{'─' * 60}")
                 if not sessions:
                     print("  (No sessions)")
                 else:
@@ -1695,17 +1777,17 @@ def terminal_session_manager():
                         print(f"  [{s['id']}] {s['title'][:40]} ({s['messages']} msgs, {s['provider']})")
                     if len(sessions) > 10:
                         print(f"  ... and {len(sessions) - 10} more")
-                print(f"{'─'*60}\n")
+                print(f"{'─' * 60}\n")
 
-            elif key == 'o':
+            elif key == "o":
                 if HAVE_GUI:
                     print("\n[Opening session browser...]\n")
                     show_session_browser()
                 else:
                     print("\n[GUI not available]\n")
 
-            elif key == 'g':
-                print(f"\n{'─'*60}")
+            elif key == "g":
+                print(f"\n{'─' * 60}")
                 print("GUI STATUS:")
                 print(f"  Available: {HAVE_GUI}")
                 print(f"  Running: {GUI_RUNNING}")
@@ -1714,42 +1796,42 @@ def terminal_session_manager():
                 if OPEN_WINDOWS:
                     for w in list(OPEN_WINDOWS):
                         print(f"    - {w}")
-                print(f"{'─'*60}\n")
+                print(f"{'─' * 60}\n")
 
-            elif key == 's':
-                print("\nEnter session ID: ", end='', flush=True)
+            elif key == "s":
+                print("\nEnter session ID: ", end="", flush=True)
                 try:
                     session_id = input().strip()
                     session = get_session(session_id)
                     if session:
-                        print(f"\n{'─'*60}")
+                        print(f"\n{'─' * 60}")
                         print(f"SESSION: {session.session_id}")
                         print(f"Title: {session.title}")
                         print(f"Endpoint: {session.endpoint} | Provider: {session.provider}")
                         print(f"Created: {session.created_at}")
-                        print(f"{'─'*60}")
+                        print(f"{'─' * 60}")
                         for msg in session.messages:
                             role = "USER" if msg["role"] == "user" else "ASSISTANT"
                             print(f"\n[{role}]")
-                            print(msg['content'][:500] + ('...' if len(msg['content']) > 500 else ''))
-                        print(f"{'─'*60}\n")
+                            print(msg["content"][:500] + ("..." if len(msg["content"]) > 500 else ""))
+                        print(f"{'─' * 60}\n")
 
                         if HAVE_GUI:
                             open_gui = input("Open in chat GUI? [y/N]: ").strip().lower()
-                            if open_gui == 'y':
+                            if open_gui == "y":
                                 show_chat_gui(session)
                     else:
                         print(f"Session '{session_id}' not found.\n")
                 except:
                     pass
 
-            elif key == 'd':
-                print("\nEnter session ID to delete: ", end='', flush=True)
+            elif key == "d":
+                print("\nEnter session ID to delete: ", end="", flush=True)
                 try:
                     session_id = input().strip()
                     if session_id in CHAT_SESSIONS:
                         confirm = input(f"Delete session {session_id}? [y/N]: ").strip().lower()
-                        if confirm == 'y':
+                        if confirm == "y":
                             with SESSION_LOCK:
                                 del CHAT_SESSIONS[session_id]
                             save_sessions()
@@ -1759,10 +1841,10 @@ def terminal_session_manager():
                 except:
                     pass
 
-            elif key == 'c':
+            elif key == "c":
                 try:
                     confirm = input("\nClear ALL sessions? This cannot be undone. [y/N]: ").strip().lower()
-                    if confirm == 'y':
+                    if confirm == "y":
                         with SESSION_LOCK:
                             CHAT_SESSIONS.clear()
                         save_sessions()
@@ -1770,8 +1852,8 @@ def terminal_session_manager():
                 except:
                     pass
 
-            elif key == 'h':
-                print("\n" + "─"*60)
+            elif key == "h":
+                print("\n" + "─" * 60)
                 print("TERMINAL COMMANDS:")
                 print("  [L] List sessions       - Show recent saved sessions")
                 print("  [O] Open browser        - Open session browser GUI")
@@ -1780,7 +1862,7 @@ def terminal_session_manager():
                 print("  [C] Clear all           - Delete all sessions")
                 print("  [G] GUI status          - Show GUI state information")
                 print("  [H] Help                - Show this help")
-                print("─"*60 + "\n")
+                print("─" * 60 + "\n")
 
             time.sleep(0.1)
 
@@ -1792,6 +1874,7 @@ def terminal_session_manager():
 # ============================================================================
 # INITIALIZATION
 # ============================================================================
+
 
 def initialize():
     global CONFIG, AI_PARAMS, ENDPOINTS, KEY_MANAGERS
@@ -1835,7 +1918,7 @@ def initialize():
     print(f"\nRegistering {len(ENDPOINTS)} endpoint(s):")
     for endpoint_name, prompt in ENDPOINTS.items():
         handler = create_endpoint_handler(endpoint_name, prompt)
-        app.add_url_rule(f'/{endpoint_name}', endpoint_name, handler, methods=['POST'])
+        app.add_url_rule(f"/{endpoint_name}", endpoint_name, handler, methods=["POST"])
         prompt_preview = prompt[:60] + "..." if len(prompt) > 60 else prompt
         print(f"  /{endpoint_name}")
         print(f"      → {prompt_preview}")
@@ -1844,7 +1927,7 @@ def initialize():
 
 
 def generate_example_config():
-    return '''# ============================================================
+    return """# ============================================================
 # Universal ShareX Middleman Server Configuration
 # ============================================================
 
@@ -1941,19 +2024,19 @@ analyze = Analyze this image and provide insights about its content, context, an
 extract_data = Extract any structured data (tables, lists, key-value pairs) from this image and format it clearly.
 
 handwriting = Transcribe any handwritten text in this image as accurately as possible.
-'''
+"""
 
 
 # ============================================================================
 # MAIN ENTRY POINT
 # ============================================================================
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Create example config if needed
     if not Path(CONFIG_FILE).exists():
         print(f"Config file '{CONFIG_FILE}' not found.")
         print("Creating example configuration file...")
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             f.write(generate_example_config())
         print(f"✓ Created '{CONFIG_FILE}'")
         print("\nPlease edit the config file to add your API keys, then restart.")
@@ -1980,8 +2063,8 @@ if __name__ == '__main__':
     terminal_thread.start()
 
     # Start server
-    host = CONFIG.get('host', '127.0.0.1')
-    port = int(CONFIG.get('port', 5000))
+    host = CONFIG.get("host", "127.0.0.1")
+    port = int(CONFIG.get("port", 5000))
 
     print(f"\n🚀 Starting server at http://{host}:{port}")
     print(f"   Endpoints: {', '.join('/' + e for e in ENDPOINTS)}")

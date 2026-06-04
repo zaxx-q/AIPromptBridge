@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 @dataclass
 class FileInfo:
     """Information about a single file"""
+
     path: Path
     file_type: str  # "image", "text", "code", "unknown"
     extension: str
@@ -42,6 +43,7 @@ class FileInfo:
 @dataclass
 class ScanResult:
     """Result of scanning a directory or file"""
+
     input_path: Path
     files: List[FileInfo] = field(default_factory=list)
     by_type: Dict[str, List[FileInfo]] = field(default_factory=dict)
@@ -74,7 +76,7 @@ class ScanResult:
 class FileHandler:
     """
     Handle file type detection and content reading.
-    
+
     File Types:
     - image: Visual files processed via vision API
     - audio: Audio files processed via audio API
@@ -90,24 +92,63 @@ class FileHandler:
         "text": [".txt", ".md", ".rst", ".log", ".csv"],
         "document": [".pdf"],
         "code": [
-            ".py", ".js", ".ts", ".jsx", ".tsx",  # Python, JavaScript, TypeScript
-            ".java", ".kt", ".scala",  # JVM
-            ".c", ".cpp", ".h", ".hpp", ".cc",  # C/C++
-            ".go", ".rs", ".rb", ".php",  # Go, Rust, Ruby, PHP
-            ".cs", ".swift", ".m",  # C#, Swift, Objective-C
-            ".html", ".css", ".scss", ".sass", ".less",  # Web
-            ".json", ".xml", ".yaml", ".yml", ".toml", ".ini",  # Config
-            ".sql", ".sh", ".bash", ".zsh", ".ps1", ".bat", ".cmd",  # Scripts
-            ".r", ".R", ".jl", ".lua", ".pl", ".pm",  # Other
-            ".vue", ".svelte", ".astro",  # Frameworks
-            ".dockerfile", ".makefile", ".cmake",  # Build
-        ]
+            ".py",
+            ".js",
+            ".ts",
+            ".jsx",
+            ".tsx",  # Python, JavaScript, TypeScript
+            ".java",
+            ".kt",
+            ".scala",  # JVM
+            ".c",
+            ".cpp",
+            ".h",
+            ".hpp",
+            ".cc",  # C/C++
+            ".go",
+            ".rs",
+            ".rb",
+            ".php",  # Go, Rust, Ruby, PHP
+            ".cs",
+            ".swift",
+            ".m",  # C#, Swift, Objective-C
+            ".html",
+            ".css",
+            ".scss",
+            ".sass",
+            ".less",  # Web
+            ".json",
+            ".xml",
+            ".yaml",
+            ".yml",
+            ".toml",
+            ".ini",  # Config
+            ".sql",
+            ".sh",
+            ".bash",
+            ".zsh",
+            ".ps1",
+            ".bat",
+            ".cmd",  # Scripts
+            ".r",
+            ".R",
+            ".jl",
+            ".lua",
+            ".pl",
+            ".pm",  # Other
+            ".vue",
+            ".svelte",
+            ".astro",  # Frameworks
+            ".dockerfile",
+            ".makefile",
+            ".cmake",  # Build
+        ],
     }
 
     def __init__(self, file_types: Dict[str, List[str]] = None):
         """
         Initialize FileHandler.
-        
+
         Args:
             file_types: Custom file type mappings (overrides defaults)
         """
@@ -122,10 +163,10 @@ class FileHandler:
     def detect_type(self, filepath: Path) -> str:
         """
         Detect file type category.
-        
+
         Args:
             filepath: Path to file
-        
+
         Returns:
             File type: "image", "audio", "text", "code", or "unknown"
         """
@@ -147,10 +188,10 @@ class FileHandler:
     def get_file_info(self, filepath: Path) -> FileInfo:
         """
         Get detailed information about a file.
-        
+
         Args:
             filepath: Path to file
-        
+
         Returns:
             FileInfo with file details
         """
@@ -168,23 +209,18 @@ class FileHandler:
             file_type=file_type,
             extension=filepath.suffix.lower(),
             size=filepath.stat().st_size if filepath.exists() else 0,
-            mime_type=mime_type
+            mime_type=mime_type,
         )
 
-    def scan(
-        self,
-        path: Path,
-        recursive: bool = False,
-        include_unknown: bool = False
-    ) -> ScanResult:
+    def scan(self, path: Path, recursive: bool = False, include_unknown: bool = False) -> ScanResult:
         """
         Scan a file or directory.
-        
+
         Args:
             path: Path to file or directory
             recursive: If directory, scan recursively
             include_unknown: Include unknown file types
-        
+
         Returns:
             ScanResult with categorized files
         """
@@ -220,10 +256,10 @@ class FileHandler:
     def read_file(self, filepath: Path) -> Tuple[str, str, Optional[str]]:
         """
         Read file content for API consumption.
-        
+
         Args:
             filepath: Path to file
-        
+
         Returns:
             Tuple of (content_type, content, mime_type)
             - For images: ("image", base64_data, mime_type)
@@ -263,15 +299,11 @@ class FileHandler:
             return ("text", content, None)
 
     def build_api_message(
-        self,
-        filepath: Path,
-        prompt: str,
-        include_filename: bool = True,
-        display_name: Optional[str] = None
+        self, filepath: Path, prompt: str, include_filename: bool = True, display_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Build API message with file content.
-        
+
         Args:
             filepath: Path to file
             prompt: Processing prompt
@@ -279,7 +311,7 @@ class FileHandler:
             display_name: Override display name for the file (e.g., original name
                          when filepath points to a processed temp file). If None,
                          uses filepath.name.
-        
+
         Returns:
             Message dict in OpenAI format (for images) or Gemini format (for audio)
         """
@@ -337,14 +369,32 @@ class FileHandler:
                 # Code files get language-tagged fence
                 ext = filepath.suffix.lower().lstrip(".")
                 lang_map = {
-                    "py": "python", "js": "javascript", "ts": "typescript",
-                    "jsx": "jsx", "tsx": "tsx", "java": "java", "kt": "kotlin",
-                    "c": "c", "cpp": "cpp", "h": "c", "hpp": "cpp",
-                    "go": "go", "rs": "rust", "rb": "ruby", "php": "php",
-                    "cs": "csharp", "swift": "swift", "sh": "bash",
-                    "html": "html", "css": "css", "json": "json",
-                    "xml": "xml", "yaml": "yaml", "yml": "yaml",
-                    "sql": "sql", "md": "markdown",
+                    "py": "python",
+                    "js": "javascript",
+                    "ts": "typescript",
+                    "jsx": "jsx",
+                    "tsx": "tsx",
+                    "java": "java",
+                    "kt": "kotlin",
+                    "c": "c",
+                    "cpp": "cpp",
+                    "h": "c",
+                    "hpp": "cpp",
+                    "go": "go",
+                    "rs": "rust",
+                    "rb": "ruby",
+                    "php": "php",
+                    "cs": "csharp",
+                    "swift": "swift",
+                    "sh": "bash",
+                    "html": "html",
+                    "css": "css",
+                    "json": "json",
+                    "xml": "xml",
+                    "yaml": "yaml",
+                    "yml": "yaml",
+                    "sql": "sql",
+                    "md": "markdown",
                 }
                 lang = lang_map.get(ext, ext)
                 file_content = f"```{lang}\n{content}\n```"
@@ -353,7 +403,7 @@ class FileHandler:
 
             # Use structured delimiters (TextEditTool-style)
             if include_filename:
-                final_prompt = f"{prompt}\n\n<file_content filename=\"{filepath.name}\">\n{file_content}\n</file_content>"
+                final_prompt = f'{prompt}\n\n<file_content filename="{filepath.name}">\n{file_content}\n</file_content>'
             else:
                 final_prompt = f"{prompt}\n\n<file_content>\n{file_content}\n</file_content>"
 
@@ -374,18 +424,18 @@ class FileHandler:
         naming_template: str,
         extension: str,
         index: int = 0,
-        base_input_path: Optional[Path] = None
+        base_input_path: Optional[Path] = None,
     ) -> Path:
         """
         Generate output file path based on template.
-        
+
         Template variables:
         - {filename}: Original filename without extension
         - {extension}: New extension (with dot)
         - {date}: Current date (YYYY-MM-DD)
         - {time}: Current time (HH-MM-SS)
         - {index}: File index (for batch processing)
-        
+
         Args:
             input_path: Original input file path
             output_dir: Output directory (None = same as input)
@@ -395,7 +445,7 @@ class FileHandler:
             base_input_path: Root input directory for recursive scans.
                 When provided, the subdirectory structure of input_path
                 relative to base_input_path is preserved under output_dir.
-        
+
         Returns:
             Output file path
         """

@@ -16,18 +16,17 @@ from ..utils import set_window_icon
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
 try:
     from ...emoji_renderer import HAVE_PIL, get_emoji_renderer
+
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
     get_emoji_renderer = None
 
 
-
-
-
 # =============================================================================
 # Test Result Dialog (Streaming)
 # =============================================================================
+
 
 class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
     """
@@ -53,6 +52,7 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         # Dark titlebar support (must happen before deiconify)
         self.withdraw()
         from ..utils import set_dark_titlebar
+
         set_dark_titlebar(self)
         set_window_icon(self)
 
@@ -62,14 +62,10 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         # Output text area
         if self.use_ctk:
-            self.output_box = ctk.CTkTextbox(
-                self.main_frame, font=get_ctk_font(12),
-                **get_ctk_textbox_colors(colors)
-            )
+            self.output_box = ctk.CTkTextbox(self.main_frame, font=get_ctk_font(12), **get_ctk_textbox_colors(colors))
         else:
             self.output_box = tk.Text(
-                self.main_frame, font=("Consolas", 10),
-                bg=colors.surface0, fg=colors.fg, wrap="word"
+                self.main_frame, font=("Consolas", 10), bg=colors.surface0, fg=colors.fg, wrap="word"
             )
         self.output_box.pack(fill="both", expand=True, pady=(0, 10))
 
@@ -81,21 +77,27 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         # Close button
         if self.use_ctk:
             ctk.CTkButton(
-                self.main_frame, text="Close", font=get_ctk_font(11),
-                width=100, **get_ctk_button_colors(colors, "primary"),
-                command=self.destroy
+                self.main_frame,
+                text="Close",
+                font=get_ctk_font(11),
+                width=100,
+                **get_ctk_button_colors(colors, "primary"),
+                command=self.destroy,
             ).pack()
         else:
             tk.Button(
-                self.main_frame, text="Close", font=("Segoe UI", 10),
-                bg=colors.accent, fg=colors.accent_fg,
-                command=self.destroy
+                self.main_frame,
+                text="Close",
+                font=("Segoe UI", 10),
+                bg=colors.accent,
+                fg=colors.accent_fg,
+                command=self.destroy,
             ).pack()
 
         # State
         self.thinking_started = False
         self._has_content = False  # True once any text/thinking content arrives
-        self._completed = False    # True once test is finished
+        self._completed = False  # True once test is finished
 
         # Start message
         self._safe_insert("Waiting for response...\n\n")
@@ -140,6 +142,7 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         """Append thinking/reasoning text."""
         if not self._has_content:
             self._has_content = True
+
             # Clear the "Waiting for response..." placeholder
             def _clear_then_insert():
                 try:
@@ -149,6 +152,7 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         self.output_box.delete("1.0", "end")
                 except Exception:
                     pass
+
             self.queue.put(_clear_then_insert)
 
         if not self.thinking_started:
@@ -160,8 +164,8 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
     def end_thinking(self):
         """Mark end of thinking."""
         if self.thinking_started:
-             self._safe_insert("\n========== THINKING END ==========\n\n", "thinking")
-             self.thinking_started = False
+            self._safe_insert("\n========== THINKING END ==========\n\n", "thinking")
+            self.thinking_started = False
 
     def append_error(self, text):
         """Append error message."""
@@ -189,6 +193,7 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
     def _safe_insert(self, text, tag=None):
         """Thread-safe text insertion via queue."""
+
         def _update():
             try:
                 if self.use_ctk:
@@ -204,6 +209,7 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
     def _safe_clear_and_insert(self, text, tag=None):
         """Thread-safe: clear output box then insert text."""
+
         def _update():
             try:
                 if self.use_ctk:
