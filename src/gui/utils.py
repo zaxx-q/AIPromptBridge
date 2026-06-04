@@ -13,10 +13,10 @@ Emoji Support:
 
 import re
 import sys
-import webbrowser
 import tkinter as tk
+import webbrowser
 from tkinter import font as tkfont
-from typing import Optional, Dict, Union, Tuple, List
+from typing import Dict, List, Optional, Tuple, Union
 
 # Windows-specific imports and constants
 _user32 = None
@@ -36,23 +36,20 @@ if sys.platform == "win32":
 from .platform import HAVE_CTK, ctk
 
 # Import theme system
-from .themes import (
-    ThemeRegistry, ThemeColors,
-    get_color_scheme as _get_color_scheme,
-    is_dark_mode as _is_dark_mode,
-    get_ctk_font
-)
+from .themes import ThemeColors, ThemeRegistry, get_ctk_font
+from .themes import get_color_scheme as _get_color_scheme
+from .themes import is_dark_mode as _is_dark_mode
 
 # Import emoji renderer
 try:
-    from .emoji_renderer import get_emoji_renderer, EmojiRenderer, HAVE_PIL
+    from .emoji_renderer import HAVE_PIL, EmojiRenderer, get_emoji_renderer
     HAVE_EMOJI_RENDERER = HAVE_PIL
 except ImportError:
     HAVE_EMOJI_RENDERER = False
     get_emoji_renderer = None
 
 # Import LaTeX renderer
-from .latex_renderer import latex_to_unicode, extract_latex_blocks
+from .latex_renderer import extract_latex_blocks, latex_to_unicode
 
 # Sentinel markers for pre-processed inline LaTeX.
 # _preprocess_inline_latex() wraps converted Unicode with these so that
@@ -97,7 +94,7 @@ def copy_to_clipboard(text: str, root = None) -> bool:
             root.clipboard_append(text)
             root.update()  # Required for clipboard to persist
             return True
-        
+
         # Fallback to subprocess method
         if sys.platform == 'win32':
             import subprocess
@@ -154,11 +151,11 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         _config = web_server.CONFIG
     except (ImportError, AttributeError):
         _config = {}
-    
+
     chat_bg_enabled = _config.get("chat_message_bg_enabled", True)
     custom_user_bg = _config.get("chat_user_bg_color", "")
     custom_assistant_bg = _config.get("chat_assistant_bg_color", "")
-    
+
     # Convert ThemeColors to dict if needed
     if hasattr(colors, '__dataclass_fields__'):
         color_dict = {
@@ -184,7 +181,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
             "select_fg": colors.bg,
         }
         colors = color_dict
-    
+
     # Apply chat message background overrides from config
     if not chat_bg_enabled:
         # Disable backgrounds entirely — use the chat area's text_bg (transparent look)
@@ -198,12 +195,12 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
             colors["user_bg"] = custom_user_bg
         if custom_assistant_bg and custom_assistant_bg.startswith("#"):
             colors["assistant_bg"] = custom_assistant_bg
-    
+
     # Configure text selection colors
     select_bg = colors.get("select_bg", colors.get("accent", "#89b4fa"))
     select_fg = colors.get("select_fg", colors.get("bg", "#1e1e2e"))
     text_widget.configure(selectbackground=select_bg, selectforeground=select_fg)
-    
+
     # Get available fonts with Segoe UI Emoji fallback for Windows
     try:
         if sys.platform == 'win32':
@@ -215,23 +212,23 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     except:
         mono_font = "TkFixedFont"
         base_font = "TkDefaultFont"
-    
+
     # Headers
     text_widget.tag_configure("h1",
         font=(base_font, 16, "bold"),
         foreground=colors["header1"],
         spacing1=6, spacing3=4)
-    
+
     text_widget.tag_configure("h2",
         font=(base_font, 14, "bold"),
         foreground=colors["header2"],
         spacing1=5, spacing3=3)
-    
+
     text_widget.tag_configure("h3",
         font=(base_font, 12, "bold"),
         foreground=colors["header3"],
         spacing1=4, spacing3=2)
-    
+
     text_widget.tag_configure("h4",
         font=(base_font, 11, "bold"),
         foreground=colors["fg"],
@@ -263,13 +260,13 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     text_widget.tag_configure("italic", font=(base_font, 11, "italic"))
     text_widget.tag_configure("bold_italic", font=(base_font, 11, "bold italic"))
     text_widget.tag_configure("strikethrough", font=(base_font, 11), overstrike=True)
-    
+
     # Code
     text_widget.tag_configure("code",
         font=(mono_font, 10),
         background=colors["code_bg"],
         foreground=colors["accent"])
-    
+
     text_widget.tag_configure("codeblock",
         font=(mono_font, 10),
         background=colors["code_bg"],
@@ -283,142 +280,142 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     text_widget.tag_bind("link", "<Enter>", lambda e: text_widget.config(cursor="hand2"))
     text_widget.tag_bind("link", "<Leave>", lambda e: text_widget.config(cursor=""))
     text_widget.tag_bind("link", "<Button-1>", _handle_link_click)
-    
+
     # Lists
     text_widget.tag_configure("bullet",
         lmargin1=16, lmargin2=28,
         foreground=colors["fg"])
-    
+
     text_widget.tag_configure("bullet_marker",
         foreground=colors["bullet"])
-    
+
     text_widget.tag_configure("numbered",
         lmargin1=16, lmargin2=28,
         foreground=colors["fg"])
-    
+
     # Blockquote
     text_widget.tag_configure("blockquote",
         lmargin1=16, lmargin2=20,
         foreground=colors["blockquote"],
         font=(base_font, 11, "italic"))
-    
+
     # =================================================================
     # Card-style message blocks with accent bars
     # =================================================================
-    
+
     # User message card - left accent bar color
     text_widget.tag_configure("user_accent_bar",
         foreground=colors["user_accent"],
         font=(base_font, 11))
-    
+
     # User message label
     text_widget.tag_configure("user_label",
         font=(base_font, 11, "bold"),
         foreground=colors["user_accent"],
         spacing1=0, spacing3=2)
-    
+
     # User message content (colored background)
     text_widget.tag_configure("user_message",
         background=colors["user_bg"],
         lmargin1=0, lmargin2=0, rmargin=8,
         spacing1=0, spacing3=0)
-    
+
     # Assistant message card - left accent bar color
     text_widget.tag_configure("assistant_accent_bar",
         foreground=colors["assistant_accent"],
         font=(base_font, 11))
-    
+
     # Assistant message label
     text_widget.tag_configure("assistant_label",
         font=(base_font, 11, "bold"),
         foreground=colors["assistant_accent"],
         spacing1=0, spacing3=2)
-    
+
     # Assistant message content (colored background)
     text_widget.tag_configure("assistant_message",
         background=colors["assistant_bg"],
         lmargin1=0, lmargin2=0, rmargin=8,
         spacing1=0, spacing3=0)
-    
+
     # Card gap (transparent space between messages)
     text_widget.tag_configure("card_gap",
         spacing1=4, spacing3=4,
         font=(base_font, 4))  # Small font for minimal height
-    
+
     # Normal text
     text_widget.tag_configure("normal",
         font=(base_font, 11),
         foreground=colors["fg"])
-    
+
     # Separator (only used within cards, not between them)
     text_widget.tag_configure("separator",
         foreground=colors.get("surface1", colors["border"]),
         spacing1=4, spacing3=4)
-    
+
     # =================================================================
     # Thinking/Reasoning display - improved styling
     # =================================================================
-    
+
     # Thinking header - clickable, yellow accent
     text_widget.tag_configure("thinking_header",
         font=(base_font, 10, "bold"),
         foreground=colors["accent_yellow"],
         spacing1=4, spacing3=2)
-    
+
     # Add cursor change on hover for thinking header
     text_widget.tag_bind("thinking_header", "<Enter>",
         lambda e: text_widget.config(cursor="hand2"))
     text_widget.tag_bind("thinking_header", "<Leave>",
         lambda e: text_widget.config(cursor=""))
-    
+
     # Thinking content - improved contrast (use overlay0 instead of blockquote)
     text_widget.tag_configure("thinking_content",
         font=(base_font, 10),
         foreground=colors.get("overlay0", colors["blockquote"]),
         lmargin1=12, lmargin2=12,
         spacing1=2, spacing3=2)
-    
+
     # Thinking message role (for markdown-rendered thinking)
     text_widget.tag_configure("thinking_message",
         lmargin1=12, lmargin2=12, rmargin=8,
         spacing1=1, spacing3=2)
-    
+
     # Thinking block background - visually distinct from answer area,
     # mirrors assistant_message layout but with darker background
     text_widget.tag_configure("thinking_block_layout",
         background=colors["code_bg"],
         lmargin1=0, lmargin2=0, rmargin=8,
         spacing1=0, spacing3=0)
-    
+
     # Separator between thinking and answer
     text_widget.tag_configure("thinking_end_sep",
         foreground=colors.get("surface2", colors.get("overlay0", "#9399b2")),
         font=(base_font, 7),
         spacing1=6, spacing3=4)
-    
+
     # =================================================================
     # Message action icons (edit, rerun, more)
     # =================================================================
-    
+
     # Muted by default — accent highlight on hover is handled per-instance
     text_widget.tag_configure("action_icon",
         font=(base_font, 10),
         foreground=colors.get("surface1", colors.get("overlay0", "#585b70")))
-    
+
     # Hover-highlighted variant
     text_widget.tag_configure("action_icon_hover",
         font=(base_font, 10),
         foreground=colors.get("accent", "#89b4fa"))
-    
+
     # =================================================================
     # LaTeX math display
     # =================================================================
-    
+
     # Inline math ($...$) - italic with accent color
     text_widget.tag_configure("latex_inline",
         font=(base_font, 11, "italic"),
         foreground=colors.get("accent_yellow", colors["accent"]))
-    
+
     # Display math ($$...$$) - left-aligned block with code font for alignment
     text_widget.tag_configure("latex_block",
         font=(mono_font, 11),
@@ -427,7 +424,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         justify="left",
         lmargin1=24, lmargin2=24, rmargin=24,
         spacing1=4, spacing3=4)
-    
+
     # Bold/italic variants for display math wrapped in markdown formatting
     # e.g. **$$...$$** → latex_block_bold
     text_widget.tag_configure("latex_block_bold",
@@ -437,7 +434,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         justify="left",
         lmargin1=24, lmargin2=24, rmargin=24,
         spacing1=4, spacing3=4)
-    
+
     text_widget.tag_configure("latex_block_italic",
         font=(mono_font, 11, "italic"),
         foreground=colors.get("accent_yellow", colors["accent"]),
@@ -445,7 +442,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         justify="left",
         lmargin1=24, lmargin2=24, rmargin=24,
         spacing1=4, spacing3=4)
-    
+
     text_widget.tag_configure("latex_block_bold_italic",
         font=(mono_font, 11, "bold italic"),
         foreground=colors.get("accent_yellow", colors["accent"]),
@@ -453,16 +450,16 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         justify="left",
         lmargin1=24, lmargin2=24, rmargin=24,
         spacing1=4, spacing3=4)
-    
+
     # Technical symbols font (center pieces) - used for characters
     # that are missing or look poor in monospaced fonts.
     text_widget.tag_configure("latex_symbols",
         font=("Segoe UI Symbol", 24),
         foreground=colors.get("accent_yellow", colors["accent"]))
-    
+
     # Raise thinking_block_layout above user_message/assistant_message so its background takes priority
     text_widget.tag_raise("thinking_block_layout")
-    
+
     # Raise "sel" tag priority so text selection always shows over background colors
     text_widget.tag_raise("sel")
 
@@ -581,13 +578,13 @@ def _extract_latex_display_blocks(text: str) -> Tuple[str, List[str]]:
         Tuple of (modified_text, list of latex_content_strings)
     """
     blocks = []
-    
+
     def replace_block(match):
         content = match.group(1).strip()
         idx = len(blocks)
         blocks.append(content)
         return f'__LATEX_DISPLAY_{idx}__'
-    
+
     # Match $$...$$ (may span multiple lines)
     modified = re.sub(r'\$\$(.+?)\$\$', replace_block, text, flags=re.DOTALL)
     return modified, blocks
@@ -759,7 +756,7 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
 
     # Pre-process: Extract and render tables first
     text, table_blocks = _extract_tables(text)
-    
+
     # Pre-process: Extract $$...$$ display math blocks (may span lines)
     text, latex_display_blocks = _extract_latex_display_blocks(text)
 
@@ -776,7 +773,7 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
             _font_obj = tkfont.Font(family="Segoe UI", size=11)
         except Exception:
             _font_obj = None
-    
+
     # Apply role-based styling
     role_tag = None
     if as_role == "user":
@@ -785,7 +782,7 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
         role_tag = "assistant_message"
     elif as_role == "thinking":
         role_tag = "thinking_message"
-    
+
     def build_tags(*primary_tags):
         """Build tag tuple including role_tag and block_tag if present."""
         result = list(primary_tags)
@@ -794,10 +791,10 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
         if block_tag:
             result.append(block_tag)
         return tuple(result) if result else None
-    
+
     for i, line in enumerate(lines):
         stripped = line.strip()
-        
+
         # Code block handling
         if stripped.startswith('```'):
             if in_code_block:
@@ -818,16 +815,16 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                 # Start code block (ignore language identifier)
                 in_code_block = True
             continue
-        
+
         if in_code_block:
             code_block_lines.append(line)
             continue
-        
+
         # Add newline between lines (except first)
         if text_widget.index(tk.END) != "1.0" and i > 0:
             newline_tags = build_tags("normal")
             text_widget.insert(tk.END, '\n', newline_tags)
-        
+
         # Empty line - minimal spacing
         if not stripped:
             continue
@@ -840,7 +837,7 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                 _, table_data = table_blocks[table_idx]
                 _render_table(text_widget, table_data, colors, role_tag, block_tag, line_prefix)
             continue
-        
+
         # Check for LaTeX display block placeholder (optionally wrapped in bold/italic markers)
         # Matches: __LATEX_DISPLAY_0__, **__LATEX_DISPLAY_0__**, *__LATEX_DISPLAY_0__*,
         #          ***__LATEX_DISPLAY_0__***, ___...___, __...__
@@ -856,7 +853,7 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                     converted = latex_to_unicode(latex_content)
                 except Exception:
                     converted = latex_content
-                
+
                 # Determine formatting from surrounding markers
                 open_marker = latex_match.group(1) or ""
                 marker_len = len(open_marker)
@@ -868,21 +865,21 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                     latex_tag = "latex_block_italic"
                 else:
                     latex_tag = "latex_block"
-                
+
                 # Need to handle each line separately to apply prefix correctly
                 converted_lines = converted.split('\n')
                 for idx, line_str in enumerate(converted_lines):
                     if idx > 0:
                         text_widget.insert(tk.END, '\n', build_tags("normal"))
-                    
+
                     if line_prefix:
                         text_widget.insert(tk.END, line_prefix, build_tags("normal"))
-                    
+
                     tags = build_tags(latex_tag)
-                    
+
                     # Technical characters that need Segoe UI Symbol
                     symbol_chars = "⎨⎬"
-                    
+
                     for char in line_str:
                         if char in symbol_chars:
                             char_tags = tuple(list(tags) + ["latex_symbols"])
@@ -895,7 +892,7 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
         if line_prefix:
             prefix_tags = build_tags("normal")
             text_widget.insert(tk.END, line_prefix, prefix_tags)
-        
+
         # Headers
         if stripped.startswith('#'):
             level = 0
@@ -904,7 +901,7 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                     level += 1
                 else:
                     break
-            
+
             if level <= 6 and len(stripped) > level and stripped[level] == ' ':
                 header_text = _preprocess_inline_latex(stripped[level+1:])
                 content, format_style = _strip_inline_formatting(header_text)
@@ -919,24 +916,24 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
                 tags = build_tags(tag)
                 _insert_with_latex_segments(text_widget, content, tags, enable_emojis)
                 continue
-        
+
         # Blockquote
         if stripped.startswith('>'):
             content = _preprocess_inline_latex(stripped[1:].strip())
             tags = build_tags("blockquote")
             _insert_with_latex_segments(text_widget, "│ " + content, tags, enable_emojis)
             continue
-        
+
         # Bullet points
         if stripped.startswith('- ') or stripped.startswith('* '):
             content = stripped[2:]
             # Calculate indentation from original line
             indent_len = len(line) - len(line.lstrip())
             indent_str = " " * indent_len
-            
+
             # Build the prefix string for hanging indent measurement
             bullet_prefix = f"{line_prefix}{indent_str}  • "
-            
+
             # Insert bullet marker with indentation
             tags = build_tags("bullet_marker")
             text_widget.insert(tk.END, f"{indent_str}  • ", tags)
@@ -945,7 +942,7 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
             # Apply hanging indent so wrapped lines align with content start
             _apply_hanging_indent(text_widget, bullet_prefix, _font_obj)
             continue
-        
+
         # Numbered list
         match = re.match(r'^(\d+)\.\s+(.+)$', stripped)
         if match:
@@ -953,26 +950,26 @@ def render_markdown(text: str, text_widget: tk.Text, colors: Dict[str, str],
             # Calculate indentation from original line
             indent_len = len(line) - len(line.lstrip())
             indent_str = " " * indent_len
-            
+
             # Build the prefix string for hanging indent measurement
             num_prefix = f"{line_prefix}{indent_str}  {num}. "
-            
+
             tags = build_tags("numbered")
             text_widget.insert(tk.END, f"{indent_str}  {num}. ", tags)
             _render_inline(content, text_widget, colors, role_tag, enable_emojis, block_tag)
             # Apply hanging indent so wrapped lines align with content start
             _apply_hanging_indent(text_widget, num_prefix, _font_obj)
             continue
-        
+
         # Horizontal rule
         if re.match(r'^[-*_]{3,}$', stripped):
             tags = build_tags("separator")
             text_widget.insert(tk.END, "─" * 40, tags)
             continue
-        
+
         # Regular paragraph with inline formatting
         _render_inline(line, text_widget, colors, role_tag, enable_emojis, block_tag)
-    
+
     # Flush any remaining code block
     if in_code_block and code_block_lines:
         code_lines_prefixed = [line_prefix + l for l in code_block_lines]
@@ -1008,7 +1005,7 @@ def _insert_with_emojis(
             if tag.startswith("url_"):
                 link_url = tag[4:]
                 break
-    
+
     # Only use emoji rendering on Windows and if available
     use_emoji_renderer = (
         enable_emojis and
@@ -1017,7 +1014,7 @@ def _insert_with_emojis(
         get_emoji_renderer is not None and
         not link_url # Check if this is a link URL segment
     )
-    
+
     if use_emoji_renderer:
         try:
             renderer = get_emoji_renderer()
@@ -1027,7 +1024,7 @@ def _insert_with_emojis(
             text_widget.insert(tk.END, text, tags)
     else:
         text_widget.insert(tk.END, text, tags)
-        
+
     # Bind click event if it's a link
     if link_url:
         # We need to bind to the specific tag that contains the URL info
@@ -1036,13 +1033,13 @@ def _insert_with_emojis(
         # Instead, we rely on the 'link' tag we added, and this helper doesn't do the binding.
         # The binding needs to be generic on the 'link' tag in setup_text_tags,
         # but that can't access the URL unless we inspect the tags at the click position.
-        
+
         # Binding is already done in setup_text_tags for 'link' tag class?
         # No, we need a way to open the specific URL.
-        
+
         def open_specific_url(event=None, u=link_url):
             webbrowser.open(u)
-            
+
         # Create a unique tag for this specific link instance to bind the click
         # This is a bit heavy but reliable.
         # Alternatively, use the global 'link' tag binding and find the url_ tag at current index.
@@ -1124,7 +1121,7 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
         if block_tag:
             result.append(block_tag)
         return tuple(result) if result else ("normal",)
-    
+
     # Pattern for inline elements
     # Order matters: check bold+italic first, then bold, then italic, then code, then strikethrough, then links
     patterns = [
@@ -1138,7 +1135,7 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
         (r'~~(.+?)~~', 'strikethrough'),         # ~~text~~
         (r'\[([^\]]+)\]\(([^)]+)\)', 'link'),    # [text](url)
     ]
-    
+
     # Build a combined pattern to find all matches in order.
     # Inline LaTeX has already been pre-processed into sentinel-wrapped
     # Unicode by _preprocess_inline_latex(), so we match \x02…\x03 here.
@@ -1148,7 +1145,7 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
                r'`[^`]+`|~~.+?~~|' \
                r'\[[^\]]+\]\([^)]+\)|' \
                r'\x02[^\x03]+\x03)'
-    
+
     pos = 0
     for match in re.finditer(combined, text):
         # Insert any text before this match
@@ -1156,11 +1153,11 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
             plain_text = text[pos:match.start()]
             tags = build_tags("normal")
             _insert_with_latex_segments(text_widget, plain_text, tags, enable_emojis)
-        
+
         matched_text = match.group(0)
         content = None
         tag = "normal"
-        
+
         # Determine which pattern matched
         if matched_text.startswith('***') and matched_text.endswith('***'):
             content = matched_text[3:-3]
@@ -1191,12 +1188,12 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
                 # Since we can't easily modify the 'tags' tuple later in _insert_with_emojis to add a unique callback,
                 # we'll handle insertion directly here for links?
                 # No, _insert_with_emojis expects content.
-                
+
                 # We will add a dynamic tag "url_{url}"
                 # But tkinter tags with spaces or odd chars might be an issue? URL encoded?
                 # Let's just use the url if safe, or a safe hash?
                 # Tkinter tags are strings.
-                
+
                 # We'll allow spaces in tags? yes.
                 url_tag = f"url_{url}"
                 extra_tag = url_tag
@@ -1210,7 +1207,7 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
         elif matched_text.startswith('_') and matched_text.endswith('_'):
             content = matched_text[1:-1]
             tag = "italic"
-        
+
         if content:
             if tag == "link" and 'extra_tag' in locals():
                 tags = build_tags(tag, extra_tag)
@@ -1219,9 +1216,9 @@ def _render_inline(text: str, text_widget: tk.Text, colors: Dict[str, str],
             else:
                 tags = build_tags(tag)
             _insert_with_latex_segments(text_widget, content, tags, enable_emojis)
-        
+
         pos = match.end()
-    
+
     # Insert any remaining text
     if pos < len(text):
         remaining = text[pos:]
@@ -1251,7 +1248,7 @@ def hide_from_taskbar(window):
                     hwnd = parent_hwnd
             except Exception:
                 hwnd = window.winfo_id()
-            
+
             # Modify the style
             style = _user32.GetWindowLongW(hwnd, _GWL_EXSTYLE)
             style = style & ~_WS_EX_APPWINDOW
@@ -1287,13 +1284,13 @@ def get_tk_text_for_ctk_frame(parent_frame, colors: Union[Dict[str, str], ThemeC
         fg = colors.get("fg", "#cdd6f4")
         insert_bg = fg
         select_bg = colors.get("accent", "#89b4fa")
-    
+
     # Default font
     if sys.platform == 'win32':
         font = ("Segoe UI", 11)
     else:
         font = ("DejaVu Sans", 11)
-    
+
     # Merge with provided kwargs
     text_kwargs = {
         "wrap": tk.WORD,
@@ -1309,5 +1306,5 @@ def get_tk_text_for_ctk_frame(parent_frame, colors: Union[Dict[str, str], ThemeC
         "pady": 12,
     }
     text_kwargs.update(kwargs)
-    
+
     return tk.Text(parent_frame, **text_kwargs)

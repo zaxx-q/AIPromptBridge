@@ -9,14 +9,22 @@ import copy
 import tkinter as tk
 from tkinter import messagebox
 
+from ...custom_widgets import (
+    ScrollableButtonList,
+    TkScrollableFrame,
+    ask_themed_string,
+    create_emoji_button,
+    create_section_header,
+)
 from ...platform import HAVE_CTK, ctk
 from ...themes import (
-    get_ctk_button_colors, get_ctk_entry_colors,
-    get_ctk_textbox_colors, get_ctk_combobox_colors, get_ctk_label_colors,
-    get_ctk_font
+    get_ctk_button_colors,
+    get_ctk_combobox_colors,
+    get_ctk_entry_colors,
+    get_ctk_font,
+    get_ctk_label_colors,
+    get_ctk_textbox_colors,
 )
-from ...custom_widgets import ScrollableButtonList, create_section_header, create_emoji_button, TkScrollableFrame
-from ...custom_widgets import ask_themed_string
 
 
 class ActionsTabMixin:
@@ -27,14 +35,14 @@ class ActionsTabMixin:
         # Container with left/right panes
         container = ctk.CTkFrame(frame, fg_color="transparent") if self.use_ctk else tk.Frame(frame, bg=self.colors.bg)
         container.pack(fill="both", expand=True, padx=15, pady=15)
-        
+
         # Left panel: action list (fixed width)
         left_panel = ctk.CTkFrame(container, fg_color="transparent", width=260) if self.use_ctk else tk.Frame(container, bg=self.colors.bg, width=260)
         left_panel.pack(side="left", fill="y", padx=(0, 15))
         left_panel.pack_propagate(False)
-        
+
         create_section_header(left_panel, "Actions", self.colors, "⚡")
-        
+
         # Tool Switcher
         if self.use_ctk:
             self.tool_switcher = ctk.CTkSegmentedButton(
@@ -52,7 +60,7 @@ class ActionsTabMixin:
             )
             self.tool_switcher.set("Text Edit Tool")
             self.tool_switcher.pack(fill="x", pady=(0, 10))
-        
+
         # List container - using ScrollableButtonList
         if self.use_ctk:
             self.action_listbox = ScrollableButtonList(
@@ -65,24 +73,24 @@ class ActionsTabMixin:
                 bg=self.colors.input_bg
             )
         self.action_listbox.pack(fill="both", expand=True)
-        
+
         # Action buttons
         btn_frame = ctk.CTkFrame(left_panel, fg_color="transparent") if self.use_ctk else tk.Frame(left_panel, bg=self.colors.bg)
         btn_frame.pack(fill="x", pady=(12, 0))
-        
+
         # Buttons using shared helper
         create_emoji_button(btn_frame, "Add", "➕", self.colors, "success", 70, 34, self._add_action).pack(side="left", padx=3)
         create_emoji_button(btn_frame, "", "📋", self.colors, "secondary", 40, 34, self._duplicate_action).pack(side="left", padx=3)
         create_emoji_button(btn_frame, "", "🗑️", self.colors, "danger", 40, 34, self._delete_action).pack(side="left", padx=3)
         create_emoji_button(btn_frame, "⬆", "", self.colors, "secondary", 40, 34, self._move_action_up).pack(side="left", padx=3)
         create_emoji_button(btn_frame, "⬇", "", self.colors, "secondary", 40, 34, self._move_action_down).pack(side="left", padx=3)
-        
+
         # Right panel: action editor
         right_panel = ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=self.colors.bg)
         right_panel.pack(side="left", fill="both", expand=True)
-        
+
         create_section_header(right_panel, "Edit Action", self.colors, "✏️")
-        
+
         # Editor form in scrollable frame
         if self.use_ctk:
             editor_container = ctk.CTkScrollableFrame(right_panel, fg_color="transparent")
@@ -91,11 +99,11 @@ class ActionsTabMixin:
             editor_container = TkScrollableFrame(right_panel, bg_color=self.colors.bg)
             editor_scroll = editor_container.scrollable_frame
         editor_container.pack(fill="both", expand=True)
-        
+
         # Action name (read-only label)
         row_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
         row_frame.pack(fill="x", pady=8)
-        
+
         if self.use_ctk:
             ctk.CTkLabel(row_frame, text="Name:", font=get_ctk_font(13), width=120, anchor="w",
                         **get_ctk_label_colors(self.colors)).pack(side="left")
@@ -110,11 +118,11 @@ class ActionsTabMixin:
                                                    font=("Segoe UI", 10, "bold"),
                                                    bg=self.colors.bg, fg=self.colors.fg)
         self.editor_widgets["name"].pack(side="left", padx=(10, 0))
-        
+
         # Icon field
         row_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
         row_frame.pack(fill="x", pady=8)
-        
+
         if self.use_ctk:
             ctk.CTkLabel(row_frame, text="Icon:", font=get_ctk_font(13), width=120, anchor="w",
                         **get_ctk_label_colors(self.colors)).pack(side="left")
@@ -139,11 +147,11 @@ class ActionsTabMixin:
             self.editor_widgets["icon_entry"].pack(side="left", padx=(10, 5))
             tk.Label(row_frame, text="(paste emoji here — Ctrl+V)", font=("Segoe UI", 9),
                     bg=self.colors.bg, fg=self.colors.surface2).pack(side="left", padx=(4, 0))
-        
+
         # Prompt type dropdown (Text Edit Tool only)
         self.prompt_type_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
         self.prompt_type_frame.pack(fill="x", pady=8)
-        
+
         if self.use_ctk:
             ctk.CTkLabel(self.prompt_type_frame, text="Type:", font=get_ctk_font(13), width=120, anchor="w",
                         **get_ctk_label_colors(self.colors)).pack(side="left")
@@ -164,11 +172,11 @@ class ActionsTabMixin:
                 values=["edit", "general"], state="readonly", width=15
             )
             self.editor_widgets["prompt_type"].pack(side="left", padx=(10, 0))
-        
+
         # System prompt (multiline)
         row_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
         row_frame.pack(fill="x", pady=8)
-        
+
         if self.use_ctk:
             ctk.CTkLabel(row_frame, text="System Prompt:", font=get_ctk_font(13), anchor="w",
                         **get_ctk_label_colors(self.colors)).pack(anchor="w")
@@ -185,11 +193,11 @@ class ActionsTabMixin:
                 bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
             )
             self.editor_widgets["system_prompt"].pack(fill="x", pady=(5, 0))
-        
+
         # Task field
         row_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
         row_frame.pack(fill="x", pady=8)
-        
+
         if self.use_ctk:
             ctk.CTkLabel(row_frame, text="Task:", font=get_ctk_font(13), width=120, anchor="w",
                         **get_ctk_label_colors(self.colors)).pack(side="left")
@@ -208,11 +216,11 @@ class ActionsTabMixin:
                 font=("Segoe UI", 10), bg=self.colors.input_bg, fg=self.colors.fg
             )
             self.editor_widgets["task"].pack(side="left", fill="x", expand=True, padx=(10, 0))
-        
+
         # Show in chat checkbox (label varies by tool)
         self.show_chat_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
         self.show_chat_frame.pack(fill="x", pady=10)
-        
+
         self.editor_widgets["show_chat_var"] = tk.BooleanVar()
         if self.use_ctk:
             self.editor_widgets["show_chat"] = ctk.CTkCheckBox(
@@ -229,11 +237,11 @@ class ActionsTabMixin:
                 selectcolor=self.colors.input_bg
             )
         self.editor_widgets["show_chat"].pack(anchor="w")
-        
+
         # Compare prompts checkbox (Text Edit Tool and Snip Tool)
         self.compare_prompts_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
         # Initially shown for text_edit_tool (the default)
-        
+
         self.editor_widgets["compare_prompts_var"] = tk.BooleanVar()
         if self.use_ctk:
             self.editor_widgets["compare_prompts"] = ctk.CTkCheckBox(
@@ -250,14 +258,14 @@ class ActionsTabMixin:
                 selectcolor=self.colors.input_bg
             )
         self.editor_widgets["compare_prompts"].pack(anchor="w")
-        
+
         # Show compare_prompts frame initially (text_edit_tool is default)
         self.compare_prompts_frame.pack(fill="x", pady=10)
-        
+
         # Connection Profile dropdown (all tools)
         self.profile_frame = ctk.CTkFrame(editor_scroll, fg_color="transparent") if self.use_ctk else tk.Frame(editor_scroll, bg=self.colors.bg)
         self.profile_frame.pack(fill="x", pady=8)
-        
+
         if self.use_ctk:
             ctk.CTkLabel(self.profile_frame, text="Connection Profile:", font=get_ctk_font(13), width=120, anchor="w",
                         **get_ctk_label_colors(self.colors)).pack(side="left")
@@ -286,15 +294,15 @@ class ActionsTabMixin:
             tk.Button(self.profile_frame, text="Manage...", font=("Segoe UI", 9),
                      bg=self.colors.surface1, fg=self.colors.fg,
                      command=self._open_profile_manager).pack(side="left")
-        
+
         # Refresh profile dropdown values
         self._refresh_profile_dropdown()
         self._refresh_action_list()
-        
+
         # Save action button - OUTSIDE scrollable frame so it's always visible
         btn_frame = ctk.CTkFrame(right_panel, fg_color="transparent") if self.use_ctk else tk.Frame(right_panel, bg=self.colors.bg)
         btn_frame.pack(fill="x", pady=(10, 0), side="bottom")
-        
+
         create_emoji_button(
             btn_frame, "Save Action", "💾", self.colors, "success", 150, 40, self._save_current_action
         ).pack(side="left")
@@ -315,18 +323,18 @@ class ActionsTabMixin:
         """Refresh the action scrollable list based on current tool."""
         if not self.action_listbox:
             return
-            
+
         selected = self.action_listbox.get_selected()
         self.action_listbox.clear()
-        
+
         tool_data = self.options_data.get(self.current_tool, {})
-        
+
         for name in tool_data.keys():
             if name == "_settings":
                 continue
             icon = tool_data[name].get("icon", "")
             self.action_listbox.add_item(name, name, icon)
-            
+
         if selected and selected in tool_data:
             self.action_listbox.select(selected)
         else:
@@ -337,14 +345,14 @@ class ActionsTabMixin:
         """Clear the editor fields."""
         if not hasattr(self, 'editor_widgets') or not self.editor_widgets:
             return
-            
+
         self.editor_widgets["icon_var"].set("")
         self.editor_widgets["prompt_type_var"].set("edit")
         self.editor_widgets["task_var"].set("")
         self.editor_widgets["show_chat_var"].set(False)
         if "compare_prompts_var" in self.editor_widgets:
             self.editor_widgets["compare_prompts_var"].set(False)
-        
+
         if self.use_ctk:
             self.editor_widgets["system_prompt"].delete("0.0", "end")
         else:
@@ -354,24 +362,24 @@ class ActionsTabMixin:
         """Show/hide editor fields based on current tool."""
         if not hasattr(self, 'prompt_type_frame'):
             return
-            
+
         is_text_edit = self.current_tool == "text_edit_tool"
         is_snip = self.current_tool == "snip_tool"
         is_audio = self.current_tool == "audio_tool"
-        
+
         # prompt_type: Text Edit only
         if is_text_edit:
             self.prompt_type_frame.pack(fill="x", pady=8)
         else:
             self.prompt_type_frame.pack_forget()
-        
+
         # compare_prompts: Text Edit and Snip Tool
         if hasattr(self, 'compare_prompts_frame'):
             if is_text_edit or is_snip:
                 self.compare_prompts_frame.pack(fill="x", pady=10)
             else:
                 self.compare_prompts_frame.pack_forget()
-        
+
         # Update checkbox label based on tool (per user requirement)
         if hasattr(self, 'editor_widgets') and "show_chat" in self.editor_widgets:
             if is_text_edit:
@@ -380,7 +388,7 @@ class ActionsTabMixin:
                 new_text = "Show response in chat window instead of copy to clipboard"
             else:  # audio_tool
                 new_text = "Show response in chat window instead of in result panel"
-            
+
             if self.use_ctk:
                 self.editor_widgets["show_chat"].configure(text=new_text)
             else:
@@ -394,7 +402,7 @@ class ActionsTabMixin:
             self.current_tool = "snip_tool"
         else:  # Audio Tool
             self.current_tool = "audio_tool"
-        
+
         # Clear current selection and refresh list
         self.current_action = None
         self._refresh_action_list()
@@ -404,28 +412,28 @@ class ActionsTabMixin:
         """Handle action selection."""
         if not action_name:
             return
-            
+
         self.current_action = action_name
         tool_data = self.options_data.get(self.current_tool, {})
         action_data = tool_data.get(action_name, {})
-        
+
         # Populate editor
         if self.use_ctk:
             self.editor_widgets["name"].configure(text=action_name)
         else:
             self.editor_widgets["name"].configure(text=action_name)
-        
+
         self.editor_widgets["icon_var"].set(action_data.get("icon", ""))
-        
+
         if self.use_ctk:
             self.editor_widgets["system_prompt"].delete("0.0", "end")
             self.editor_widgets["system_prompt"].insert("0.0", action_data.get("system_prompt", ""))
         else:
             self.editor_widgets["system_prompt"].delete("1.0", "end")
             self.editor_widgets["system_prompt"].insert("1.0", action_data.get("system_prompt", ""))
-        
+
         self.editor_widgets["task_var"].set(action_data.get("task", ""))
-        
+
         # Handle different field names per tool
         if self.current_tool == "text_edit_tool":
             self.editor_widgets["prompt_type_var"].set(action_data.get("prompt_type", "edit"))
@@ -445,12 +453,12 @@ class ActionsTabMixin:
                 self.editor_widgets["compare_prompts_var"].set(
                     action_data.get("compare_prompts", False)
                 )
-        
+
         # Load connection profile (all tools)
         if "profile_var" in self.editor_widgets:
             profile_name = action_data.get("connection_profile", "") or ""
             self.editor_widgets["profile_var"].set(profile_name if profile_name else "(None)")
-        
+
         # Update field visibility
         self._update_editor_visibility()
 
@@ -459,7 +467,7 @@ class ActionsTabMixin:
         from ....connection_profiles import ProfileStore
         profile_names = ProfileStore.get_instance().get_profile_names()
         values = ["(None)"] + profile_names
-        
+
         if "profile_combo" in self.editor_widgets:
             combo = self.editor_widgets["profile_combo"]
             if self.use_ctk:
@@ -480,7 +488,7 @@ class ActionsTabMixin:
         """Add a new action."""
         name = ask_themed_string(self.root, "New Action", "Enter action name:", self.colors)
         tool_data = self.options_data.setdefault(self.current_tool, {})
-        
+
         if name and name not in tool_data:
             tool_data[name] = {
                 "_is_default": False,
@@ -497,17 +505,17 @@ class ActionsTabMixin:
         """Duplicate selected action."""
         if not self.current_action:
             return
-        
+
         tool_data = self.options_data.get(self.current_tool, {})
         new_name = f"{self.current_action}_copy"
         counter = 1
         while new_name in tool_data:
             counter += 1
             new_name = f"{self.current_action}_copy{counter}"
-        
+
         tool_data[new_name] = copy.deepcopy(tool_data[self.current_action])
         tool_data[new_name]["_is_default"] = False
-        
+
         icon = tool_data[new_name].get("icon", "")
         self.action_listbox.add_item(new_name, new_name, icon)
 
@@ -515,13 +523,13 @@ class ActionsTabMixin:
         """Delete selected action."""
         if not self.current_action:
             return
-        
+
         if messagebox.askyesno("Delete Action", f"Delete action '{self.current_action}'?", parent=self.root):
             tool_data = self.options_data.get(self.current_tool, {})
-            
+
             # Check if this was a default action before removing
-            from ...prompts import DEFAULT_TEXT_EDIT_ACTIONS, DEFAULT_SNIP_ACTIONS, DEFAULT_AUDIO_ACTIONS
-            
+            from ...prompts import DEFAULT_AUDIO_ACTIONS, DEFAULT_SNIP_ACTIONS, DEFAULT_TEXT_EDIT_ACTIONS
+
             is_default = False
             if self.current_tool == "text_edit_tool" and self.current_action in DEFAULT_TEXT_EDIT_ACTIONS:
                 is_default = True
@@ -529,13 +537,13 @@ class ActionsTabMixin:
                 is_default = True
             elif self.current_tool == "audio_tool" and self.current_action in DEFAULT_AUDIO_ACTIONS:
                 is_default = True
-                
+
             if is_default:
                 _settings = tool_data.setdefault("_settings", {})
                 deleted_defaults = _settings.setdefault("deleted_defaults", [])
                 if self.current_action not in deleted_defaults:
                     deleted_defaults.append(self.current_action)
-            
+
             if self.current_action in tool_data:
                 del tool_data[self.current_action]
             self.action_listbox.delete(self.current_action)
@@ -549,26 +557,26 @@ class ActionsTabMixin:
         """Move selected action up."""
         if not self.current_action:
             return
-            
+
         tool_data = self.options_data.get(self.current_tool, {})
         display_keys = [k for k in tool_data.keys() if k != "_settings"]
         if self.current_action not in display_keys:
             return
-            
+
         idx = display_keys.index(self.current_action)
         if idx > 0:
             # Swap
             display_keys[idx], display_keys[idx-1] = display_keys[idx-1], display_keys[idx]
-            
+
             # Reconstruct dictionary
             new_data = {}
             for k in display_keys:
                 new_data[k] = tool_data[k]
-                
+
             # append _settings if exists
             if "_settings" in tool_data:
                 new_data["_settings"] = tool_data["_settings"]
-                
+
             self.options_data[self.current_tool] = new_data
             self._refresh_action_list()
             self.action_listbox.select(self.current_action)
@@ -577,25 +585,25 @@ class ActionsTabMixin:
         """Move selected action down."""
         if not self.current_action:
             return
-            
+
         tool_data = self.options_data.get(self.current_tool, {})
         display_keys = [k for k in tool_data.keys() if k != "_settings"]
         if self.current_action not in display_keys:
             return
-            
+
         idx = display_keys.index(self.current_action)
         if idx < len(display_keys) - 1:
             # Swap
             display_keys[idx], display_keys[idx+1] = display_keys[idx+1], display_keys[idx]
-            
+
             # Reconstruct dictionary
             new_data = {}
             for k in display_keys:
                 new_data[k] = tool_data[k]
-                
+
             if "_settings" in tool_data:
                 new_data["_settings"] = tool_data["_settings"]
-                
+
             self.options_data[self.current_tool] = new_data
             self._refresh_action_list()
             self.action_listbox.select(self.current_action)
@@ -604,12 +612,12 @@ class ActionsTabMixin:
         """Save the currently edited action."""
         if not self.current_action:
             return
-        
+
         if self.use_ctk:
             system_prompt = self.editor_widgets["system_prompt"].get("0.0", "end").strip()
         else:
             system_prompt = self.editor_widgets["system_prompt"].get("1.0", "end").strip()
-        
+
         # Build action dict with common fields
         action_dict = {
             "_is_default": False,
@@ -617,7 +625,7 @@ class ActionsTabMixin:
             "system_prompt": system_prompt,
             "task": self.editor_widgets["task_var"].get(),
         }
-        
+
         # Tool-specific fields
         if self.current_tool == "text_edit_tool":
             action_dict["prompt_type"] = self.editor_widgets["prompt_type_var"].get()
@@ -630,19 +638,19 @@ class ActionsTabMixin:
                 action_dict["compare_prompts"] = self.editor_widgets["compare_prompts_var"].get()
         else:  # audio_tool
             action_dict["show_chat_window"] = self.editor_widgets["show_chat_var"].get()
-        
+
         # Save connection profile (all tools)
         if "profile_var" in self.editor_widgets:
             profile_val = self.editor_widgets["profile_var"].get()
             if profile_val and profile_val != "(None)":
                 action_dict["connection_profile"] = profile_val
-        
+
         tool_data = self.options_data.setdefault(self.current_tool, {})
         tool_data[self.current_action] = action_dict
-        
+
         # Refresh UI list to update icons
         self._refresh_action_list()
-        
+
         if self.use_ctk:
             self.editor_widgets["save_status"].configure(
                 text=f"✅ Saved '{self.current_action}'",

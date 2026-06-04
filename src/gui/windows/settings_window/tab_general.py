@@ -12,10 +12,10 @@ Sections:
 import tkinter as tk
 from typing import Callable
 
+from ...custom_widgets import create_section_header
 from ...platform import HAVE_CTK, ctk
 from ...themes import get_ctk_font, get_ctk_label_colors
-from ...custom_widgets import create_section_header
-from .widgets import ToggleSwitch, LABEL_WIDTH
+from .widgets import LABEL_WIDTH, ToggleSwitch
 
 
 class GeneralTabMixin:
@@ -354,7 +354,7 @@ class GeneralTabMixin:
         """Create the Welcome Guide button row."""
         row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
         row.pack(fill="x", pady=4)
-        
+
         if self.use_ctk:
             from ...themes import get_ctk_button_colors
             guide_btn = ctk.CTkButton(
@@ -366,7 +366,7 @@ class GeneralTabMixin:
                 command=self._on_run_welcome_guide,
             )
             guide_btn.pack(side="left")
-            
+
             hint_lbl = ctk.CTkLabel(
                 row, text="Launch the onboarding wizard to configure keys, profiles, and take a feature tour.",
                 font=get_ctk_font(11),
@@ -384,14 +384,14 @@ class GeneralTabMixin:
                 command=self._on_run_welcome_guide,
             )
             guide_btn.pack(side="left")
-            
+
             hint_lbl = tk.Label(
                 row, text="Launch the onboarding wizard to configure keys, profiles, and take a feature tour.",
                 font=("Segoe UI", 9),
                 bg=self.colors.bg, fg=self.colors.blockquote
             )
             hint_lbl.pack(side="left", padx=(15, 0))
-            
+
     def _on_run_welcome_guide(self):
         """Run the welcome guide wizard."""
         try:

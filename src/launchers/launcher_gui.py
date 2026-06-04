@@ -6,10 +6,10 @@ It launches the internal Nuitka Standalone executable (bin/AIPromptBridge_Intern
 in GUI mode (no console).
 """
 
-import sys
 import os
-import subprocess
 import shutil
+import subprocess
+import sys
 
 ROOT_UPDATE_ALLOWLIST = [
     "AIPromptBridge.exe",
@@ -53,7 +53,7 @@ def main():
 
     # 2. Construct path to internal executable
     internal_exe = os.path.join(root_dir, "bin", "AIPromptBridge_Internal.exe")
-    
+
     # 3. Validation
     if not os.path.exists(internal_exe):
         # Fallback for dev environment (running from source)
@@ -73,18 +73,18 @@ def main():
     # 4. Prepare Arguments
     # Pass through original arguments, prepend our mode flag
     cmd_args = [str(internal_exe), "--launched-mode=gui"] + sys.argv[1:]
-    
+
     # 5. Launch
     try:
         # DETACHED_PROCESS = 0x00000008
         # CREATE_NEW_PROCESS_GROUP = 0x00000200
         # CREATE_NO_WINDOW = 0x08000000
-        
+
         # We want to launch it without a window (since it's now a Console subsystem app)
         # and ensure it's detached from any group.
         # We also need to redirect stdio to DEVNULL to prevents crashes on write when no console exists.
         creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
-        
+
         subprocess.Popen(
             cmd_args,
             creationflags=creation_flags,

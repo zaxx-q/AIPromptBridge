@@ -18,7 +18,7 @@ try:
 except ImportError:
     HAVE_PYPDF = False
 
-from src.console import print_warning, print_error, print_info
+from src.console import print_error, print_info, print_warning
 
 
 def is_pypdf_available() -> bool:

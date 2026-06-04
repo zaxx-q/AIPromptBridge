@@ -8,7 +8,7 @@ import threading
 
 class KeyManager:
     """Manages API keys with rotation on failures"""
-    
+
     def __init__(self, keys, provider_name, key_names=None):
         self.keys = [k for k in keys if k]
         self.current_index = 0
@@ -18,7 +18,7 @@ class KeyManager:
         # Optional display names for keys (parallel list, same length as self.keys)
         # Used by profile resolver to select keys by name
         self.key_names = key_names or [""] * len(self.keys)
-    
+
     def get_current_key(self):
         """Get the current active API key"""
         with self.lock:
@@ -27,7 +27,7 @@ class KeyManager:
             if self.current_index >= len(self.keys):
                 self.current_index = 0
             return self.keys[self.current_index]
-    
+
     def rotate_key(self, reason=""):
         """Rotate to next available key"""
         with self.lock:
@@ -57,28 +57,28 @@ class KeyManager:
             if self.current_index < len(self.key_names) and self.key_names[self.current_index]:
                 return self.key_names[self.current_index]
             return f"#{self.current_index + 1}"
-    
+
     def get_key_count(self):
         """Get total number of keys"""
         return len(self.keys)
-    
+
     def get_key_number(self):
         """Get current key number (1-indexed)"""
         return self.current_index + 1
-    
+
     def has_keys(self):
         """Check if any keys are available"""
         return len(self.keys) > 0
-    
+
     def has_more_keys(self):
         """Check if there are more keys to try"""
         return len(self.exhausted_keys) < len(self.keys)
-    
+
     def reset_exhausted(self):
         """Reset exhausted keys tracking"""
         with self.lock:
             self.exhausted_keys.clear()
-    
+
     def get_key_by_name(self, name: str):
         """
         Get an API key by its display name.

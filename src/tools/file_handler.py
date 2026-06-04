@@ -13,7 +13,7 @@ import base64
 import mimetypes
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -24,17 +24,17 @@ class FileInfo:
     extension: str
     size: int
     mime_type: Optional[str] = None
-    
+
     @property
     def name(self) -> str:
         """Get filename without extension"""
         return self.path.stem
-    
+
     @property
     def full_name(self) -> str:
         """Get full filename with extension"""
         return self.path.name
-    
+
     def __str__(self) -> str:
         return str(self.path)
 
@@ -46,26 +46,26 @@ class ScanResult:
     files: List[FileInfo] = field(default_factory=list)
     by_type: Dict[str, List[FileInfo]] = field(default_factory=dict)
     warnings: List[str] = field(default_factory=list)
-    
+
     @property
     def total_count(self) -> int:
         """Total number of files"""
         return len(self.files)
-    
+
     @property
     def type_count(self) -> int:
         """Number of different file types"""
         return len(self.by_type)
-    
+
     @property
     def has_mixed_types(self) -> bool:
         """Check if multiple file types are present"""
         return self.type_count > 1
-    
+
     def get_type_summary(self) -> Dict[str, int]:
         """Get count per file type"""
         return {ft: len(files) for ft, files in self.by_type.items()}
-    
+
     def filter_by_type(self, file_type: str) -> List[FileInfo]:
         """Get files of a specific type"""
         return self.by_type.get(file_type, [])
@@ -82,7 +82,7 @@ class FileHandler:
     - code: Source code files (processed as text)
     - unknown: Unrecognized file types
     """
-    
+
     # Default file type mappings
     DEFAULT_FILE_TYPES = {
         "image": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".tif"],
@@ -103,7 +103,7 @@ class FileHandler:
             ".dockerfile", ".makefile", ".cmake",  # Build
         ]
     }
-    
+
     def __init__(self, file_types: Dict[str, List[str]] = None):
         """
         Initialize FileHandler.
@@ -112,13 +112,13 @@ class FileHandler:
             file_types: Custom file type mappings (overrides defaults)
         """
         self.file_types = file_types or self.DEFAULT_FILE_TYPES
-        
+
         # Build reverse lookup (extension -> type)
         self._ext_to_type: Dict[str, str] = {}
         for file_type, extensions in self.file_types.items():
             for ext in extensions:
                 self._ext_to_type[ext.lower()] = file_type
-    
+
     def detect_type(self, filepath: Path) -> str:
         """
         Detect file type category.
@@ -131,7 +131,7 @@ class FileHandler:
         """
         ext = filepath.suffix.lower()
         return self._ext_to_type.get(ext, "unknown")
-    
+
     # Audio MIME type mapping (Gemini supported formats)
     AUDIO_MIME_TYPES = {
         ".mp3": "audio/mp3",
@@ -143,7 +143,7 @@ class FileHandler:
         ".m4a": "audio/mp4",  # M4A is typically AAC in MP4 container
         ".wma": "audio/x-ms-wma",
     }
-    
+
     def get_file_info(self, filepath: Path) -> FileInfo:
         """
         Get detailed information about a file.
@@ -156,13 +156,13 @@ class FileHandler:
         """
         file_type = self.detect_type(filepath)
         mime_type = None
-        
+
         if file_type == "image":
             mime_type = mimetypes.guess_type(str(filepath))[0] or "image/png"
         elif file_type == "audio":
             ext = filepath.suffix.lower()
             mime_type = self.AUDIO_MIME_TYPES.get(ext) or mimetypes.guess_type(str(filepath))[0] or "audio/mp3"
-        
+
         return FileInfo(
             path=filepath,
             file_type=file_type,
@@ -170,7 +170,7 @@ class FileHandler:
             size=filepath.stat().st_size if filepath.exists() else 0,
             mime_type=mime_type
         )
-    
+
     def scan(
         self,
         path: Path,
@@ -190,14 +190,14 @@ class FileHandler:
         """
         path = Path(path)
         result = ScanResult(input_path=path)
-        
+
         if path.is_file():
             # Single file
             info = self.get_file_info(path)
             if include_unknown or info.file_type != "unknown":
                 result.files.append(info)
                 result.by_type.setdefault(info.file_type, []).append(info)
-        
+
         elif path.is_dir():
             # Directory
             pattern = "**/*" if recursive else "*"
@@ -207,16 +207,16 @@ class FileHandler:
                     if include_unknown or info.file_type != "unknown":
                         result.files.append(info)
                         result.by_type.setdefault(info.file_type, []).append(info)
-        
+
         else:
             result.warnings.append(f"Path does not exist: {path}")
-        
+
         # Check for mixed types
         if result.has_mixed_types:
             result.warnings.append("mixed_file_types")
-        
+
         return result
-    
+
     def read_file(self, filepath: Path) -> Tuple[str, str, Optional[str]]:
         """
         Read file content for API consumption.
@@ -231,26 +231,26 @@ class FileHandler:
             - For text/code: ("text", text_content, None)
         """
         file_type = self.detect_type(filepath)
-        
+
         if file_type == "image":
             mime_type = mimetypes.guess_type(str(filepath))[0] or "image/png"
             with open(filepath, "rb") as f:
                 base64_data = base64.b64encode(f.read()).decode("utf-8")
             return ("image", base64_data, mime_type)
-        
+
         elif file_type == "audio":
             ext = filepath.suffix.lower()
             mime_type = self.AUDIO_MIME_TYPES.get(ext) or mimetypes.guess_type(str(filepath))[0] or "audio/mp3"
             with open(filepath, "rb") as f:
                 base64_data = base64.b64encode(f.read()).decode("utf-8")
             return ("audio", base64_data, mime_type)
-        
+
         elif file_type == "document":
             mime_type = "application/pdf"
             with open(filepath, "rb") as f:
                 base64_data = base64.b64encode(f.read()).decode("utf-8")
             return ("document", base64_data, mime_type)
-        
+
         else:
             # Text or code - read as text
             try:
@@ -261,7 +261,7 @@ class FileHandler:
                 with open(filepath, "r", encoding="latin-1") as f:
                     content = f.read()
             return ("text", content, None)
-    
+
     def build_api_message(
         self,
         filepath: Path,
@@ -284,9 +284,9 @@ class FileHandler:
             Message dict in OpenAI format (for images) or Gemini format (for audio)
         """
         from src.messages import build_image_message, build_inline_message, build_text_message
-        
+
         content_type, content, mime_type = self.read_file(filepath)
-        
+
         # For non-text files, filename context is appended at the end of the prompt
         # (not prefixed) so the AI processes the main instructions first.
         filename_context = ""
@@ -294,9 +294,9 @@ class FileHandler:
             # Use the provided display_name, or fall back to the actual filepath name
             name = display_name or filepath.name
             filename_context = f"\n\n[File: {name}]"
-        
+
         full_prompt = f"{prompt}{filename_context}" if filename_context else prompt
-        
+
         if content_type == "image":
             # Returns list of messages; extract the user message (skip system)
             msgs = build_image_message(content, mime_type, full_prompt, None)
@@ -304,7 +304,7 @@ class FileHandler:
                 if m["role"] == "user":
                     return m
             return msgs[-1]  # Fallback to last message
-        
+
         elif content_type == "audio":
             # Returns list of messages; extract the user message (skip system)
             msgs = build_inline_message(content, mime_type, full_prompt, None)
@@ -312,7 +312,7 @@ class FileHandler:
                 if m["role"] == "user":
                     return m
             return msgs[-1]  # Fallback to last message
-        
+
         elif content_type == "document":
             # Document (PDF) message - use inline_data (preferred for Gemini)
             # Inject filename so providers (e.g., OpenRouter) can include it
@@ -326,12 +326,12 @@ class FileHandler:
                                 part["filename"] = display_name or filepath.name
                     return m
             return msgs[-1]  # Fallback to last message
-        
+
         else:
             # Text/code message - use TextEditTool-style delimiters
             # Note: filename is already included in <file_content> tag for text files
             file_type = self.detect_type(filepath)
-            
+
             # Build file content with appropriate formatting
             if file_type == "code":
                 # Code files get language-tagged fence
@@ -350,23 +350,23 @@ class FileHandler:
                 file_content = f"```{lang}\n{content}\n```"
             else:
                 file_content = content
-            
+
             # Use structured delimiters (TextEditTool-style)
             if include_filename:
                 final_prompt = f"{prompt}\n\n<file_content filename=\"{filepath.name}\">\n{file_content}\n</file_content>"
             else:
                 final_prompt = f"{prompt}\n\n<file_content>\n{file_content}\n</file_content>"
-            
+
             msgs = build_text_message(final_prompt, "You are a helper.")
-            
+
             # Extract user message
             for m in msgs:
                 if m["role"] == "user":
                     return m
-            
+
             # Fallback
             return {"role": "user", "content": final_prompt}
-    
+
     def get_output_path(
         self,
         input_path: Path,
@@ -400,9 +400,9 @@ class FileHandler:
             Output file path
         """
         from datetime import datetime
-        
+
         now = datetime.now()
-        
+
         # Build template variables
         variables = {
             "filename": input_path.stem,
@@ -411,22 +411,22 @@ class FileHandler:
             "time": now.strftime("%H-%M-%S"),
             "index": str(index).zfill(3),
         }
-        
+
         # Apply template
         output_name = naming_template
         for var, value in variables.items():
             output_name = output_name.replace(f"{{{var}}}", value)
-        
+
         # Ensure extension is included
         if not output_name.endswith(extension):
             output_name += extension
-        
+
         # Determine output directory
         if output_dir:
             out_dir = Path(output_dir)
         else:
             out_dir = input_path.parent
-        
+
         # Preserve subdirectory structure for recursive scans
         if base_input_path:
             base = Path(base_input_path)
@@ -436,9 +436,9 @@ class FileHandler:
             except ValueError:
                 # input_path is not under base_input_path; fall back to flat
                 pass
-        
+
         return out_dir / output_name
-    
+
     @classmethod
     def format_size(cls, size_bytes: int) -> str:
         """Format file size in human-readable form"""

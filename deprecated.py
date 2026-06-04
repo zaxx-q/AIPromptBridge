@@ -8,18 +8,18 @@ with smart key rotation, auto-retry, configurable endpoints, and GUI display.
 import base64
 import json
 import os
+import queue
 import re
+import sys
 import threading
 import time
 import uuid
-import sys
-import queue
-from pathlib import Path
-from datetime import datetime
 from collections import OrderedDict
+from datetime import datetime
+from pathlib import Path
 
 import requests
-from flask import Flask, request, abort, jsonify
+from flask import Flask, abort, jsonify, request
 
 # GUI support with Dear PyGui
 try:
@@ -110,7 +110,7 @@ FONTS = {
 
 class ChatSession:
     """Represents a chat session with history"""
-    
+
     def __init__(self, session_id=None, endpoint=None, provider=None, model=None, image_base64=None, mime_type=None):
         self.session_id = session_id or str(uuid.uuid4())[:8]
         self.endpoint = endpoint or "chat"
@@ -122,7 +122,7 @@ class ChatSession:
         self.mime_type = mime_type or "image/png"
         self.messages = []
         self.title = None
-    
+
     def add_message(self, role, content):
         self.messages.append({
             "role": role,
@@ -132,7 +132,7 @@ class ChatSession:
         self.updated_at = datetime.now().isoformat()
         if not self.title and role == "user":
             self.title = content[:50] + ("..." if len(content) > 50 else "")
-    
+
     def get_conversation_for_api(self, include_image=True):
         messages = []
         for i, msg in enumerate(self.messages):
@@ -146,7 +146,7 @@ class ChatSession:
             else:
                 messages.append({"role": "assistant", "content": msg["content"]})
         return messages
-    
+
     def to_dict(self):
         return {
             "session_id": self.session_id,
@@ -160,7 +160,7 @@ class ChatSession:
             "has_image": bool(self.image_base64),
             "mime_type": self.mime_type
         }
-    
+
     @classmethod
     def from_dict(cls, data):
         session = cls()
@@ -191,7 +191,7 @@ def load_sessions():
     global CHAT_SESSIONS
     try:
         if Path(SESSIONS_FILE).exists():
-            with open(SESSIONS_FILE, 'r', encoding='utf-8') as f:
+            with open(SESSIONS_FILE, encoding='utf-8') as f:
                 data = json.load(f)
             with SESSION_LOCK:
                 for sid, session_data in data.items():
@@ -261,26 +261,26 @@ def load_config(filepath=CONFIG_FILE):
     ai_params = {}
     endpoints = dict(DEFAULT_ENDPOINTS)
     keys = {"custom": [], "openrouter": [], "google": []}
-    
+
     if not Path(filepath).exists():
         print(f"[Warning] Config file '{filepath}' not found. Using defaults.")
         return config, ai_params, endpoints, keys
-    
+
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, encoding='utf-8') as f:
             lines = f.readlines()
-        
+
         current_section = None
         multiline_key = None
         multiline_value = []
-        
+
         for line in lines:
             raw_line = line.rstrip('\n\r')
             stripped = raw_line.strip()
-            
+
             if not stripped or stripped.startswith('#'):
                 continue
-            
+
             if stripped.startswith('[') and stripped.endswith(']'):
                 if multiline_key and current_section == 'endpoints':
                     endpoints[multiline_key] = ' '.join(multiline_value)
@@ -288,7 +288,7 @@ def load_config(filepath=CONFIG_FILE):
                     multiline_value = []
                 current_section = stripped[1:-1].lower()
                 continue
-            
+
             if current_section == 'config':
                 if '=' in stripped:
                     key, value = stripped.split('=', 1)
@@ -298,7 +298,7 @@ def load_config(filepath=CONFIG_FILE):
                         config[key] = value
                     elif value is not None:
                         ai_params[key] = value
-            
+
             elif current_section == 'endpoints':
                 if '=' in stripped:
                     if multiline_key:
@@ -324,24 +324,24 @@ def load_config(filepath=CONFIG_FILE):
                         endpoints[multiline_key] = ' '.join(multiline_value)
                         multiline_key = None
                         multiline_value = []
-            
+
             elif current_section in keys:
                 if stripped and not stripped.startswith('#'):
                     keys[current_section].append(stripped)
-        
+
         if multiline_key and current_section == 'endpoints':
             endpoints[multiline_key] = ' '.join(multiline_value)
-        
+
         if not keys["google"] and os.getenv("GEMINI_API_KEY"):
             keys["google"].append(os.getenv("GEMINI_API_KEY"))
         if not keys["openrouter"] and os.getenv("OPENROUTER_API_KEY"):
             keys["openrouter"].append(os.getenv("OPENROUTER_API_KEY"))
         if not keys["custom"] and os.getenv("CUSTOM_API_KEY"):
             keys["custom"].append(os.getenv("CUSTOM_API_KEY"))
-        
+
     except Exception as e:
         print(f"[Error] Failed to load config: {e}")
-    
+
     return config, ai_params, endpoints, keys
 
 
@@ -363,7 +363,7 @@ class KeyManager:
         self.exhausted_keys = set()
         self.provider_name = provider_name
         self.lock = threading.Lock()
-    
+
     def get_current_key(self):
         with self.lock:
             if not self.keys:
@@ -371,7 +371,7 @@ class KeyManager:
             if self.current_index >= len(self.keys):
                 self.current_index = 0
             return self.keys[self.current_index]
-    
+
     def rotate_key(self, reason=""):
         with self.lock:
             if not self.keys:
@@ -387,19 +387,19 @@ class KeyManager:
             self.exhausted_keys.clear()
             self.current_index = 0
             return self.keys[0] if self.keys else None
-    
+
     def get_key_count(self):
         return len(self.keys)
-    
+
     def get_key_number(self):
         return self.current_index + 1
-    
+
     def has_keys(self):
         return len(self.keys) > 0
-    
+
     def has_more_keys(self):
         return len(self.exhausted_keys) < len(self.keys)
-    
+
     def reset_exhausted(self):
         with self.lock:
             self.exhausted_keys.clear()
@@ -413,7 +413,7 @@ def is_rate_limit_error(error_msg, status_code=None):
     if status_code == 429:
         return True
     error_str = str(error_msg).lower()
-    patterns = ["too many requests", "rate limit", "rate_limit", "quota exceeded", 
+    patterns = ["too many requests", "rate limit", "rate_limit", "quota exceeded",
                 "429", "throttl", "resource exhausted", "resource_exhausted"]
     return any(p in error_str for p in patterns)
 
@@ -471,7 +471,7 @@ def call_google_api(key_manager, model, messages, ai_params, timeout):
         return None, "No API key available"
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     headers = {"x-goog-api-key": current_key, "Content-Type": "application/json"}
-    
+
     contents = []
     for msg in messages:
         role = "user" if msg["role"] == "user" else "model"
@@ -491,7 +491,7 @@ def call_google_api(key_manager, model, messages, ai_params, timeout):
                             mime_type, b64_data = match.groups()
                             parts.append({"inline_data": {"mime_type": mime_type, "data": b64_data}})
         contents.append({"role": role, "parts": parts})
-    
+
     payload = {"contents": contents, "generationConfig": {}}
     for param, value in ai_params.items():
         if value is not None:
@@ -541,17 +541,17 @@ def extract_text_from_response(response_json, provider):
 
 def call_api_with_retry(provider, messages, model_override=None):
     global CONFIG, AI_PARAMS, KEY_MANAGERS
-    
+
     max_retries = CONFIG.get("max_retries", 3)
     retry_delay = CONFIG.get("retry_delay", 5)
     timeout = CONFIG.get("request_timeout", 120)
-    
+
     key_manager = KEY_MANAGERS.get(provider)
     if not key_manager or not key_manager.has_keys():
         return None, f"No API keys configured for provider: {provider}"
-    
+
     max_attempts = max_retries * max(1, key_manager.get_key_count())
-    
+
     # Determine the model to use
     if model_override:
         model = model_override
@@ -563,16 +563,16 @@ def call_api_with_retry(provider, messages, model_override=None):
         model = CONFIG.get("custom_model")
     else:
         model = None
-    
+
     for attempt in range(max_attempts):
         try:
             key_num = key_manager.get_key_number()
             print(f"    Calling {provider} API (key #{key_num}, attempt {attempt + 1}/{max_attempts})")
             print(f"    Model: {model}")
-            
+
             response = None
             error = None
-            
+
             if provider == "openrouter":
                 response, error = call_openrouter_api(key_manager, model, messages, AI_PARAMS, timeout)
             elif provider == "google":
@@ -584,34 +584,34 @@ def call_api_with_retry(provider, messages, model_override=None):
                 response, error = call_custom_api(key_manager, url, model, messages, AI_PARAMS, timeout)
             else:
                 return None, f"Unknown provider: {provider}"
-            
+
             if error:
                 print(f"    [Error] {error}")
                 continue
-            
+
             if response is None:
                 continue
-            
+
             resp_json = None
             try:
                 resp_json = response.json()
             except:
                 pass
-            
+
             if is_invalid_key_error(response.text, response.status_code):
                 print(f"    [Error] Invalid API key #{key_num}")
                 new_key = key_manager.rotate_key("(invalid key)")
                 if not new_key or not key_manager.has_more_keys():
                     return None, "All API keys are invalid"
                 continue
-            
+
             if is_insufficient_credits_error(response.text, resp_json):
                 print(f"    [Warning] Insufficient credits on key #{key_num}")
                 new_key = key_manager.rotate_key("(insufficient credits)")
                 if not new_key or not key_manager.has_more_keys():
                     return None, "All API keys have insufficient credits"
                 continue
-            
+
             if response.status_code != 200:
                 if is_rate_limit_error(response.text, response.status_code):
                     print(f"    [Warning] Rate limited on key #{key_num}")
@@ -628,16 +628,16 @@ def call_api_with_retry(provider, messages, model_override=None):
                 if attempt < max_attempts - 1:
                     time.sleep(retry_delay)
                 continue
-            
+
             text = extract_text_from_response(resp_json, provider)
             if text:
                 return text, None
             else:
-                print(f"    [Warning] No text in response, retrying...")
+                print("    [Warning] No text in response, retrying...")
                 if attempt < max_attempts - 1:
                     time.sleep(retry_delay)
                 continue
-        
+
         except requests.exceptions.Timeout:
             print(f"    [Error] Request timeout after {timeout}s")
             if attempt < max_attempts - 1:
@@ -652,7 +652,7 @@ def call_api_with_retry(provider, messages, model_override=None):
             print(f"    [Error] Unexpected: {e}")
             if attempt < max_attempts - 1:
                 time.sleep(retry_delay)
-    
+
     return None, f"All {max_attempts} attempts failed"
 
 
@@ -681,45 +681,45 @@ def strip_markdown(text):
     """Convert markdown to plain text by stripping formatting"""
     if not text:
         return text
-    
+
     result = text
-    
+
     # Remove code blocks (``` ... ```)
     result = re.sub(r'```[\s\S]*?```', lambda m: m.group(0).replace('```', '').strip(), result)
-    
+
     # Remove inline code (`code`)
     result = re.sub(r'`([^`]+)`', r'\1', result)
-    
+
     # Remove bold (**text** or __text__)
     result = re.sub(r'\*\*([^*]+)\*\*', r'\1', result)
     result = re.sub(r'__([^_]+)__', r'\1', result)
-    
+
     # Remove italic (*text* or _text_)
     result = re.sub(r'\*([^*]+)\*', r'\1', result)
     result = re.sub(r'(?<!\w)_([^_]+)_(?!\w)', r'\1', result)
-    
+
     # Remove strikethrough (~~text~~)
     result = re.sub(r'~~([^~]+)~~', r'\1', result)
-    
+
     # Remove headers (# Header)
     result = re.sub(r'^#{1,6}\s+', '', result, flags=re.MULTILINE)
-    
+
     # Remove blockquotes (> text)
     result = re.sub(r'^>\s+', '', result, flags=re.MULTILINE)
-    
+
     # Remove horizontal rules
     result = re.sub(r'^[-*_]{3,}\s*$', '', result, flags=re.MULTILINE)
-    
+
     # Remove link formatting [text](url) -> text
     result = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', result)
-    
+
     # Remove image formatting ![alt](url) -> alt
     result = re.sub(r'!\[([^\]]*)\]\([^)]+\)', r'\1', result)
-    
+
     # Remove list markers
     result = re.sub(r'^[\s]*[-*+]\s+', '• ', result, flags=re.MULTILINE)
     result = re.sub(r'^[\s]*\d+\.\s+', '', result, flags=re.MULTILINE)
-    
+
     return result
 
 
@@ -729,7 +729,7 @@ def render_markdown(text, parent, wrap_width=-1):
     in_code_block = False
     code_block_lines = []
     code_lang = ""
-    
+
     # Helper to flush code block
     def flush_code_block():
         nonlocal code_block_lines, code_lang
@@ -737,14 +737,14 @@ def render_markdown(text, parent, wrap_width=-1):
             code_text = '\n'.join(code_block_lines)
             # Estimate height: lines * 18 pixels + padding
             height = max(60, len(code_block_lines) * 18 + 20)
-            dpg.add_input_text(default_value=code_text, multiline=True, readonly=True, 
+            dpg.add_input_text(default_value=code_text, multiline=True, readonly=True,
                               width=-1, height=height, parent=parent)
             code_block_lines = []
             code_lang = ""
 
     for line in lines:
         stripped_line = line.strip()
-        
+
         # Code Block Detection
         if stripped_line.startswith('```'):
             if in_code_block:
@@ -756,11 +756,11 @@ def render_markdown(text, parent, wrap_width=-1):
                 in_code_block = True
                 code_lang = stripped_line[3:].strip()
             continue
-            
+
         if in_code_block:
             code_block_lines.append(line)
             continue
-            
+
         # Headers
         if stripped_line.startswith('#'):
             level = len(stripped_line.split(' ')[0])
@@ -775,7 +775,7 @@ def render_markdown(text, parent, wrap_width=-1):
                 item = dpg.add_text(content, parent=parent, wrap=wrap_width, color=(180, 220, 255))
                 if FONTS.get("bold"): dpg.bind_item_font(item, FONTS.get("bold"))
             continue
-            
+
         # Bullet Points
         if stripped_line.startswith('- ') or stripped_line.startswith('* '):
             content = stripped_line[2:].strip()
@@ -783,14 +783,14 @@ def render_markdown(text, parent, wrap_width=-1):
             content = content.replace('**', '').replace('__', '')
             dpg.add_text(content, parent=parent, wrap=wrap_width, bullet=True)
             continue
-            
+
         # Bold Line (whole line)
         if stripped_line.startswith('**') and stripped_line.endswith('**') and len(stripped_line) > 4:
             content = stripped_line[2:-2]
             item = dpg.add_text(content, parent=parent, wrap=wrap_width)
             if FONTS.get("bold"): dpg.bind_item_font(item, FONTS.get("bold"))
             continue
-            
+
         # Italic Line (whole line)
         if (stripped_line.startswith('*') and stripped_line.endswith('*') and len(stripped_line) > 2) or \
            (stripped_line.startswith('_') and stripped_line.endswith('_') and len(stripped_line) > 2):
@@ -802,12 +802,12 @@ def render_markdown(text, parent, wrap_width=-1):
         # Regular Text (with simple inline stripping for display)
         # Note: We don't support true inline bold/italic yet, so we strip markers for cleaner look
         # but keep the text.
-        
+
         # Check if empty line (spacer)
         if not stripped_line:
             dpg.add_spacer(height=5, parent=parent)
             continue
-            
+
         dpg.add_text(line, parent=parent, wrap=wrap_width)
 
     # Flush any remaining code block
@@ -865,14 +865,14 @@ def has_open_windows():
 def init_dearpygui():
     """Initialize Dear PyGui context and viewport"""
     global GUI_CONTEXT_CREATED, DEFAULT_FONT, FONTS
-    
+
     if GUI_CONTEXT_CREATED:
         return True
-    
+
     try:
         dpg.create_context()
         dpg.create_viewport(title='ShareX Middleman', width=900, height=700, decorated=True)
-        
+
         # Create a font registry with a larger default font and styles
         with dpg.font_registry():
             # Try to load Consolas family (Windows)
@@ -898,7 +898,7 @@ def init_dearpygui():
                     "/System/Library/Fonts/SFNSMono.ttf",  # macOS
                     "/System/Library/Fonts/Menlo.ttc",  # macOS fallback
                 ]
-                
+
                 for font_path in font_paths:
                     if Path(font_path).exists():
                         try:
@@ -910,23 +910,22 @@ def init_dearpygui():
                             break
                         except:
                             continue
-            
+
             if DEFAULT_FONT:
                 dpg.bind_font(DEFAULT_FONT)
-        
+
         # Set theme
-        with dpg.theme() as global_theme:
-            with dpg.theme_component(dpg.mvAll):
-                dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 4)
-                dpg.add_theme_style(dpg.mvStyleVar_WindowRounding, 6)
-                dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 8, 6)
-                dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 8, 6)
-                dpg.add_theme_color(dpg.mvThemeCol_WindowBg, (30, 30, 40))
-                dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (45, 45, 60))
-                dpg.add_theme_color(dpg.mvThemeCol_Button, (70, 100, 150))
-                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (90, 120, 170))
-                dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (60, 90, 140))
-        
+        with dpg.theme() as global_theme, dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 4)
+            dpg.add_theme_style(dpg.mvStyleVar_WindowRounding, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 8, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 8, 6)
+            dpg.add_theme_color(dpg.mvThemeCol_WindowBg, (30, 30, 40))
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (45, 45, 60))
+            dpg.add_theme_color(dpg.mvThemeCol_Button, (70, 100, 150))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (90, 120, 170))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (60, 90, 140))
+
         dpg.bind_theme(global_theme)
         dpg.setup_dearpygui()
         dpg.show_viewport()
@@ -940,7 +939,7 @@ def init_dearpygui():
 def shutdown_dearpygui():
     """Shutdown Dear PyGui context"""
     global GUI_CONTEXT_CREATED, GUI_RUNNING, DEFAULT_FONT
-    
+
     try:
         if GUI_CONTEXT_CREATED:
             dpg.destroy_context()
@@ -950,45 +949,45 @@ def shutdown_dearpygui():
                 OPEN_WINDOWS.clear()
     except Exception as e:
         print(f"[GUI Error] Failed to shutdown Dear PyGui: {e}")
-    
+
     GUI_RUNNING = False
 
 
 def gui_main_loop():
     """Main GUI loop running in separate thread - runs only when windows are open"""
     global GUI_RUNNING, GUI_SHUTDOWN_REQUESTED
-    
+
     if not init_dearpygui():
         print("[GUI Error] Failed to start GUI")
         GUI_RUNNING = False
         return
-    
+
     GUI_RUNNING = True
     GUI_SHUTDOWN_REQUESTED = False
     last_window_check = time.time()
-    
+
     print("[GUI] Started")
-    
+
     while dpg.is_dearpygui_running() and not GUI_SHUTDOWN_REQUESTED:
         # Process any queued GUI requests
         try:
             while not GUI_QUEUE.empty():
                 task = GUI_QUEUE.get_nowait()
                 task_type = task.get("type")
-                
+
                 if task_type == "result":
                     create_result_window(task["text"], task.get("endpoint"), task.get("title"))
                 elif task_type == "chat":
                     create_chat_window(task["session"], task.get("initial_response"))
                 elif task_type == "browser":
                     create_session_browser_window()
-                
+
                 GUI_QUEUE.task_done()
         except:
             pass
-        
+
         dpg.render_dearpygui_frame()
-        
+
         # Check if all windows are closed (every 0.5 seconds)
         current_time = time.time()
         if current_time - last_window_check > 0.5:
@@ -996,7 +995,7 @@ def gui_main_loop():
             if not has_open_windows():
                 print("[GUI] All windows closed, stopping...")
                 break
-    
+
     shutdown_dearpygui()
     print("[GUI] Stopped")
 
@@ -1004,25 +1003,25 @@ def gui_main_loop():
 def ensure_gui_running():
     """Ensure GUI thread is running, start if needed"""
     global GUI_THREAD, GUI_RUNNING, GUI_SHUTDOWN_REQUESTED
-    
+
     if not HAVE_GUI:
         return False
-    
+
     with GUI_LOCK:
         if GUI_RUNNING and GUI_THREAD and GUI_THREAD.is_alive():
             return True
-        
+
         # Start new GUI thread
         GUI_SHUTDOWN_REQUESTED = False
         GUI_THREAD = threading.Thread(target=gui_main_loop, daemon=True)
         GUI_THREAD.start()
-        
+
         # Wait for GUI to initialize
         for _ in range(50):  # Wait up to 5 seconds
             if GUI_RUNNING and GUI_CONTEXT_CREATED:
                 return True
             time.sleep(0.1)
-        
+
         return GUI_RUNNING
 
 
@@ -1035,95 +1034,95 @@ def create_result_window(text, endpoint=None, title=None):
     wrap_btn_tag = f"wrap_btn_{window_id}"
     mode_btn_tag = f"mode_btn_{window_id}"
     scroll_area_tag = f"scroll_area_{window_id}"
-    
+
     title = title or f"Response - /{endpoint}" if endpoint else "AI Response"
-    
+
     # State for toggles
     state = {
         'wrapped': True,
         'mode': 'rich',  # 'rich' (markdown) or 'text' (selectable)
         'original_text': text
     }
-    
+
     def get_display_text():
         """Get text based on current display mode"""
         if state['mode'] == 'rich':
             return state['original_text']
         else:
             return strip_markdown(state['original_text'])
-    
+
     def update_display():
         """Update the text display"""
         # Clear existing content
         dpg.delete_item(content_group_tag, children_only=True)
-        
+
         # Update buttons
         dpg.configure_item(wrap_btn_tag, label=f"Wrap: {'ON' if state['wrapped'] else 'OFF'}")
         dpg.configure_item(mode_btn_tag, label=f"Mode: {'Rich' if state['mode'] == 'rich' else 'Text'}")
-        
+
         # Configure parent scrollbar
         if state['wrapped']:
             dpg.configure_item(scroll_area_tag, horizontal_scrollbar=False)
         else:
             dpg.configure_item(scroll_area_tag, horizontal_scrollbar=True)
-            
+
         # Add content based on mode
         if state['mode'] == 'text':
             # Use InputText for selection (monochrome)
             width = -1 if state['wrapped'] else 3000
-            dpg.add_input_text(default_value=get_display_text(), parent=content_group_tag, 
+            dpg.add_input_text(default_value=get_display_text(), parent=content_group_tag,
                               multiline=True, readonly=True, width=width, height=-1)
         else:
             # Use Text for rich display (colored potential, clean wrapping)
             wrap_width = 0 if state['wrapped'] else -1
             render_markdown(state['original_text'], parent=content_group_tag, wrap_width=wrap_width)
-    
+
     def toggle_wrap():
         state['wrapped'] = not state['wrapped']
         update_display()
         dpg.set_value(status_tag, f"Wrap: {'ON' if state['wrapped'] else 'OFF'}")
-    
+
     def toggle_mode():
         state['mode'] = 'text' if state['mode'] == 'rich' else 'rich'
         update_display()
         dpg.set_value(status_tag, f"Mode: {state['mode'].title()}")
-    
+
     def copy_callback():
         if copy_to_clipboard(get_display_text()):
             dpg.set_value(status_tag, "✓ Copied to clipboard!")
         else:
             dpg.set_value(status_tag, "✗ Failed to copy")
-    
+
     def close_callback():
         unregister_window(window_tag)
         dpg.delete_item(window_tag)
-    
+
     register_window(window_tag)
-    
-    with dpg.window(label=title, tag=window_tag, width=700, height=500, 
+
+    with dpg.window(label=title, tag=window_tag, width=700, height=500,
                     pos=[100 + (window_id % 5) * 30, 100 + (window_id % 5) * 30],
                     on_close=close_callback):
-        
+
         if endpoint:
             dpg.add_text(f"Endpoint: /{endpoint}")
             dpg.add_separator()
-        
+
         # Toggle buttons row
         with dpg.group(horizontal=True):
             dpg.add_text("Response:", color=(150, 200, 255))
             dpg.add_spacer(width=20)
             dpg.add_button(label="Wrap: ON", tag=wrap_btn_tag, callback=toggle_wrap, width=100)
             dpg.add_button(label="Mode: Rich", tag=mode_btn_tag, callback=toggle_mode, width=100)
-        
+
         # Scrollable area for text
         with dpg.child_window(tag=scroll_area_tag, border=False, width=-1, height=-60, horizontal_scrollbar=False):
             dpg.add_group(tag=content_group_tag)
-            
+
         # Initial display
         update_display()
-        
+
         dpg.add_separator()
-        
+
         with dpg.group(horizontal=True):
             dpg.add_button(label="Copy to Clipboard", callback=copy_callback)
             dpg.add_button(label="Close", callback=close_callback)
@@ -1142,7 +1141,7 @@ def create_chat_window(session, initial_response=None):
     md_btn_tag = f"md_btn_{window_id}"
     select_btn_tag = f"select_btn_{window_id}"
     scroll_area_tag = f"scroll_area_{window_id}"
-    
+
     # State for toggles
     state = {
         'wrapped': True,
@@ -1150,7 +1149,7 @@ def create_chat_window(session, initial_response=None):
         'selectable': False,
         'last_response': initial_response or ""
     }
-    
+
     def get_conversation_text():
         """Build conversation text based on current display mode (for clipboard)"""
         parts = []
@@ -1161,28 +1160,28 @@ def create_chat_window(session, initial_response=None):
                 content = strip_markdown(content)
             parts.append(f"[{role}]\n{content}\n")
         return "\n".join(parts)
-    
+
     def update_chat_display():
         # Clear existing messages
         dpg.delete_item(chat_log_group, children_only=True)
-        
+
         # Update buttons
         dpg.configure_item(wrap_btn_tag, label=f"Wrap: {'ON' if state['wrapped'] else 'OFF'}")
         dpg.configure_item(md_btn_tag, label=f"{'Markdown' if state['markdown'] else 'Plain Text'}")
         dpg.configure_item(select_btn_tag, label=f"Select: {'ON' if state['selectable'] else 'OFF'}")
-        
+
         # Handle wrapping
         wrap_width = 0 if state['wrapped'] else -1
-        
+
         if state['wrapped']:
             dpg.configure_item(scroll_area_tag, horizontal_scrollbar=False)
         else:
             dpg.configure_item(scroll_area_tag, horizontal_scrollbar=True)
-            
+
         if state['selectable']:
             # Selectable mode: One big text box (monochrome)
             width = -1 if state['wrapped'] else 3000
-            dpg.add_input_text(default_value=get_conversation_text(), parent=chat_log_group, 
+            dpg.add_input_text(default_value=get_conversation_text(), parent=chat_log_group,
                               multiline=True, readonly=True, width=width, height=-1)
         else:
             # Rich mode: Colored text blocks
@@ -1191,55 +1190,55 @@ def create_chat_window(session, initial_response=None):
                 content = msg["content"]
                 if not state['markdown']:
                     content = strip_markdown(content)
-                
+
                 if role == "user":
                     dpg.add_text("You:", color=(100, 200, 255), parent=chat_log_group)
                 else:
                     dpg.add_text("Assistant:", color=(150, 255, 150), parent=chat_log_group)
-                
+
                 if state['markdown']:
                     render_markdown(content, parent=chat_log_group, wrap_width=wrap_width)
                 else:
                     dpg.add_text(content, parent=chat_log_group, wrap=wrap_width, bullet=True)
-                    
+
                 dpg.add_separator(parent=chat_log_group)
-            
+
         # Scroll to bottom (simple hack: set scroll y to max)
         # Note: DPG scroll setting is sometimes tricky, usually requires next frame
         # dpg.set_y_scroll(scroll_area_tag, dpg.get_y_scroll_max(scroll_area_tag))
-    
+
     def toggle_wrap():
         state['wrapped'] = not state['wrapped']
         update_chat_display()
         dpg.set_value(status_tag, f"Wrap: {'ON' if state['wrapped'] else 'OFF'}")
-    
+
     def toggle_markdown():
         state['markdown'] = not state['markdown']
         update_chat_display()
         dpg.set_value(status_tag, f"Mode: {'Markdown' if state['markdown'] else 'Plain Text'}")
-        
+
     def toggle_selectable():
         state['selectable'] = not state['selectable']
         update_chat_display()
         dpg.set_value(status_tag, f"Selectable: {'ON' if state['selectable'] else 'OFF'}")
-    
+
     def send_callback():
         user_input = dpg.get_value(input_tag).strip()
         if not user_input:
             dpg.set_value(status_tag, "Please enter a message")
             return
-        
+
         # Disable input during processing
         dpg.configure_item(send_btn_tag, enabled=False)
         dpg.set_value(status_tag, "Sending...")
-        
+
         def process_message():
             session.add_message("user", user_input)
             update_chat_display()
             dpg.set_value(input_tag, "")
-            
+
             response_text, error = call_api_chat(session)
-            
+
             if error:
                 dpg.set_value(status_tag, f"Error: {error}")
                 session.messages.pop()  # Remove failed user message
@@ -1249,18 +1248,18 @@ def create_chat_window(session, initial_response=None):
                 update_chat_display()
                 dpg.set_value(status_tag, "✓ Response received")
                 add_session(session)
-            
+
             dpg.configure_item(send_btn_tag, enabled=True)
-        
+
         threading.Thread(target=process_message, daemon=True).start()
-    
+
     def copy_all_callback():
         all_text = get_conversation_text()
         if copy_to_clipboard(all_text):
             dpg.set_value(status_tag, "✓ Copied all!")
         else:
             dpg.set_value(status_tag, "✗ Failed to copy")
-    
+
     def copy_last_callback():
         text = state['last_response']
         if not state['markdown']:
@@ -1269,23 +1268,23 @@ def create_chat_window(session, initial_response=None):
             dpg.set_value(status_tag, "✓ Copied last response!")
         else:
             dpg.set_value(status_tag, "✗ Failed to copy")
-    
+
     def close_callback():
         unregister_window(window_tag)
         dpg.delete_item(window_tag)
-    
+
     register_window(window_tag)
-    
+
     title = f"Chat - {session.title or session.session_id}"
-    
+
     with dpg.window(label=title, tag=window_tag, width=750, height=600,
                     pos=[80 + (window_id % 5) * 30, 80 + (window_id % 5) * 30],
                     on_close=close_callback):
-        
+
         dpg.add_text(f"Session: {session.session_id} | Endpoint: /{session.endpoint} | Provider: {session.provider}",
                     color=(150, 150, 200))
         dpg.add_separator()
-        
+
         # Toggle buttons row
         with dpg.group(horizontal=True):
             dpg.add_text("Conversation:", color=(150, 200, 255))
@@ -1293,25 +1292,25 @@ def create_chat_window(session, initial_response=None):
             dpg.add_button(label="Wrap: ON", tag=wrap_btn_tag, callback=toggle_wrap, width=100)
             dpg.add_button(label="Markdown", tag=md_btn_tag, callback=toggle_markdown, width=100)
             dpg.add_button(label="Select: OFF", tag=select_btn_tag, callback=toggle_selectable, width=100)
-        
+
         # Scrollable area for chat log
         with dpg.child_window(tag=scroll_area_tag, border=False, width=-1, height=-150, horizontal_scrollbar=False):
             dpg.add_group(tag=chat_log_group)
-            
+
         # Initial display
         update_chat_display()
-        
+
         dpg.add_separator()
         dpg.add_text("Your message:", color=(150, 200, 255))
-        dpg.add_input_text(tag=input_tag, multiline=True, width=-1, height=60, 
+        dpg.add_input_text(tag=input_tag, multiline=True, width=-1, height=60,
                           hint="Type your follow-up message here...")
-        
+
         with dpg.group(horizontal=True):
             dpg.add_button(label="Send", tag=send_btn_tag, callback=send_callback)
             dpg.add_button(label="Copy All", callback=copy_all_callback)
             dpg.add_button(label="Copy Last", callback=copy_last_callback)
             dpg.add_button(label="Close", callback=close_callback)
-        
+
         dpg.add_text("", tag=status_tag, color=(100, 255, 100))
 
 
@@ -1321,18 +1320,18 @@ def create_session_browser_window():
     window_tag = f"browser_window_{window_id}"
     table_tag = f"session_table_{window_id}"
     status_tag = f"browser_status_{window_id}"
-    
+
     sessions = list_sessions()
     selected_session = {'id': None}
-    
+
     def refresh_table():
         nonlocal sessions
         sessions = list_sessions()
-        
+
         # Clear existing rows
         for child in dpg.get_item_children(table_tag, 1):
             dpg.delete_item(child)
-        
+
         # Add rows
         for s in sessions:
             sid = s['id']
@@ -1346,11 +1345,11 @@ def create_session_browser_window():
                 dpg.add_text(str(s['messages']))
                 updated = s['updated'][:16].replace('T', ' ') if s['updated'] else ''
                 dpg.add_text(updated)
-    
+
     def select_session(session_id):
         selected_session['id'] = session_id
         dpg.set_value(status_tag, f"Selected: {session_id}")
-    
+
     def open_callback():
         if selected_session['id']:
             session = get_session(selected_session['id'])
@@ -1359,7 +1358,7 @@ def create_session_browser_window():
                 dpg.set_value(status_tag, f"Opened session {selected_session['id']}")
         else:
             dpg.set_value(status_tag, "No session selected")
-    
+
     def delete_callback():
         if selected_session['id']:
             sid = selected_session['id']
@@ -1372,31 +1371,31 @@ def create_session_browser_window():
             dpg.set_value(status_tag, f"Deleted session {sid}")
         else:
             dpg.set_value(status_tag, "No session selected")
-    
+
     def close_callback():
         unregister_window(window_tag)
         dpg.delete_item(window_tag)
-    
+
     register_window(window_tag)
-    
+
     with dpg.window(label="Session Browser", tag=window_tag, width=850, height=500,
                     pos=[50 + (window_id % 3) * 30, 50 + (window_id % 3) * 30],
                     on_close=close_callback):
-        
+
         dpg.add_text("Saved Chat Sessions", color=(200, 200, 255))
         dpg.add_separator()
-        
-        with dpg.table(tag=table_tag, header_row=True, borders_innerH=True, 
+
+        with dpg.table(tag=table_tag, header_row=True, borders_innerH=True,
                        borders_outerH=True, borders_innerV=True, borders_outerV=True,
                        scrollY=True, height=-60):
-            
+
             dpg.add_table_column(label="ID", width_fixed=True, init_width_or_weight=70)
             dpg.add_table_column(label="Title", width_stretch=True)
             dpg.add_table_column(label="Endpoint", width_fixed=True, init_width_or_weight=80)
             dpg.add_table_column(label="Provider", width_fixed=True, init_width_or_weight=80)
             dpg.add_table_column(label="Msgs", width_fixed=True, init_width_or_weight=50)
             dpg.add_table_column(label="Updated", width_fixed=True, init_width_or_weight=130)
-            
+
             for s in sessions:
                 sid = s['id']
                 with dpg.table_row():
@@ -1409,15 +1408,15 @@ def create_session_browser_window():
                     dpg.add_text(str(s['messages']))
                     updated = s['updated'][:16].replace('T', ' ') if s['updated'] else ''
                     dpg.add_text(updated)
-        
+
         dpg.add_separator()
-        
+
         with dpg.group(horizontal=True):
             dpg.add_button(label="Open Chat", callback=open_callback)
             dpg.add_button(label="Delete", callback=delete_callback)
             dpg.add_button(label="Refresh", callback=refresh_table)
             dpg.add_button(label="Close", callback=close_callback)
-        
+
         dpg.add_text("Click on a session ID to select it", tag=status_tag, color=(150, 150, 150))
 
 
@@ -1426,11 +1425,11 @@ def show_result_gui(text, title="AI Response", endpoint=None):
     if not HAVE_GUI:
         print("[Warning] GUI not available.")
         return False
-    
+
     if not ensure_gui_running():
         print("[Warning] Failed to start GUI.")
         return False
-    
+
     GUI_QUEUE.put({"type": "result", "text": text, "title": title, "endpoint": endpoint})
     return True
 
@@ -1440,11 +1439,11 @@ def show_chat_gui(session, initial_response=None):
     if not HAVE_GUI:
         print("[Warning] GUI not available.")
         return False
-    
+
     if not ensure_gui_running():
         print("[Warning] Failed to start GUI.")
         return False
-    
+
     GUI_QUEUE.put({"type": "chat", "session": session, "initial_response": initial_response})
     return True
 
@@ -1454,11 +1453,11 @@ def show_session_browser():
     if not HAVE_GUI:
         print("[Warning] GUI not available.")
         return False
-    
+
     if not ensure_gui_running():
         print("[Warning] Failed to start GUI.")
         return False
-    
+
     GUI_QUEUE.put({"type": "browser"})
     return True
 
@@ -1473,10 +1472,10 @@ app = Flask(__name__)
 def create_endpoint_handler(endpoint_name, prompt_template):
     def handler():
         start_time = time.time()
-        
+
         image_bytes = None
         mime_type = 'image/png'
-        
+
         if 'image' in request.files:
             image_file = request.files['image']
             image_bytes = image_file.read()
@@ -1486,33 +1485,33 @@ def create_endpoint_handler(endpoint_name, prompt_template):
             mime_type = request.content_type.split(';')[0]
         elif request.data:
             image_bytes = request.data
-        
+
         if not image_bytes:
             abort(400, description='No image found in request.')
-        
+
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
-        
+
         # Parse provider override
         provider = CONFIG.get("default_provider", "google")
         if request.args.get('provider'):
             provider = request.args.get('provider').lower()
         elif request.headers.get('X-API-Provider'):
             provider = request.headers.get('X-API-Provider').lower()
-        
+
         # Parse prompt override
         prompt = prompt_template
         if request.args.get('prompt'):
             prompt = request.args.get('prompt')
         elif request.headers.get('X-Custom-Prompt'):
             prompt = request.headers.get('X-Custom-Prompt')
-        
+
         # Parse model override
         model_override = None
         if request.args.get('model'):
             model_override = request.args.get('model')
         elif request.headers.get('X-API-Model'):
             model_override = request.headers.get('X-API-Model')
-        
+
         # Determine the effective model for logging
         if model_override:
             effective_model = model_override
@@ -1524,9 +1523,9 @@ def create_endpoint_handler(endpoint_name, prompt_template):
             effective_model = CONFIG.get("custom_model", "not configured")
         else:
             effective_model = "unknown"
-        
+
         show_mode = request.args.get('show', CONFIG.get('default_show', 'no')).lower()
-        
+
         # Enhanced request logging
         print(f"\n{'='*60}")
         print(f"[{endpoint_name.upper()}] New request")
@@ -1535,25 +1534,25 @@ def create_endpoint_handler(endpoint_name, prompt_template):
         print(f"  Image: {len(image_bytes) / 1024:.1f} KB ({mime_type})")
         print(f"  Show mode: {show_mode}")
         print(f"  Prompt: {prompt[:80]}{'...' if len(prompt) > 80 else ''}")
-        
+
         result, error = call_api_simple(provider, prompt, base64_image, mime_type, model_override)
         elapsed = time.time() - start_time
-        
+
         if error:
             print(f"  [FAILED] {error} ({elapsed:.1f}s)")
             print(f"{'='*60}\n")
-            
+
             if show_mode in ('gui', 'chatgui') and HAVE_GUI:
                 show_result_gui(f"Error: {error}", title="Error", endpoint=endpoint_name)
-            
+
             return jsonify({"error": error, "elapsed": elapsed}), 500
-        
+
         print(f"  [SUCCESS] {len(result)} chars ({elapsed:.1f}s)")
         print(f"{'='*60}\n")
-        
+
         if show_mode == 'gui' and HAVE_GUI:
             show_result_gui(result, title=f"Response - /{endpoint_name}", endpoint=endpoint_name)
-        
+
         elif show_mode == 'chatgui' and HAVE_GUI:
             session = ChatSession(
                 endpoint=endpoint_name,
@@ -1566,12 +1565,12 @@ def create_endpoint_handler(endpoint_name, prompt_template):
             session.add_message("assistant", result)
             add_session(session)
             show_chat_gui(session, initial_response=result)
-        
+
         if request.headers.get('Accept') == 'application/json':
             return jsonify({"text": result, "elapsed": elapsed})
-        
+
         return result, 200, {'Content-Type': 'text/plain; charset=utf-8'}
-    
+
     handler.__name__ = f"handle_{endpoint_name}"
     return handler
 
@@ -1586,7 +1585,7 @@ def index():
         "gui_running": GUI_RUNNING,
         "default_provider": CONFIG.get("default_provider", "google"),
         "available_providers": available_providers,
-        "endpoints": {f"/{name}": prompt[:100] + "..." if len(prompt) > 100 else prompt 
+        "endpoints": {f"/{name}": prompt[:100] + "..." if len(prompt) > 100 else prompt
                      for name, prompt in ENDPOINTS.items()},
         "show_modes": {
             "no": "Return text only (default)",
@@ -1653,7 +1652,7 @@ def terminal_session_manager():
     print("  [C] Clear all sessions  [H] Help")
     print("  [G] Toggle GUI status")
     print("─"*60 + "\n")
-    
+
     def get_input_nonblocking():
         if sys.platform == 'win32':
             import msvcrt
@@ -1662,8 +1661,8 @@ def terminal_session_manager():
             return None
         else:
             import select
-            import tty
             import termios
+            import tty
             old_settings = None
             try:
                 old_settings = termios.tcgetattr(sys.stdin)
@@ -1679,11 +1678,11 @@ def terminal_session_manager():
                     except:
                         pass
             return None
-    
+
     while True:
         try:
             key = get_input_nonblocking()
-            
+
             if key == 'l':
                 sessions = list_sessions()
                 print(f"\n{'─'*60}")
@@ -1697,17 +1696,17 @@ def terminal_session_manager():
                     if len(sessions) > 10:
                         print(f"  ... and {len(sessions) - 10} more")
                 print(f"{'─'*60}\n")
-            
+
             elif key == 'o':
                 if HAVE_GUI:
                     print("\n[Opening session browser...]\n")
                     show_session_browser()
                 else:
                     print("\n[GUI not available]\n")
-            
+
             elif key == 'g':
                 print(f"\n{'─'*60}")
-                print(f"GUI STATUS:")
+                print("GUI STATUS:")
                 print(f"  Available: {HAVE_GUI}")
                 print(f"  Running: {GUI_RUNNING}")
                 print(f"  Context Created: {GUI_CONTEXT_CREATED}")
@@ -1716,7 +1715,7 @@ def terminal_session_manager():
                     for w in list(OPEN_WINDOWS):
                         print(f"    - {w}")
                 print(f"{'─'*60}\n")
-            
+
             elif key == 's':
                 print("\nEnter session ID: ", end='', flush=True)
                 try:
@@ -1734,7 +1733,7 @@ def terminal_session_manager():
                             print(f"\n[{role}]")
                             print(msg['content'][:500] + ('...' if len(msg['content']) > 500 else ''))
                         print(f"{'─'*60}\n")
-                        
+
                         if HAVE_GUI:
                             open_gui = input("Open in chat GUI? [y/N]: ").strip().lower()
                             if open_gui == 'y':
@@ -1743,7 +1742,7 @@ def terminal_session_manager():
                         print(f"Session '{session_id}' not found.\n")
                 except:
                     pass
-            
+
             elif key == 'd':
                 print("\nEnter session ID to delete: ", end='', flush=True)
                 try:
@@ -1759,7 +1758,7 @@ def terminal_session_manager():
                         print(f"Session '{session_id}' not found.\n")
                 except:
                     pass
-            
+
             elif key == 'c':
                 try:
                     confirm = input("\nClear ALL sessions? This cannot be undone. [y/N]: ").strip().lower()
@@ -1770,7 +1769,7 @@ def terminal_session_manager():
                         print("All sessions cleared.\n")
                 except:
                     pass
-            
+
             elif key == 'h':
                 print("\n" + "─"*60)
                 print("TERMINAL COMMANDS:")
@@ -1782,9 +1781,9 @@ def terminal_session_manager():
                 print("  [G] GUI status          - Show GUI state information")
                 print("  [H] Help                - Show this help")
                 print("─"*60 + "\n")
-            
+
             time.sleep(0.1)
-        
+
         except Exception as e:
             print(f"[Terminal Error] {e}")
             time.sleep(1)
@@ -1796,18 +1795,18 @@ def terminal_session_manager():
 
 def initialize():
     global CONFIG, AI_PARAMS, ENDPOINTS, KEY_MANAGERS
-    
+
     print("=" * 60)
     print("Universal ShareX Middleman Server (Dear PyGui - On Demand)")
     print("=" * 60)
-    
+
     print(f"\nLoading configuration from '{CONFIG_FILE}'...")
     config, ai_params, endpoints, keys = load_config()
-    
+
     CONFIG = config
     AI_PARAMS = ai_params
     ENDPOINTS = endpoints
-    
+
     for provider in ["custom", "openrouter", "google"]:
         KEY_MANAGERS[provider] = KeyManager(keys[provider], provider)
         count = len(keys[provider])
@@ -1815,24 +1814,24 @@ def initialize():
             print(f"  ✓ {provider}: {count} API key(s) loaded")
         else:
             print(f"  ✗ {provider}: No API keys")
-    
-    print(f"\nLoading saved sessions...")
+
+    print("\nLoading saved sessions...")
     load_sessions()
-    
-    print(f"\nServer Configuration:")
+
+    print("\nServer Configuration:")
     print(f"  Host: {CONFIG.get('host', '127.0.0.1')}")
     print(f"  Port: {CONFIG.get('port', 5000)}")
     print(f"  Default Provider: {CONFIG.get('default_provider', 'google')}")
     print(f"  Default Show Mode: {CONFIG.get('default_show', 'no')}")
     print(f"  GUI Available: {HAVE_GUI}")
-    print(f"  GUI Mode: On-demand (starts when needed)")
+    print("  GUI Mode: On-demand (starts when needed)")
     print(f"  Max Sessions: {CONFIG.get('max_sessions', 50)}")
-    
+
     if AI_PARAMS:
-        print(f"\nAI Parameters:")
+        print("\nAI Parameters:")
         for k, v in AI_PARAMS.items():
             print(f"  {k}: {v}")
-    
+
     print(f"\nRegistering {len(ENDPOINTS)} endpoint(s):")
     for endpoint_name, prompt in ENDPOINTS.items():
         handler = create_endpoint_handler(endpoint_name, prompt)
@@ -1840,7 +1839,7 @@ def initialize():
         prompt_preview = prompt[:60] + "..." if len(prompt) > 60 else prompt
         print(f"  /{endpoint_name}")
         print(f"      → {prompt_preview}")
-    
+
     print("\n" + "=" * 60)
 
 
@@ -1959,37 +1958,37 @@ if __name__ == '__main__':
         print(f"✓ Created '{CONFIG_FILE}'")
         print("\nPlease edit the config file to add your API keys, then restart.")
         exit(0)
-    
+
     # Initialize
     initialize()
-    
+
     # Check for API keys
     has_any_keys = any(km.has_keys() for km in KEY_MANAGERS.values())
     if not has_any_keys:
         print("\n⚠️  WARNING: No API keys configured!")
         print("Please add your API keys to config.ini\n")
-    
+
     # NOTE: GUI is NOT started at startup - it will be started on-demand
     # when a GUI window is requested (via ?show=gui, ?show=chatgui, or pressing 'O')
     if HAVE_GUI:
         print("✓ GUI available (will start on-demand when needed)")
     else:
         print("✗ GUI not available (Dear PyGui not installed)")
-    
+
     # Start terminal session manager
     terminal_thread = threading.Thread(target=terminal_session_manager, daemon=True)
     terminal_thread.start()
-    
+
     # Start server
     host = CONFIG.get('host', '127.0.0.1')
     port = int(CONFIG.get('port', 5000))
-    
+
     print(f"\n🚀 Starting server at http://{host}:{port}")
-    print(f"   Endpoints: {', '.join('/' + e for e in ENDPOINTS.keys())}")
-    print(f"\n   Show modes:")
-    print(f"     ?show=no      - Return text only (default)")
-    print(f"     ?show=gui     - Display result in GUI window (starts GUI on first use)")
-    print(f"     ?show=chatgui - Display result in chat GUI with follow-up input")
+    print(f"   Endpoints: {', '.join('/' + e for e in ENDPOINTS)}")
+    print("\n   Show modes:")
+    print("     ?show=no      - Return text only (default)")
+    print("     ?show=gui     - Display result in GUI window (starts GUI on first use)")
+    print("     ?show=chatgui - Display result in chat GUI with follow-up input")
     print("\nPress Ctrl+C to stop\n")
-    
+
     app.run(host=host, port=port, debug=False, threaded=True)

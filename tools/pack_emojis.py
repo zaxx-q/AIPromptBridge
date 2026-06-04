@@ -10,10 +10,10 @@ Usage:
     python tools/pack_emojis.py
 """
 
-import os
 import sys
 import zipfile
 from pathlib import Path
+
 
 def pack_emojis():
     # Define paths
@@ -37,7 +37,7 @@ def pack_emojis():
             count += 1
             if count % 100 == 0:
                 print(f"Packed {count} files...", end='\r')
-    
+
     print(f"\nSuccess! Packed {count} emoji files into {output_zip}")
     print(f"Zip size: {output_zip.stat().st_size / 1024 / 1024:.2f} MB")
 

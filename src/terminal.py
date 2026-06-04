@@ -6,16 +6,32 @@ Terminal interactive session manager with enhanced console UI
 import sys
 import time
 
-from .session_manager import (
-    list_sessions, get_session, delete_session, save_sessions,
-    CHAT_SESSIONS, SESSION_LOCK, clear_all_sessions
-)
-from .gui.core import show_session_browser, get_gui_status, HAVE_GUI
-from .config import OPENROUTER_URL
-from .console import console, Panel, Table, print_panel, print_success, print_error, print_warning, print_info, HAVE_RICH
 from rich.align import Align
 from rich.columns import Columns
 from rich.text import Text
+
+from .config import OPENROUTER_URL
+from .console import (
+    HAVE_RICH,
+    Panel,
+    Table,
+    console,
+    print_error,
+    print_info,
+    print_panel,
+    print_success,
+    print_warning,
+)
+from .gui.core import HAVE_GUI, get_gui_status, show_session_browser
+from .session_manager import (
+    CHAT_SESSIONS,
+    SESSION_LOCK,
+    clear_all_sessions,
+    delete_session,
+    get_session,
+    list_sessions,
+    save_sessions,
+)
 
 
 def get_base_url_for_status(config, provider, profile=None):
@@ -64,9 +80,9 @@ def print_system_info(include_server_and_keys=True, delay_val=None):
     thinking = web_server.get_active_setting("thinking", False)
 
     if HAVE_RICH:
-        from rich.table import Table as RichTable
         from rich.panel import Panel as RichPanel
-        
+        from rich.table import Table as RichTable
+
         grid = RichTable.grid(expand=True, padding=(0, 2))
         grid.add_column(justify="left")
         grid.add_column(justify="left")
@@ -170,21 +186,21 @@ def print_system_info(include_server_and_keys=True, delay_val=None):
                 pool_count = len(ks.list_pools())
                 print(f"\n 🔑 API Keys: {total_keys} keys in {pool_count} pools")
             except Exception:
-                print(f"\n 🔑 API Keys: N/A")
+                print("\n 🔑 API Keys: N/A")
         print(f"{'─'*64}\n")
 
 
 def print_commands_box():
     """Print the terminal commands box"""
     if HAVE_RICH:
-        from rich.table import Table
-        from rich.panel import Panel
-        from rich.layout import Layout
         from rich.align import Align
-        
+        from rich.layout import Layout
+        from rich.panel import Panel
+        from rich.table import Table
+
         # Create a grid for the content - do NOT expand, keep it compact
         grid = Table.grid(expand=False, padding=(0, 4))
-        
+
         # Helper to create sub-tables for columns with explicit emoji separation
         def create_column_table(items):
             t = Table.grid(padding=(0, 1))
@@ -194,7 +210,7 @@ def print_commands_box():
             t.add_column(width=3, justify="center")
             # Col 3: Description - Left aligned
             t.add_column(style="white")
-            
+
             for key, icon, desc in items:
                 if key:
                     t.add_row(f"[{key}]", icon, desc)
@@ -209,7 +225,7 @@ def print_commands_box():
             ("T", "🔊", "TTS"),
             ("X", "🧰", "Tools"),
         ])
-        
+
         # Column 2: Configuration
         col2 = create_column_table([
             ("U", "🔄", "Update"),
@@ -225,9 +241,9 @@ def print_commands_box():
             ("K", "💭", "Thinking"),
             ("R", "🌊", "Streaming"),
         ])
-        
+
         grid.add_row(col1, col2, col3)
-        
+
         # Use Panel.fit to wrap tightly around the grid, and Align.center to place it in the middle
         console.print(Align.center(Panel.fit(
             grid,
@@ -253,7 +269,7 @@ def terminal_session_manager():
     """Interactive terminal session manager"""
     # Print the commands box
     print_commands_box()
-    
+
     def get_input_nonblocking():
         """Get keyboard input without blocking"""
         if sys.platform == 'win32':
@@ -263,8 +279,8 @@ def terminal_session_manager():
             return None
         else:
             import select
-            import tty
             import termios
+            import tty
             old_settings = None
             try:
                 old_settings = termios.tcgetattr(sys.stdin)
@@ -280,11 +296,11 @@ def terminal_session_manager():
                     except:
                         pass
             return None
-    
+
     while True:
         try:
             key = get_input_nonblocking()
-            
+
             if key == 'l':
                 sessions = list_sessions()
                 print(f"\n{'─'*64}")
@@ -302,12 +318,12 @@ def terminal_session_manager():
                 if HAVE_GUI:
                     from . import web_server
                     from .gui.core import GUICoordinator
-                    
+
                     if HAVE_RICH:
                         console.print("\n[bold]🔊  Opening TTS Window...[/bold]\n")
                     else:
                         print("\n🔊  Opening TTS Window...\n")
-                        
+
                     GUICoordinator.get_instance().request_tts_window(
                         web_server.CONFIG,
                         web_server.AI_PARAMS,
@@ -319,7 +335,7 @@ def terminal_session_manager():
                         console.print("\n[red]✗ GUI not available[/red]\n")
                     else:
                         print("\n✗ GUI not available\n")
-            
+
             elif key == 's':
                 if HAVE_GUI:
                     if HAVE_RICH:
@@ -332,12 +348,12 @@ def terminal_session_manager():
                         console.print("\n[red]✗ GUI not available[/red]\n")
                     else:
                         print("\n✗ GUI not available\n")
-            
+
             elif key == 'a':
                 # Open Audio Analyzer
                 from .gui.audio_tool import get_instance
                 app = get_instance()
-                
+
                 if app:
                     if HAVE_RICH:
                         console.print("\n[bold]🎤  Opening Audio Analyzer...[/bold]\n")
@@ -350,22 +366,22 @@ def terminal_session_manager():
                         console.print("\n[red]✗ Audio Tool not initialized[/red]\n")
                     else:
                         print("\n✗ Audio Tool not initialized\n")
-            
+
             elif key == 'm':
                 # Model management with two-tier display
                 from . import web_server
                 from .api_client import fetch_models
-    
+
                 if HAVE_RICH:
                     console.print("[bold]🤖 Model Management[/bold]")
-    
+
                 provider = web_server.get_active_setting("provider", "custom")
                 current_model = web_server.get_active_setting("model", "not set")
-                
+
                 # Resolve profile to get merged config with connection keys
                 from .profile_resolver import resolve_profile
                 resolved = resolve_profile(None, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
-    
+
                 if HAVE_RICH:
                     console.print(f" Provider: [cyan]{provider}[/cyan]")
                     console.print(f" Current: [green]{current_model}[/green]")
@@ -377,9 +393,9 @@ def terminal_session_manager():
                     print(f"{'─'*64}")
                     print(f" Provider: {provider}")
                     print(f" Current: {current_model}")
-                    print(f"\n Fetching available models...")
+                    print("\n Fetching available models...")
                     models, error = fetch_models(resolved.config, resolved.key_managers)
-                
+
                 if error:
                     if HAVE_RICH:
                         print_error(error)
@@ -395,7 +411,7 @@ def terminal_session_manager():
                         elif ctx >= 1000:
                             return f"{ctx // 1000}k"
                         return str(ctx)
-                    
+
                     # Helper function to format pricing
                     def format_price_list(m):
                         pricing = m.get('pricing')
@@ -404,19 +420,19 @@ def terminal_session_manager():
                         try:
                             prompt = float(pricing.get('prompt', 0))
                             completion = float(pricing.get('completion', 0))
-                            
+
                             if prompt < 0: return "[dim]Router[/dim]"
                             if prompt == 0 and completion == 0: return "[bold green]Free[/bold green]"
-                            
+
                             # Format as price per 1M tokens
                             p_val = prompt * 1000000
                             c_val = completion * 1000000
-                            
+
                             def fmt(v):
                                 if v == 0: return "0"
                                 if v < 0.01: return "<.01"
                                 return f"{v:.2f}"
-                                
+
                             return f"${fmt(p_val)}/${fmt(c_val)}"
                         except:
                             return ""
@@ -428,14 +444,14 @@ def terminal_session_manager():
                         table.add_column("Context", style="cyan", justify="right", width=8)
                         table.add_column("1M (In/Out)", style="yellow", justify="right", width=14)
                         table.add_column("🧠", justify="center", width=3)
-                        
+
                         for i, m in enumerate(models):
                             marker = " [bold green]◄[/bold green]" if m['id'] == current_model else ""
                             ctx = format_context(m.get('context_length'))
                             thinking = "[green]✓[/green]" if m.get('thinking') else ""
                             price = format_price_list(m)
                             table.add_row(str(i+1), f"{m['id']}{marker}", ctx, price, thinking)
-                        
+
                         console.print(table)
                         console.print("\n   [dim]Enter number, model name, or ?N for details (q = cancel):[/dim] ", end="")
                     else:
@@ -459,12 +475,12 @@ def terminal_session_manager():
                                         price_str = f"${p*1000000:.1f}/${c*1000000:.1f}"
                                 except: pass
                             print(f"   {i+1:>3}  {m['id']:<35}{marker} {ctx:>8} {price_str:>14} {thinking}")
-                        
+
                         print("\n   Enter number, model name, or ?N for details (q = cancel): ", end='', flush=True)
-                    
+
                     try:
                         choice = input().strip()
-                        
+
                         # Handle model details request (?N syntax)
                         if choice.startswith('?'):
                             detail_choice = choice[1:].strip()
@@ -493,7 +509,7 @@ def terminal_session_manager():
                                     new_model = choice
                             except ValueError:
                                 new_model = choice
-                            
+
                             # In-memory only — model is owned by the active profile.
                             # Switch profile or edit on Connection Manager for persistent changes.
                             web_server.SESSION_OVERRIDES["model"] = new_model
@@ -503,14 +519,14 @@ def terminal_session_manager():
                 else:
                     print("   No models available")
                 print(f"{'─'*64}\n")
-            
+
             elif key == 'i':
                 print_system_info()
-            
+
             elif key == 'k':
                 # Toggle thinking mode (session-scoped, in-memory only)
                 from . import web_server
-    
+
                 current = web_server.get_active_setting("thinking", False)
                 new_value = not current
                 web_server.SESSION_OVERRIDES["thinking"] = new_value
@@ -525,7 +541,7 @@ def terminal_session_manager():
             elif key == 'r':
                 # Toggle streaming mode (session-scoped, in-memory only)
                 from . import web_server
-    
+
                 current = web_server.get_active_setting("streaming", True)
                 new_value = not current
                 web_server.SESSION_OVERRIDES["streaming"] = new_value
@@ -548,17 +564,17 @@ def terminal_session_manager():
                 active = store.get_active_profile_name()
 
                 if HAVE_RICH:
-                    console.print(f"\n[bold]🔌 Connection Profiles[/bold]")
+                    console.print("\n[bold]🔌 Connection Profiles[/bold]")
                     console.print(f"   Active: [green]{active}[/green]\n")
                 else:
-                    print(f"\n🔌 Connection Profiles")
+                    print("\n🔌 Connection Profiles")
                     print(f"   Active: {active}\n")
 
                 for i, name in enumerate(names):
                     marker = " ◄" if name == active else ""
                     print(f"      [{i+1}] {name}{marker}")
 
-                print(f"\n   Enter number/name to switch, [E] edit profiles (q = cancel): ", end='', flush=True)
+                print("\n   Enter number/name to switch, [E] edit profiles (q = cancel): ", end='', flush=True)
                 try:
                     choice = input().strip()
                     if choice.lower() == 'e':
@@ -634,7 +650,7 @@ def terminal_session_manager():
                                 print(f"\n{role_icon} [{role}]")
                                 print(msg['content'][:500] + ('...' if len(msg['content']) > 500 else ''))
                             print(f"{'─'*64}\n")
-                        
+
                         if HAVE_GUI:
                             open_gui = input("Open in GUI? [y/N]: ").strip().lower()
                             if open_gui == 'y':
@@ -644,7 +660,7 @@ def terminal_session_manager():
                         print(f"✗ Session '{session_id}' not found.\n")
                 except:
                     pass
-            
+
             elif key == 'd':
                 print("\nEnter session ID to delete: ", end='', flush=True)
                 try:
@@ -674,7 +690,7 @@ def terminal_session_manager():
                         console.print("\n[red]✗ GUI not available[/red]\n")
                     else:
                         print("\n✗ GUI not available\n")
-            
+
             elif key == 'w':
                 # Open Prompt Editor window
                 if HAVE_GUI:
@@ -689,15 +705,15 @@ def terminal_session_manager():
                         console.print("\n[red]✗ GUI not available[/red]\n")
                     else:
                         print("\n✗ GUI not available\n")
-            
+
             elif key == 'u':
                 # Check for updates
                 from . import web_server
                 from .updater import check_and_prompt_terminal
-                
+
                 config = web_server.CONFIG or {}
                 check_and_prompt_terminal(config)
-            
+
             elif key == 'x':
                 # Open Tools menu
                 try:
@@ -725,7 +741,7 @@ def terminal_session_manager():
                 # Reprint commands box after returning
                 print()
                 print_commands_box()
-            
+
             elif key == 'h':
                 print(f"\n{'─'*64}")
                 print("❓ HELP")
@@ -751,9 +767,9 @@ def terminal_session_manager():
                 print("   [U] ⬆️ Update        Check for updates")
                 print("   [H] ❓ Help          Show this help")
                 print(f"{'─'*64}\n")
-            
+
             time.sleep(0.1)
-        
+
         except Exception as e:
             # Suppress atexit errors during shutdown
             error_msg = str(e)
@@ -776,7 +792,7 @@ def _show_model_details(model: dict):
         try:
             return f"{int(n):,}"
         except: return str(n)
-            
+
     def fmt_money(val, rich=True):
         if val is None or val == "": return "[dim]N/A[/dim]" if rich else "N/A"
         try:
@@ -792,7 +808,7 @@ def _show_model_details(model: dict):
         console.print(f"\n{'─'*64}")
         console.print("[bold]📋 MODEL DETAILS[/bold]")
         console.print(f"{'─'*64}")
-        
+
         # Core info
         console.print(f"   [bold]Name:[/bold]        {model.get('name', model.get('id', 'Unknown'))}")
         console.print(f"   [bold]ID:[/bold]          [cyan]{model.get('id', 'Unknown')}[/cyan]")
@@ -800,11 +816,11 @@ def _show_model_details(model: dict):
              console.print(f"   [bold]Provider:[/bold]    [yellow]{model.get('owned_by')}[/yellow]")
         if model.get('version'):
             console.print(f"   [bold]Version:[/bold]     {model.get('version')}")
-        
+
         if model.get('description'):
             desc = model.get('description', '')
             if len(desc) > 60:
-                console.print(f"   [bold]Description:[/bold]")
+                console.print("   [bold]Description:[/bold]")
                 words = desc.split()
                 line = "                "
                 for word in words:
@@ -814,19 +830,19 @@ def _show_model_details(model: dict):
                     else: line += " " + word if line.strip() else word
                 if line.strip(): console.print(f"   [dim]{line}[/dim]")
             else: console.print(f"   [bold]Description:[/bold] [dim]{desc}[/dim]")
-        
+
         console.print()
-        
+
         # Performance & Limits
         ctx = model.get('context_length') or model.get('input_token_limit')
         out_limit = model.get('output_token_limit')
         console.print(f"   [bold]Context:[/bold]     {fmt_num(ctx)} tokens (input)")
         console.print(f"   [bold]Max Output:[/bold]  {fmt_num(out_limit)} tokens")
-        
+
         thinking = model.get('thinking', False)
         think_str = "[green]✅ Supported[/green]" if thinking else "[dim]Not supported[/dim]"
         console.print(f"   [bold]Thinking:[/bold]    {think_str}")
-        
+
         # Pricing
         pricing = model.get('pricing')
         if pricing:
@@ -838,25 +854,25 @@ def _show_model_details(model: dict):
         arch = model.get('architecture')
         if arch:
             console.print("\n   [bold]Architecture:[/bold]")
-            
+
             # Use specific modality lists for better accuracy (shows audio/video/etc)
             inputs = arch.get('input_modalities')
             outputs = arch.get('output_modalities')
-            
+
             if inputs:
                 console.print(f"      Input Mod.: [dim]{', '.join(inputs)}[/dim]")
             if outputs:
                 console.print(f"      Output Mod.:[dim]{', '.join(outputs)}[/dim]")
-            
+
             # Fallback to summary string if lists are missing
             if not inputs and arch.get('modality'):
                 console.print(f"      Modality:   [dim]{arch.get('modality')}[/dim]")
-                
+
             if arch.get('tokenizer'):
                 console.print(f"      Tokenizer:  [dim]{arch.get('tokenizer')}[/dim]")
 
         console.print()
-        
+
         # Generation defaults
         if any(model.get(k) is not None for k in ['temperature', 'top_p', 'top_k', 'max_temperature']):
             console.print("   [bold]Defaults:[/bold]")
@@ -865,10 +881,10 @@ def _show_model_details(model: dict):
             if model.get('top_p') is not None: console.print(f"      Top P:     {model.get('top_p')}")
             if model.get('top_k') is not None: console.print(f"      Top K:     {model.get('top_k')}")
             console.print()
-        
+
         methods = model.get('supported_methods', [])
         if methods: console.print(f"   [bold]Methods:[/bold]     {', '.join(methods)}")
-        
+
         # Show any unknown/future fields from _raw
         raw = model.get('_raw', {})
         if raw:
@@ -880,13 +896,13 @@ def _show_model_details(model: dict):
                 'supported_parameters', 'input_modalities', 'output_modalities'
             }
             extra_fields = {k: v for k, v in raw.items() if k not in excluded and v is not None}
-            
+
             if extra_fields:
                 console.print("\n   [bold]Additional Information:[/bold]")
                 for key, value in extra_fields.items():
                     val_str = str(value)[:50] + ("..." if len(str(value)) > 50 else "")
                     console.print(f"      {key}: [dim]{val_str}[/dim]")
-        
+
         console.print(f"{'─'*64}\n")
     else:
         # Plain text fallback
@@ -894,15 +910,15 @@ def _show_model_details(model: dict):
         print(f"   Name:        {model.get('name', 'Unknown')}")
         print(f"   ID:          {model.get('id', 'Unknown')}")
         print(f"   Context:     {fmt_num(model.get('context_length'), False)} tokens")
-        
+
         pricing = model.get('pricing')
         if pricing:
             print(f"   Pricing:     {fmt_money(pricing.get('prompt'), False)} (Prompt)")
-            
+
         if model.get('description'):
             desc = model.get('description', '')
             print(f"   Description: {desc[:60]}...")
-            
+
         raw = model.get('_raw', {})
         if raw:
             print("\n   Additional Fields:")
@@ -916,14 +932,14 @@ def print_usage(usage_data, prefix=""):
     """Print token usage information to console"""
     if not usage_data:
         return
-    
+
     input_tokens = usage_data.get("prompt_tokens", 0)
     output_tokens = usage_data.get("completion_tokens", 0)
     total_tokens = usage_data.get("total_tokens", input_tokens + output_tokens)
     estimated = usage_data.get("estimated", False)
-    
+
     est_mark = " (est)" if estimated else ""
-    
+
     if HAVE_RICH:
         console.print(f"{prefix}[dim]📊 Tokens: [bold green]{input_tokens}[/bold green] in | [bold blue]{output_tokens}[/bold blue] out | [bold white]{total_tokens}[/bold white] total{est_mark}[/dim]")
     else:

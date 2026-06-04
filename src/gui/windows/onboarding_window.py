@@ -7,28 +7,33 @@ Configures API Keys (stored in KeyStore) and default connection profile (Profile
 """
 
 import sys
-import time
 import threading
+import time
 import tkinter as tk
 from tkinter import messagebox, ttk
-from typing import Callable, Optional, Dict, List
+from typing import Callable, Dict, List, Optional
 
-from ..platform import HAVE_CTK, ctk
-from ..themes import (
-    ThemeColors, get_colors, get_ctk_font, get_ctk_label_colors,
-    get_ctk_button_colors, get_ctk_frame_colors, get_ctk_entry_colors,
-    get_ctk_combobox_colors
-)
-from ..custom_widgets import create_emoji_button, ScrollableComboBox, TkScrollableFrame, ScrollableButtonList
-from .utils import set_window_icon, set_dark_titlebar
 from ...config import save_config_value
+from ...connection_profiles import ConnectionProfile, ProfileStore
 from ...key_store import KeyStore
-from ...connection_profiles import ProfileStore, ConnectionProfile
 from ...providers.registry import get_provider_definitions
 from ...version import __version__
+from ..custom_widgets import ScrollableButtonList, ScrollableComboBox, TkScrollableFrame, create_emoji_button
+from ..platform import HAVE_CTK, ctk
+from ..themes import (
+    ThemeColors,
+    get_colors,
+    get_ctk_button_colors,
+    get_ctk_combobox_colors,
+    get_ctk_entry_colors,
+    get_ctk_font,
+    get_ctk_frame_colors,
+    get_ctk_label_colors,
+)
+from .utils import set_dark_titlebar, set_window_icon
 
 try:
-    from ..emoji_renderer import prepare_emoji_content, HAVE_PIL
+    from ..emoji_renderer import HAVE_PIL, prepare_emoji_content
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
@@ -46,11 +51,11 @@ def _adjust_hex_color(hex_color: str, factor: float) -> str:
         r = int(hex_color[0:2], 16)
         g = int(hex_color[2:4], 16)
         b = int(hex_color[4:6], 16)
-        
+
         r = max(0, min(255, int(r * factor)))
         g = max(0, min(255, int(g * factor)))
         b = max(0, min(255, int(b * factor)))
-        
+
         return f"#{r:02x}{g:02x}{b:02x}"
     except ValueError:
         return f"#{hex_color}"
@@ -172,7 +177,7 @@ class OnboardingWizard:
         # Center: Step Dots Indicator
         dots_container = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=c.surface0)
         dots_container.pack(side="left", expand=True, fill="both")
-        
+
         dots_sub = ctk.CTkFrame(dots_container, fg_color="transparent") if self.use_ctk else tk.Frame(dots_container, bg=c.surface0)
         dots_sub.pack(expand=True, pady=10)
 
@@ -875,8 +880,8 @@ class OnboardingWizard:
 
         def _fetch():
             try:
-                from ...key_store import KeyStore
                 from ...key_manager import KeyManager
+                from ...key_store import KeyStore
                 from ...providers import create_provider
 
                 key_store = KeyStore.get_instance()
@@ -943,7 +948,7 @@ class OnboardingWizard:
             except Exception as e:
                 err_msg = str(e)[:30]
                 fallback = get_fallback_models(provider)
-    
+
                 def _fallback_on_exception(msg=err_msg, fb=fallback):
                     if hasattr(self, "model_combo") and self.model_combo:
                         self.model_combo.configure(values=fb)
@@ -951,7 +956,7 @@ class OnboardingWizard:
                         if fb and not self._model_var.get().strip():
                             self._model_var.set(fb[0])
                     self._set_model_status(msg, "error")
-    
+
                 self._schedule_ui(_fallback_on_exception)
 
         threading.Thread(target=_fetch, daemon=True).start()
@@ -1063,7 +1068,7 @@ class OnboardingWizard:
             if self.use_ctk:
                 card = ctk.CTkFrame(grid, fg_color=c.surface0, corner_radius=8)
                 card.grid(row=r, column=col, padx=8, pady=8, sticky="nsew")
-                
+
                 header_row = ctk.CTkFrame(card, fg_color="transparent")
                 header_row.pack(fill="x", padx=12, pady=(10, 4))
 
@@ -1093,7 +1098,7 @@ class OnboardingWizard:
 
                 body = tk.Label(card, text=desc, font=("Segoe UI", 8), justify="left", wraplength=270, bg=c.surface0, fg=c.blockquote)
                 body.pack(anchor="w", padx=10, pady=(0, 8), fill="both", expand=True)
-    
+
         # Additional features note — rendered once, outside the for loop
         extra_text = "Also available: Chat windows for conversations, 6 themes in Settings, console commands (press H for help), and a Prompt Editor to customize actions."
         if self.use_ctk:

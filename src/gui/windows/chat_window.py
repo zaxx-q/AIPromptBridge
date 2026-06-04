@@ -23,14 +23,14 @@ class StandaloneChatWindow(ChatWindowBase):
     Standalone chat window that creates its own CTk root.
     Used when launching from non-GUI contexts (e.g., terminal command).
     """
-    
+
     def __init__(self, session, initial_response: Optional[str] = None):
         super().__init__(session, initial_response)
         self.window_tag = f"standalone_chat_{self.window_id}"
-    
+
     def _get_window_tag(self) -> str:
         return self.window_tag
-    
+
     def show(self):
         """Create and show the window with its own mainloop."""
         # Sync appearance mode
@@ -40,31 +40,31 @@ class StandaloneChatWindow(ChatWindowBase):
         else:
             self.root = tk.Tk()
             self.root.configure(bg=self.colors["bg"])
-        
+
         # Hide window while building UI (prevents flashing)
         self.root.withdraw()
-        
+
         self._configure_window()
         self._build_ui()
-        
+
         # Initial display
         self._update_chat_display(scroll_to_bottom=True)
-        
+
         # Force Tk to process all pending drawing commands before showing
         self.root.update_idletasks()
-        
+
         # Show window after UI is fully rendered
         self.root.deiconify()
-        
+
         # Set window icon AFTER deiconify (CTk overrides icon during setup)
         set_window_icon(self.root)
-        
+
         # Focus - use after() for reliable focus
         self.root.after(50, lambda: self._focus_window())
-        
+
         # Run event loop
         self._run_event_loop()
-    
+
     def _run_event_loop(self):
         """Run event loop without blocking other Tk instances."""
         try:
@@ -85,16 +85,16 @@ class AttachedChatWindow(ChatWindowBase):
     Chat window as CTkToplevel attached to coordinator's root.
     Used for centralized GUI threading.
     """
-    
+
     def __init__(self, parent_root, session, initial_response: Optional[str] = None):
         self.parent_root = parent_root
         super().__init__(session, initial_response)
         self.window_tag = f"attached_chat_{self.window_id}"
         self._create_window()
-    
+
     def _get_window_tag(self) -> str:
         return self.window_tag
-    
+
     def _create_window(self):
         """Create the chat window as CTkToplevel."""
         if HAVE_CTK:
@@ -102,42 +102,42 @@ class AttachedChatWindow(ChatWindowBase):
         else:
             self.root = tk.Toplevel(self.parent_root)
             self.root.configure(bg=self.colors["bg"])
-        
+
         # Hide window while building UI
         self.root.withdraw()
-        
+
         self._configure_window()
         self._build_ui()
-        
+
         self._update_chat_display(scroll_to_bottom=True)
-        
+
         # Force Tk to process all pending drawing commands before showing
         self.root.update_idletasks()
-        
+
         # Show window after UI is fully rendered
         self.root.deiconify()
-        
+
         # Set window icon AFTER deiconify (CTk overrides icon during setup)
         set_window_icon(self.root)
-        
+
         # Use after() for reliable focus on new window
         self.root.after(100, lambda: self._focus_window())
-    
+
     def _run_on_gui_thread(self, func):
         """Run callback on GUI thread via coordinator."""
         if self._destroyed:
             return
         from ..core import GUICoordinator
-        
+
         def safe_wrapper():
             if not self._destroyed:
                 try:
                     func()
                 except tk.TclError:
                     pass
-        
+
         GUICoordinator.get_instance().run_on_gui_thread(safe_wrapper)
-    
+
     def _safe_after(self, delay: int, func):
         """Schedule callback safely via coordinator for delay=0."""
         if self._destroyed:
@@ -150,7 +150,7 @@ class AttachedChatWindow(ChatWindowBase):
                     self.root.after(delay, func)
             except Exception:
                 pass
-    
+
     def _focus_window(self):
         """Focus the window reliably."""
         if self._destroyed or not self.root:

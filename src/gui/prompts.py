@@ -47,7 +47,7 @@ Per-Action Options (new structure):
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 PROMPTS_FILE = "prompts.json"
 
@@ -683,26 +683,26 @@ class PromptsConfig:
     snip_actions = prompts.get_snip_actions()
     text_actions = prompts.get_text_edit_actions()
     """
-    
+
     _instance = None
-    
+
     @classmethod
     def get_instance(cls) -> 'PromptsConfig':
         """Get singleton instance."""
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
-    
+
     @classmethod
     def reset_instance(cls):
         """Reset singleton (useful for testing)."""
         cls._instance = None
-    
+
     def __init__(self):
         self._config: Dict[str, Any] = {}
         self._file_path = Path(PROMPTS_FILE)
         self._load()
-    
+
     def _load(self):
         """Load prompts from JSON file or use defaults."""
         if self._file_path.exists():
@@ -710,10 +710,10 @@ class PromptsConfig:
                 with open(self._file_path, 'r', encoding='utf-8') as f:
                     self._config = json.load(f)
                 logging.debug(f'Loaded prompts from {self._file_path}')
-                
+
                 # Ensure required sections exist
                 self._ensure_sections()
-                
+
             except Exception as e:
                 logging.error(f'Failed to load prompts.json: {e}')
                 self._config = self._get_defaults()
@@ -721,7 +721,7 @@ class PromptsConfig:
             logging.debug('prompts.json not found, using defaults')
             self._config = self._get_defaults()
             self._save()
-    
+
     def _compare_action(self, user_action: dict, default_action: dict) -> bool:
         """Compare two actions ignoring _is_default."""
         u_copy = user_action.copy()
@@ -748,19 +748,19 @@ class PromptsConfig:
     def _merge_section(self, section_data: dict, default_actions: dict, default_settings: dict) -> bool:
         """Merge a dictionary-based tool section."""
         changed = False
-        
+
         # Tag untagged
         if self._tag_defaults(section_data, default_actions):
             changed = True
-            
+
         settings = section_data.get("_settings", {})
         deleted_defaults = settings.get("deleted_defaults", [])
-            
+
         # Add missing or update default
         for name, d_action in default_actions.items():
             if name in deleted_defaults:
                 continue # Skip re-adding defaults the user explicitly deleted
-                
+
             if name not in section_data:
                 section_data[name] = d_action.copy()
                 section_data[name]["_is_default"] = True
@@ -779,7 +779,7 @@ class PromptsConfig:
             changed = True
         else:
             settings_dict = section_data["_settings"]
-            
+
             # Legacy Config Hook: Initalize modified_settings if missing
             if "modified_settings" not in settings_dict:
                 settings_dict["modified_settings"] = []
@@ -787,9 +787,9 @@ class PromptsConfig:
                     if isinstance(v, str) and k in settings_dict and settings_dict[k] != v:
                         settings_dict["modified_settings"].append(k)
                 changed = True
-                
+
             modified_settings = settings_dict.get("modified_settings", [])
-            
+
             for k, v in default_settings.items():
                 if k not in settings_dict:
                     settings_dict[k] = v
@@ -804,15 +804,15 @@ class PromptsConfig:
                     user_groups = section_data["_settings"]["popup_groups"]
                     deleted_groups = section_data["_settings"].get("deleted_groups", [])
                     deleted_group_items = section_data["_settings"].get("deleted_group_items", {})
-                    
+
                     user_group_names = [g.get("name") for g in user_groups if isinstance(g, dict)]
-                    
+
                     for d_group in v:
                         if not isinstance(d_group, dict): continue
                         g_name = d_group.get("name")
                         if not g_name or g_name in deleted_groups:
                             continue
-                            
+
                         if g_name not in user_group_names:
                             user_groups.append(d_group.copy())
                             changed = True
@@ -824,18 +824,18 @@ class PromptsConfig:
                                 d_items = d_group.get("items", [])
                                 u_items = u_group["items"]
                                 deleted_items = deleted_group_items.get(g_name, [])
-                                
+
                                 for d_item in d_items:
                                     if d_item not in u_items and d_item not in deleted_items:
                                         u_items.append(d_item)
                                         changed = True
-                    
+
         return changed
 
     def _ensure_sections(self):
         """Ensure all required sections exist with defaults."""
         changed = False
-        
+
         # Merge global settings
         if "_global_settings" not in self._config:
             self._config["_global_settings"] = DEFAULT_GLOBAL_SETTINGS.copy()
@@ -847,7 +847,7 @@ class PromptsConfig:
                 if k not in self._config["_global_settings"]:
                     self._config["_global_settings"][k] = v
                     changed = True
-                    
+
             # Safely merge modifiers without overwriting existing ones
             if "modifiers" not in self._config["_global_settings"]:
                 self._config["_global_settings"]["modifiers"] = DEFAULT_GLOBAL_SETTINGS.get("modifiers", []).copy()
@@ -855,16 +855,16 @@ class PromptsConfig:
             else:
                 user_modifiers = self._config["_global_settings"]["modifiers"]
                 deleted_modifiers = self._config["_global_settings"].get("deleted_modifiers", [])
-                
+
                 # Get current keys to avoid duplicates
                 user_mod_keys = [m.get("key") for m in user_modifiers if isinstance(m, dict)]
-                
+
                 for d_mod in DEFAULT_GLOBAL_SETTINGS.get("modifiers", []):
                     m_key = d_mod.get("key")
                     if m_key and m_key not in user_mod_keys and m_key not in deleted_modifiers:
                         user_modifiers.append(d_mod.copy())
                         changed = True
-                
+
                 # Migration: ensure all existing modifiers have `default_tools` field
                 for mod in user_modifiers:
                     if isinstance(mod, dict) and "default_tools" not in mod:
@@ -877,7 +877,7 @@ class PromptsConfig:
         else:
             if self._merge_section(self._config["text_edit_tool"], DEFAULT_TEXT_EDIT_ACTIONS, DEFAULT_TEXT_EDIT_SETTINGS):
                 changed = True
-        
+
         if "snip_tool" not in self._config:
             self._config["snip_tool"] = {
                 "_settings": DEFAULT_SNIP_SETTINGS.copy(),
@@ -887,7 +887,7 @@ class PromptsConfig:
         else:
             if self._merge_section(self._config["snip_tool"], DEFAULT_SNIP_ACTIONS, DEFAULT_SNIP_SETTINGS):
                 changed = True
-        
+
         if "audio_tool" not in self._config:
             self._config["audio_tool"] = {
                 "_settings": DEFAULT_AUDIO_SETTINGS.copy(),
@@ -897,7 +897,7 @@ class PromptsConfig:
         else:
             if self._merge_section(self._config["audio_tool"], DEFAULT_AUDIO_ACTIONS, DEFAULT_AUDIO_SETTINGS):
                 changed = True
-        
+
         if "tts_tool" not in self._config:
             self._config["tts_tool"] = {
                 "_settings": DEFAULT_TTS_SETTINGS.copy()
@@ -906,17 +906,17 @@ class PromptsConfig:
         else:
             if self._merge_section(self._config["tts_tool"], {}, DEFAULT_TTS_SETTINGS):
                 changed = True
-        
+
         if changed:
             self._save()
-    
+
     def _get_text_edit_defaults(self) -> dict:
         """Get text edit tool defaults."""
         return {
             "_settings": DEFAULT_TEXT_EDIT_SETTINGS.copy(),
             **{k: {**v, "_is_default": True} for k, v in DEFAULT_TEXT_EDIT_ACTIONS.items()}
         }
-    
+
     def _get_defaults(self) -> dict:
         """Get complete default configuration."""
         return {
@@ -934,7 +934,7 @@ class PromptsConfig:
                 "_settings": DEFAULT_TTS_SETTINGS.copy()
             }
         }
-    
+
     def _save(self):
         """Save current config to file."""
         try:
@@ -943,120 +943,120 @@ class PromptsConfig:
             logging.debug(f'Saved prompts to {self._file_path}')
         except Exception as e:
             logging.error(f'Failed to save prompts.json: {e}')
-    
+
     def reload(self):
         """Reload configuration from file."""
         self._load()
         logging.info('Prompts configuration reloaded')
-    
+
     def reset_to_defaults(self):
         """Reset configuration to defaults and save to file."""
         self._config = self._get_defaults()
         self._save()
         logging.info('Prompts configuration reset to defaults')
-    
+
     # =========================================================================
     # Text Edit Tool Accessors
     # =========================================================================
-    
+
     def get_text_edit_tool(self) -> dict:
         """Get complete text edit tool configuration (including _settings)."""
         return self._config.get("text_edit_tool", {})
-    
+
     def get_text_edit_setting(self, key: str, default=None):
         """Get a setting from text edit tool _settings."""
         tet = self.get_text_edit_tool()
         settings = tet.get("_settings", {})
         return settings.get(key, DEFAULT_TEXT_EDIT_SETTINGS.get(key, default))
-    
+
     def get_text_edit_actions(self) -> dict:
         """Get text edit tool actions (excluding _settings)."""
         tet = self.get_text_edit_tool()
         return {k: v for k, v in tet.items() if k != "_settings"}
-    
+
     # =========================================================================
     # Snip Tool Accessors
     # =========================================================================
-    
+
     def get_snip_tool(self) -> dict:
         """Get complete snip tool configuration (including _settings)."""
         return self._config.get("snip_tool", {})
-    
+
     def get_snip_setting(self, key: str, default=None):
         """Get a setting from snip tool _settings."""
         snip = self.get_snip_tool()
         settings = snip.get("_settings", {})
         return settings.get(key, DEFAULT_SNIP_SETTINGS.get(key, default))
-    
+
     def get_snip_actions(self) -> dict:
         """Get snip tool actions (excluding _settings)."""
         snip = self.get_snip_tool()
         return {k: v for k, v in snip.items() if k != "_settings"}
-    
+
     def can_use_text_edit_actions(self) -> bool:
         """Check if snip tool can borrow text edit tool actions."""
         return self.get_snip_setting("allow_text_edit_actions", True)
-    
+
     # =========================================================================
     # Audio Tool Accessors
     # =========================================================================
-    
+
     def get_audio_tool(self) -> dict:
         """Get complete audio tool configuration (including _settings)."""
         return self._config.get("audio_tool", {})
-    
+
     def get_audio_setting(self, key: str, default=None):
         """Get a setting from audio tool _settings."""
         audio = self.get_audio_tool()
         settings = audio.get("_settings", {})
         return settings.get(key, DEFAULT_AUDIO_SETTINGS.get(key, default))
-    
+
     def get_audio_actions(self) -> dict:
         """Get audio tool actions (excluding _settings)."""
         audio = self.get_audio_tool()
         return {k: v for k, v in audio.items() if k != "_settings"}
-    
+
     # =========================================================================
     # TTS Tool Accessors
     # =========================================================================
-    
+
     def get_tts_tool(self) -> dict:
         """Get complete TTS tool configuration (including _settings)."""
         return self._config.get("tts_tool", {})
-    
+
     def get_tts_setting(self, key: str, default=None):
         """Get a setting from TTS tool _settings."""
         tts = self.get_tts_tool()
         settings = tts.get("_settings", {})
         return settings.get(key, DEFAULT_TTS_SETTINGS.get(key, default))
-    
+
     def get_tts_director_system_prompt(self) -> str:
         """Get the AI Director system prompt for TTS style generation."""
         return self.get_tts_setting(
             "director_system_prompt",
             DEFAULT_TTS_SETTINGS["director_system_prompt"]
         )
-    
+
     def get_tts_director_task_template(self) -> str:
         """Get the AI Director task template."""
         return self.get_tts_setting(
             "director_task_template",
             DEFAULT_TTS_SETTINGS["director_task_template"]
         )
-    
+
     # =========================================================================
     # Global Settings Accessors
     # =========================================================================
-    
+
     def get_global_setting(self, key: str, default=None):
         """Get a setting from _global_settings."""
         global_settings = self._config.get("_global_settings", {})
         return global_settings.get(key, DEFAULT_GLOBAL_SETTINGS.get(key, default))
-    
+
     def get_modifiers(self) -> List[dict]:
         """Get global modifier definitions."""
         return self.get_global_setting("modifiers", [])
-    
+
     def get_default_modifier_keys_for_tool(self, tool_name: str) -> List[str]:
         """Get modifier keys that should be pre-active for a given tool.
         
@@ -1078,7 +1078,7 @@ class PromptsConfig:
             "chat_window_system_instruction",
             "You are a helpful AI assistant continuing a conversation."
         )
-    
+
     def get_system_prompt_for_origin(self, origin: str) -> Optional[str]:
         """
         Resolve a system prompt from a session origin string.
@@ -1096,42 +1096,42 @@ class PromptsConfig:
         """
         if not origin:
             return None
-        
+
         # directchat → text_edit_tool._settings.chat_system_instruction
         if origin == "directchat":
             return self.get_text_edit_setting(
                 "chat_system_instruction",
                 "You are a friendly, helpful, and knowledgeable AI conversational assistant."
             )
-        
+
         # chat → None (caller uses global chat_window_system_instruction)
         if origin == "chat":
             return None
-        
+
         # Parse tool:action format
         if ":" not in origin:
             return None
-        
+
         tool, action_key = origin.split(":", 1)
-        
+
         if tool == "textedit":
             actions = self.get_text_edit_actions()
             action = actions.get(action_key, {})
             return action.get("system_prompt") or None
-        
+
         elif tool == "snip":
             actions = self.get_snip_actions()
             action = actions.get(action_key, {})
             return action.get("system_prompt") or None
-        
+
         elif tool == "audio":
             actions = self.get_audio_actions()
             action = actions.get(action_key, {})
             return action.get("system_prompt") or None
-        
+
         # Unknown tool prefix → None (fallback to global)
         return None
-    
+
     # No legacy migration support needed for fresh install
 
 

@@ -13,21 +13,22 @@ import json
 import re
 import time
 from pathlib import Path
-from typing import List, Dict, Optional, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
 import requests
+
+import src.providers.gemini_services as gemini_services
 
 from .base import (
     BaseProvider,
+    CallbackType,
     ProviderResult,
+    RetryReason,
     StreamCallback,
     UsageData,
-    CallbackType,
-    RetryReason,
-    estimate_tokens,
     estimate_message_tokens,
+    estimate_tokens,
 )
-import src.providers.gemini_services as gemini_services
-
 
 # Base URL for Gemini API
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"

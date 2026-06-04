@@ -6,7 +6,7 @@ for creating provider instances.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Any, List
+from typing import Any, Dict, List, Optional
 
 from .base import BaseProvider
 
@@ -122,13 +122,13 @@ def create_provider(provider_type: str, key_manager=None, config: Optional[Dict]
     """
     if config is None:
         config = {}
-        
+
     definition = PROVIDER_REGISTRY.get(provider_type)
     if not definition:
         raise ValueError(f"Unknown provider type: {provider_type}")
-    
+
     base_url = config.get("base_url") or definition.default_base_url
-    
+
     provider_config = {
         "request_timeout": config.get("request_timeout", 120),
         "max_retries": config.get("max_retries", 3),
@@ -138,20 +138,20 @@ def create_provider(provider_type: str, key_manager=None, config: Optional[Dict]
         "thinking_level": config.get("thinking_level", "high"),
         "tts_use_official_endpoint": config.get("tts_use_official_endpoint", False),
     }
-    
+
     # Forward base_url field into the config dictionary as well for backward compatibility
     provider_config["base_url"] = base_url
-    
+
     if definition.provider_class == "gemini_native":
         from .gemini_native import GeminiNativeProvider
         # Also set gemini_endpoint for backward compat with GeminiNativeProvider's config-based init
         provider_config["gemini_endpoint"] = base_url
         return GeminiNativeProvider(base_url=base_url, key_manager=key_manager, config=provider_config)
-        
+
     elif definition.provider_class == "anthropic":
         from .anthropic import AnthropicProvider
         return AnthropicProvider(base_url=base_url, key_manager=key_manager, config=provider_config)
-        
+
     else:  # openai_compatible
         from .openai_compatible import OpenAICompatibleProvider
         return OpenAICompatibleProvider(

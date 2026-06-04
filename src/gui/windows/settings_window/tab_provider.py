@@ -10,9 +10,9 @@ Sections:
 
 import tkinter as tk
 
+from ...custom_widgets import create_emoji_button, create_section_header
 from ...platform import HAVE_CTK, ctk
 from ...themes import get_ctk_font, get_ctk_label_colors
-from ...custom_widgets import create_section_header, create_emoji_button
 
 
 class ProviderTabMixin:
@@ -52,15 +52,15 @@ class ProviderTabMixin:
 
         # --- Request Settings ---
         create_section_header(content, "🔄 Request Settings", self.colors, top_padding=20)
-    
+
         self._add_spinbox_field(content, "max_retries", "Max retries:",
             self.config_data.config.get("max_retries", 3),
             0, 10, hint="Retries before giving up on API calls")
-    
+
         self._add_spinbox_field(content, "retry_delay", "Retry delay (s):",
             self.config_data.config.get("retry_delay", 5),
             1, 60, hint="Seconds between retries")
-    
+
         self._add_spinbox_field(content, "request_timeout", "Request timeout (s):",
             self.config_data.config.get("request_timeout", 120),
             10, 600, hint="Timeout for API requests (overridden by active profile)")
@@ -72,7 +72,8 @@ class ProviderTabMixin:
     def _create_profile_selector(self, parent):
         """Active profile dropdown + Manage Profiles button."""
         from src.connection_profiles import ProfileStore
-        from .widgets import LABEL_WIDTH, DROPDOWN_WIDTH_MD
+
+        from .widgets import DROPDOWN_WIDTH_MD, LABEL_WIDTH
 
         store = ProfileStore.get_instance()
         profile_names = store.get_profile_names()
@@ -209,7 +210,8 @@ class ProviderTabMixin:
     def _create_pool_assignment_dropdown(self, parent, provider: str):
         """Add a Key Pool dropdown to a provider section."""
         from src.key_store import KeyStore
-        from .widgets import LABEL_WIDTH, DROPDOWN_WIDTH_MD
+
+        from .widgets import DROPDOWN_WIDTH_MD, LABEL_WIDTH
         key_store = KeyStore.get_instance()
 
         pool_ids = key_store.get_all_pool_ids()

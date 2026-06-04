@@ -15,8 +15,8 @@ Functions:
 
 import re
 import shutil
-from typing import Dict, Optional, List, Any
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 
 class ConfigData:

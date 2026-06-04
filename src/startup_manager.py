@@ -46,7 +46,7 @@ def get_launcher_path() -> Optional[str]:
             elif mode == "console":
                 preferred_launcher = "AIPromptBridge.exe"
             break
-            
+
     launchers_to_check = [preferred_launcher]
     # Add the other one as fallback
     if preferred_launcher == "AIPromptBridge.exe":
@@ -56,28 +56,28 @@ def get_launcher_path() -> Optional[str]:
 
     # 2. Determine potential root directories
     search_roots = []
-    
+
     if is_compiled():
         exe_path = Path(sys.executable).resolve()
-        
+
         # PATH STRATEGY 1: Split Structure (bin/Internal.exe -> ../Launcher.exe)
         # This is the standard release structure
         if exe_path.parent.name.lower() == "bin":
             search_roots.append(exe_path.parent.parent)
-            
+
         # PATH STRATEGY 2: Flat Structure (Internal.exe -> ./Launcher.exe)
         search_roots.append(exe_path.parent)
-        
+
         # PATH STRATEGY 3: Main Module CWD override
         # main.py sets CWD to root_dir in setup_workspace()
         search_roots.append(Path.cwd())
-        
+
     else:
         # Development Mode
         # Assuming struct: src/startup_manager.py -> src/launchers/
         current_file = Path(__file__).resolve()
         src_dir = current_file.parent.parent
-        
+
         search_roots.append(src_dir / "src" / "launchers")
         search_roots.append(src_dir / "launchers")
         search_roots.append(Path.cwd() / "src" / "launchers")
@@ -86,12 +86,12 @@ def get_launcher_path() -> Optional[str]:
     for root in search_roots:
         if not root.exists():
             continue
-            
+
         for launcher_name in launchers_to_check:
             candidate = root / launcher_name
             if candidate.is_file():
                 return str(candidate.resolve())
-    
+
     # 4. Dev Fallback: Return script path if no exe found
     # (Only in dev mode)
     if not is_compiled():
@@ -100,9 +100,9 @@ def get_launcher_path() -> Optional[str]:
                 candidate = root / "launcher_gui.py"
             else:
                 candidate = root / "launcher_console.py"
-                
+
             if candidate.is_file():
-                # In dev, we can't really set registry run to a .py file easily 
+                # In dev, we can't really set registry run to a .py file easily
                 # without python.exe, but we return it for info purposes.
                 return str(candidate.resolve())
 
@@ -142,13 +142,13 @@ def set_startup(enabled: bool) -> Tuple[bool, str]:
     try:
         if enabled:
             launcher_path = get_launcher_path()
-            
+
             if not launcher_path:
                 return False, "Could not determine launcher path. This feature requires the application to be installed/compiled."
-            
+
             # Use abspath to strictly ensure full path
             launcher_path = str(Path(launcher_path).resolve())
-            
+
             # Check if it's a python script (Dev mode protection)
             if launcher_path.endswith(".py"):
                 return False, "Cannot set startup in development mode (launcher is a .py script)."
@@ -159,7 +159,7 @@ def set_startup(enabled: bool) -> Tuple[bool, str]:
                 cmd_line = f'"{launcher_path}"'
                 winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, cmd_line)
                 return True, f"Added to startup: {APP_NAME}"
-        
+
         else:
             # Disable
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY_PATH, 0, winreg.KEY_SET_VALUE) as key:
@@ -172,7 +172,7 @@ def set_startup(enabled: bool) -> Tuple[bool, str]:
     except PermissionError:
         return False, "Permission denied. Try running as Administrator."
     except Exception as e:
-        return False, f"Registry Error: {str(e)}"
+        return False, f"Registry Error: {e!s}"
 
 
 def get_startup_info() -> dict:
@@ -187,14 +187,14 @@ def get_startup_info() -> dict:
         "path": None,
         "mode": "unknown"
     }
-    
+
     # Determine current mode
     for arg in sys.argv:
         if arg.startswith("--launched-mode="):
             info["mode"] = arg.split("=")[1]
             break
-            
+
     # Get detected launcher path
     info["path"] = get_launcher_path()
-    
+
     return info

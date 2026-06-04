@@ -3,10 +3,10 @@
 Utility functions for text processing and error detection
 """
 
+import os
 import re
 import sys
 
-import os
 
 def is_compiled() -> bool:
     """Check if running as a compiled executable (Nuitka/PyInstaller)."""
@@ -22,45 +22,45 @@ def strip_markdown(text):
     """Convert markdown to plain text by stripping formatting"""
     if not text:
         return text
-    
+
     result = text
-    
+
     # Remove code blocks (``` ... ```)
     result = re.sub(r'```[\s\S]*?```', lambda m: m.group(0).replace('```', '').strip(), result)
-    
+
     # Remove inline code (`code`)
     result = re.sub(r'`([^`]+)`', r'\1', result)
-    
+
     # Remove bold (**text** or __text__)
     result = re.sub(r'\*\*([^*]+)\*\*', r'\1', result)
     result = re.sub(r'__([^_]+)__', r'\1', result)
-    
+
     # Remove italic (*text* or _text_)
     result = re.sub(r'\*([^*]+)\*', r'\1', result)
     result = re.sub(r'(?<!\w)_([^_]+)_(?!\w)', r'\1', result)
-    
+
     # Remove strikethrough (~~text~~)
     result = re.sub(r'~~([^~]+)~~', r'\1', result)
-    
+
     # Remove headers (# Header)
     result = re.sub(r'^#{1,6}\s+', '', result, flags=re.MULTILINE)
-    
+
     # Remove blockquotes (> text)
     result = re.sub(r'^>\s+', '', result, flags=re.MULTILINE)
-    
+
     # Remove horizontal rules
     result = re.sub(r'^[-*_]{3,}\s*$', '', result, flags=re.MULTILINE)
-    
+
     # Remove link formatting [text](url) -> text
     result = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', result)
-    
+
     # Remove image formatting ![alt](url) -> alt
     result = re.sub(r'!\[([^\]]*)\]\([^)]+\)', r'\1', result)
-    
+
     # Remove list markers
     result = re.sub(r'^[\s]*[-*+]\s+', '• ', result, flags=re.MULTILINE)
     result = re.sub(r'^[\s]*\d+\.\s+', '', result, flags=re.MULTILINE)
-    
+
     return result
 
 
@@ -69,7 +69,7 @@ def is_rate_limit_error(error_msg, status_code=None):
     if status_code == 429:
         return True
     error_str = str(error_msg).lower()
-    patterns = ["too many requests", "rate limit", "rate_limit", "quota exceeded", 
+    patterns = ["too many requests", "rate limit", "rate_limit", "quota exceeded",
                 "429", "throttl", "resource exhausted", "resource_exhausted"]
     return any(p in error_str for p in patterns)
 
@@ -114,14 +114,14 @@ def play_sound(path: str, async_play: bool = True) -> bool:
         True if sound played successfully, False otherwise
     """
     import logging
-    
+
     if sys.platform != "win32":
         return False
-    
+
     try:
         import winsound
         from pathlib import Path
-        
+
         sound_path = Path(path)
 
         if is_compiled():
@@ -135,14 +135,14 @@ def play_sound(path: str, async_play: bool = True) -> bool:
         if not sound_path.exists():
             logging.debug(f"[Sound] File not found: {path} (Checked {sound_path.absolute()})")
             return False
-        
+
         flags = winsound.SND_FILENAME
         if async_play:
             flags |= winsound.SND_ASYNC
-        
+
         winsound.PlaySound(str(sound_path), flags)
         return True
-        
+
     except Exception as e:
         logging.debug(f"[Sound] Failed to play {path}: {e}")
         return False

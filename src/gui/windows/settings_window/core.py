@@ -15,25 +15,28 @@ Functions:
 """
 
 import os
-import time
-import threading
 import queue
+import threading
+import time
 import tkinter as tk
 from tkinter import messagebox
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
 
+from ...core import get_next_window_id, register_window, unregister_window
+from ...custom_widgets import create_emoji_button, upgrade_tabview_with_icons
 from ...platform import HAVE_CTK, ctk
 from ...themes import (
-    ThemeColors, get_colors, sync_ctk_appearance,
-    get_ctk_font, get_ctk_label_colors,
+    ThemeColors,
+    get_colors,
+    get_ctk_font,
+    get_ctk_label_colors,
+    sync_ctk_appearance,
 )
-from ...core import get_next_window_id, register_window, unregister_window
-from ...custom_widgets import upgrade_tabview_with_icons, create_emoji_button
 from ..utils import set_window_icon
 
 # Import emoji renderer for CTkImage support
 try:
-    from ...emoji_renderer import get_emoji_renderer, HAVE_PIL
+    from ...emoji_renderer import HAVE_PIL, get_emoji_renderer
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
@@ -41,13 +44,13 @@ except ImportError:
 
 # Local imports
 from .config_io import ConfigData, parse_config_full, save_config_full
-from .widgets import FormFieldsMixin
 from .tab_general import GeneralTabMixin
+from .tab_keys import KeysTabMixin
 from .tab_provider import ProviderTabMixin
+from .tab_theme import ThemeTabMixin
 from .tab_tools import ToolsTabMixin
 from .tab_tts import TTSTabMixin
-from .tab_keys import KeysTabMixin
-from .tab_theme import ThemeTabMixin
+from .widgets import FormFieldsMixin
 
 
 def _can_use_ctk() -> bool:
@@ -551,8 +554,8 @@ class SettingsWindow(
         try:
             if self.root:
                 try:
-                    import sys
                     import contextlib
+                    import sys
 
                     @contextlib.contextmanager
                     def start_suppress_stderr():

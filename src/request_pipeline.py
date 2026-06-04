@@ -10,12 +10,12 @@ This pipeline ensures:
 4. Unified error handling
 """
 
+import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Callable, Dict, Any, List
-import time
+from typing import Any, Callable, Dict, List, Optional
 
-from src.console import console, HAVE_RICH, print_panel
+from src.console import HAVE_RICH, console, print_panel
 
 
 class RequestOrigin(Enum):

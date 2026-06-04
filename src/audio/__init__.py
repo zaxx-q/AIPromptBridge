@@ -13,48 +13,45 @@ Components:
 
 from .devices import (
     AudioDevice,
-    list_input_devices,
-    list_loopback_devices,
     get_default_input_device,
     get_default_loopback_device,
-    is_pyaudio_available
+    is_pyaudio_available,
+    list_input_devices,
+    list_loopback_devices,
 )
-
-from .ffmpeg_utils import (
-    is_ffmpeg_available,
-    is_ffprobe_available,
-    is_ffplay_available,
-    get_audio_duration,
-)
-
-from .recorder import AudioRecorder, COMPRESSION_PRESETS
-
 from .export import (
-    sanitize_filename,
-    get_format_ext,
+    CODEC_MAP,
+    build_output_filename,
     export_audio_file,
     export_audio_from_file,
-    build_output_filename,
-    CODEC_MAP,
+    get_format_ext,
+    sanitize_filename,
 )
+from .ffmpeg_utils import (
+    get_audio_duration,
+    is_ffmpeg_available,
+    is_ffplay_available,
+    is_ffprobe_available,
+)
+from .recorder import COMPRESSION_PRESETS, AudioRecorder
 
 __all__ = [
+    'CODEC_MAP',
+    'COMPRESSION_PRESETS',
     'AudioDevice',
     'AudioRecorder',
-    'COMPRESSION_PRESETS',
-    'CODEC_MAP',
-    'is_ffmpeg_available',
-    'is_ffprobe_available',
-    'is_ffplay_available',
-    'get_audio_duration',
-    'sanitize_filename',
-    'get_format_ext',
+    'build_output_filename',
     'export_audio_file',
     'export_audio_from_file',
-    'build_output_filename',
-    'list_input_devices',
-    'list_loopback_devices',
+    'get_audio_duration',
     'get_default_input_device',
     'get_default_loopback_device',
-    'is_pyaudio_available'
+    'get_format_ext',
+    'is_ffmpeg_available',
+    'is_ffplay_available',
+    'is_ffprobe_available',
+    'is_pyaudio_available',
+    'list_input_devices',
+    'list_loopback_devices',
+    'sanitize_filename'
 ]

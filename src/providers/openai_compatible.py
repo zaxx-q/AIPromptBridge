@@ -8,22 +8,22 @@ Supports:
 """
 
 import json
-import time
 import re
-from typing import List, Dict, Optional, Any
+import time
+from typing import Any, Dict, List, Optional
+
 import requests
 
 from .base import (
-    BaseProvider, 
-    ProviderResult, 
+    BaseProvider,
+    CallbackType,
+    ProviderResult,
+    RetryReason,
     StreamCallback,
     UsageData,
-    CallbackType,
-    RetryReason,
+    estimate_message_tokens,
     estimate_tokens,
-    estimate_message_tokens
 )
-
 
 # Safety settings for Google's OpenAI-compatible endpoint
 # Must use BLOCK_NONE (not OFF)
@@ -50,12 +50,12 @@ class OpenAICompatibleProvider(BaseProvider):
     - Thinking/reasoning support via reasoning_effort and extra_body.google
     - Key rotation on errors via BaseProvider
     """
-    
+
     # Known endpoint types
     ENDPOINT_CUSTOM = "custom"
     ENDPOINT_OPENROUTER = "openrouter"
     ENDPOINT_GOOGLE = "google"
-    
+
     def __init__(
         self,
         endpoint_type: str,
@@ -69,7 +69,7 @@ class OpenAICompatibleProvider(BaseProvider):
         super().__init__(f"OpenAI-Compat/{endpoint_type}", key_manager, config)
         self.endpoint_type = endpoint_type
         self.base_url = self._normalize_url(base_url)
-    
+
     def _normalize_url(self, url: str) -> str:
         """Normalize the base URL - strip trailing slash and /chat/completions"""
         if not url:
@@ -78,100 +78,100 @@ class OpenAICompatibleProvider(BaseProvider):
         if url.endswith("/chat/completions"):
             url = url[:-17]
         return url
-    
+
     def _get_completions_url(self) -> str:
         """Get the full chat completions URL"""
         return f"{self.base_url}/chat/completions"
-    
+
     def _get_models_url(self) -> str:
         """Get the models endpoint URL"""
         return f"{self.base_url}/models"
-    
+
     def _is_google_endpoint(self) -> bool:
         """
         Check if this is a Google endpoint (needs extra_body).
         """
         if self.endpoint_type == self.ENDPOINT_GOOGLE:
             return True
-        
+
         url_lower = self.base_url.lower()
         return "googleapis.com" in url_lower or "google" in url_lower
-    
+
     def _get_headers(self, api_key: str) -> Dict[str, str]:
         """Get request headers"""
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-        
+
         if self.endpoint_type == self.ENDPOINT_OPENROUTER:
             headers["HTTP-Referer"] = "https://github.com/zaxx-q/AIPromptBridge"
             headers["X-Title"] = "AIPromptBridge"
-            
+
         return headers
-    
+
     def _is_openrouter_endpoint(self) -> bool:
         """
         Check if this is an OpenRouter endpoint.
         """
         if self.endpoint_type == self.ENDPOINT_OPENROUTER:
             return True
-        
+
         url_lower = self.base_url.lower()
         return "openrouter.ai" in url_lower or "openrouter" in url_lower
-    
+
     def _reorder_content_for_provider(self, content: List[Dict]) -> List[Dict]:
         if not self._is_openrouter_endpoint():
             return content
-        
+
         media_count = 0
         for item in content:
             item_type = item.get("type", "")
             if item_type != "text":
                 media_count += 1
-        
+
         # OpenRouter Logic:
         # If exactly ONE media item, move it to the end (Text First).
         if media_count == 1:
             text_items = []
             media_items = []
-            
+
             for item in content:
                 item_type = item.get("type", "")
                 if item_type == "text":
                     text_items.append(item)
                 else:
                     media_items.append(item)
-            
+
             return text_items + media_items
-        
+
         return content
-    
+
     def _process_messages(self, messages: List[Dict]) -> List[Dict]:
         """
         Process messages to handle specific content types like audio and files.
         """
         processed = []
-        
+
         for msg in messages:
             content = msg.get("content")
-            
+
             if not isinstance(content, list):
                 processed.append(msg)
                 continue
-                
+
             new_content = []
             for item in content:
                 item_type = item.get("type")
-                
+
                 if item_type == "input_audio" or item_type == "audio":
                     audio_data = None
                     audio_format = "wav"
-                    
+
                     if "input_audio" in item:
                         new_content.append(item)
                         continue
-                        
+
                     data_url = item.get("image_url", {}).get("url") or item.get("url") or item.get("data")
                     if data_url and isinstance(data_url, str) and data_url.startswith("data:"):
                         match = re.match(r"data:audio/([^;]+);base64,(.+)", data_url)
@@ -179,7 +179,7 @@ class OpenAICompatibleProvider(BaseProvider):
                             fmt, b64 = match.groups()
                             audio_format = fmt
                             audio_data = b64
-                    
+
                     if audio_data:
                         new_content.append({
                             "type": "input_audio",
@@ -190,10 +190,10 @@ class OpenAICompatibleProvider(BaseProvider):
                         })
                     else:
                         new_content.append(item)
-                
+
                 elif item_type == "file":
                     file_info = item.get("file", {})
-                    
+
                     if not file_info and "url" in item:
                         new_content.append({
                             "type": "file",
@@ -210,11 +210,11 @@ class OpenAICompatibleProvider(BaseProvider):
                         })
                     else:
                         new_content.append(item)
-                
+
                 elif item_type == "inline_data":
                     inline = item.get("inline_data", {})
                     mime_type = inline.get("mime_type", "")
-                    
+
                     if mime_type.startswith("audio/"):
                         audio_format = mime_type.split("/")[-1]
                         mime_to_format = {
@@ -225,7 +225,7 @@ class OpenAICompatibleProvider(BaseProvider):
                             "x-ms-wma": "wma",
                         }
                         audio_format = mime_to_format.get(audio_format, audio_format)
-                        
+
                         new_content.append({
                             "type": "input_audio",
                             "input_audio": {
@@ -233,7 +233,7 @@ class OpenAICompatibleProvider(BaseProvider):
                                 "format": audio_format
                             }
                         })
-                    
+
                     elif mime_type.startswith("image/"):
                         data_url = f"data:{mime_type};base64,{inline.get('data', '')}"
                         new_content.append({
@@ -242,7 +242,7 @@ class OpenAICompatibleProvider(BaseProvider):
                                 "url": data_url
                             }
                         })
-                        
+
                     elif mime_type.startswith("text/") or mime_type in (
                         "application/json", "application/xml", "application/javascript",
                         "application/x-python-code", "application/x-sh"
@@ -256,11 +256,11 @@ class OpenAICompatibleProvider(BaseProvider):
                             })
                         except Exception:
                             new_content.append(item)
-                    
+
                     elif mime_type == "application/pdf":
                         b64_data = inline.get("data", "")
                         filename = item.get("filename", "document.pdf")
-                        
+
                         if self._is_openrouter_endpoint():
                             data_url = f"data:application/pdf;base64,{b64_data}"
                             new_content.append({
@@ -278,21 +278,21 @@ class OpenAICompatibleProvider(BaseProvider):
                                     "url": data_url
                                 }
                             })
-                    
+
                     else:
                         new_content.append(item)
-                
+
                 else:
                     new_content.append(item)
-            
+
             new_content = self._reorder_content_for_provider(new_content)
-            
+
             new_msg = msg.copy()
             new_msg["content"] = new_content
             processed.append(new_msg)
-            
+
         return processed
-    
+
     def _build_request_body(
         self,
         messages: List[Dict],
@@ -306,21 +306,21 @@ class OpenAICompatibleProvider(BaseProvider):
             "model": model,
             "messages": self._process_messages(messages)
         }
-        
+
         if streaming:
             body["stream"] = True
             body["stream_options"] = {"include_usage": True}
         else:
             body["stream"] = False
-        
+
         for key, value in params.items():
             if key not in ("stream", "stream_options") and value is not None:
                 body[key] = value
-        
+
         if thinking_enabled:
             reasoning_effort = self.config.get("reasoning_effort", "high")
             body["reasoning_effort"] = reasoning_effort
-            
+
             if self._is_google_endpoint():
                 body["extra_body"] = {
                     "google": {
@@ -336,13 +336,13 @@ class OpenAICompatibleProvider(BaseProvider):
                     "safety_settings": GOOGLE_SAFETY_SETTINGS
                 }
             }
-        
+
         return body
-    
+
     # =========================================================================
     # CORE GENERATION PIPELINE (TEMPLATE METHOD IMPLEMENTATIONS)
     # =========================================================================
-    
+
     def _do_generate_stream(
         self,
         messages: List[Dict],
@@ -357,13 +357,13 @@ class OpenAICompatibleProvider(BaseProvider):
         url = self._get_completions_url()
         headers = self._get_headers(api_key)
         body = self._build_request_body(messages, model, params, thinking_enabled, streaming=True)
-        
+
         # Accumulators for content
         accumulated_content = ""
         accumulated_thinking = ""
         accumulated_tool_calls = []
         usage_data = None
-        
+
         response = requests.post(
             url,
             headers=headers,
@@ -371,7 +371,7 @@ class OpenAICompatibleProvider(BaseProvider):
             timeout=timeout,
             stream=True
         )
-        
+
         # Handle error responses
         if response.status_code != 200:
             error_text = response.text
@@ -380,15 +380,15 @@ class OpenAICompatibleProvider(BaseProvider):
                 error=error_text,
                 status_code=response.status_code
             )
-        
+
         # Process streaming response
         response.encoding = 'utf-8'
-        
+
         chunk_count = 0
         last_content_time = time.time()  # Track last meaningful content for idle timeout
         for line in response.iter_lines(decode_unicode=True):
             self._check_abort(abort_event)
-            
+
             # Content-idle timeout: detect hangs masked by SSE heartbeats
             if time.time() - last_content_time > timeout:
                 response.close()
@@ -398,22 +398,22 @@ class OpenAICompatibleProvider(BaseProvider):
 
             if not line:
                 continue
-            
+
             line = line.strip()
-            
+
             if line == "data: [DONE]":
                 callback(CallbackType.DONE, None)
                 break
-            
+
             # Ignore SSE comments/keep-alive heartbeats (lines starting with :)
             if line.startswith(":"):
                 continue
-            
+
             if not line.startswith("data: "):
                 if line:
                     self.log("debug", f"Unexpected line format: {line[:100]}")
                 continue
-            
+
             try:
                 json_str = line[6:]
                 data = json.loads(json_str)
@@ -438,37 +438,37 @@ class OpenAICompatibleProvider(BaseProvider):
                 choices = data.get("choices", [])
                 if choices:
                     choice = choices[0]
-                    
+
                     if choice is None or not isinstance(choice, dict):
                         continue
-                    
+
                     delta = choice.get("delta")
                     if delta is None:
                         delta = {}
                     if not isinstance(delta, dict):
                         continue
-                    
+
                     # Handle regular content
                     content = delta.get("content", "")
                     if content:
                         accumulated_content += content
                         callback(CallbackType.TEXT, content)
                         last_content_time = time.time()
-                    
+
                     # Handle reasoning_content (DeepSeek/thinking style)
                     reasoning = delta.get("reasoning_content", "")
                     if reasoning:
                         accumulated_thinking += reasoning
                         callback(CallbackType.THINKING, reasoning)
                         last_content_time = time.time()
-                    
+
                     # Also check for "reasoning" field
                     reasoning_alt = delta.get("reasoning", "")
                     if reasoning_alt:
                         accumulated_thinking += reasoning_alt
                         callback(CallbackType.THINKING, reasoning_alt)
                         last_content_time = time.time()
-                    
+
                     # Handle tool calls
                     tool_calls = delta.get("tool_calls")
                     if tool_calls:
@@ -496,11 +496,11 @@ class OpenAICompatibleProvider(BaseProvider):
                             total_tokens=usage.get("total_tokens", 0)
                         )
                         callback(CallbackType.USAGE, usage_data.to_dict())
-            
+
             except json.JSONDecodeError as e:
                 self.log("warn", f"Chunk {chunk_count}: JSON decode error: {e}, raw: {line[:200]}")
                 continue
-        
+
         # Extract inline thinking if native reasoning is empty
         if not accumulated_thinking and accumulated_content:
             from .inline_thinking import extract_leading_thinking_blocks
@@ -523,7 +523,7 @@ class OpenAICompatibleProvider(BaseProvider):
                 success=False,
                 error="Empty response (0 output tokens, no content)"
             )
-        
+
         if not usage_data:
             input_tokens = estimate_message_tokens(messages)
             output_tokens = estimate_tokens(accumulated_content + accumulated_thinking)
@@ -534,7 +534,7 @@ class OpenAICompatibleProvider(BaseProvider):
                 estimated=True
             )
             callback(CallbackType.USAGE, usage_data.to_dict())
-        
+
         return ProviderResult(
             success=True,
             content=accumulated_content,
@@ -556,11 +556,11 @@ class OpenAICompatibleProvider(BaseProvider):
         url = self._get_completions_url()
         headers = self._get_headers(api_key)
         body = self._build_request_body(messages, model, params, thinking_enabled, streaming=False)
-        
+
         self._check_abort(abort_event)
         response = requests.post(url, headers=headers, json=body, timeout=timeout)
         self._check_abort(abort_event)
-        
+
         if response.status_code != 200:
             error_text = response.text
             return ProviderResult(
@@ -568,7 +568,7 @@ class OpenAICompatibleProvider(BaseProvider):
                 error=error_text,
                 status_code=response.status_code
             )
-        
+
         try:
             data = response.json()
         except Exception:
@@ -576,7 +576,7 @@ class OpenAICompatibleProvider(BaseProvider):
             if not response_text or not response_text.strip():
                 raise ValueError("Empty response body from server")
             data = json.loads(response_text)
-        
+
         choices = data.get("choices", [])
         if not choices:
             choice = {}
@@ -584,7 +584,7 @@ class OpenAICompatibleProvider(BaseProvider):
             choice = choices[0]
             if choice is None or not isinstance(choice, dict):
                 choice = {}
-    
+
             if "error" in data:
                 error_obj = data["error"]
                 if isinstance(error_obj, dict):
@@ -599,7 +599,7 @@ class OpenAICompatibleProvider(BaseProvider):
                     success=False,
                     error=error_text
                 )
-    
+
             if isinstance(choice, dict):
                 finish_reason = choice.get("finish_reason")
                 if finish_reason in ("content_filter", "blocked"):
@@ -608,17 +608,17 @@ class OpenAICompatibleProvider(BaseProvider):
                         success=False,
                         error=block_msg
                     )
-        
+
         message = choice.get("message") if isinstance(choice, dict) else None
         if message is None or not isinstance(message, dict):
             message = {}
-        
+
         content = message.get("content", "") or ""
         reasoning = message.get("reasoning_content", "") or ""
         if not reasoning:
             reasoning = message.get("reasoning", "") or ""
         tool_calls = message.get("tool_calls", []) or []
-        
+
         # Extract inline thinking if native reasoning is empty
         if not reasoning and content:
             from .inline_thinking import extract_leading_thinking_blocks
@@ -626,7 +626,7 @@ class OpenAICompatibleProvider(BaseProvider):
             if extracted.stripped:
                 content = extracted.content
                 reasoning = extracted.thinking
-        
+
         usage = data.get("usage")
         if usage is None or not isinstance(usage, dict):
             usage = {}
@@ -635,7 +635,7 @@ class OpenAICompatibleProvider(BaseProvider):
             completion_tokens=usage.get("completion_tokens", 0),
             total_tokens=usage.get("total_tokens", 0)
         )
-        
+
         if self.detect_empty_response(content, reasoning, tool_calls, usage_data.completion_tokens):
             thinking_note = f", thinking: {len(reasoning)} chars" if reasoning else ""
             self.log("warn", f"Empty response detected (no content{thinking_note})")
@@ -643,7 +643,7 @@ class OpenAICompatibleProvider(BaseProvider):
                 success=False,
                 error="Empty response (0 output tokens, no content)"
             )
-        
+
         return ProviderResult(
             success=True,
             content=content,
@@ -676,7 +676,7 @@ class OpenAICompatibleProvider(BaseProvider):
                     return error_obj[:100]
         except (json.JSONDecodeError, TypeError, KeyError):
             pass
-        
+
         first_line = error_text.split('\n')[0][:100] if error_text else ""
         if status_code:
             return f"HTTP {status_code}: {first_line[:80]}"
@@ -686,19 +686,19 @@ class OpenAICompatibleProvider(BaseProvider):
         """Fetch available models from the API with metadata."""
         if not self.key_manager or not self.key_manager.has_keys():
             return None, f"No API keys configured for {self.name}"
-        
+
         current_key = self.key_manager.get_current_key()
         if not current_key:
             return None, "No API key available"
-        
+
         url = self._get_models_url()
         headers = self._get_headers(current_key)
-        
+
         try:
             response = requests.get(url, headers=headers, timeout=30)
             if response.status_code != 200:
                 return None, f"Failed to fetch models ({response.status_code}): {response.text[:200]}"
-            
+
             data = response.json()
             if "data" in data and isinstance(data["data"], list):
                 models = []
@@ -706,14 +706,14 @@ class OpenAICompatibleProvider(BaseProvider):
                     model_id = model.get("id", str(model))
                     supported_params = model.get("supported_parameters", [])
                     has_thinking_param = any(p in supported_params for p in ("include_reasoning", "reasoning"))
-                    
+
                     model_info = {
                         "id": model_id,
                         "name": model.get("name", model_id),
                         "owned_by": model.get("owned_by", "unknown"),
                         "context_length": (
-                            model.get("context_length") or 
-                            model.get("context_window") or 
+                            model.get("context_length") or
+                            model.get("context_window") or
                             model.get("max_context_length")
                         ),
                         "description": model.get("description", ""),
@@ -722,7 +722,7 @@ class OpenAICompatibleProvider(BaseProvider):
                         "top_provider": model.get("top_provider"),
                         "_raw": model
                     }
-                    
+
                     if has_thinking_param:
                         model_info["thinking"] = True
                     else:
@@ -730,10 +730,10 @@ class OpenAICompatibleProvider(BaseProvider):
                         model_info["thinking"] = any(kw in model_id_lower for kw in [
                             "thinking", "reason", "o1", "o3", "deepseek-r1"
                         ])
-                    
+
                     models.append(model_info)
                 return models, None
-            
+
             if isinstance(data, list):
                 models = []
                 for model in data:
@@ -752,7 +752,7 @@ class OpenAICompatibleProvider(BaseProvider):
                             "_raw": model
                         })
                 return models, None
-            
+
             return None, "Unknown models response format"
         except requests.exceptions.RequestException as e:
             return None, f"Request failed: {e}"

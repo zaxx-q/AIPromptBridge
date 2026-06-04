@@ -11,7 +11,6 @@ import io
 import wave
 from typing import Optional
 
-
 # Default PCM format from Gemini TTS API
 TTS_SAMPLE_RATE = 24000
 TTS_SAMPLE_WIDTH = 2  # 16-bit = 2 bytes

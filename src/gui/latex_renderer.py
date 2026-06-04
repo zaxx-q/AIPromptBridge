@@ -17,8 +17,7 @@ heavy dependencies (no matplotlib, sympy, etc.). Handles:
 """
 
 import re
-from typing import List, Tuple, Optional
-
+from typing import List, Optional, Tuple
 
 # =============================================================================
 # Unicode symbol mappings
@@ -230,7 +229,7 @@ def _extract_brace_content(text: str, pos: int) -> Tuple[Optional[str], int]:
     """
     if pos >= len(text) or text[pos] != '{':
         return None, pos
-    
+
     depth = 0
     start = pos + 1
     for i in range(pos, len(text)):
@@ -240,7 +239,7 @@ def _extract_brace_content(text: str, pos: int) -> Tuple[Optional[str], int]:
             depth -= 1
             if depth == 0:
                 return text[start:i], i + 1
-    
+
     # Unbalanced braces - return content to end
     return text[start:], len(text)
 
@@ -249,47 +248,47 @@ def _process_fraction(text: str) -> str:
     """Process \\frac{num}{den} patterns."""
     pattern = r'\\frac\s*'
     result = text
-    
+
     while True:
         match = re.search(pattern, result)
         if not match:
             break
-        
+
         # Extract numerator
         num_content, after_num = _extract_brace_content(result, match.end())
         if num_content is None:
             break
-        
+
         # Extract denominator
         den_content, after_den = _extract_brace_content(result, after_num)
         if den_content is None:
             break
-        
+
         # Process inner LaTeX in numerator and denominator
         num_processed = latex_to_unicode(num_content)
         den_processed = latex_to_unicode(den_content)
-        
+
         # Simple single-char fraction uses Unicode fraction slash
         if len(num_processed) <= 2 and len(den_processed) <= 2:
             replacement = f'{num_processed}⁄{den_processed}'
         else:
             replacement = f'({num_processed})⁄({den_processed})'
-        
+
         result = result[:match.start()] + replacement + result[after_den:]
-    
+
     return result
 
 
 def _process_sqrt(text: str) -> str:
     """Process \\sqrt{x} and \\sqrt[n]{x} patterns."""
     result = text
-    
+
     # \sqrt[n]{x} → ∛x (for n=3), ∜x (for n=4), or ⁿ√x
     while True:
         match = re.search(r'\\sqrt\s*\[([^\]]*)\]\s*', result)
         if not match:
             break
-        
+
         n = match.group(1).strip()
         content, after = _extract_brace_content(result, match.end())
         if content is None:
@@ -299,9 +298,9 @@ def _process_sqrt(text: str) -> str:
                 after = match.end() + 1
             else:
                 break
-        
+
         inner = latex_to_unicode(content)
-        
+
         if n == '3':
             replacement = f'∛{inner}'
         elif n == '4':
@@ -309,15 +308,15 @@ def _process_sqrt(text: str) -> str:
         else:
             n_super = _to_superscript(n)
             replacement = f'{n_super}√{inner}'
-        
+
         result = result[:match.start()] + replacement + result[after:]
-    
+
     # \sqrt{x} → √x
     while True:
         match = re.search(r'\\sqrt\s*', result)
         if not match:
             break
-        
+
         content, after = _extract_brace_content(result, match.end())
         if content is None:
             if match.end() < len(result):
@@ -325,28 +324,28 @@ def _process_sqrt(text: str) -> str:
                 after = match.end() + 1
             else:
                 break
-        
+
         inner = latex_to_unicode(content)
         replacement = f'√({inner})' if len(inner) > 1 else f'√{inner}'
         result = result[:match.start()] + replacement + result[after:]
-    
+
     return result
 
 
 def _process_superscript(text: str) -> str:
     """Process ^{content} and ^x patterns."""
     result = text
-    
+
     # ^{content} — braced superscript
     while True:
         match = re.search(r'\^', result)
         if not match:
             break
-        
+
         pos = match.end()
         if pos >= len(result):
             break
-        
+
         if result[pos] == '{':
             content, after = _extract_brace_content(result, pos)
             if content is None:
@@ -360,24 +359,24 @@ def _process_superscript(text: str) -> str:
             ch = result[pos]
             sup = _to_superscript(ch)
             result = result[:match.start()] + sup + result[pos + 1:]
-    
+
     return result
 
 
 def _process_subscript(text: str) -> str:
     """Process _{content} and _x patterns."""
     result = text
-    
+
     while True:
         # Find _ that is NOT part of a LaTeX command (not preceded by \)
         match = re.search(r'(?<!\\)_', result)
         if not match:
             break
-        
+
         pos = match.end()
         if pos >= len(result):
             break
-        
+
         if result[pos] == '{':
             content, after = _extract_brace_content(result, pos)
             if content is None:
@@ -390,7 +389,7 @@ def _process_subscript(text: str) -> str:
             ch = result[pos]
             sub = _to_subscript(ch)
             result = result[:match.start()] + sub + result[pos + 1:]
-    
+
     return result
 
 
@@ -410,9 +409,9 @@ def _process_matrices(text: str, _depth: int = 0) -> str:
         'matrix':  (' ', ' ', ' ', ' ', ' ', ' '),         # No brackets
         'smallmatrix': (' ', ' ', ' ', ' ', ' ', ' '),     # No brackets
     }
-    
+
     result = text
-    
+
     # Iterate over all matrix types
     for env_name, style in bracket_styles.items():
         lt, lm, lb, rt, rm, rb = style
@@ -422,12 +421,12 @@ def _process_matrices(text: str, _depth: int = 0) -> str:
             r'\s*\\end\s*\{' + re.escape(env_name) + r'\}',
             re.DOTALL
         )
-        
+
         while True:
             match = pattern.search(result)
             if not match:
                 break
-            
+
             # --- ALIGNMENT FIX ---
             # Calculate visual length of the text before the matrix starts
             # so we can indent subsequent lines of the matrix to align with the first line.
@@ -440,20 +439,20 @@ def _process_matrices(text: str, _depth: int = 0) -> str:
                 # Recursive call is safe because `prefix` is a strictly smaller substring.
                 # and we increase depth to avoid infinite recursion loops if something goes wrong.
                 vis_prefix_full = latex_to_unicode(prefix, _depth + 1, preserve_spaces=True)
-                
+
                 # We only care about the last line of the prefix for indentation
                 if '\n' in vis_prefix_full:
                     vis_prefix = vis_prefix_full.split('\n')[-1]
                 else:
                     vis_prefix = vis_prefix_full
-                    
+
                 padding = ' ' * len(vis_prefix)
             except Exception:
                 # Fallback if something goes wrong
                 padding = ''
-            
+
             body = match.group(1).strip()
-            
+
             # Parse rows separated by \\ and cells by &
             raw_rows = re.split(r'\\\\', body)
             matrix_rows = []
@@ -464,11 +463,11 @@ def _process_matrices(text: str, _depth: int = 0) -> str:
                 # Process cell content (recursive)
                 cells = [latex_to_unicode(c.strip(), _depth + 1) for c in row.split('&')]
                 matrix_rows.append(cells)
-            
+
             if not matrix_rows:
                 result = result[:match.start()] + result[match.end():]
                 continue
-            
+
             # Calculate column widths
             num_cols = max(len(r) for r in matrix_rows)
             col_widths = [0] * num_cols
@@ -476,7 +475,7 @@ def _process_matrices(text: str, _depth: int = 0) -> str:
                 for j, cell in enumerate(row):
                     if j < num_cols:
                         col_widths[j] = max(col_widths[j], len(cell))
-            
+
             # Render as aligned text with brackets
             rendered_rows = []
             for row in matrix_rows:
@@ -486,17 +485,17 @@ def _process_matrices(text: str, _depth: int = 0) -> str:
                 # Align cells
                 cells_str = '  '.join(cell.ljust(col_widths[j]) for j, cell in enumerate(row))
                 rendered_rows.append(cells_str)
-            
+
             # Build output with brackets on each line
             lines = []
             n_rows = len(rendered_rows)
             for i, row_str in enumerate(rendered_rows):
                 row_str = row_str.rstrip()
-                
+
                 # Determine brackets for this line
                 if n_rows == 1:
                     # Single row -> use brackets that look like [ ... ]
-                    l, r = lt, rt 
+                    l, r = lt, rt
                     if env_name == 'pmatrix': l, r = '(', ')'
                     elif env_name == 'bmatrix': l, r = '[', ']'
                 elif i == 0:
@@ -505,14 +504,14 @@ def _process_matrices(text: str, _depth: int = 0) -> str:
                     l, r = lb, rb
                 else:
                     l, r = lm, rm
-                
+
                 # Add padding to lines after the first
                 line_padding = padding if i > 0 else ''
                 lines.append(f'{line_padding}{l} {row_str} {r}')
-            
+
             replacement = '\n'.join(lines)
             result = result[:match.start()] + replacement + result[match.end():]
-    
+
     return result
 
 
@@ -536,23 +535,23 @@ def latex_to_unicode(latex_str: str, _depth: int = 0, preserve_spaces: bool = Fa
     """
     if not latex_str:
         return latex_str
-    
+
     if preserve_spaces:
         text = latex_str
     else:
         text = latex_str.strip()
-    
+
     # Strip $ delimiters if present
     # If preserve_spaces is True, we check the stripped version for delimiters
     # but still return the content stripped of delimiters (because delimiters shouldn't be rendered).
     # The prefix calculation usually doesn't involve $ delimiters.
-    
+
     stripped_text = text.strip()
     if stripped_text.startswith('$$') and stripped_text.endswith('$$'):
         text = stripped_text[2:-2].strip()
     elif stripped_text.startswith('$') and stripped_text.endswith('$'):
         text = stripped_text[1:-1].strip()
-    
+
     # Process \text{} — render content as-is
     text = re.sub(r'\\text\s*\{([^}]*)\}', r'\1', text)
     text = re.sub(r'\\textbf\s*\{([^}]*)\}', r'\1', text)
@@ -562,44 +561,44 @@ def latex_to_unicode(latex_str: str, _depth: int = 0, preserve_spaces: bool = Fa
     text = re.sub(r'\\mathit\s*\{([^}]*)\}', r'\1', text)
     text = re.sub(r'\\mathcal\s*\{([^}]*)\}', r'\1', text)
     text = re.sub(r'\\mathbb\s*\{([^}]*)\}', r'\1', text)
-    
+
     # Process \overline{x} → x̄  (combining macron U+0304)
     text = re.sub(r'\\overline\s*\{([^}]*)\}', lambda m: m.group(1) + '\u0304', text)
     text = re.sub(r'\\bar\s*\{([^}]*)\}', lambda m: m.group(1) + '\u0304', text)
-    
+
     # Process \hat{x} → x̂  (combining circumflex U+0302)
     text = re.sub(r'\\hat\s*\{([^}]*)\}', lambda m: m.group(1) + '\u0302', text)
-    
+
     # Process \tilde{x} → x̃  (combining tilde U+0303)
     text = re.sub(r'\\tilde\s*\{([^}]*)\}', lambda m: m.group(1) + '\u0303', text)
-    
+
     # Process \vec{x} → x⃗  (combining arrow U+20D7)
     text = re.sub(r'\\vec\s*\{([^}]*)\}', lambda m: m.group(1) + '\u20D7', text)
-    
+
     # Process \dot{x} → ẋ  (combining dot above U+0307)
     text = re.sub(r'\\dot\s*\{([^}]*)\}', lambda m: m.group(1) + '\u0307', text)
-    
+
     # Process \ddot{x} → ẍ  (combining diaeresis U+0308)
     text = re.sub(r'\\ddot\s*\{([^}]*)\}', lambda m: m.group(1) + '\u0308', text)
-    
+
     # Process matrices before fractions (matrices may contain fractions)
     text = _process_matrices(text, _depth + 1)
-    
+
     # Process fractions before other transformations
     text = _process_fraction(text)
-    
+
     # Process square roots
     text = _process_sqrt(text)
-    
+
     # Process LaTeX spacing commands BEFORE symbol replacement
     # \, → thin space, \; → medium space, \: → medium space
     # \! → nothing (negative thin space), \  → space
     # \quad → em space, \qquad → 2 em spaces
-    
+
     # Handle \\ line breaks that aren't in matrices (standalone)
     # Must be done BEFORE backslash-space handling to avoid consuming the second backslash
     text = text.replace('\\\\', '\n')
-    
+
     # Spacing commands (consume surrounding spaces)
     text = re.sub(r'\s*\\,\s*', '\u2009', text)      # Thin space
     text = re.sub(r'\s*\\;\s*', '\u2005', text)      # Medium mathematical space
@@ -608,7 +607,7 @@ def latex_to_unicode(latex_str: str, _depth: int = 0, preserve_spaces: bool = Fa
     text = re.sub(r'\s*\\\s\s*', ' ', text)          # Backslash-space → regular space
     text = re.sub(r'\s*\\quad\s*', '\u2003', text)   # Em space
     text = re.sub(r'\s*\\qquad\s*', '\u2003\u2003', text)  # Double em space
-    
+
     # Replace LaTeX commands with Unicode symbols (longest match first)
     for cmd in _SORTED_SYMBOLS:
         if cmd in text:
@@ -617,44 +616,44 @@ def latex_to_unicode(latex_str: str, _depth: int = 0, preserve_spaces: bool = Fa
             escaped = re.escape(cmd)
             # Match command followed by non-alpha (boundary) or end of string
             text = re.sub(escaped + r'(?![a-zA-Z])', SYMBOL_MAP[cmd], text)
-    
+
     # Process superscripts and subscripts AFTER symbol replacement
     text = _process_superscript(text)
     text = _process_subscript(text)
-    
+
     # Clean up: remove \left and \right (they're just sizing hints)
     text = re.sub(r'\\left\s*', '', text)
     text = re.sub(r'\\right\s*', '', text)
-    
+
     # Handle \\ line breaks that aren't in matrices (standalone)
     # Already handled earlier
     # text = text.replace('\\\\', '\n')
-    
+
     # Remove remaining \commands that weren't matched (graceful degradation)
     # But keep the argument: \unknown{content} → content
     text = re.sub(r'\\[a-zA-Z]+\s*\{([^}]*)\}', r'\1', text)
     # Remove bare unknown commands: \unknown → (empty)
     text = re.sub(r'\\[a-zA-Z]+', '', text)
-    
+
     # Clean up remaining braces (grouping artifacts)
     text = text.replace('{', '').replace('}', '')
-    
+
     # Clean up sentinel fallback markers → readable notation
     text = text.replace(_SUPER_FALLBACK, '^')
     text = text.replace(_SUB_FALLBACK, '_')
-    
+
     # Clean up & (alignment markers in non-matrix contexts)
     text = text.replace('&', ' ')
-    
+
     # Collapse multiple spaces (but preserve newlines and indentation)
     # Only collapse ASCII spaces to preserve special Unicode spaces (\u2009 etc.)
     # Use positive lookbehind (?<=\S) to only collapse spaces that follow a non-whitespace character
     text = re.sub(r'(?<=\S) {2,}', ' ', text)
-    
+
     # Trim spaces around operators for cleaner look
     if not preserve_spaces:
         text = text.strip()
-    
+
     return text
 
 
@@ -673,35 +672,35 @@ def extract_latex_blocks(text: str) -> List[Tuple[str, int, int, bool]]:
     Requires non-space after opening $ and non-space before closing $.
     """
     blocks = []
-    
+
     # First find $$...$$ display math (can span lines)
     for match in re.finditer(r'\$\$(.+?)\$\$', text, re.DOTALL):
         content = match.group(1).strip()
         if content:  # Skip empty
             blocks.append((content, match.start(), match.end(), True))
-    
+
     # Then find $...$ inline math (single line only)
     # Avoid matching inside already-found $$ blocks
     display_ranges = [(b[1], b[2]) for b in blocks]
-    
+
     for match in re.finditer(r'(?<!\$)\$(?!\$)(\S(?:[^$]*?\S)?)\$(?!\$)', text):
         start, end = match.start(), match.end()
         content = match.group(1)
-        
+
         # Skip if inside a display block
         inside_display = False
         for ds, de in display_ranges:
             if start >= ds and end <= de:
                 inside_display = True
                 break
-        
+
         if not inside_display and content.strip():
             # Skip if this looks like currency ($100, $3.50, $1,000)
             # but NOT single digits which are valid LaTeX math ($9$, $3$)
             if re.match(r'^\d{2,}[\d,]*\.?\d*$|^\d[\d,]*\.\d+$|^\d[\d,]+$', content):
                 continue
             blocks.append((content, start, end, False))
-    
+
     # Sort by position
     blocks.sort(key=lambda b: b[1])
     return blocks

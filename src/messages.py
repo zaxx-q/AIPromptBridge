@@ -19,7 +19,8 @@ Compatibility:
 - Follows the standard [{"role": "system", ...}, {"role": "user", ...}] structure.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 
 def build_text_message(
     task: str,
@@ -65,9 +66,9 @@ def build_audio_message(
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": [
             {
-                "type": "inline_data", 
+                "type": "inline_data",
                 "inline_data": {
-                    "mime_type": mime_type, 
+                    "mime_type": mime_type,
                     "data": audio_b64
                 }
             },
@@ -98,7 +99,7 @@ def build_image_message(
         List of message dictionaries.
     """
     data_url = f"data:{mime_type};base64,{image_b64}"
-    
+
     return [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": [
@@ -131,7 +132,7 @@ def build_comparison_message(
     """
     data_url1 = f"data:{mime_type};base64,{image1_b64}"
     data_url2 = f"data:{mime_type};base64,{image2_b64}"
-    
+
     return [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": [
@@ -209,12 +210,12 @@ def build_file_message(
             {"type": "text", "text": task}
         ]
     }
-    
+
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append(message)
-    
+
     return messages
 
 def build_inline_message(
@@ -241,7 +242,7 @@ def build_inline_message(
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
-    
+
     messages.append({
         "role": "user",
         "content": [
@@ -255,5 +256,5 @@ def build_inline_message(
             {"type": "text", "text": task}
         ]
     })
-    
+
     return messages

@@ -3,9 +3,9 @@
 Configuration loading and management
 """
 
+import logging
 import os
 import re
-import logging
 import threading
 from pathlib import Path
 
@@ -142,29 +142,29 @@ def load_config(filepath=CONFIG_FILE):
         API keys are managed separately by KeyStore (keys.json).
     """
     config = dict(DEFAULT_CONFIG)
-    
+
     if not Path(filepath).exists():
         print(f"[Warning] Config file '{filepath}' not found. Using defaults.")
         return config
-    
+
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-        
+
         current_section = None
         seen_config_keys = set()
-        
+
         for line in lines:
             raw_line = line.rstrip('\n\r')
             stripped = raw_line.strip()
-            
+
             if not stripped or stripped.startswith('#'):
                 continue
-            
+
             if stripped.startswith('[') and stripped.endswith(']'):
                 current_section = stripped[1:-1].lower()
                 continue
-            
+
             if current_section == 'config':
                 if '=' in stripped:
                     key, value = stripped.split('=', 1)
@@ -177,16 +177,16 @@ def load_config(filepath=CONFIG_FILE):
                         config[key] = value
                     else:
                         print(f"[Warning] Unknown key '{key}' in [config] section (ignored).")
-            
+
             # [ai_params], [endpoints], and API key sections ([custom],
             # [openrouter], [google]) are silently ignored here.
             # ai_params: managed by Connection Profiles (profiles.json)
             # endpoints: managed by PromptsConfig (prompts.json)
             # API keys: managed by KeyStore (keys.json)
-        
+
     except Exception as e:
         print(f"[Error] Failed to load config: {e}")
-    
+
     return config
 
 
@@ -205,26 +205,26 @@ def load_key_names(filepath=CONFIG_FILE):
         Names are empty strings for keys without inline comments.
     """
     key_names = {"custom": [], "openrouter": [], "google": []}
-    
+
     if not Path(filepath).exists():
         return key_names
-    
+
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-        
+
         current_section = None
-        
+
         for line in lines:
             stripped = line.strip()
-            
+
             if not stripped or stripped.startswith('#'):
                 continue
-            
+
             if stripped.startswith('[') and stripped.endswith(']'):
                 current_section = stripped[1:-1].lower()
                 continue
-            
+
             if current_section in key_names:
                 if stripped and not stripped.startswith('#'):
                     match = re.search(r'\s+#\s*(.+)$', stripped)
@@ -242,7 +242,7 @@ def load_key_names(filepath=CONFIG_FILE):
                         key_names[current_section].append(name)
     except Exception as e:
         logging.debug(f"[Config] Failed to load key names: {e}")
-    
+
     return key_names
 
 
@@ -295,10 +295,10 @@ def save_config_value(key: str, value, filepath=CONFIG_FILE):
     try:
         if not Path(filepath).exists():
             return False
-        
+
         with open(filepath, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-        
+
         # Convert value to string
         if isinstance(value, bool):
             value_str = "true" if value else "false"
@@ -306,26 +306,26 @@ def save_config_value(key: str, value, filepath=CONFIG_FILE):
             value_str = "none"
         else:
             value_str = str(value)
-        
+
         # Find and update the key in [config] section
         in_config_section = False
         found = False
         new_lines = []
-        
+
         for line in lines:
             stripped = line.strip()
-            
+
             # Track section
             if stripped.startswith('[') and stripped.endswith(']'):
                 in_config_section = stripped.lower() == '[config]'
-            
+
             # Update key if in config section
-            if in_config_section and stripped.startswith(f"{key} =") or stripped.startswith(f"{key}="):
+            if (in_config_section and stripped.startswith(f"{key} =")) or stripped.startswith(f"{key}="):
                 new_lines.append(f"{key} = {value_str}\n")
                 found = True
             else:
                 new_lines.append(line)
-        
+
         # If not found, add it to [config] section
         if not found:
             final_lines = []
@@ -336,10 +336,10 @@ def save_config_value(key: str, value, filepath=CONFIG_FILE):
                     final_lines.append(f"{key} = {value_str}\n")
                     added = True
             new_lines = final_lines
-        
+
         with open(filepath, 'w', encoding='utf-8') as f:
             f.writelines(new_lines)
-        
+
         notify_config_change(key, value)
         return True
     except Exception as e:

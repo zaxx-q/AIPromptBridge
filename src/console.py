@@ -3,20 +3,20 @@ Centralized Rich Console Configuration
 """
 
 try:
+    from rich import print as rprint
+    from rich.align import Align
+    from rich.box import DOUBLE, HEAVY, ROUNDED
     from rich.console import Console
-    from rich.theme import Theme
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.markdown import Markdown
     from rich.layout import Layout
     from rich.live import Live
-    from rich.align import Align
-    from rich.text import Text
-    from rich.prompt import Prompt, Confirm
-    from rich import print as rprint
-    from rich.box import ROUNDED, HEAVY, DOUBLE
+    from rich.markdown import Markdown
+    from rich.panel import Panel
+    from rich.prompt import Confirm, Prompt
     from rich.style import Style
-    
+    from rich.table import Table
+    from rich.text import Text
+    from rich.theme import Theme
+
     # Custom AIPromptBridge Theme
     custom_theme = Theme({
         "info": "cyan",
@@ -32,7 +32,7 @@ try:
         "code": "bold white on black",
         "timestamp": "dim white",
     })
-    
+
     console = Console(theme=custom_theme)
     HAVE_RICH = True
 
@@ -40,7 +40,7 @@ try:
         """Helper to print a uniform panel"""
         if isinstance(content, str):
             content = Text.from_markup(content)
-        
+
         console.print(Panel(
             content,
             title=title,
@@ -59,7 +59,7 @@ try:
 
     def print_warning(msg):
         console.print(f"[warning]⚠️  {msg}[/warning]")
-        
+
     def print_info(msg):
         console.print(f"[info]ℹ️  {msg}[/info]")
 
@@ -68,20 +68,20 @@ try:
 
 except ImportError:
     HAVE_RICH = False
-    
+
     # Fallback mock class
     class MockConsole:
         def print(self, *args, **kwargs):
             if args:
                 print(*args)
-            elif 'renderable' in kwargs: 
+            elif 'renderable' in kwargs:
                 print(kwargs['renderable'])
             else:
                 print()
-        
+
         def input(self, prompt=""):
             return input(prompt)
-            
+
         def status(self, *args, **kwargs):
             class MockStatus:
                 def __enter__(self): pass
@@ -91,24 +91,24 @@ except ImportError:
     class MockPanel:
         def __init__(self, renderable, **kwargs):
             self.renderable = renderable
-            
+
         def __str__(self):
             return str(self.renderable)
 
     class MockTable:
         def __init__(self, **kwargs):
             self.rows = []
-            
+
         def add_column(self, *args, **kwargs): pass
         def add_row(self, *args): self.rows.append(args)
-        
+
     console = MockConsole()
     Panel = MockPanel
     Table = MockTable
     Markdown = str
     Text = str
     rprint = print
-    
+
     def print_panel(content, title=None, **kwargs):
         print("-" * 60)
         if title: print(f" {title} ")

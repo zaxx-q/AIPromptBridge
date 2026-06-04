@@ -10,10 +10,11 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+from src import web_server
 from src.config import load_config
 from src.key_store import KeyStore
-from src import web_server
 from src.tools.file_processor import show_tools_menu
+
 
 def main():
     # Initialize globals for the tool to function (mirroring main.py logic)

@@ -11,9 +11,9 @@ Sections:
 
 import tkinter as tk
 
+from ...custom_widgets import create_section_header
 from ...platform import HAVE_CTK, ctk
 from ...themes import get_ctk_font, get_ctk_label_colors
-from ...custom_widgets import create_section_header
 
 
 class TTSTabMixin:

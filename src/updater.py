@@ -9,20 +9,20 @@ and triggering the launcher to apply file replacements.
 - Source users: Notification-only with a link to the releases page
 """
 
-import os
-import sys
 import json
+import os
 import shutil
-import zipfile
+import sys
 import tempfile
 import threading
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Callable, Tuple
+from typing import Callable, Optional, Tuple
 
-from .version import __version__
-from .console import console, print_success, print_error, print_warning, print_info, HAVE_RICH
+from .console import HAVE_RICH, console, print_error, print_info, print_success, print_warning
 from .utils import is_compiled
+from .version import __version__
 
 # ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -557,17 +557,17 @@ def background_update_check(config: dict):
             info = check_for_update()
             if info:
                 _print_update_notification(info)
-                
+
                 # Show the GUI popup if GUI is available and we are not in terminal mode
                 try:
-                    from .gui.core import GUICoordinator, HAVE_GUI
+                    from .gui.core import HAVE_GUI, GUICoordinator
                     if HAVE_GUI:
                         coordinator = GUICoordinator.get_instance()
-                        
+
                         def _show_update_dialog():
                             from .gui.windows.update_dialogs import show_update_available_dialog
                             show_update_available_dialog(info, __version__)
-                        
+
                         coordinator.run_on_gui_thread(_show_update_dialog)
                 except Exception as e:
                     print(f"[Error] Failed to show startup update dialog: {e}")

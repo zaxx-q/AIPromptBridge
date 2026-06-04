@@ -21,15 +21,15 @@ Public API:
 """
 
 from .core import (
-    SettingsWindow,
     AttachedSettingsWindow,
+    SettingsWindow,
     create_attached_settings_window,
     show_settings_window,
 )
 
 __all__ = [
-    'SettingsWindow',
     'AttachedSettingsWindow',
+    'SettingsWindow',
     'create_attached_settings_window',
     'show_settings_window',
 ]

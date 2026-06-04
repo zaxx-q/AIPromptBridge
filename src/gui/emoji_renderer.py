@@ -17,14 +17,15 @@ For multi-codepoint emojis (like flags 🇺🇸), filenames use hyphens:
 1f1fa-1f1f8.png
 """
 
+import io
 import os
 import re
-import sys
-import zipfile
-import io
-import tempfile
 import shutil
+import sys
+import tempfile
 import threading
+import zipfile
+
 
 # Safe atexit registration that ignores errors during interpreter shutdown
 def _safe_atexit_register(func):
@@ -44,9 +45,9 @@ try:
     HAVE_EMOJI_LIB = True
 except ImportError:
     HAVE_EMOJI_LIB = False
-from pathlib import Path
-from typing import Dict, Optional, Tuple, List, Any
 import tkinter as tk
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 # Try to import PIL for image handling
 try:
@@ -55,10 +56,9 @@ try:
 except ImportError:
     HAVE_PIL = False
 
-from .platform import HAVE_CTK, ctk, CTkImage
-
 # Nuitka injects __compiled__ into every compiled module's globals().
 from ..utils import is_compiled
+from .platform import HAVE_CTK, CTkImage, ctk
 
 
 def get_assets_path() -> Tuple[Path, bool]:
@@ -70,20 +70,20 @@ def get_assets_path() -> Tuple[Path, bool]:
     """
     # Potential paths to check
     paths = []
-    
+
     # 1. Relative to this file (development)
     module_dir = Path(__file__).parent.parent.parent
     assets_base = module_dir / "assets"
     paths.append(assets_base / "emojis.zip")
     paths.append(assets_base / "emojis" / "72x72")
-    
+
     # 2. Relative to sys.executable (compiled executable)
     if is_compiled():
         exe_dir = Path(sys.executable).parent
         assets_base = exe_dir / "assets"
         paths.append(assets_base / "emojis.zip")
         paths.append(assets_base / "emojis" / "72x72")
-    
+
     # 3. Current working directory (if different from above)
     # This is important when launching from search/Run dialog where CWD might be arbitrary
     cwd = Path.cwd()
@@ -91,11 +91,11 @@ def get_assets_path() -> Tuple[Path, bool]:
         cwd_base = cwd / "assets"
         paths.append(cwd_base / "emojis.zip")
         paths.append(cwd_base / "emojis" / "72x72")
-    
+
     for path in paths:
         if path.exists():
             return path, path.suffix == '.zip'
-    
+
     # Default fallback
     return Path("assets/emojis.zip"), True
 
@@ -156,10 +156,10 @@ class EmojiRenderer:
         content = renderer.prepare_widget_content("📋 Sessions", size=18)
         button = CTkButton(parent, text=content["text"], image=content["image"], compound=content["compound"])
     """
-    
+
     DEFAULT_SIZE = 18  # Default emoji size in pixels
     CTK_DEFAULT_SIZE = 18  # Default size for CTkImage buttons
-    
+
     def __init__(self, size: int = None):
         """
         Initialize the emoji renderer.
@@ -169,23 +169,23 @@ class EmojiRenderer:
         """
         self.assets_path, self.is_zip = get_assets_path()
         self.size = size or self.DEFAULT_SIZE
-        
+
         # Temp dir for generated icons - Eager initialization
         # We create this immediately so we can exclude it from background cleanup logic
         self._temp_icon_dir = tempfile.mkdtemp(prefix="aipromptbridge_icons_")
         _safe_atexit_register(self.cleanup)
-        
+
         # Clean up stale directories in background to avoid startup delay
         # This is safe because we've already created (and know the path of) our current dir
         threading.Thread(target=self._clean_stale_dirs, daemon=True).start()
-        
+
         # Preload app emojis in background so PIL cache is warm by first popup
         threading.Thread(target=self._preload_app_emojis, daemon=True).start()
-        
+
         # ZIP file handling
         self.zip_file: Optional[zipfile.ZipFile] = None
         self.zip_data: Optional[bytes] = None
-        
+
         if self.is_zip and self.assets_path.exists():
             try:
                 # Read entire ZIP into RAM
@@ -194,28 +194,28 @@ class EmojiRenderer:
                 self.zip_file = zipfile.ZipFile(io.BytesIO(self.zip_data))
             except Exception as e:
                 print(f"[Error] Failed to load emoji zip: {e}")
-        
+
         # Cache for PhotoImage (tk.Text widgets)
         self._cache: Dict[Tuple[str, int], ImageTk.PhotoImage] = {}
-        
+
         # Cache for PIL Image objects (keyed by codepoint filename, e.g. "1f600")
         # This is the primary performance cache — avoids re-reading the ZIP and
         # re-decoding PNGs on every call. Benefits all consumers:
         # get_emoji_image(), get_ctk_image(), get_emoji_icon_path().
         self._pil_cache: Dict[str, Image.Image] = {}
-        
+
         # Cache for CTkImage (CTkButton/CTkLabel widgets)
         # We DO NOT cache CTkImage objects because they are bound to the Tk instance
         # they were created in. If multiple threads/windows create their own roots,
         # sharing CTkImage objects causes "pyimage doesn't exist" errors.
-        
+
         # Track missing files to avoid repeated lookups
         self._missing_cache: set = set()
-        
+
         # Check if PIL is available
         if not HAVE_PIL:
             print("[Warning] PIL not available - emoji rendering disabled")
-    
+
     def _get_temp_icon_dir(self) -> str:
         """Get the temporary directory for icon files."""
         # Already initialized in __init__
@@ -223,9 +223,9 @@ class EmojiRenderer:
             # Re-create if missing (e.g. if user deleted it manually while app running)
             self._temp_icon_dir = tempfile.mkdtemp(prefix="aipromptbridge_icons_")
             # atexit registration is idempotent or harmless if duplicated
-            
+
         return self._temp_icon_dir
-    
+
     def cleanup(self):
         """Clean up the temporary icon directory."""
         if self._temp_icon_dir and os.path.exists(self._temp_icon_dir):
@@ -240,14 +240,14 @@ class EmojiRenderer:
         try:
             temp_base = tempfile.gettempdir()
             prefix = "aipromptbridge_icons_"
-            
+
             for item in os.listdir(temp_base):
                 if item.startswith(prefix):
                     full_path = os.path.join(temp_base, item)
                     # Don't delete the current one if it exists (though it shouldn't yet)
                     if full_path == self._temp_icon_dir:
                         continue
-                        
+
                     if os.path.isdir(full_path):
                         try:
                             # Attempt to remove - will fail silently if in use/locked
@@ -271,30 +271,30 @@ class EmojiRenderer:
         """
         if not HAVE_PIL:
             return None
-            
+
         try:
             filename = self.get_codepoint_filename(emoji_char)
             temp_dir = self._get_temp_icon_dir()
             # Use fixed name to include multiple sizes
             icon_path = os.path.join(temp_dir, f"{filename}_multi.ico")
-            
+
             if os.path.exists(icon_path):
                 return icon_path
-                
+
             # Load and generate
             pil_img = self._load_pil_image(emoji_char)
             if pil_img:
                 # Resize to standard menu icon size (16x16)
                 # Using a single size is safer for basic GDI menus to avoid scaling issues
                 img = pil_img.resize((16, 16), Image.Resampling.LANCZOS)
-                
+
                 # Convert to RGBA for compositing
                 rgba = img.convert("RGBA")
-                
+
                 # FLATTEN TRANSPARENCY
                 # Composite the emoji against the menu background color so
                 # Windows GDI menus don't show black/white boxes behind the icon.
-                
+
                 # Determine background color based on system theme
                 bg_color = (240, 240, 240, 255)  # Standard Windows Light Menu Gray
                 try:
@@ -305,22 +305,22 @@ class EmojiRenderer:
                     pass
                 except Exception:
                     pass
-                
+
                 # Alpha composite onto solid background
                 bg = Image.new('RGBA', (16, 16), bg_color)
                 combined = Image.alpha_composite(bg, rgba)
-                
+
                 # Convert to RGB (no alpha) to prevent GDI from
                 # misinterpreting residual alpha channel data in the ICO
                 combined_rgb = combined.convert("RGB")
-                
+
                 # Save as ICO — fully opaque, no transparency artifacts
                 combined_rgb.save(icon_path, format="ICO", sizes=[(16, 16)])
                 return icon_path
-                
+
         except Exception as e:
             print(f"[Error] Failed to generate emoji icon: {e}")
-            
+
         return None
 
     def get_codepoint_filename(self, char_or_seq: str, strip_vs16: bool = True) -> str:
@@ -346,9 +346,9 @@ class EmojiRenderer:
             if strip_vs16 and cp == 0xfe0f:
                 continue
             codepoints.append(f"{cp:x}")
-        
+
         return "-".join(codepoints)
-    
+
     def _load_pil_image(self, emoji: str) -> Optional[Image.Image]:
         """
         Load PIL Image for an emoji from assets, with PIL-level caching.
@@ -366,40 +366,40 @@ class EmojiRenderer:
         """
         if not HAVE_PIL:
             return None
-        
+
         # Try both with and without VS16
         # Some twemoji files include fe0f (e.g. 1f3f3-fe0f-200d-1f308.png)
         # Others don't (e.g. 1f600.png)
         # We try strict first (keeping the sequence as provided or with fe0f), then loose
-        
+
         filenames_to_try = []
-        
+
         # 1. Exact match (preserve fe0f if present)
         filenames_to_try.append(self.get_codepoint_filename(emoji, strip_vs16=False))
-        
+
         # 2. Stripped match (remove fe0f)
         filenames_to_try.append(self.get_codepoint_filename(emoji, strip_vs16=True))
-        
+
         # Avoid duplicates
         filenames_to_try = list(dict.fromkeys(filenames_to_try))
-        
+
         # Check PIL cache first (any variant key resolves to the same image)
         for filename in filenames_to_try:
             if filename in self._pil_cache:
                 return self._pil_cache[filename]
-        
+
         # Check if we already know ALL variants are missing
         if all(f in self._missing_cache for f in filenames_to_try):
             return None
-        
+
         # Try to load the image from disk/ZIP
         for filename in filenames_to_try:
             if filename in self._missing_cache:
                 continue
-                
+
             try:
                 name_variants = [f"{filename}.png", f"{filename.lower()}.png"]
-                
+
                 if self.is_zip and self.zip_file:
                     # Look in ZIP
                     found_name = None
@@ -407,7 +407,7 @@ class EmojiRenderer:
                         if name in self.zip_file.namelist():
                             found_name = name
                             break
-                    
+
                     if found_name:
                         with self.zip_file.open(found_name) as f:
                             # Must read into memory because Image.open is lazy
@@ -418,7 +418,7 @@ class EmojiRenderer:
                             for fn in filenames_to_try:
                                 self._pil_cache[fn] = img
                             return img
-                
+
                 elif not self.is_zip and self.assets_path.exists():
                     # Look in directory
                     for name in name_variants:
@@ -428,15 +428,15 @@ class EmojiRenderer:
                             for fn in filenames_to_try:
                                 self._pil_cache[fn] = img
                             return img
-            
+
             except Exception:
                 pass
-            
+
             # If we got here, this filename failed
             self._missing_cache.add(filename)
-            
+
         return None
-    
+
     @staticmethod
     def _hex_to_rgba(hex_color: str) -> Tuple[int, int, int, int]:
         """Convert a hex color string like '#1e3e2e' to an RGBA tuple."""
@@ -445,7 +445,7 @@ class EmojiRenderer:
         g = int(hex_color[2:4], 16)
         b = int(hex_color[4:6], 16)
         return (r, g, b, 255)
-    
+
     def get_emoji_image(self, emoji: str, size: Optional[int] = None,
                         bg_color: Optional[str] = None) -> Optional[ImageTk.PhotoImage]:
         """
@@ -462,47 +462,47 @@ class EmojiRenderer:
         """
         if not HAVE_PIL:
             return None
-        
+
         size = size or self.size
         # Special handling for simple keycaps 1..9 which might come as single digits
         # but files are named 31-20e3.png
         # This normalization is usually handled by get_codepoint_filename but
         # keycaps often have the invisible 20E3
-        
+
         filename = self.get_codepoint_filename(emoji)
         cache_key = (filename, size, bg_color)
-        
+
         # Check cache
         if cache_key in self._cache:
             return self._cache[cache_key]
-        
+
         # Load PIL image
         pil_image = self._load_pil_image(emoji)
         if pil_image is None:
             return None
-        
+
         try:
             # Resize
             pil_image = pil_image.resize((size, size), Image.Resampling.LANCZOS)
-            
+
             # Composite against background color if provided
             # tk.Text embedded images composite against the widget's bg, not the tag's
             # background. This flattens transparency against the correct tag bg color.
             if bg_color:
                 bg = Image.new('RGBA', (size, size), self._hex_to_rgba(bg_color))
                 pil_image = Image.alpha_composite(bg, pil_image)
-            
+
             # Convert to PhotoImage
             photo = ImageTk.PhotoImage(pil_image)
-            
+
             # Cache it (IMPORTANT: must keep reference to prevent garbage collection)
             self._cache[cache_key] = photo
-            
+
             return photo
-            
+
         except Exception:
             return None
-    
+
     def get_ctk_image(self, emoji: str, size: Optional[int] = None) -> Optional[Any]:
         """
         Load an emoji as CTkImage (for CTkButton/CTkLabel widgets).
@@ -519,14 +519,14 @@ class EmojiRenderer:
         """
         if not HAVE_PIL or not HAVE_CTK:
             return None
-        
+
         size = size or self.CTK_DEFAULT_SIZE
-        
+
         # Load PIL image (cached via _pil_cache in _load_pil_image)
         pil_image = self._load_pil_image(emoji)
         if pil_image is None:
             return None
-        
+
         try:
             # Create fresh CTkImage every time to ensure it binds to the current Tk root
             # This prevents "pyimage doesn't exist" errors in multi-threaded/multi-window apps
@@ -535,10 +535,10 @@ class EmojiRenderer:
                 dark_image=pil_image,
                 size=(size, size)
             )
-            
+
         except Exception:
             return None
-    
+
     def extract_leading_emoji(self, text: str) -> Tuple[Optional[str], str]:
         """
         Extract a leading emoji from text.
@@ -557,7 +557,7 @@ class EmojiRenderer:
         text = text.strip()
         if not text:
             return None, text
-        
+
         if HAVE_EMOJI_LIB:
             # Use emoji library to find first token
             try:
@@ -572,9 +572,9 @@ class EmojiRenderer:
                         return emoji_char, remaining
             except Exception:
                 pass
-        
+
         # Fallback to simple regex checks if library unavailable or failed
-        
+
         # Check for flag emoji first (two regional indicators)
         if len(text) >= 2:
             match = FALLBACK_FLAG_PATTERN.match(text)
@@ -582,16 +582,16 @@ class EmojiRenderer:
                 emoji_char = match.group()
                 remaining = text[len(emoji_char):].lstrip()
                 return emoji_char, remaining
-        
+
         # Check single emoji at start
         match = FALLBACK_EMOJI_PATTERN.match(text)
         if match:
             emoji_char = match.group()
             remaining = text[len(emoji_char):].lstrip()
             return emoji_char, remaining
-        
+
         return None, text
-    
+
     def prepare_widget_content(
         self,
         text: str,
@@ -617,28 +617,28 @@ class EmojiRenderer:
             button = CTkButton(parent, **content, ...)
         """
         size = size or self.CTK_DEFAULT_SIZE
-        
+
         # Extract leading emoji
         emoji_char, remaining_text = self.extract_leading_emoji(text)
-        
+
         if emoji_char:
             # Try to get CTkImage for the emoji
             ctk_img = self.get_ctk_image(emoji_char, size)
-            
+
             if ctk_img:
                 return {
                     "text": remaining_text,
                     "image": ctk_img,
                     "compound": "left"
                 }
-        
+
         # No emoji or couldn't load image - return original text
         return {
             "text": text,
             "image": None,
             "compound": None
         }
-    
+
     def find_emojis(self, text: str) -> List[Tuple[int, int, str]]:
         """
         Find all emoji positions in text.
@@ -650,7 +650,7 @@ class EmojiRenderer:
             List of (start, end, emoji_string) tuples
         """
         results = []
-        
+
         if HAVE_EMOJI_LIB:
             try:
                 # Use emoji.emoji_list which gives positions directly
@@ -663,32 +663,32 @@ class EmojiRenderer:
                 return results
             except Exception:
                 pass
-        
+
         # Fallback to simple regex if library unavailable
-        
+
         # First, find flag sequences (two regional indicators)
         for match in FALLBACK_FLAG_PATTERN.finditer(text):
             results.append((match.start(), match.end(), match.group()))
-        
+
         # Then find individual emojis
         for match in FALLBACK_EMOJI_PATTERN.finditer(text):
             start, end = match.start(), match.end()
-            
+
             # Skip if this position is already covered by a flag
             if any(r[0] <= start < r[1] for r in results):
                 continue
-            
+
             results.append((start, end, match.group()))
-        
+
         # Sort by position
         results.sort(key=lambda x: x[0])
-        
+
         return results
-    
+
     def insert_text_with_emojis(
-        self, 
-        text_widget: tk.Text, 
-        text: str, 
+        self,
+        text_widget: tk.Text,
+        text: str,
         tags: Optional[Tuple[str, ...]] = None,
         at_end: bool = True
     ):
@@ -708,10 +708,10 @@ class EmojiRenderer:
             else:
                 text_widget.insert(tk.INSERT, text, tags)
             return
-        
+
         # Find emojis
         emojis = self.find_emojis(text)
-        
+
         if not emojis:
             # No emojis, just insert text
             if at_end:
@@ -719,7 +719,7 @@ class EmojiRenderer:
             else:
                 text_widget.insert(tk.INSERT, text, tags)
             return
-        
+
         # Detect tag background color for emoji compositing
         # tk.Text embedded images don't inherit tag backgrounds, so we must
         # flatten emoji transparency against the correct bg color.
@@ -733,19 +733,19 @@ class EmojiRenderer:
                         break
                 except Exception:
                     pass
-        
+
         # Insert text segments and emojis
         pos = tk.END if at_end else tk.INSERT
         last_end = 0
-        
+
         for start, end, emoji_char in emojis:
             # Insert text before this emoji
             if start > last_end:
                 text_widget.insert(pos, text[last_end:start], tags)
-            
+
             # Try to get emoji image (with bg_color for proper blending)
             img = self.get_emoji_image(emoji_char, bg_color=bg_color)
-            
+
             if img:
                 # Record position before insertion so we can tag the image
                 img_idx = text_widget.index("end-1c") if at_end else text_widget.index(tk.INSERT)
@@ -759,19 +759,19 @@ class EmojiRenderer:
             else:
                 # Fallback: insert the emoji character as text
                 text_widget.insert(pos, emoji_char, tags)
-            
+
             last_end = end
-        
+
         # Insert remaining text after last emoji
         if last_end < len(text):
             text_widget.insert(pos, text[last_end:], tags)
-    
+
     def clear_cache(self):
         """Clear all image caches."""
         self._cache.clear()
         self._pil_cache.clear()
         self._missing_cache.clear()
-    
+
     def _preload_app_emojis(self):
         """Preload PIL images for emojis actually used by the app.
         
@@ -784,24 +784,24 @@ class EmojiRenderer:
         """
         if not HAVE_PIL:
             return
-        
+
         emojis = set()
-        
+
         # --- 1. Extract icons from prompt defaults ---
         try:
             from .prompts import (
-                DEFAULT_GLOBAL_SETTINGS,
-                DEFAULT_TEXT_EDIT_ACTIONS,
-                DEFAULT_SNIP_ACTIONS,
                 DEFAULT_AUDIO_ACTIONS,
+                DEFAULT_GLOBAL_SETTINGS,
+                DEFAULT_SNIP_ACTIONS,
+                DEFAULT_TEXT_EDIT_ACTIONS,
             )
-            
+
             # Modifier icons
             for mod in DEFAULT_GLOBAL_SETTINGS.get("modifiers", []):
                 icon = mod.get("icon")
                 if icon:
                     emojis.add(icon)
-            
+
             # Action icons from all tool sections
             for actions_dict in (DEFAULT_TEXT_EDIT_ACTIONS, DEFAULT_SNIP_ACTIONS, DEFAULT_AUDIO_ACTIONS):
                 for action in actions_dict.values():
@@ -811,7 +811,7 @@ class EmojiRenderer:
                             emojis.add(icon)
         except ImportError:
             pass
-        
+
         # --- 2. Hardcoded GUI emojis (used directly by windows/widgets) ---
         gui_emojis = [
             "✍️", "❌", "📷", "📤", "💾", "🔴", "📁", "▶", "⏹", "⏸",
@@ -819,7 +819,7 @@ class EmojiRenderer:
             "📋", "📄", "📊", "💬", "📝",
         ]
         emojis.update(gui_emojis)
-        
+
         # --- 3. Preload into PIL cache ---
         for emoji_char in emojis:
             try:

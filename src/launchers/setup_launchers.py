@@ -1,7 +1,8 @@
-import sys
 import os
 import shutil
-from cx_Freeze import setup, Executable
+import sys
+
+from cx_Freeze import Executable, setup
 
 # Minimalistic build options for the launcher
 # We aggressively exclude everything that is not strictly needed for os, sys, subprocess, and simple logic.
@@ -96,7 +97,7 @@ if "build" in sys.argv:
     print("\n[Post-Build] Performing cleanup...")
     build_dir = "build_launchers_cx"
     email_dir = os.path.join(build_dir, "lib", "email")
-    
+
     if os.path.exists(email_dir):
         print(f"[Post-Build] Removing persistent '{email_dir}'...")
         try:

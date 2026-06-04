@@ -20,15 +20,15 @@ import time
 import wave
 from dataclasses import dataclass
 from pathlib import Path
-from queue import Queue, Empty
-from typing import Callable, Optional, List
+from queue import Empty, Queue
+from typing import Callable, List, Optional
 
 from .devices import AudioDevice, is_pyaudio_available
 from .ffmpeg_utils import (
-    is_ffmpeg_available,
-    get_ffmpeg_path,
-    get_creation_flags,
     get_audio_duration,
+    get_creation_flags,
+    get_ffmpeg_path,
+    is_ffmpeg_available,
 )
 
 # Try to import PyAudioWPatch
@@ -92,30 +92,30 @@ def get_rms_level(audio_chunk: bytes, sample_width: int = 2) -> float:
     """
     if not audio_chunk or len(audio_chunk) < sample_width:
         return 0.0
-    
+
     try:
         if sample_width == 2:  # 16-bit audio
             num_samples = len(audio_chunk) // 2
             fmt = f"<{num_samples}h"  # Little-endian signed shorts
             samples = struct.unpack(fmt, audio_chunk[:num_samples * 2])
-            
+
             # Calculate RMS
             sum_squares = sum(s * s for s in samples)
             rms = math.sqrt(sum_squares / len(samples))
-            
+
             # Normalize to 0-1 (32767 is max for 16-bit signed)
             return min(1.0, rms / 32767.0)
         elif sample_width == 4:  # 32-bit float
             num_samples = len(audio_chunk) // 4
             fmt = f"<{num_samples}f"
             samples = struct.unpack(fmt, audio_chunk[:num_samples * 4])
-            
+
             sum_squares = sum(s * s for s in samples)
             rms = math.sqrt(sum_squares / len(samples))
             return min(1.0, rms)
     except Exception as e:
         logging.debug(f"[AudioRecorder] RMS calculation error: {e}")
-    
+
     return 0.0
 
 
@@ -137,11 +137,11 @@ class AudioRecorder:
     - Level monitoring runs continuously while stream is active
     - Call stop_stream() when done or changing devices
     """
-    
+
     CHUNK_SIZE = 512  # Small chunks for responsive level meter
     LOOPBACK_CHUNK_SIZE = 4096  # Larger chunks for WASAPI loopback (buffers ~1sec)
     FORMAT = pyaudio.paInt16 if HAVE_PYAUDIO else None
-    
+
     def __init__(self, device: Optional[AudioDevice] = None):
         """
         Initialize the recorder.
@@ -151,16 +151,16 @@ class AudioRecorder:
         """
         if not HAVE_PYAUDIO:
             raise RuntimeError("PyAudioWPatch is not installed. Install with: pip install PyAudioWPatch")
-        
+
         self._device = device
         self._pyaudio: Optional[pyaudio.PyAudio] = None
-        
+
         # Unified stream state (new architecture - uses thread with blocking reads)
         self._stream = None
         self._stream_active = False
         self._stream_thread: Optional[threading.Thread] = None
         self._stream_lock = threading.Lock()
-        
+
         # Recording uses a Queue for thread-safe, lossless audio capture
         # The queue approach ensures no data is lost at recording boundaries
         self._is_recording = False
@@ -169,11 +169,11 @@ class AudioRecorder:
         self._sample_rate = 44100
         self._channels = 2
         self._sample_width = 2
-        
+
         # Level monitoring (always active when stream is open)
         self._current_level = 0.0
         self._level_callback: Optional[Callable[[float], None]] = None
-        
+
         # Playback state
         self._playing = False
         self._paused = False
@@ -185,14 +185,14 @@ class AudioRecorder:
         self._playback_sample_rate = 44100
         self._playback_channels = 2
         self._playback_sample_width = 2
-        
+
         logging.debug(f"[AudioRecorder] Initialized with device: {device}")
-    
+
     @property
     def device(self) -> Optional[AudioDevice]:
         """Get current device."""
         return self._device
-    
+
     @device.setter
     def device(self, device: Optional[AudioDevice]):
         """Set device (stops any active operations first)."""
@@ -201,13 +201,13 @@ class AudioRecorder:
         self.stop_recording()
         self._device = device
         logging.debug(f"[AudioRecorder] Device changed to: {device}")
-    
+
     def _get_pyaudio(self) -> pyaudio.PyAudio:
         """Get or create PyAudio instance."""
         if self._pyaudio is None:
             self._pyaudio = pyaudio.PyAudio()
         return self._pyaudio
-    
+
     def _close_pyaudio(self):
         """Close PyAudio instance if no streams are active."""
         if self._pyaudio and not self._playing and not self._stream_active:
@@ -216,11 +216,11 @@ class AudioRecorder:
             except Exception:
                 pass
             self._pyaudio = None
-    
+
     # =========================================================================
     # Unified Stream Architecture (New)
     # =========================================================================
-    
+
     def start_stream(self, level_callback: Optional[Callable[[float], None]] = None) -> bool:
         """
         Start the audio input stream for level monitoring and recording.
@@ -241,43 +241,43 @@ class AudioRecorder:
                 self._level_callback = level_callback
                 logging.debug("[AudioRecorder] Stream already active, updated callback")
                 return True
-            
+
             if not self._device:
                 logging.error("[AudioRecorder] No device set")
                 return False
-            
+
             try:
                 self._level_callback = level_callback
-                
+
                 # Store sample info for WAV generation
                 self._sample_rate = int(self._device.sample_rate)
                 self._channels = self._device.channels
                 p = self._get_pyaudio()
                 self._sample_width = p.get_sample_size(self.FORMAT)
-                
+
                 # Create callback (runs in PyAudio's thread)
                 def stream_callback(in_data, frame_count, time_info, status):
                     """PyAudio callback - invoked by audio driver when data is available."""
                     # Update level (always)
                     self._current_level = get_rms_level(in_data, self._sample_width)
-                    
+
                     # Call level callback if set
                     if self._level_callback:
                         try:
                             self._level_callback(self._current_level)
                         except Exception:
                             pass
-                    
+
                     # Queue audio data if recording (always queue, drain later)
                     # This prevents data loss at recording boundaries
                     if self._is_recording:
                         self._audio_queue.put(in_data)
-                    
+
                     return (in_data, pyaudio.paContinue)
-                
+
                 # Detect if this is a loopback device (they have different buffering behavior)
                 is_loopback = 'loopback' in self._device.name.lower()
-                
+
                 # For loopback devices, use larger buffer to get more data per callback
                 # WASAPI loopback typically buffers internally and delivers data less frequently
                 if is_loopback:
@@ -286,7 +286,7 @@ class AudioRecorder:
                     chunk_size = self.LOOPBACK_CHUNK_SIZE
                 else:
                     chunk_size = self.CHUNK_SIZE
-                
+
                 # Open stream WITH callback - this uses PyAudio's native threading
                 self._stream = p.open(
                     format=self.FORMAT,
@@ -297,25 +297,25 @@ class AudioRecorder:
                     frames_per_buffer=chunk_size,
                     stream_callback=stream_callback
                 )
-                
+
                 self._stream_active = True
                 logging.info(f"[AudioRecorder] Stream started on {self._device.name}")
                 return True
-                
+
             except Exception as e:
                 logging.error(f"[AudioRecorder] Failed to start stream: {e}")
                 self._stream_active = False
                 return False
-    
+
     def stop_stream(self):
         """Stop the audio input stream."""
         with self._stream_lock:
             if not self._stream_active:
                 return
-            
+
             self._stream_active = False
             self._is_recording = False
-            
+
             # Close the stream
             if self._stream:
                 try:
@@ -324,15 +324,15 @@ class AudioRecorder:
                 except Exception as e:
                     logging.debug(f"[AudioRecorder] Error closing stream: {e}")
                 self._stream = None
-        
+
         self._current_level = 0.0
         self._close_pyaudio()
         logging.debug("[AudioRecorder] Stream stopped")
-    
+
     def is_stream_active(self) -> bool:
         """Check if the unified stream is active."""
         return self._stream_active
-    
+
     def start_recording_unified(self) -> bool:
         """
         Start recording audio (unified stream version).
@@ -346,24 +346,24 @@ class AudioRecorder:
         if not self._stream_active:
             logging.error("[AudioRecorder] Stream not active - call start_stream() first")
             return False
-        
+
         if self._is_recording:
             logging.warning("[AudioRecorder] Already recording")
             return False
-        
+
         # Clear any stale data from the queue
         while not self._audio_queue.empty():
             try:
                 self._audio_queue.get_nowait()
             except Empty:
                 break
-        
+
         self._recording_start_time = time.time()
         self._is_recording = True
-        
+
         logging.info("[AudioRecorder] Recording started (queue-based)")
         return True
-    
+
     def stop_recording_unified(self) -> Optional[bytes]:
         """
         Stop recording and return WAV data (unified stream version).
@@ -380,13 +380,13 @@ class AudioRecorder:
         """
         if not self._is_recording:
             return None
-        
+
         # Stop queueing new data
         self._is_recording = False
-        
+
         # Small delay to ensure last callback completes
         time.sleep(0.05)
-        
+
         # Drain all audio data from the queue
         frames = []
         while True:
@@ -395,11 +395,11 @@ class AudioRecorder:
                 frames.append(data)
             except Empty:
                 break
-        
+
         if not frames:
             logging.warning("[AudioRecorder] No frames recorded")
             return None
-        
+
         try:
             wav_buffer = io.BytesIO()
             with wave.open(wav_buffer, 'wb') as wf:
@@ -407,26 +407,26 @@ class AudioRecorder:
                 wf.setsampwidth(self._sample_width)
                 wf.setframerate(self._sample_rate)
                 wf.writeframes(b''.join(frames))
-            
+
             wav_data = wav_buffer.getvalue()
-            
+
             # Calculate duration from frames
             total_bytes = sum(len(f) for f in frames)
             bytes_per_second = self._sample_rate * self._channels * self._sample_width
             duration = total_bytes / bytes_per_second if bytes_per_second > 0 else 0.0
-            
+
             logging.info(f"[AudioRecorder] Recording stopped: {len(wav_data)} bytes, {duration:.1f}s, {len(frames)} chunks")
-            
+
             return wav_data
-            
+
         except Exception as e:
             logging.error(f"[AudioRecorder] Failed to create WAV: {e}")
             return None
-    
+
     def is_recording_unified(self) -> bool:
         """Check if recording is active (unified stream version)."""
         return self._is_recording
-    
+
     def get_duration_unified(self) -> float:
         """
         Get current recording duration in seconds (unified stream version).
@@ -436,10 +436,10 @@ class AudioRecorder:
         """
         if not self._is_recording:
             return 0.0
-        
+
         # Use elapsed time since recording started (queue-based approach)
         return time.time() - self._recording_start_time
-    
+
     def get_level(self) -> float:
         """
         Get current audio level.
@@ -448,11 +448,11 @@ class AudioRecorder:
             Level between 0.0 and 1.0
         """
         return self._current_level
-    
+
     # =========================================================================
     # Playback
     # =========================================================================
-    
+
     def play(self, audio_data: bytes, start_position: float = 0.0) -> bool:
         """
         Start playing audio data.
@@ -467,15 +467,15 @@ class AudioRecorder:
         with self._playback_lock:
             # Stop any existing playback
             self._stop_playback_internal()
-            
+
             try:
                 # Decode audio if compressed
                 pcm_data, sample_rate, channels, sample_width = self._decode_audio(audio_data)
-                
+
                 if not pcm_data:
                     logging.error("[AudioRecorder] Failed to decode audio for playback")
                     return False
-                
+
                 self._playback_data = pcm_data
                 self._playback_sample_rate = sample_rate
                 self._playback_channels = channels
@@ -483,7 +483,7 @@ class AudioRecorder:
                 self._playback_position = start_position
                 self._playing = True
                 self._paused = False
-                
+
                 # Start playback thread
                 self._playback_thread = threading.Thread(
                     target=self._playback_loop,
@@ -491,14 +491,14 @@ class AudioRecorder:
                     name="AudioPlayback"
                 )
                 self._playback_thread.start()
-                
+
                 logging.debug(f"[AudioRecorder] Playback started at {start_position:.1f}s")
                 return True
-                
+
             except Exception as e:
                 logging.error(f"[AudioRecorder] Playback error: {e}")
                 return False
-    
+
     def _decode_audio(self, audio_data: bytes) -> tuple:
         """
         Decode audio data to raw PCM.
@@ -514,7 +514,7 @@ class AudioRecorder:
                 return (pcm_data, wf.getframerate(), wf.getnchannels(), wf.getsampwidth())
         except Exception:
             pass
-        
+
         # Try FFmpeg for compressed formats
         if is_ffmpeg_available():
             try:
@@ -522,9 +522,9 @@ class AudioRecorder:
                 with tempfile.NamedTemporaryFile(suffix=".audio", delete=False) as tmp_in:
                     tmp_in.write(audio_data)
                     tmp_in_path = tmp_in.name
-                
+
                 tmp_out_path = tmp_in_path + ".wav"
-                
+
                 try:
                     result = subprocess.run(
                         [
@@ -535,11 +535,11 @@ class AudioRecorder:
                         capture_output=True,
                         creationflags=get_creation_flags()
                     )
-                    
+
                     if result.returncode == 0 and Path(tmp_out_path).exists():
                         with open(tmp_out_path, 'rb') as f:
                             wav_data = f.read()
-                        
+
                         wav_buffer = io.BytesIO(wav_data)
                         with wave.open(wav_buffer, 'rb') as wf:
                             pcm_data = wf.readframes(wf.getnframes())
@@ -551,27 +551,27 @@ class AudioRecorder:
                         Path(tmp_out_path).unlink(missing_ok=True)
                     except Exception:
                         pass
-                        
+
             except Exception as e:
                 logging.debug(f"[AudioRecorder] FFmpeg decode failed: {e}")
-        
+
         return (None, 0, 0, 0)
-    
+
     def _playback_loop(self):
         """Background thread for audio playback."""
         try:
             p = self._get_pyaudio()
-            
+
             bytes_per_frame = self._playback_channels * self._playback_sample_width
             bytes_per_second = self._playback_sample_rate * bytes_per_frame
-            
+
             # Calculate start offset
             start_byte = int(self._playback_position * bytes_per_second)
             start_byte = (start_byte // bytes_per_frame) * bytes_per_frame  # Align to frame
-            
+
             current_byte = start_byte
             chunk_size = 1024 * bytes_per_frame
-            
+
             # Open output stream
             self._playback_stream = p.open(
                 format=p.get_format_from_width(self._playback_sample_width),
@@ -579,26 +579,26 @@ class AudioRecorder:
                 rate=self._playback_sample_rate,
                 output=True
             )
-            
+
             while self._playing and current_byte < len(self._playback_data):
                 if self._paused:
                     time.sleep(0.05)
                     continue
-                
+
                 # Get next chunk
                 end_byte = min(current_byte + chunk_size, len(self._playback_data))
                 chunk = self._playback_data[current_byte:end_byte]
-                
+
                 # Write to stream
                 self._playback_stream.write(chunk)
-                
+
                 # Update position
                 current_byte = end_byte
                 self._playback_position = current_byte / bytes_per_second
-            
+
             # Playback complete
             self._playing = False
-            
+
         except Exception as e:
             logging.error(f"[AudioRecorder] Playback loop error: {e}")
         finally:
@@ -609,41 +609,41 @@ class AudioRecorder:
                 except Exception:
                     pass
                 self._playback_stream = None
-            
+
             self._playing = False
             self._close_pyaudio()
-    
+
     def _stop_playback_internal(self):
         """Stop playback (internal, no lock)."""
         self._playing = False
         self._paused = False
-        
+
         if self._playback_thread and self._playback_thread.is_alive():
             self._playback_thread.join(timeout=1.0)
-        
+
         self._playback_thread = None
         self._playback_position = 0.0
-    
+
     def pause(self):
         """Pause playback."""
         with self._playback_lock:
             if self._playing and not self._paused:
                 self._paused = True
                 logging.debug("[AudioRecorder] Playback paused")
-    
+
     def resume(self):
         """Resume paused playback."""
         with self._playback_lock:
             if self._playing and self._paused:
                 self._paused = False
                 logging.debug("[AudioRecorder] Playback resumed")
-    
+
     def stop_playback(self):
         """Stop playback."""
         with self._playback_lock:
             self._stop_playback_internal()
             logging.debug("[AudioRecorder] Playback stopped")
-    
+
     def seek(self, position: float):
         """
         Seek to position in current audio.
@@ -656,26 +656,26 @@ class AudioRecorder:
                 bytes_per_frame = self._playback_channels * self._playback_sample_width
                 bytes_per_second = self._playback_sample_rate * bytes_per_frame
                 max_position = len(self._playback_data) / bytes_per_second
-                
+
                 self._playback_position = max(0.0, min(position, max_position))
                 logging.debug(f"[AudioRecorder] Seeked to {self._playback_position:.1f}s")
-    
+
     def get_playback_position(self) -> float:
         """Get current playback position in seconds."""
         return self._playback_position
-    
+
     def is_playing(self) -> bool:
         """Check if audio is currently playing."""
         return self._playing
-    
+
     def is_paused(self) -> bool:
         """Check if playback is paused."""
         return self._paused
-    
+
     # =========================================================================
     # Compression
     # =========================================================================
-    
+
     def compress_audio(
         self,
         wav_data: bytes,
@@ -694,45 +694,45 @@ class AudioRecorder:
         if not is_ffmpeg_available():
             logging.error("[AudioRecorder] FFmpeg not available for compression")
             return None
-        
+
         preset_config = COMPRESSION_PRESETS.get(preset, COMPRESSION_PRESETS["recommended"])
         output_ext = preset_config.get("output_ext", ".ogg")
         ffmpeg_args = preset_config.get("ffmpeg_args", "")
-        
+
         try:
             # Write input to temp file
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_in:
                 tmp_in.write(wav_data)
                 tmp_in_path = tmp_in.name
-            
+
             tmp_out_path = tmp_in_path.replace(".wav", output_ext)
-            
+
             try:
                 # Build FFmpeg command
                 cmd = [get_ffmpeg_path(), "-y", "-i", tmp_in_path]
                 cmd.extend(ffmpeg_args.split())
                 cmd.append(tmp_out_path)
-                
+
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
                     creationflags=get_creation_flags()
                 )
-                
+
                 if result.returncode != 0:
                     logging.error(f"[AudioRecorder] FFmpeg error: {result.stderr.decode()}")
                     return None
-                
+
                 if not Path(tmp_out_path).exists():
                     logging.error("[AudioRecorder] FFmpeg output file not created")
                     return None
-                
+
                 with open(tmp_out_path, 'rb') as f:
                     compressed_data = f.read()
-                
+
                 logging.info(f"[AudioRecorder] Compressed: {len(wav_data)} -> {len(compressed_data)} bytes")
                 return compressed_data
-                
+
             finally:
                 # Cleanup
                 try:
@@ -740,11 +740,11 @@ class AudioRecorder:
                     Path(tmp_out_path).unlink(missing_ok=True)
                 except Exception:
                     pass
-                    
+
         except Exception as e:
             logging.error(f"[AudioRecorder] Compression error: {e}")
             return None
-    
+
     def estimate_compressed_size(self, wav_data: bytes, preset: str = "recommended") -> int:
         """
         Estimate compressed size without actually compressing.
@@ -757,10 +757,10 @@ class AudioRecorder:
             Estimated size in bytes
         """
         preset_config = COMPRESSION_PRESETS.get(preset, COMPRESSION_PRESETS["recommended"])
-        
+
         # Parse bitrate from args
         ffmpeg_args = preset_config.get("ffmpeg_args", "")
-        
+
         # Extract bitrate (e.g., "-b:a 32k" -> 32000)
         bitrate = 32000  # Default 32kbps
         if "-b:a" in ffmpeg_args:
@@ -774,7 +774,7 @@ class AudioRecorder:
                         bitrate = int(bitrate_str)
             except Exception:
                 pass
-        
+
         # Estimate duration from WAV
         try:
             wav_buffer = io.BytesIO(wav_data)
@@ -783,31 +783,31 @@ class AudioRecorder:
         except Exception:
             # Rough estimate: assume 44100Hz, 16-bit, stereo
             duration = len(wav_data) / (44100 * 2 * 2)
-        
+
         # Calculate estimated size
         estimated_bytes = int((bitrate / 8) * duration)
-        
+
         # Add ~5% for container overhead
         return int(estimated_bytes * 1.05)
-    
+
     # =========================================================================
     # Cleanup
     # =========================================================================
-    
+
     def cleanup(self):
         """Clean up all resources."""
         self.stop_stream()  # New unified stream
         self.stop_playback()
-        
+
         if self._pyaudio:
             try:
                 self._pyaudio.terminate()
             except Exception:
                 pass
             self._pyaudio = None
-        
+
         logging.debug("[AudioRecorder] Cleaned up")
-    
+
     def __del__(self):
         """Destructor."""
         self.cleanup()

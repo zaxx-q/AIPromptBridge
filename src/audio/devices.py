@@ -28,11 +28,11 @@ class AudioDevice:
     channels: int
     sample_rate: int
     host_api: int = 0
-    
+
     def __str__(self) -> str:
         loopback_marker = " [Loopback]" if self.is_loopback else ""
         return f"{self.name}{loopback_marker}"
-    
+
     def get_display_name(self) -> str:
         """Get a user-friendly display name."""
         # Truncate long names
@@ -59,15 +59,15 @@ def list_input_devices() -> List[AudioDevice]:
     if not HAVE_PYAUDIO:
         logging.warning("[AudioDevices] PyAudioWPatch not available")
         return []
-    
+
     devices = []
-    
+
     try:
         with pyaudio.PyAudio() as p:
             for i in range(p.get_device_count()):
                 try:
                     info = p.get_device_info_by_index(i)
-                    
+
                     # Only include devices with input channels that aren't loopback
                     if info.get("maxInputChannels", 0) > 0 and not info.get("isLoopbackDevice", False):
                         devices.append(AudioDevice(
@@ -81,10 +81,10 @@ def list_input_devices() -> List[AudioDevice]:
                 except Exception as e:
                     logging.debug(f"[AudioDevices] Error reading device {i}: {e}")
                     continue
-    
+
     except Exception as e:
         logging.error(f"[AudioDevices] Error listing input devices: {e}")
-    
+
     return devices
 
 
@@ -98,9 +98,9 @@ def list_loopback_devices() -> List[AudioDevice]:
     if not HAVE_PYAUDIO:
         logging.warning("[AudioDevices] PyAudioWPatch not available")
         return []
-    
+
     devices = []
-    
+
     try:
         with pyaudio.PyAudio() as p:
             # Use the loopback device generator
@@ -117,10 +117,10 @@ def list_loopback_devices() -> List[AudioDevice]:
                 except Exception as e:
                     logging.debug(f"[AudioDevices] Error reading loopback device: {e}")
                     continue
-    
+
     except Exception as e:
         logging.error(f"[AudioDevices] Error listing loopback devices: {e}")
-    
+
     return devices
 
 
@@ -133,7 +133,7 @@ def get_default_input_device() -> Optional[AudioDevice]:
     """
     if not HAVE_PYAUDIO:
         return None
-    
+
     try:
         with pyaudio.PyAudio() as p:
             try:
@@ -150,7 +150,7 @@ def get_default_input_device() -> Optional[AudioDevice]:
                 # No default input device
                 logging.debug("[AudioDevices] No default input device found")
                 return None
-    
+
     except Exception as e:
         logging.error(f"[AudioDevices] Error getting default input: {e}")
         return None
@@ -165,7 +165,7 @@ def get_default_loopback_device() -> Optional[AudioDevice]:
     """
     if not HAVE_PYAUDIO:
         return None
-    
+
     try:
         with pyaudio.PyAudio() as p:
             try:
@@ -182,7 +182,7 @@ def get_default_loopback_device() -> Optional[AudioDevice]:
                 # WASAPI not available or no loopback device
                 logging.debug("[AudioDevices] No default loopback device found")
                 return None
-    
+
     except Exception as e:
         logging.error(f"[AudioDevices] Error getting default loopback: {e}")
         return None
@@ -215,16 +215,16 @@ def find_device_by_name(name: str, prefer_loopback: bool = False) -> Optional[Au
         devices = list_loopback_devices() + list_input_devices()
     else:
         devices = list_input_devices() + list_loopback_devices()
-    
+
     # Exact match first
     for device in devices:
         if device.name == name:
             return device
-    
+
     # Partial match
     name_lower = name.lower()
     for device in devices:
         if name_lower in device.name.lower():
             return device
-    
+
     return None

@@ -23,7 +23,7 @@ def get_icon_path():
         icon_path = os.path.join(base_dir, "icon.ico")
         if os.path.exists(icon_path):
             return icon_path
-            
+
     # Development mode
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     icon_path = os.path.join(base_dir, "icon.ico")
@@ -52,7 +52,7 @@ def set_window_icon(window, delay_ms: int = 100):
                     window.iconbitmap(icon_path)
             except Exception:
                 pass  # Icon setting may fail on some systems
-        
+
         # Use multiple after() calls to override CTk defaults and race conditions
         try:
             window.after(50, _set_icon)

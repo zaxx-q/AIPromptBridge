@@ -12,7 +12,6 @@ from typing import Dict
 
 from ...prompts import PROMPTS_FILE, reload_prompts
 
-
 # =============================================================================
 # Constants
 # =============================================================================
@@ -52,13 +51,13 @@ def save_options(data: Dict, filepath: str = OPTIONS_FILE) -> bool:
         if Path(filepath).exists():
             backup_path = filepath + ".bak"
             shutil.copy2(filepath, backup_path)
-        
+
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-        
+
         # Reload prompts in the main app
         reload_prompts()
-        
+
         return True
     except Exception as e:
         print(f"[PromptEditor] Error saving options: {e}")

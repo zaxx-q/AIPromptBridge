@@ -5,16 +5,18 @@ Provides common retry logic, error handling, and callback interface for all prov
 Retry behavior modeled after reverse-proxy/src/upstream/gemini.js and openai-compatible.js
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Callable, Optional, Any, List, Dict
-from enum import Enum
-import time
-import requests
 import json
 import re
+import time
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
-from src.console import console, HAVE_RICH
+import requests
+
+from src.console import HAVE_RICH, console
+
 
 class CallbackType(Enum):
     """Types of callback events during streaming"""
@@ -40,7 +42,7 @@ class UsageData:
     completion_tokens: int = 0
     total_tokens: int = 0
     estimated: bool = False
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "prompt_tokens": self.prompt_tokens,
@@ -66,12 +68,12 @@ class ProviderResult:
     # Used to maintain reasoning context across multi-turn conversations.
     # Only populated by GeminiNativeProvider; None for other providers.
     gemini_parts: Optional[List[Dict]] = None
-    
+
     def has_content(self) -> bool:
         """Check if result has any meaningful content"""
         return bool(
-            self.content.strip() or 
-            self.thinking_content.strip() or 
+            self.content.strip() or
+            self.thinking_content.strip() or
             self.tool_calls
         )
 
@@ -106,23 +108,23 @@ class BaseProvider(ABC):
     - max_retries: Maximum number of retry attempts (default: 3)
     - retry_delay: Delay between retries in seconds (default: 5, used for server errors)
     """
-    
+
     # Default retry configuration (used when not specified in config)
     DEFAULT_MAX_RETRIES = 3
     DEFAULT_RETRY_DELAY = 5.0  # seconds - configurable from config.ini
     RETRY_DELAY_RATE_LIMITED = 0.0  # Immediate retry with key rotation
     RETRY_DELAY_AUTH_ERROR = 0.0  # Immediate retry with key rotation
     RETRY_DELAY_NETWORK_ERROR = 1.0  # seconds
-    
+
     def __init__(self, name: str, key_manager=None, config: Optional[Dict] = None):
         self.name = name
         self.key_manager = key_manager
         self.config = config or {}
-    
+
     def generate_stream(
-        self, 
-        messages: List[Dict], 
-        model: str, 
+        self,
+        messages: List[Dict],
+        model: str,
         params: Dict,
         callback: StreamCallback,
         thinking_enabled: bool = False,
@@ -131,61 +133,61 @@ class BaseProvider(ABC):
         """Centralized retry loop for streaming requests — subclasses implement _do_generate_stream()."""
         if not self.key_manager or not self.key_manager.has_keys():
             return ProviderResult(success=False, error=f"No API keys configured for {self.name}")
-        
+
         max_retries = self.config.get("max_retries", self.DEFAULT_MAX_RETRIES)
-        
+
         for retry in range(max_retries + 1):
             try:
                 self._check_abort(abort_event)
-                
+
                 current_key = self.key_manager.get_current_key()
                 if not current_key:
                     return ProviderResult(success=False, error="No API key available")
-                
+
                 key_num = self.key_manager.get_key_label()
                 self.log_request(model, key_num, thinking_enabled, streaming=True, retry=retry)
-                
+
                 result = self._do_generate_stream(
                     messages, model, params, callback,
                     thinking_enabled, current_key, abort_event
                 )
-                
+
                 if result.success:
                     self.log_success(key_num)
                     result.retry_count = retry
                     return result
-                
+
                 # Non-success (like empty response)
                 if result.error and not self._should_retry_result(result, retry, max_retries):
                     return result
-                    
+
             except AbortedError:
                 callback(CallbackType.ABORTED, None)
                 return ProviderResult(success=False, error="Request aborted")
-                
+
             except requests.exceptions.Timeout as e:
                 if not self._handle_exception_retry(
                     RetryReason.NETWORK_ERROR, retry, max_retries, str(e)
                 ):
                     callback(CallbackType.ERROR, "Request timeout")
                     return ProviderResult(success=False, error=str(e), retry_count=retry)
-                    
+
             except requests.exceptions.RequestException as e:
                 if not self._handle_exception_retry(
                     RetryReason.NETWORK_ERROR, retry, max_retries, str(e)
                 ):
                     callback(CallbackType.ERROR, str(e))
                     return ProviderResult(success=False, error=str(e), retry_count=retry)
-                    
+
             except Exception as e:
                 if not self._handle_exception_retry(
                     RetryReason.SERVER_ERROR, retry, max_retries, str(e)
                 ):
                     callback(CallbackType.ERROR, str(e))
                     return ProviderResult(success=False, error=str(e), retry_count=retry)
-        
+
         return ProviderResult(success=False, error="Max retries exhausted")
-    
+
     def generate(
         self,
         messages: List[Dict],
@@ -197,57 +199,57 @@ class BaseProvider(ABC):
         """Centralized retry loop for non-streaming requests — subclasses implement _do_generate()."""
         if not self.key_manager or not self.key_manager.has_keys():
             return ProviderResult(success=False, error=f"No API keys configured for {self.name}")
-        
+
         max_retries = self.config.get("max_retries", self.DEFAULT_MAX_RETRIES)
-        
+
         for retry in range(max_retries + 1):
             try:
                 self._check_abort(abort_event)
-                
+
                 current_key = self.key_manager.get_current_key()
                 if not current_key:
                     return ProviderResult(success=False, error="No API key available")
-                
+
                 key_num = self.key_manager.get_key_label()
                 self.log_request(model, key_num, thinking_enabled, streaming=False, retry=retry)
-                
+
                 result = self._do_generate(
                     messages, model, params,
                     thinking_enabled, current_key, abort_event
                 )
-                
+
                 if result.success:
                     self.log_success(key_num)
                     result.retry_count = retry
                     return result
-                
+
                 # Non-success (like empty response)
                 if result.error and not self._should_retry_result(result, retry, max_retries):
                     return result
-                    
+
             except AbortedError:
                 return ProviderResult(success=False, error="Request aborted")
-                
+
             except requests.exceptions.Timeout as e:
                 if not self._handle_exception_retry(
                     RetryReason.NETWORK_ERROR, retry, max_retries, str(e)
                 ):
                     return ProviderResult(success=False, error=str(e), retry_count=retry)
-                    
+
             except requests.exceptions.RequestException as e:
                 if not self._handle_exception_retry(
                     RetryReason.NETWORK_ERROR, retry, max_retries, str(e)
                 ):
                     return ProviderResult(success=False, error=str(e), retry_count=retry)
-                    
+
             except Exception as e:
                 if not self._handle_exception_retry(
                     RetryReason.SERVER_ERROR, retry, max_retries, str(e)
                 ):
                     return ProviderResult(success=False, error=str(e), retry_count=retry)
-        
+
         return ProviderResult(success=False, error="Max retries exhausted")
-    
+
     @abstractmethod
     def _do_generate_stream(
         self,
@@ -274,7 +276,7 @@ class BaseProvider(ABC):
     ) -> ProviderResult:
         """Single non-streaming attempt — provider-specific. No retry logic needed."""
         pass
-    
+
     @abstractmethod
     def fetch_models(self) -> tuple[List[Dict], Optional[str]]:
         """
@@ -285,7 +287,7 @@ class BaseProvider(ABC):
             models_list is a list of dicts with 'id' and 'name' keys
         """
         raise NotImplementedError
-    
+
     def get_retry_reason(self, status_code: int, error_text: str = "") -> RetryReason:
         """
         Determine if an error is retryable and why.
@@ -304,7 +306,7 @@ class BaseProvider(ABC):
         if 500 <= status_code < 600:
             return RetryReason.SERVER_ERROR
         return RetryReason.NON_RETRYABLE
-    
+
     def should_retry(self, reason: RetryReason, retry_count: int) -> bool:
         """
         Check if we should retry based on reason and retry count.
@@ -320,7 +322,7 @@ class BaseProvider(ABC):
             return False
         max_retries = self.config.get("max_retries", self.DEFAULT_MAX_RETRIES)
         return retry_count < max_retries
-    
+
     def get_retry_delay(self, reason: RetryReason) -> float:
         """
         Get the delay before retrying based on reason.
@@ -353,7 +355,7 @@ class BaseProvider(ABC):
 
         # Get configurable delay (used for server errors and empty responses)
         retry_delay = self.config.get("retry_delay", self.DEFAULT_RETRY_DELAY)
-        
+
         if reason == RetryReason.SERVER_ERROR:
             return float(retry_delay)  # Use config value
         if reason == RetryReason.EMPTY_RESPONSE:
@@ -361,7 +363,7 @@ class BaseProvider(ABC):
         if reason == RetryReason.NETWORK_ERROR:
             return self.RETRY_DELAY_NETWORK_ERROR
         return 0.0
-    
+
     def rotate_key_if_possible(self, reason: str) -> bool:
         """
         Attempt to rotate to the next API key.
@@ -376,7 +378,7 @@ class BaseProvider(ABC):
             new_key = self.key_manager.rotate_key(reason)
             return new_key is not None and self.key_manager.has_more_keys()
         return False
-    
+
     def detect_empty_response(
         self,
         content: str,
@@ -406,12 +408,12 @@ class BaseProvider(ABC):
             tool_calls
         )
         return not has_actual_content
-    
+
     def _check_abort(self, abort_event: Optional[Any]) -> None:
         """Check if request has been aborted."""
         if abort_event and abort_event.is_set():
             raise AbortedError("Request aborted")
-            
+
     def _handle_http_error(self, status_code: int, error_text: str, retry: int, max_retries: int) -> bool:
         """
         Classify HTTP error, rotate key if needed, sleep if needed.
@@ -428,7 +430,7 @@ class BaseProvider(ABC):
         if delay > 0:
             time.sleep(delay)
         return True
-        
+
     def _handle_exception_retry(self, reason: RetryReason, retry: int, max_retries: int, error_brief: str) -> bool:
         """Handle retry on exception (network/timeout)."""
         if not self.should_retry(reason, retry):
@@ -441,16 +443,16 @@ class BaseProvider(ABC):
         if delay > 0:
             time.sleep(delay)
         return True
-        
+
     def _should_retry_result(self, result: ProviderResult, retry: int, max_retries: int) -> bool:
         """Determine if a result containing an error should be retried."""
         status_code = getattr(result, "status_code", None)
         if status_code is not None:
             return self._handle_http_error(status_code, result.error or "", retry, max_retries)
-            
+
         if getattr(result, "_retryable", False):
             return True
-            
+
         if result.error and "Empty response" in result.error:
             reason = RetryReason.EMPTY_RESPONSE
             if not self.should_retry(reason, retry):
@@ -461,9 +463,9 @@ class BaseProvider(ABC):
             if delay > 0:
                 time.sleep(delay)
             return True
-            
+
         return False
-        
+
     def sanitize_api_error(self, error_text: str, status_code: int = 0) -> str:
         """
         Sanitize raw API error response, stripping HTML or parsing JSON error structures.
@@ -471,13 +473,13 @@ class BaseProvider(ABC):
         """
         if not error_text:
             return f"HTTP {status_code}" if status_code else "Unknown error"
-            
+
         # Strip HTML tags if present (e.g. proxy pages or Cloudflare/NGINX blocks)
         if error_text.strip().startswith("<!DOCTYPE") or error_text.strip().startswith("<html"):
             stripped = re.sub(r'<[^>]+>', ' ', error_text)
             stripped = " ".join(stripped.split())
             return f"HTTP {status_code}: {stripped[:80]}" if status_code else stripped[:100]
-            
+
         try:
             error_data = json.loads(error_text)
             if "error" in error_data:
@@ -494,17 +496,17 @@ class BaseProvider(ABC):
                         return f"Error status/type: {err_type}"
                 elif isinstance(error_obj, str):
                     return error_obj[:100]
-                    
+
             if "message" in error_data:
                 return str(error_data["message"])[:100]
         except Exception:
             pass
-            
+
         first_line = error_text.split('\n')[0].strip()[:100]
         if status_code:
             return f"HTTP {status_code}: {first_line[:80]}"
         return first_line or "Unknown error"
-        
+
     def _estimate_usage_fallback(self, messages: List[Dict], content: str, thinking: str) -> UsageData:
         """Estimate token usage when the API does not provide it."""
         input_tokens = estimate_message_tokens(messages)
@@ -530,12 +532,12 @@ class BaseProvider(ABC):
             details = ""
             if kwargs:
                 details = " (" + ", ".join(f"[cyan]{k}[/cyan]=[yellow]{v}[/yellow]" for k, v in kwargs.items()) + ")"
-            
+
             style = "white"
             if level == "error": style = "red"
             elif level == "warn": style = "yellow"
             elif level == "debug": style = "dim"
-            
+
             console.print(f"    {prefix} [{style}]{message}[/{style}]{details}")
         else:
             prefix = f"[{self.name}]"
@@ -544,7 +546,7 @@ class BaseProvider(ABC):
                 print(f"    {prefix} {message} ({details})")
             else:
                 print(f"    {prefix} {message}")
-    
+
     def log_request(self, model: str, key_num: Any, thinking: bool, streaming: bool, retry: int = 0):
         """Log request start"""
         retry_str = f", retry {retry}" if retry > 0 else ""
@@ -552,21 +554,21 @@ class BaseProvider(ABC):
         if not key_str.startswith("#"):
             key_str = f"'{key_str}'"
         self.log("info", f"Request to {model} with key {key_str} (thinking: {thinking}, stream: {streaming}{retry_str})")
-    
+
     def log_success(self, key_num: Any):
         """Log successful completion"""
         key_str = str(key_num)
         if not key_str.startswith("#"):
             key_str = f"'{key_str}'"
         self.log("info", f"Request completed successfully with key {key_str}")
-    
+
     def log_retry(self, reason: RetryReason, retry_count: int, delay: float, error_detail: str = ""):
         """Log retry attempt with optional error detail"""
         max_retries = self.config.get("max_retries", self.DEFAULT_MAX_RETRIES)
         delay_str = f" after {delay}s delay" if delay > 0 else " immediately"
         detail_str = f": {error_detail}" if error_detail else ""
         self.log("warn", f"{reason.value}{detail_str}, retrying{delay_str} ({retry_count}/{max_retries})")
-    
+
     def log_error(self, message: str, status_code: int = 0):
         """Log error"""
         if status_code:

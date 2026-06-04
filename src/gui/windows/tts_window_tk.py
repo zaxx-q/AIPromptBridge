@@ -6,13 +6,13 @@ Provides standard Tkinter layout implementation when CustomTkinter is unavailabl
 
 import tkinter as tk
 from tkinter import ttk
-from typing import Optional, Callable, Any
+from typing import Any, Callable, Optional
 
-from ..themes import get_colors
 from ..popups import Tooltip
+from ..themes import get_colors
 
 # Reuse wrappers from audio_analyzer_tk
-from .audio_analyzer_tk import TkOptionMenuWrapper, TkSliderWrapper, TkCheckBoxWrapper
+from .audio_analyzer_tk import TkCheckBoxWrapper, TkOptionMenuWrapper, TkSliderWrapper
 
 
 def build_tk_ui(window):
@@ -143,7 +143,7 @@ def _create_voice_section_tk(window, parent):
 
     # Build voice list
     try:
-        from ...audio.tts_constants import get_voice_list, get_voice_details
+        from ...audio.tts_constants import get_voice_details, get_voice_list
         voice_list = get_voice_list()
     except ImportError:
         voice_list = [window.selected_voice]
@@ -235,7 +235,7 @@ def _create_multi_speaker_section_tk(window, parent):
 
     # Build voice list for speaker dropdowns
     try:
-        from ...audio.tts_constants import get_voice_list, get_voice_details
+        from ...audio.tts_constants import get_voice_details, get_voice_list
         voice_list = get_voice_list()
     except ImportError:
         voice_list = [window.selected_voice, "Puck"]

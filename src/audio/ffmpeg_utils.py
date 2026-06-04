@@ -21,7 +21,6 @@ import wave
 from pathlib import Path
 from typing import Optional
 
-
 # =============================================================================
 # Cached Binary Detection
 # =============================================================================
@@ -162,14 +161,14 @@ def get_audio_duration(audio_data: bytes) -> float:
             return wf.getnframes() / wf.getframerate()
     except Exception:
         pass
-    
+
     # Try FFprobe for compressed formats
     if is_ffprobe_available():
         try:
             with tempfile.NamedTemporaryFile(suffix=".audio", delete=False) as tmp:
                 tmp.write(audio_data)
                 tmp_path = tmp.name
-            
+
             try:
                 result = subprocess.run(
                     [
@@ -182,7 +181,7 @@ def get_audio_duration(audio_data: bytes) -> float:
                     text=True,
                     creationflags=get_creation_flags()
                 )
-                
+
                 if result.returncode == 0:
                     return float(result.stdout.strip())
             finally:
@@ -190,8 +189,8 @@ def get_audio_duration(audio_data: bytes) -> float:
                     Path(tmp_path).unlink(missing_ok=True)
                 except Exception:
                     pass
-                    
+
         except Exception:
             pass
-    
+
     return 0.0

@@ -5,12 +5,12 @@ Flask web server for AIPromptBridge
 
 import time
 
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 
+from .api_client import call_api_chat, call_api_simple, fetch_models
 from .config import CONFIG_FILE
-from .api_client import call_api_simple, call_api_chat, fetch_models
+from .gui.core import HAVE_GUI, get_gui_status, show_chat_gui, show_session_browser
 from .session_manager import ChatSession, add_session, get_session, list_sessions
-from .gui.core import show_chat_gui, show_session_browser, get_gui_status, HAVE_GUI
 
 # Global state - will be initialized by main.py
 CONFIG = {}
@@ -74,13 +74,13 @@ def get_models():
     from .profile_resolver import resolve_profile
     resolved = resolve_profile(None, CONFIG, AI_PARAMS, KEY_MANAGERS)
     models, error = fetch_models(resolved.config, resolved.key_managers)
-    
+
     if error:
         return jsonify({"error": error}), 500
-    
+
     # Cache the models
     CACHED_MODELS = models
-    
+
     return jsonify({
         "object": "list",
         "data": models,
@@ -149,8 +149,8 @@ def switch_active_profile(profile_name: str) -> bool:
     """
     global CONFIG, AI_PARAMS, ACTIVE_PROFILE, SESSION_OVERRIDES
 
-    from .connection_profiles import ProfileStore
     from .config import notify_config_change
+    from .connection_profiles import ProfileStore
 
     store = ProfileStore.get_instance()
     if not store.set_active_profile(profile_name):

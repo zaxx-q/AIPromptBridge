@@ -9,16 +9,17 @@ All API requests flow through the provider classes for consistent retry, key rot
 import base64
 import re
 import time
-from typing import Dict, List, Optional, Tuple, Callable, Any
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .providers import (
-    create_provider,
     BaseProvider,
-    ProviderResult,
     CallbackType,
+    ProviderResult,
+    create_provider,
+)
+from .providers import (
     StreamCallback as ProviderStreamCallback,
 )
-
 
 # ============================================================
 # STREAMING API - Uses new provider classes
@@ -57,7 +58,7 @@ def call_api_stream_unified(
         error = f"No API keys configured for provider: {provider_type}"
         callback("error", error)
         return None, None, None, error
-    
+
     # Build provider configuration
     provider_config = {
         "request_timeout": config.get("request_timeout", 120),
@@ -69,52 +70,52 @@ def call_api_stream_unified(
         "base_url": config.get("base_url"),
         "tts_use_official_endpoint": config.get("tts_use_official_endpoint", False),
     }
-    
+
     # Create provider instance using registry factory
     try:
         provider = create_provider(provider_type, key_manager, provider_config)
     except ValueError as e:
         callback("error", str(e))
         return None, None, None, str(e)
-    
+
     # Build params from ai_params
     params = dict(ai_params)
-    
+
     # Track content for the callback adapter
     accumulated_text = ""
     accumulated_thinking = ""
     usage_data = None
-    
+
     def provider_callback(cb_type: CallbackType, content: Any):
         nonlocal accumulated_text, accumulated_thinking, usage_data
-        
+
         if cb_type == CallbackType.TEXT:
             accumulated_text += content
             callback("text", content)
-        
+
         elif cb_type == CallbackType.THINKING:
             accumulated_thinking += content
             callback("thinking", content)
-        
+
         elif cb_type == CallbackType.TOOL_CALLS:
             callback("tool_calls", content)
-        
+
         elif cb_type == CallbackType.USAGE:
             usage_data = content
             callback("usage", content)
-        
+
         elif cb_type == CallbackType.RESPONSE_PARTS:
             callback("response_parts", content)
-        
+
         elif cb_type == CallbackType.DONE:
             callback("done", None)
-        
+
         elif cb_type == CallbackType.ERROR:
             callback("error", content)
-            
+
         elif cb_type == CallbackType.ABORTED:
             callback("aborted", None)
-    
+
     # Execute streaming request via provider
     result = provider.generate_stream(
         messages=messages,
@@ -124,7 +125,7 @@ def call_api_stream_unified(
         thinking_enabled=thinking_enabled,
         abort_event=abort_event
     )
-    
+
     if result.success:
         return (
             result.content,
@@ -142,12 +143,12 @@ def call_custom_api_stream(key_manager, url, model, messages, ai_params, timeout
     """
     if not key_manager or not key_manager.has_keys():
         return None, None, None, "No API key available"
-    
+
     config = {
         "request_timeout": timeout,
         "base_url": url,
     }
-    
+
     # Create provider config
     provider_config = {
         "request_timeout": timeout,
@@ -155,17 +156,17 @@ def call_custom_api_stream(key_manager, url, model, messages, ai_params, timeout
         "retry_delay": 5,
         "base_url": url,
     }
-    
+
     provider = create_provider("custom", key_manager, provider_config)
-    
+
     # Track accumulated content
     accumulated_text = ""
     accumulated_thinking = ""
     usage_data = None
-    
+
     def provider_callback(cb_type: CallbackType, content: Any):
         nonlocal accumulated_text, accumulated_thinking, usage_data
-        
+
         if cb_type == CallbackType.TEXT:
             accumulated_text += content
             callback("text", content)
@@ -183,14 +184,13 @@ def call_custom_api_stream(key_manager, url, model, messages, ai_params, timeout
             callback("error", content)
         elif cb_type == CallbackType.ABORTED:
             callback("aborted", None)
-    
+
     # Determine if thinking should be enabled based on ai_params
     thinking_enabled = "reasoning_effort" in ai_params
-    
+
     params = dict(ai_params)
-    if "reasoning_effort" in params:
-        del params["reasoning_effort"]
-    
+    params.pop("reasoning_effort", None)
+
     result = provider.generate_stream(
         messages=messages,
         model=model,
@@ -199,7 +199,7 @@ def call_custom_api_stream(key_manager, url, model, messages, ai_params, timeout
         thinking_enabled=thinking_enabled,
         abort_event=abort_event
     )
-    
+
     if result.success:
         return (
             result.content,
@@ -212,7 +212,7 @@ def call_custom_api_stream(key_manager, url, model, messages, ai_params, timeout
 
 
 # ============================================================
-# NON-STREAMING API - Uses new provider classes  
+# NON-STREAMING API - Uses new provider classes
 # ============================================================
 
 def call_api_with_retry(provider, messages, model_override, config, ai_params, key_managers, abort_event=None, result_out=None):
@@ -222,7 +222,7 @@ def call_api_with_retry(provider, messages, model_override, config, ai_params, k
     key_manager = key_managers.get(provider)
     if not key_manager or not key_manager.has_keys():
         return None, f"No API keys configured for provider: {provider}"
-    
+
     # Determine model
     if model_override:
         model = model_override
@@ -236,10 +236,10 @@ def call_api_with_retry(provider, messages, model_override, config, ai_params, k
         model = config.get("anthropic_model", "claude-3-5-sonnet-latest")
     else:
         model = None
-    
+
     if not model:
         return None, f"No model configured for provider: {provider}"
-    
+
     # Create provider and execute
     try:
         # Build provider configuration
@@ -253,12 +253,12 @@ def call_api_with_retry(provider, messages, model_override, config, ai_params, k
             "base_url": config.get("base_url"),
             "tts_use_official_endpoint": config.get("tts_use_official_endpoint", False),
         }
-        
+
         prov = create_provider(provider, key_manager, provider_config)
-        
+
         params = dict(ai_params)
         thinking_enabled = config.get("thinking_enabled", False)
-        
+
         result = prov.generate(
             messages=messages,
             model=model,
@@ -266,14 +266,14 @@ def call_api_with_retry(provider, messages, model_override, config, ai_params, k
             thinking_enabled=thinking_enabled,
             abort_event=abort_event
         )
-        
+
         if result.success:
             if isinstance(result_out, dict):
                 result_out["gemini_parts"] = result.gemini_parts
             return result.content, None
         else:
             return None, result.error
-    
+
     except Exception as e:
         return None, f"Provider error: {e}"
 
@@ -297,11 +297,11 @@ def call_api_chat(session, config, ai_params, key_managers, provider_override=No
     Uses current config settings for provider/model, not session-stored values.
     """
     messages = session.get_conversation_for_api(include_image=True)
-    
+
     # Prepend system instruction if provided
     if system_instruction:
         messages = [{"role": "system", "content": system_instruction}] + messages
-    
+
     provider = provider_override or config.get("default_provider", "google")
     model = model_override or config.get(f"{provider}_model")
     return call_api_with_retry(provider, messages, model, config, ai_params, key_managers, abort_event=abort_event, result_out=result_out)
@@ -323,15 +323,15 @@ def call_api_chat_stream(
     Uses current config settings for provider/model, not session-stored values.
     """
     messages = session.get_conversation_for_api(include_image=True)
-    
+
     # Prepend system instruction if provided
     if system_instruction:
         messages = [{"role": "system", "content": system_instruction}] + messages
-    
+
     # Use provided overrides or get from current config
     provider = provider_override or config.get("default_provider", "google")
     model = model_override
-    
+
     # Determine model if not set
     if not model:
         if provider == "custom":
@@ -342,12 +342,12 @@ def call_api_chat_stream(
             model = config.get("google_model", "gemini-2.5-flash")
         elif provider == "anthropic":
             model = config.get("anthropic_model", "claude-3-5-sonnet-latest")
-    
+
     if not model:
         error = "No model configured"
         callback("error", error)
         return None, None, None, error
-    
+
     thinking_enabled = config.get("thinking_enabled", False)
 
     return call_api_stream_unified(
@@ -372,11 +372,11 @@ def fetch_models(config, key_managers, provider_override=None):
     Fetch available models from the configured API.
     """
     provider_type = provider_override or config.get("default_provider", "custom")
-    
+
     key_manager = key_managers.get(provider_type)
     if not key_manager or not key_manager.has_keys():
         return None, f"No API keys configured for provider: {provider_type}"
-    
+
     try:
         # Build provider configuration
         provider_config = {
@@ -385,7 +385,7 @@ def fetch_models(config, key_managers, provider_override=None):
             "retry_delay": config.get("retry_delay", 5),
             "base_url": config.get("base_url"),
         }
-        
+
         provider = create_provider(provider_type, key_manager, provider_config)
         models, error = provider.fetch_models()
         return models, error

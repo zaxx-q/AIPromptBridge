@@ -12,20 +12,19 @@ Flow:
 4. AI processes audio and shows result in chat window
 """
 
+import base64
 import logging
-import threading
-from typing import Optional, Dict, Any, List
-
-from .hotkey import HotkeyListener
 import os
 import tempfile
-import base64
+import threading
 from pathlib import Path
-from typing import Callable
-from .prompts import PromptsConfig
+from typing import Any, Callable, Dict, List, Optional
+
 from ..messages import build_audio_message, build_file_message
-from ..request_pipeline import RequestPipeline, RequestContext, RequestOrigin
 from ..providers import create_provider
+from ..request_pipeline import RequestContext, RequestOrigin, RequestPipeline
+from .hotkey import HotkeyListener
+from .prompts import PromptsConfig
 
 
 class AudioToolApp:
@@ -37,7 +36,7 @@ class AudioToolApp:
     - Audio analyzer window
     - AI request processing
     """
-    
+
     def __init__(
         self,
         config: Dict[str, Any],
@@ -55,83 +54,83 @@ class AudioToolApp:
         self.config = config
         self.ai_params = ai_params
         self.key_managers = key_managers
-        
+
         # Feature settings
         self.enabled = config.get("audio_tool_enabled", True)
         self.hotkey = config.get("audio_tool_hotkey", "ctrl+alt+a")
-        
+
         # Load prompts via unified config
         self.prompts = PromptsConfig.get_instance()
-        
+
         # State
         self.hotkey_listener: Optional[HotkeyListener] = None
         self._active_tasks = 0
         self._tasks_lock = threading.Lock()
         self.cancel_requested = False
         self._window_open = False
-        
+
         logging.debug('AudioToolApp initialized')
-    
+
     def _begin_task(self):
         with self._tasks_lock:
             self._active_tasks += 1
-    
+
     def _end_task(self):
         with self._tasks_lock:
             self._active_tasks = max(0, self._active_tasks - 1)
-    
+
     @property
     def is_processing(self):
         with self._tasks_lock:
             return self._active_tasks > 0
-    
+
     def start(self):
         """Start the audio tool with hotkey listener."""
         if not self.enabled:
             logging.info('AudioTool is disabled')
             return
-        
+
         logging.info(f'Starting AudioTool with hotkey: {self.hotkey}')
-        
+
         self.hotkey_listener = HotkeyListener(
             shortcut=self.hotkey,
             callback=self._on_hotkey_pressed
         )
         self.hotkey_listener.start()
-        
+
         print(f"  ✅ AudioTool: Hotkey '{self.hotkey}' registered")
-    
+
     def stop(self):
         """Stop the audio tool."""
         logging.info('Stopping AudioTool')
-        
+
         if self.hotkey_listener:
             self.hotkey_listener.stop()
             self.hotkey_listener = None
-        
+
         self.cancel_requested = True
-    
+
     def pause(self):
         """Pause the hotkey listener."""
         if self.hotkey_listener:
             self.hotkey_listener.pause()
-    
+
     def resume(self):
         """Resume the hotkey listener."""
         if self.hotkey_listener:
             self.hotkey_listener.resume()
-    
+
     def _on_hotkey_pressed(self):
         """Handle hotkey press - show audio analyzer window."""
         logging.debug('AudioTool hotkey pressed')
-        
+
         if self._window_open:
             logging.debug('Window already open, ignoring hotkey')
             return
-        
+
         self.cancel_requested = False
         self._window_open = True
-        
+
         # Request window via GUICoordinator (runs on GUI thread)
         from .core import GUICoordinator
         GUICoordinator.get_instance().request_audio_analyzer_window(
@@ -141,12 +140,12 @@ class AudioToolApp:
             on_action=self._on_action_selected,
             on_close=self._on_window_closed
         )
-    
+
     def _on_window_closed(self):
         """Handle window close."""
         logging.debug('Audio analyzer window closed')
         self._window_open = False
-    
+
     def _on_action_selected(
         self,
         action_key: str,
@@ -187,7 +186,7 @@ class AudioToolApp:
             args=(action_key, audio_data, mime_type, custom_input, duration, provider, model, profile_name),
             daemon=True
         ).start()
-    
+
     def analyze_audio(
         self,
         audio_data: bytes,
@@ -228,10 +227,10 @@ class AudioToolApp:
                 if profile_name:
                     action = dict(action)
                     action["connection_profile"] = profile_name
-                
+
                 system_prompt = action.get("system_prompt", "You are an audio analysis assistant.")
                 task = action.get("task", "Analyze this audio.")
-                
+
                 # Check for custom input substitution
                 if action_key in ["_Custom", "_Ask"]:
                     settings = self.prompts.get_audio_tool().get("_settings", {})
@@ -240,7 +239,7 @@ class AudioToolApp:
                         task = template.replace("{custom_input}", custom_text)
                     else:
                         task = "Analyze this audio."
-                
+
                 # Apply modifier injections
                 if active_modifiers:
                     modifier_defs = self.prompts.get_modifiers()
@@ -252,38 +251,38 @@ class AudioToolApp:
                                 injections.append(injection)
                     if injections:
                         system_prompt = system_prompt + "\n\n" + "\n".join(injections)
-                
+
                 messages = []
-                
+
                 # Determine provider/model using profile resolution
                 from ..profile_resolver import resolve_profile
                 resolved = resolve_profile(action, self.config, self.ai_params, self.key_managers)
                 req_provider = provider or resolved.provider
                 req_model = model or resolved.model
-                
+
                 # Check for large file support (Gemini only)
                 # Upload if > 15MB
                 is_large_file = len(audio_data) > 15 * 1024 * 1024
-                
+
                 if req_provider == "google" and is_large_file:
                     if callback_progress:
                         callback_progress("Uploading large file...")
-                        
+
                     # Determine extension
                     ext = ".wav"
                     if "ogg" in mime_type: ext = ".ogg"
                     elif "mpeg" in mime_type or "mp3" in mime_type: ext = ".mp3"
-                    
+
                     try:
                         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as f:
                             f.write(audio_data)
                             temp_file_path = f.name
-                        
+
                         key_manager = resolved.key_managers.get("google")
                         if key_manager:
                             prov_instance = create_provider("google", key_manager, resolved.config)
                             uploaded_file, error = prov_instance.upload_file(Path(temp_file_path))
-                            
+
                             if uploaded_file:
                                 messages = build_file_message(uploaded_file.uri, mime_type, task, system_prompt)
                                 logging.info(f"[AudioTool] Uploaded large file: {uploaded_file.uri}")
@@ -297,7 +296,7 @@ class AudioToolApp:
                                 os.unlink(temp_file_path)
                             except Exception:
                                 pass
-                
+
                 if not messages:
                     # Build message with inline audio
                     audio_b64 = base64.b64encode(audio_data).decode('utf-8')
@@ -307,7 +306,7 @@ class AudioToolApp:
                         task=task,
                         system_prompt=system_prompt
                     )
-                
+
                 ctx = RequestContext(
                     origin=RequestOrigin.AUDIO_TOOL,
                     provider=req_provider,
@@ -315,19 +314,19 @@ class AudioToolApp:
                     streaming=resolved.config.get("streaming_enabled", True),
                     thinking_enabled=resolved.thinking_enabled
                 )
-                
+
                 # Execute simple (non-streaming result for this method)
                 ctx = RequestPipeline.execute_simple(
                     ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers
                 )
-                
+
                 if ctx.error:
                     if callback_error:
                         callback_error(f"Analysis error: {ctx.error}")
                 else:
                     if callback_success:
                         callback_success(ctx.response_text, ctx.total_tokens)
-                        
+
             except Exception as e:
                 logging.error(f"[AudioTool] Analysis error: {e}")
                 if callback_error:
@@ -358,11 +357,11 @@ class AudioToolApp:
             if profile_name:
                 action = dict(action)
                 action["connection_profile"] = profile_name
-            
+
             # Build prompt
             system_prompt = action.get("system_prompt", "You are an AI assistant analyzing audio.")
             task = action.get("task", "Analyze this audio.")
-            
+
             # Handle custom input
             if action_key in ["_Custom", "_Ask"]:
                 if custom_input:
@@ -374,7 +373,7 @@ class AudioToolApp:
                 else:
                     # Fallback if custom input is empty
                     task = "Analyze this audio."
-            
+
             # Build multimodal message with audio
             audio_b64 = base64.b64encode(audio_data).decode('utf-8')
             messages = build_audio_message(
@@ -383,14 +382,14 @@ class AudioToolApp:
                 task=task,
                 system_prompt=system_prompt
             )
-            
+
             window_title = f"🎤 {action_key}"
-            
+
             # Log the request
             print(f"\n{'─'*60}")
             print(f"[AudioTool] Processing: {action_key}")
             print(f"[AudioTool] Audio: {duration:.1f}s, {len(audio_data) / 1024:.1f} KB, {mime_type}")
-            
+
             # Stream to chat window
             from ..request_pipeline import RequestOrigin
             session_origin = f"audio:{action_key}"
@@ -406,12 +405,12 @@ class AudioToolApp:
                 session_origin=session_origin,
                 action_config=action
             )
-            
+
             print(f"{'─'*60}\n")
-            
+
         except Exception as e:
             logging.error(f'Error processing audio action: {e}')
-            
+
             from .popups import show_error_popup
             show_error_popup(
                 title="Audio Tool Error",
@@ -420,10 +419,10 @@ class AudioToolApp:
             )
         finally:
             self._end_task()
-    
+
     # _build_audio_message removed in favor of src/gui/messages.py
     # _get_audio_format removed as it's no longer needed for inline_data
-    
+
     def _stream_to_chat_window(
         self,
         messages: List[Dict[str, Any]],
@@ -451,19 +450,19 @@ class AudioToolApp:
             model: Selected model override
             session_origin: Origin string for session tracking (e.g., "audio:Transcribe")
         """
-        from .core import GUICoordinator
-        from ..session_manager import ChatSession
         from ..attachment_manager import AttachmentManager
-        from ..request_pipeline import RequestPipeline, RequestContext, StreamCallback
-        
+        from ..request_pipeline import RequestContext, RequestPipeline, StreamCallback
+        from ..session_manager import ChatSession
+        from .core import GUICoordinator
+
         # Create session with audio info
         session = ChatSession(origin=session_origin)
         session.title = window_title
-        
+
         # Carry over profile override to the chat session
         if action_config and action_config.get("connection_profile"):
             session.profile_override = action_config["connection_profile"]
-        
+
         # Save audio to external file for persistence
         attachment_path = AttachmentManager.save_audio(
             session_id=session.session_id,
@@ -478,7 +477,7 @@ class AudioToolApp:
                 "mime_type": mime_type,
                 "duration": duration
             })
-        
+
         # Add user message (just the task text, audio is in session)
         # Extract text from multimodal message
         user_content = messages[1]["content"]
@@ -489,10 +488,10 @@ class AudioToolApp:
             )
         else:
             task_text = user_content
-        
+
         # Add message with attachments (attachments belong to message, not session)
         session.add_message("user", task_text, attachments=attachments)
-        
+
         # Resolve follow-up system instruction based on origin
         use_origin = self.config.get("chat_use_origin_system_prompt", True)
         if use_origin:
@@ -503,29 +502,29 @@ class AudioToolApp:
                 session.system_instruction = self.prompts.get_chat_window_system_instruction()
         else:
             session.system_instruction = self.prompts.get_chat_window_system_instruction()
-        
+
         # Check if streaming is enabled
         from ..profile_resolver import resolve_profile
         resolved = resolve_profile(action_config, self.config, self.ai_params, self.key_managers)
         streaming_enabled = resolved.config.get("streaming_enabled", True)
-        
+
         if streaming_enabled:
             # Request streaming chat window
             callbacks = GUICoordinator.get_instance().request_streaming_chat_window(session)
-            
+
             if not callbacks.on_text:
                 logging.error("Failed to create streaming chat window")
                 print("  [Error] Failed to create chat window")
                 return
-            
+
             # Accumulated response
             full_response = []
             full_thinking = []
-            
+
             # Use provided settings or fallback to resolved profile defaults
             req_provider = provider or resolved.provider
             req_model = model or resolved.model
-            
+
             # Setup context
             ctx = RequestContext(
                 origin=origin,
@@ -534,28 +533,28 @@ class AudioToolApp:
                 streaming=True,
                 thinking_enabled=resolved.thinking_enabled
             )
-            
+
             # Stream callbacks
             def on_text(content):
                 full_response.append(content)
                 if callbacks.on_text:
                     callbacks.on_text(content)
-            
+
             def on_thinking(content):
                 full_thinking.append(content)
                 if callbacks.on_thinking:
                     callbacks.on_thinking(content)
-            
+
             def on_done():
                 if callbacks.on_done:
                     callbacks.on_done()
-            
+
             stream_callbacks = StreamCallback(
                 on_text=on_text,
                 on_thinking=on_thinking,
                 on_done=on_done
             )
-            
+
             # Execute streaming request
             ctx = RequestPipeline.execute_unified_stream(
                 ctx,
@@ -565,11 +564,11 @@ class AudioToolApp:
                 resolved.key_managers,
                 stream_callbacks
             )
-            
+
             if ctx.error:
                 logging.error(f'Streaming to chat window failed: {ctx.error}')
                 print(f"  [Error] {ctx.error}")
-                
+
                 from .popups import show_error_popup
                 show_error_popup(
                     title="API Request Failed",
@@ -577,11 +576,11 @@ class AudioToolApp:
                     details=ctx.error
                 )
                 return
-            
+
             # Finalize
             response_text = ''.join(full_response) or ctx.response_text or ""
             thinking_text = ''.join(full_thinking) or ctx.reasoning_text or ""
-            
+
             callbacks.finalize(response_text, thinking_text)
 
             # Explicitly add assistant message to session before auto-save
@@ -591,13 +590,13 @@ class AudioToolApp:
 
             # Auto-save session if confgured
             self._handle_auto_save(session)
-            
+
             print(f"  ✅ Response streamed to chat window ({len(response_text)} chars)")
         else:
             # Non-streaming: execute simple request, then show window
             req_provider = provider or resolved.provider
             req_model = model or resolved.model
-            
+
             ctx = RequestContext(
                 origin=origin,
                 provider=req_provider,
@@ -605,7 +604,7 @@ class AudioToolApp:
                 streaming=False,
                 thinking_enabled=resolved.thinking_enabled
             )
-            
+
             ctx = RequestPipeline.execute_simple(
                 ctx,
                 messages,
@@ -613,11 +612,11 @@ class AudioToolApp:
                 resolved.ai_params,
                 resolved.key_managers
             )
-            
+
             if ctx.error:
                 logging.error(f'Audio analysis failed: {ctx.error}')
                 print(f"  [Error] {ctx.error}")
-                
+
                 from .popups import show_error_popup
                 show_error_popup(
                     title="API Request Failed",
@@ -625,23 +624,23 @@ class AudioToolApp:
                     details=ctx.error
                 )
                 return
-            
+
             if ctx.response_text:
                 # Show chat window with response
                 session.add_message("assistant", ctx.response_text)
-                
+
                 from .core import show_chat_gui
                 show_chat_gui(session, initial_response=ctx.response_text)
 
                 # Auto-save session if confgured
                 self._handle_auto_save(session)
-                
+
                 print(f"  ✅ Response received ({len(ctx.response_text)} chars)")
-    
+
     def _handle_auto_save(self, session):
         """Handle auto-saving session based on configuration."""
         auto_save = self.config.get("auto_save_session", "on_followup")
-        
+
         should_save = False
         if auto_save == "always_window":
             should_save = True
@@ -651,7 +650,7 @@ class AudioToolApp:
                 if msg.get("attachments"):
                     should_save = True
                     break
-                    
+
         if should_save:
             from ..session_manager import add_session
             add_session(session, self.config.get("max_sessions", 200))
@@ -660,11 +659,11 @@ class AudioToolApp:
     def is_running(self) -> bool:
         """Check if AudioTool is running."""
         return self.hotkey_listener is not None and self.hotkey_listener.is_running()
-    
+
     def is_paused(self) -> bool:
         """Check if AudioTool is paused."""
         return self.hotkey_listener is not None and self.hotkey_listener.is_paused()
-    
+
     def get_status(self) -> Dict[str, Any]:
         """Get current status."""
         return {
@@ -675,7 +674,7 @@ class AudioToolApp:
             "processing": self.is_processing,
             "window_open": self._window_open
         }
-    
+
     def reload_prompts(self):
         """Reload prompts configuration."""
         self.prompts.reload()

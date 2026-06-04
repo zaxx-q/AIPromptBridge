@@ -4,28 +4,22 @@ System Tray implementation for AIPromptBridge
 Uses infi.systray for Windows with native .ico support (no Pillow needed)
 """
 
+import ctypes
 import os
-import sys
 import shutil
 import subprocess
-import ctypes
+import sys
+import threading
 from pathlib import Path
 
 from .utils import is_compiled
-import threading
 
 # Try to import infi.systray
 HAVE_SYSTRAY = False
 SysTrayIcon = None
 try:
     from infi.systray import SysTrayIcon
-    from infi.systray.win32_adapter import (
-        MENUITEMINFO,
-        PackMENUITEMINFO,
-        InsertMenuItem,
-        CreatePopupMenu,
-        ctypes
-    )
+    from infi.systray.win32_adapter import MENUITEMINFO, CreatePopupMenu, InsertMenuItem, PackMENUITEMINFO, ctypes
     # Define constants missing from win32_adapter
     MFT_SEPARATOR = 0x00000800
     MIIM_FTYPE = 0x00000100
@@ -42,7 +36,7 @@ try:
                     item.fType = MFT_SEPARATOR
                     InsertMenuItem(menu, 0, 1, ctypes.byref(item))
                     continue
-                
+
                 if option_icon:
                     option_icon = self._prep_menu_icon(option_icon)
 
@@ -94,22 +88,22 @@ def get_process_map():
     try:
         kernel32 = ctypes.windll.kernel32
         hSnapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-        
+
         pe32 = PROCESSENTRY32()
         pe32.dwSize = ctypes.sizeof(PROCESSENTRY32)
-        
+
         proc_map = {}
-        
+
         if kernel32.Process32First(hSnapshot, ctypes.byref(pe32)):
             while True:
                 pid = pe32.th32ProcessID
                 ppid = pe32.th32ParentProcessID
                 name = pe32.szExeFile.decode('utf-8', 'ignore')
                 proc_map[pid] = (ppid, name)
-                
+
                 if not kernel32.Process32Next(hSnapshot, ctypes.byref(pe32)):
                     break
-                    
+
         kernel32.CloseHandle(hSnapshot)
         return proc_map
     except Exception:
@@ -124,12 +118,12 @@ def get_console_window(use_cache=True):
         use_cache: If True, use cached WT window handle if available
     """
     global _cached_wt_hwnd, _cached_wt_pid
-    
+
     if sys.platform != 'win32':
         return None
-    
+
     user32 = ctypes.windll.user32
-        
+
     # 1. Check if we have a cached WT window handle that's still valid
     if use_cache and _cached_wt_hwnd:
         # Verify the cached window still exists and belongs to the right process
@@ -139,45 +133,45 @@ def get_console_window(use_cache=True):
             # Window no longer exists, clear cache
             _cached_wt_hwnd = None
             _cached_wt_pid = None
-    
+
     # 2. Try standard method first
     hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-    
+
     # If the window is visible, it's likely the real one (standard console)
     if hwnd and user32.IsWindowVisible(hwnd):
         return hwnd
-        
+
     # 3. If standard window is hidden or missing, we might be in Windows Terminal
     # We need to walk up the process tree to find WindowsTerminal.exe
     try:
         my_pid = os.getpid()
         proc_map = get_process_map()
-        
+
         curr = my_pid
         wt_pid = None
-        
+
         # Traverse up for a limited depth
         for _ in range(10):
             if curr not in proc_map:
                 break
             ppid, name = proc_map[curr]
-            
+
             # Check for Windows Terminal
             if 'WindowsTerminal.exe' in name:
                 wt_pid = curr
                 break
-                
+
             if ppid == 0 or ppid == curr:
                 break
             curr = ppid
-            
+
         if wt_pid:
             # We found Windows Terminal process. Now find its window.
             # We prioritize CASCADIA_HOSTING_WINDOW_CLASS
             # Note: We search for ANY window (not just visible) so we can find hidden ones too
             found_hwnd = None
             fallback_hwnd = None
-            
+
             def enum_handler(h, ctx):
                 nonlocal found_hwnd, fallback_hwnd
                 pid = ctypes.c_ulong()
@@ -187,22 +181,22 @@ def get_console_window(use_cache=True):
                     class_buff = ctypes.create_unicode_buffer(256)
                     user32.GetClassNameW(h, class_buff, 256)
                     class_name = class_buff.value
-                    
+
                     if class_name == 'CASCADIA_HOSTING_WINDOW_CLASS':
                         found_hwnd = h
                         return False # Stop enumeration, found the best match
-                    
+
                     # Only use as fallback if it's a top-level window with a title
                     if fallback_hwnd is None:
                         length = user32.GetWindowTextLengthW(h)
                         if length > 0:
                             fallback_hwnd = h
-                            
+
                 return True
 
             CMPFUNC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
             user32.EnumWindows(CMPFUNC(enum_handler), 0)
-            
+
             if found_hwnd:
                 # Cache this for future use
                 _cached_wt_hwnd = found_hwnd
@@ -212,10 +206,10 @@ def get_console_window(use_cache=True):
                 _cached_wt_hwnd = fallback_hwnd
                 _cached_wt_pid = wt_pid
                 return fallback_hwnd
-                
+
     except Exception as e:
         print(f"[Warning] Failed to resolve Windows Terminal window: {e}")
-        
+
     # Fallback to standard handle even if hidden, or None
     return hwnd
 
@@ -238,10 +232,10 @@ def hide_console():
         hwnd = get_console_window()
         if hwnd:
             user32 = ctypes.windll.user32
-            
+
             # Try ShowWindow first
             user32.ShowWindow(hwnd, 0)  # SW_HIDE
-            
+
             # If ShowWindow didn't fully hide it, use SetWindowPos as backup
             # This is more forceful and works better with some window types
             if user32.IsWindowVisible(hwnd):
@@ -251,14 +245,14 @@ def hide_console():
                 SWP_NOMOVE = 0x0002
                 SWP_NOZORDER = 0x0004
                 SWP_NOACTIVATE = 0x0010
-                
+
                 user32.SetWindowPos(
                     hwnd,
                     None,  # hWndInsertAfter (not used with these flags)
                     0, 0, 0, 0,  # x, y, cx, cy (ignored with NOSIZE|NOMOVE)
                     SWP_HIDEWINDOW | SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE
                 )
-            
+
             return True
     return False
 
@@ -293,17 +287,17 @@ def disable_console_close_button():
     """
     if sys.platform != 'win32':
         return False
-    
+
     try:
         hwnd = get_console_window()
         if not hwnd:
             return False
-        
+
         # Get the system menu (window menu)
         # GetSystemMenu(hwnd, bRevert) - bRevert=False gets the current menu
         user32 = ctypes.windll.user32
         hmenu = user32.GetSystemMenu(hwnd, False)
-        
+
         if hmenu:
             # SC_CLOSE = 0xF060
             # MF_BYCOMMAND = 0x0000
@@ -312,17 +306,17 @@ def disable_console_close_button():
             SC_CLOSE = 0xF060
             MF_BYCOMMAND = 0x0000
             MF_GRAYED = 0x0001
-            
+
             # Disable (gray out) the close menu item
             user32.EnableMenuItem(hmenu, SC_CLOSE, MF_BYCOMMAND | MF_GRAYED)
-            
+
             # Also remove it entirely (optional - comment out if you just want grayed)
             # user32.DeleteMenu(hmenu, SC_CLOSE, MF_BYCOMMAND)
-            
+
             return True
     except Exception as e:
         print(f"[Warning] Could not disable console close button: {e}")
-    
+
     return False
 
 
@@ -330,19 +324,19 @@ def enable_console_close_button():
     """Re-enable the close button on the console window."""
     if sys.platform != 'win32':
         return False
-    
+
     try:
         hwnd = get_console_window()
         if not hwnd:
             return False
-        
+
         user32 = ctypes.windll.user32
         # GetSystemMenu with bRevert=True resets to default
         user32.GetSystemMenu(hwnd, True)
         return True
     except Exception:
         pass
-    
+
     return False
 
 
@@ -350,7 +344,7 @@ def enable_console_close_button():
 
 class TrayApp:
     """System tray application for AIPromptBridge"""
-    
+
     def __init__(self, icon_path=None, on_exit_callback=None, allow_console_toggle=True, show_edit_file_items=False):
         """
         Initialize the tray application
@@ -366,7 +360,7 @@ class TrayApp:
         self.console_visible = True
         self.allow_console_toggle = allow_console_toggle
         self.show_edit_file_items = show_edit_file_items
-        
+
         # Find icon path
         if icon_path is None:
             # Look for icon.ico
@@ -377,7 +371,7 @@ class TrayApp:
                 # Dev: uses project root
                 project_root = Path(__file__).parent.parent
                 icon_path = project_root / "icon.ico"
-            
+
             if not icon_path.exists():
                 # Fallback: try current directory/assets (for fallback)
                 cwd = Path.cwd()
@@ -385,18 +379,18 @@ class TrayApp:
                     icon_path = cwd / "icon.ico"
                 else:
                     icon_path = Path("icon.ico")
-        
+
         self.icon_path = str(icon_path) if Path(icon_path).exists() else None
-        
+
         if not HAVE_SYSTRAY:
             print("[Warning] infi.systray not available - tray functionality disabled")
             print("         Install with: pip install infi.systray")
-    
+
     def _on_toggle_console(self, systray):
         """Toggle console visibility based on actual window state"""
         visible = is_console_visible()
         minimized = is_console_minimized()
-        
+
         # A minimized window is "visible" but not shown - we should restore it
         if visible and not minimized:
             hide_console()
@@ -404,28 +398,28 @@ class TrayApp:
         else:
             show_console()
             self.console_visible = True
-    
+
     def _on_show_console(self, systray):
         """Show the console window"""
         show_console()
         self.console_visible = True
-    
+
     def _on_hide_console(self, systray):
         """Hide the console window"""
         hide_console()
         self.console_visible = False
-    
+
     def _on_restart(self, systray):
         """Restart the application"""
         print("\n🔄 Restarting AIPromptBridge...")
-        
+
         # Get current state
         script = os.path.abspath(sys.argv[0])
         args = sys.argv[1:]
-        
+
         # Detect mode
         app_is_compiled = is_compiled()
-        
+
         launched_mode = None
         for arg in sys.argv:
             if arg.startswith("--launched-mode="):
@@ -436,7 +430,7 @@ class TrayApp:
         if launched_mode != "gui":
             show_console()
             enable_console_close_button()
-        
+
         # Clean up emoji resources
         try:
             from .gui.emoji_renderer import get_emoji_renderer
@@ -444,27 +438,27 @@ class TrayApp:
                 get_emoji_renderer().cleanup()
         except Exception:
             pass
-            
+
         # Strategy 1: Compiled Mode - Restart via Launcher
         if app_is_compiled and launched_mode:
             try:
                 bin_dir = Path(sys.executable).parent
                 root_dir = bin_dir.parent
-                
+
                 # Determine correct launcher
                 # Console mode is AIPromptBridge.exe
                 # GUI mode is AIPromptBridge-NoConsole.exe
                 launcher_name = "AIPromptBridge-NoConsole.exe" if launched_mode == "gui" else "AIPromptBridge.exe"
                 launcher_path = root_dir / launcher_name
-                
+
                 if launcher_path.exists():
                     print(f"🔄 Restarting via launcher: {launcher_name}")
-                    
+
                     # Remove --launched-mode arg as launcher adds it
                     new_args = [arg for arg in sys.argv[1:] if not arg.startswith("--launched-mode")]
-                    
+
                     cmd = [str(launcher_path)] + new_args
-                    
+
                     # Detached process group
                     subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
                     os._exit(0)
@@ -476,11 +470,11 @@ class TrayApp:
             try:
                 # Legacy console or GUI background restart
                 flags = subprocess.CREATE_NEW_PROCESS_GROUP
-                
+
                 # Only create new console window if NOT in GUI mode
                 if launched_mode != "gui":
                     flags |= subprocess.CREATE_NEW_CONSOLE
-                
+
                 if script.endswith('.py'):
                     subprocess.Popen(
                         [sys.executable, script] + args,
@@ -498,24 +492,24 @@ class TrayApp:
                 return
         else:
             os.execv(sys.executable, [sys.executable, script] + args)
-        
+
         os._exit(0)
-    
+
     def _on_session_browser(self, systray):
         """Open the session browser GUI"""
         try:
-            from .gui.core import show_session_browser, HAVE_GUI
+            from .gui.core import HAVE_GUI, show_session_browser
             if HAVE_GUI:
                 show_session_browser()
             else:
                 print("[Warning] GUI not available")
         except Exception as e:
             print(f"[Error] Could not open session browser: {e}")
-    
+
     def _on_settings(self, systray):
         """Open settings window"""
         try:
-            from .gui.core import show_settings_window, HAVE_GUI
+            from .gui.core import HAVE_GUI, show_settings_window
             if HAVE_GUI:
                 print("\n⚙️  Opening settings...\n")
                 show_settings_window()
@@ -523,11 +517,11 @@ class TrayApp:
                 print("[Warning] GUI not available")
         except Exception as e:
             print(f"[Error] Could not open settings: {e}")
-    
+
     def _on_prompt_editor(self, systray):
         """Open prompt editor window"""
         try:
-            from .gui.core import show_prompt_editor, HAVE_GUI
+            from .gui.core import HAVE_GUI, show_prompt_editor
             if HAVE_GUI:
                 print("\n📝  Opening prompt editor...\n")
                 show_prompt_editor()
@@ -539,7 +533,7 @@ class TrayApp:
     def _on_connection_profiles(self, systray):
         """Open connection profile manager window"""
         try:
-            from .gui.core import show_connection_manager, HAVE_GUI
+            from .gui.core import HAVE_GUI, show_connection_manager
             if HAVE_GUI:
                 print("\n🔌  Opening connection profiles...\n")
                 show_connection_manager()
@@ -590,8 +584,8 @@ class TrayApp:
         """Open TTS Window"""
         try:
             from . import web_server
-            from .gui.core import GUICoordinator, HAVE_GUI
-            
+            from .gui.core import HAVE_GUI, GUICoordinator
+
             if HAVE_GUI:
                 GUICoordinator.get_instance().request_tts_window(
                     web_server.CONFIG,
@@ -603,27 +597,30 @@ class TrayApp:
                 print("[Warning] GUI not available")
         except Exception as e:
             print(f"[Error] Could not open TTS Window: {e}")
-    
+
     def _on_check_updates(self, systray):
         """Check for updates from GitHub Releases"""
         def _check_thread():
             try:
                 from . import web_server
                 from .updater import (
-                    check_for_update, get_cached_update_info,
-                    is_compiled, perform_update, RELEASES_URL,
+                    RELEASES_URL,
+                    check_for_update,
+                    get_cached_update_info,
+                    is_compiled,
+                    perform_update,
                 )
                 from .version import __version__
-                
+
                 config = web_server.CONFIG or {}
 
                 print("\n⬆️  Checking for updates...")
                 info = check_for_update()
-                
+
                 if not info:
                     print(f"✅ You're up to date! (v{__version__})\n")
                     try:
-                        from .gui.core import GUICoordinator, HAVE_GUI
+                        from .gui.core import HAVE_GUI, GUICoordinator
                         if HAVE_GUI:
                             coordinator = GUICoordinator.get_instance()
                             def _show_uptodate_dialog():
@@ -633,51 +630,51 @@ class TrayApp:
                     except Exception as e:
                         print(f"[Error] Failed to show up-to-date dialog: {e}")
                     return
-                
+
                 print(f"⬆️  Update available: v{info.version} (current: v{__version__})")
-                
+
                 # Attempt update via GUI dialog or direct
                 try:
-                    from .gui.core import GUICoordinator, HAVE_GUI
+                    from .gui.core import HAVE_GUI, GUICoordinator
                     if HAVE_GUI:
                         coordinator = GUICoordinator.get_instance()
-                        
+
                         def _show_update_dialog():
                             from .gui.windows.update_dialogs import show_update_available_dialog
                             show_update_available_dialog(info, __version__)
-                        
+
                         coordinator.run_on_gui_thread(_show_update_dialog)
                         return
                 except Exception as e:
                     print(f"[Error] Failed to show update dialog: {e}")
-                
+
                 # Fallback: console prompt
-                print(f"   Press U in the terminal to install.\n")
-                
+                print("   Press U in the terminal to install.\n")
+
             except Exception as e:
                 print(f"[Error] Update check failed: {e}")
-        
+
         import threading
         threading.Thread(target=_check_thread, daemon=True).start()
-    
+
     def _on_edit_config(self, systray):
         """Open config.ini in default editor"""
         config_path = Path.cwd() / "config.ini"
-            
+
         if config_path.exists():
             self._open_file(config_path)
         else:
             print(f"[Error] Config file not found: {config_path}")
-    
+
     def _on_edit_options(self, systray):
         """Open prompts.json in default editor"""
         options_path = Path.cwd() / "prompts.json"
-        
+
         if options_path.exists():
             self._open_file(options_path)
         else:
             print(f"[Error] Options file not found: {options_path}")
-    
+
     def _open_file(self, path):
         """Open a file in the default system editor"""
         path = str(path)
@@ -687,19 +684,19 @@ class TrayApp:
             subprocess.run(['open', path])
         else:
             subprocess.run(['xdg-open', path])
-    
+
     def _on_exit(self, systray):
         """Exit the application"""
         print("\n👋 Exiting AIPromptBridge...")
-        
+
         # Show console before exit so user sees the message
         show_console()
         enable_console_close_button()  # Re-enable close button before exit
-        
+
         # Call the exit callback if provided
         if self.on_exit_callback:
             self.on_exit_callback()
-            
+
         # Clean up emoji resources
         try:
             from .gui.emoji_renderer import get_emoji_renderer
@@ -707,10 +704,10 @@ class TrayApp:
                 get_emoji_renderer().cleanup()
         except Exception:
             pass
-        
+
         # Force exit
         os._exit(0)
-    
+
     def start(self, hide_console_on_start=True):
         """
         Start the system tray icon
@@ -721,28 +718,28 @@ class TrayApp:
         if not HAVE_SYSTRAY:
             print("[Warning] System tray not available")
             return False
-        
+
         if not self.icon_path:
             print("[Warning] Icon file not found - using default icon")
-        
+
         # Disable the console close button (X) to prevent accidental closure
         # Users should use tray icon's Quit option instead
         disable_console_close_button()
-        
+
         # Enable dark mode for menus if applicable
         self._enable_dark_mode()
-        
+
         # Helper for separators
         def _separator(systray): pass
         SEP = ("---", _separator)
 
         # Define menu options with dynamic emoji icon support
         raw_options = []
-        
+
         if self.allow_console_toggle:
             raw_options.append(("💻 Toggle Console", self._on_toggle_console))
             raw_options.append(SEP)
-            
+
         raw_options.extend([
             ("🔍 Session Browser", self._on_session_browser),
             ("💬 Direct Chat", self._on_direct_chat),
@@ -754,28 +751,28 @@ class TrayApp:
             ("✏️ Prompt Editor", self._on_prompt_editor),
             ("🔌 Profiles", self._on_connection_profiles),
         ])
-        
+
         # File editing options (debug mode)
         if self.show_edit_file_items:
             raw_options.extend([
                 ("📝 Edit config.ini (file)", self._on_edit_config),
                 ("📄 Edit prompts.json (file)", self._on_edit_options),
             ])
-        
+
         raw_options.extend([
             SEP,
             ("⬆️ Check for Updates", self._on_check_updates),
             ("🔄 Restart", self._on_restart),
             SEP # Separator before "Quit" (which is added automatically)
         ])
-        
+
         menu_options = []
-        
+
         try:
             # Try to use emoji renderer to generate icons
             from .gui.emoji_renderer import get_emoji_renderer
             renderer = get_emoji_renderer()
-            
+
             for text, callback in raw_options:
                 if text == "---":
                     menu_options.append((text, None, callback))
@@ -784,22 +781,22 @@ class TrayApp:
                 # Extract emoji
                 emoji_char, clean_text = renderer.extract_leading_emoji(text)
                 icon_path = None
-                
+
                 if emoji_char:
                     # Generate temporary .ico file
                     icon_path = renderer.get_emoji_icon_path(emoji_char)
-                
+
                 if icon_path:
                     # Use clean text and custom icon
                     menu_options.append((clean_text, icon_path, callback))
                 else:
                     menu_options.append((text, None, callback))
-                    
+
         except Exception as e:
             print(f"[Warning] Failed to generate tray icons: {e}")
             for text, callback in raw_options:
                 menu_options.append((text, None, callback))
-        
+
         # Create the system tray icon
         try:
             # Standard initialization: Let library handle the Quit button
@@ -811,7 +808,7 @@ class TrayApp:
                 on_quit=self._on_exit,
                 default_menu_index=0  # "Show Console" is default action on double-click
             )
-            
+
             # Hide console if requested
             if hide_console_on_start:
                 # Use a short delay and retry to ensure WT window is ready
@@ -828,15 +825,15 @@ class TrayApp:
                     # Final attempt
                     hide_console()
                     self.console_visible = not is_console_visible()
-            
+
             # Start the tray (this blocks until shutdown is called)
             self.systray.start()
             return True
-            
+
         except Exception as e:
             print(f"[Error] Failed to start system tray: {e}")
             return False
-    
+
     def _enable_dark_mode(self):
         """
         Attempt to enable dark mode for the application menus.
@@ -844,7 +841,7 @@ class TrayApp:
         """
         if sys.platform != 'win32':
             return
-            
+
         try:
             # Check if we should use dark mode
             try:
@@ -852,7 +849,7 @@ class TrayApp:
                 should_be_dark = is_dark_mode()
             except ImportError:
                 should_be_dark = True # Default to dark if can't check
-            
+
             if not should_be_dark:
                 return
 
@@ -872,7 +869,7 @@ class TrayApp:
                         pass
             except Exception:
                 pass
-                
+
         except Exception as e:
             print(f"[Warning] Failed to enable dark mode for tray: {e}")
 
@@ -891,18 +888,18 @@ def run_with_tray(main_func, icon_path=None, hide_console=True):
         icon_path: Path to icon.ico
         hide_console: Whether to hide console on start
     """
-    
+
     # Create tray app
     tray = TrayApp(icon_path=icon_path)
-    
+
     if not HAVE_SYSTRAY:
         # No tray support - just run main function
         main_func()
         return
-    
+
     # Run main function in a separate thread
     main_thread = threading.Thread(target=main_func, daemon=True)
     main_thread.start()
-    
+
     # Start tray (this blocks)
     tray.start(hide_console_on_start=hide_console)

@@ -14,15 +14,17 @@ Layout Constants:
 """
 
 import tkinter as tk
-from typing import Optional, Callable, Any, List
+from typing import Any, Callable, List, Optional
 
+from ...custom_widgets import ScrollableComboBox
 from ...platform import HAVE_CTK, ctk
 from ...themes import (
-    ThemeColors, get_ctk_font,
-    get_ctk_label_colors, get_ctk_entry_colors,
+    ThemeColors,
     get_ctk_combobox_colors,
+    get_ctk_entry_colors,
+    get_ctk_font,
+    get_ctk_label_colors,
 )
-from ...custom_widgets import ScrollableComboBox
 
 # =============================================================================
 # Layout Constants — used by all tab mixins for uniform appearance

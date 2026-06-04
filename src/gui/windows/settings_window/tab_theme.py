@@ -11,13 +11,17 @@ Sections (in display order):
 
 import tkinter as tk
 
+from ...custom_widgets import create_section_header
 from ...platform import HAVE_CTK, ctk
 from ...themes import (
-    ThemeRegistry, ThemeColors, get_ctk_font,
-    get_ctk_label_colors, get_ctk_entry_colors,
-    get_ctk_combobox_colors, list_themes,
+    ThemeColors,
+    ThemeRegistry,
+    get_ctk_combobox_colors,
+    get_ctk_entry_colors,
+    get_ctk_font,
+    get_ctk_label_colors,
+    list_themes,
 )
-from ...custom_widgets import create_section_header
 from .widgets import LABEL_WIDTH
 
 

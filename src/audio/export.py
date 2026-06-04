@@ -23,9 +23,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from .ffmpeg_utils import get_ffmpeg_path, get_creation_flags, is_ffmpeg_available
-from .wav_utils import save_wav, pcm_to_wav
-
+from .ffmpeg_utils import get_creation_flags, get_ffmpeg_path, is_ffmpeg_available
+from .wav_utils import pcm_to_wav, save_wav
 
 # =============================================================================
 # Codec Configuration
@@ -119,43 +118,43 @@ def export_audio_file(
             return None
         except Exception as e:
             return str(e)
-    
+
     # Compressed formats require FFmpeg
     ffmpeg_path = get_ffmpeg_path()
     if not ffmpeg_path:
         return "FFmpeg not available for conversion"
-    
+
     codec_args, _ = CODEC_MAP.get(format_ext, CODEC_MAP["ogg"])
-    
+
     try:
         # Base command: read WAV from stdin
         cmd = [ffmpeg_path, "-y", "-i", "pipe:0", "-v", "error"]
-        
+
         # Insert extra args (filters, etc.) before codec
         if extra_input_args:
             cmd.extend(extra_input_args)
-        
+
         # Codec settings
         cmd.extend(codec_args)
-        
+
         # Metadata embedding
         if metadata_comment:
             cmd.extend(["-metadata", f"comment={metadata_comment}"])
-        
+
         cmd.append(output_path)
-        
+
         result = subprocess.run(
             cmd,
             input=wav_data,
             capture_output=True,
             creationflags=get_creation_flags()
         )
-        
+
         if result.returncode != 0:
             return f"FFmpeg: {result.stderr.decode('utf-8', errors='replace')}"
-        
+
         return None
-        
+
     except Exception as e:
         return str(e)
 
@@ -189,40 +188,40 @@ def export_audio_from_file(
     ffmpeg_path = get_ffmpeg_path()
     if not ffmpeg_path:
         return "FFmpeg not available"
-    
+
     # Determine codec
     if codec_override:
         codec_args = codec_override
     else:
         codec_args, _ = CODEC_MAP.get(format_ext, CODEC_MAP["ogg"])
-    
+
     try:
         cmd = [ffmpeg_path, "-y", "-i", input_path, "-v", "error"]
-        
+
         # Audio filters
         if ffmpeg_filter_args:
             cmd.extend(ffmpeg_filter_args.split())
-        
+
         # Codec
         cmd.extend(codec_args)
-        
+
         # Metadata
         if metadata_comment:
             cmd.extend(["-metadata", f"comment={metadata_comment}"])
-        
+
         cmd.append(output_path)
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             creationflags=get_creation_flags()
         )
-        
+
         if result.returncode != 0:
             return f"FFmpeg: {result.stderr.decode('utf-8', errors='replace')}"
-        
+
         return None
-        
+
     except Exception as e:
         return str(e)
 
@@ -250,11 +249,11 @@ def build_output_filename(
         Filename string like "tts_hello_world_20260323_110100.ogg"
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
+
     slug = sanitize_filename(text_source, max_words=max_words)
     if not slug and fallback_name:
         slug = sanitize_filename(fallback_name, max_words=3, max_len=30)
-    
+
     if slug:
         return f"{prefix}_{slug}_{timestamp}.{format_ext}"
     else:

@@ -44,26 +44,26 @@ class ThemeColors:
     and legacy popup-style naming (base, text, blue) via properties
     for backward compatibility.
     """
-    
+
     # Base colors
     bg: str                    # Primary background
     fg: str                    # Primary text
     text_bg: str               # Text area background
     input_bg: str              # Input field background
     border: str                # Border color
-    
+
     # Accent colors
     accent: str                # Primary accent (blue-ish)
     accent_green: str          # Success/positive
     accent_yellow: str         # Warning/attention
     accent_red: str            # Error/danger
-    
+
     # Chat-specific
     user_bg: str               # User message background
     user_accent: str           # User label color
     assistant_bg: str          # Assistant message background
     assistant_accent: str      # Assistant label color
-    
+
     # Code/Markdown
     code_bg: str               # Code block background
     header1: str               # H1 color
@@ -71,7 +71,7 @@ class ThemeColors:
     header3: str               # H3 color
     bullet: str                # Bullet point color
     blockquote: str            # Blockquote/muted text
-    
+
     # Popup-specific (elevated surfaces)
     surface0: str              # Elevated surface level 0
     surface1: str              # Elevated surface level 1 (hover)
@@ -79,38 +79,38 @@ class ThemeColors:
     overlay0: str              # Muted overlay text
     lavender: str              # Secondary accent (purple-ish)
     peach: str                 # Tertiary accent (orange-ish)
-    
+
     # Legacy popup-style property aliases
     @property
     def base(self) -> str:
         """Alias for bg (legacy popup compatibility)."""
         return self.bg
-    
+
     @property
     def mantle(self) -> str:
         """Alias for code_bg (legacy popup compatibility)."""
         return self.code_bg
-    
+
     @property
     def text(self) -> str:
         """Alias for fg (legacy popup compatibility)."""
         return self.fg
-    
+
     @property
     def subtext0(self) -> str:
         """Alias for blockquote (legacy popup compatibility)."""
         return self.blockquote
-    
+
     @property
     def blue(self) -> str:
         """Alias for accent (legacy popup compatibility)."""
         return self.accent
-    
+
     @property
     def green(self) -> str:
         """Alias for accent_green (legacy popup compatibility)."""
         return self.accent_green
-    
+
     @property
     def red(self) -> str:
         """Alias for accent_red (legacy popup compatibility)."""
@@ -500,7 +500,7 @@ class ThemeRegistry:
         # List available themes
         themes = ThemeRegistry.list_themes()
     """
-    
+
     _themes: Dict[str, tuple] = {
         "catppuccin": (CATPPUCCIN_DARK, CATPPUCCIN_LIGHT),
         "dracula": (DRACULA_DARK, DRACULA_LIGHT),
@@ -509,16 +509,16 @@ class ThemeRegistry:
         "minimal": (MINIMAL_DARK, MINIMAL_LIGHT),
         "highcontrast": (HIGHCONTRAST_DARK, HIGHCONTRAST_LIGHT),
     }
-    
+
     # Default theme
     DEFAULT_THEME = "dracula"
     DEFAULT_MODE = "auto"
-    
+
     @classmethod
     def list_themes(cls) -> list:
         """Get list of available theme names."""
         return list(cls._themes.keys())
-    
+
     @classmethod
     def get_theme(cls, name: str, mode: str) -> ThemeColors:
         """
@@ -533,13 +533,13 @@ class ThemeRegistry:
         """
         if name not in cls._themes:
             name = cls.DEFAULT_THEME
-        
+
         dark_theme, light_theme = cls._themes[name]
-        
+
         if mode == "light":
             return light_theme
         return dark_theme
-    
+
     @classmethod
     def is_dark_mode(cls) -> bool:
         """Check if system is in dark mode."""
@@ -549,7 +549,7 @@ class ThemeRegistry:
             except Exception:
                 pass
         return True  # Default to dark if can't detect
-    
+
     @classmethod
     def get_current(cls, config: Optional[Dict] = None) -> ThemeColors:
         """
@@ -569,15 +569,15 @@ class ThemeRegistry:
                 config = web_server.CONFIG
             except (ImportError, AttributeError):
                 config = {}
-        
+
         # Get theme name (default: catppuccin)
         theme_name = config.get("ui_theme", cls.DEFAULT_THEME)
         if theme_name not in cls._themes:
             theme_name = cls.DEFAULT_THEME
-        
+
         # Get mode (auto, dark, light)
         theme_mode = config.get("ui_theme_mode", cls.DEFAULT_MODE)
-        
+
         if theme_mode == "auto":
             # Use system detection
             is_dark = cls.is_dark_mode()
@@ -585,9 +585,9 @@ class ThemeRegistry:
             is_dark = False
         else:  # "dark" or fallback
             is_dark = True
-        
+
         return cls.get_theme(theme_name, "dark" if is_dark else "light")
-    
+
     @classmethod
     def get_current_as_dict(cls, config: Optional[Dict] = None) -> Dict[str, str]:
         """
@@ -711,7 +711,7 @@ def get_ctk_font(size: int = 12, weight: str = "normal", family: str = None):
             family = "SF Pro Text"
         else:
             family = "DejaVu Sans"
-    
+
     # Always return tuple - works with both tk and CTk, and is thread-safe
     return (family, size, weight)
 
@@ -725,11 +725,11 @@ def _adjust_hex_color(hex_color: str, factor: float) -> str:
         r = int(hex_color[0:2], 16)
         g = int(hex_color[2:4], 16)
         b = int(hex_color[4:6], 16)
-        
+
         r = max(0, min(255, int(r * factor)))
         g = max(0, min(255, int(g * factor)))
         b = max(0, min(255, int(b * factor)))
-        
+
         return f"#{r:02x}{g:02x}{b:02x}"
     except ValueError:
         return f"#{hex_color}"
@@ -933,16 +933,16 @@ def sync_ctk_appearance(config: Optional[Dict] = None):
     """
     if not HAVE_CTK:
         return
-    
+
     if config is None:
         try:
             from .. import web_server
             config = web_server.CONFIG
         except (ImportError, AttributeError):
             config = {}
-    
+
     mode = config.get("ui_theme_mode", "auto")
-    
+
     if mode == "auto":
         ctk.set_appearance_mode("system")
     elif mode == "light":
@@ -970,19 +970,19 @@ def apply_hover_effect(widget, colors: ThemeColors,
         normal_color = colors.surface0
     if hover_color is None:
         hover_color = colors.surface1
-    
+
     def on_enter(e):
         try:
             widget.configure(fg_color=hover_color)
         except:
             pass
-    
+
     def on_leave(e):
         try:
             widget.configure(fg_color=normal_color)
         except:
             pass
-    
+
     widget.bind("<Enter>", on_enter, add="+")
     widget.bind("<Leave>", on_leave, add="+")
 
@@ -999,7 +999,7 @@ class CatppuccinMocha:
     This class exists only for backward compatibility.
     """
     _colors = CATPPUCCIN_DARK
-    
+
     base = _colors.bg
     mantle = _colors.code_bg
     surface0 = _colors.surface0
@@ -1023,7 +1023,7 @@ class CatppuccinLatte:
     This class exists only for backward compatibility.
     """
     _colors = CATPPUCCIN_LIGHT
-    
+
     base = _colors.bg
     mantle = _colors.code_bg
     surface0 = _colors.surface0

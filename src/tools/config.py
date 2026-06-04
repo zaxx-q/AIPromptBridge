@@ -8,7 +8,7 @@ Creates the config file on-demand when user first interacts with tools.
 
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 from .defaults import DEFAULT_TOOLS_CONFIG
 
@@ -39,7 +39,7 @@ def ensure_tools_config(filepath: str = TOOLS_CONFIG_FILE) -> Path:
         Path to the config file
     """
     path = Path(filepath)
-    
+
     if not path.exists():
         print(f"[Info] Creating default tools config: {filepath}")
         try:
@@ -48,7 +48,7 @@ def ensure_tools_config(filepath: str = TOOLS_CONFIG_FILE) -> Path:
             print(f"[Success] Created {filepath}")
         except IOError as e:
             print(f"[Error] Failed to create tools config: {e}")
-    
+
     return path
 
 
@@ -101,7 +101,7 @@ def _merge_with_defaults(user_config: Dict[str, Any]) -> tuple[Dict[str, Any], b
     else:
         user_prompts = user_config["file_processor"]["prompts"]
         default_prompts = default_config["file_processor"]["prompts"]
-        
+
         # Helper to compare ignoring _is_default
         def compare_prompt(u_act, d_act):
             u_copy = u_act.copy()
@@ -125,7 +125,7 @@ def _merge_with_defaults(user_config: Dict[str, Any]) -> tuple[Dict[str, Any], b
         for name, d_action in default_prompts.items():
             if name in deleted_defaults:
                 continue # Skip re-adding defaults the user explicitly deleted
-                
+
             if name not in user_prompts:
                 user_prompts[name] = d_action.copy()
                 user_prompts[name]["_is_default"] = True
@@ -151,17 +151,17 @@ def load_tools_config(filepath: str = TOOLS_CONFIG_FILE, create_if_missing: bool
         Configuration dictionary
     """
     path = Path(filepath)
-    
+
     if not path.exists():
         if create_if_missing:
             ensure_tools_config(filepath)
         else:
             return get_default_config()
-    
+
     # Re-check after potential creation
     if not path.exists():
         return get_default_config()
-    
+
     try:
         with open(path, "r", encoding="utf-8") as f:
             user_config = json.load(f)

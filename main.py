@@ -12,31 +12,31 @@ Nuitka Configuration:
 (Moved to .github/workflows/manual_release.yml)
 """
 
-import sys
-import os
-import socket
-import logging
-import threading
-import signal
 import argparse
-import shutil
 import ctypes
+import logging
+import os
+import shutil
+import signal
+import socket
+import sys
+import threading
 from pathlib import Path
 
-from src.console import console, Panel, Table, print_panel, print_success, print_error, print_warning, HAVE_RICH
-from src.config import load_config, generate_example_config, CONFIG_FILE, OPENROUTER_URL
-from src.version import __version__
-from src.key_store import KeyStore
-from src.session_manager import load_sessions, list_sessions
-from src.attachment_manager import AttachmentManager
-from src.terminal import terminal_session_manager, print_commands_box
-from src.gui.core import HAVE_GUI, show_settings_window_blocking
 from src import web_server
+from src.attachment_manager import AttachmentManager
+from src.config import CONFIG_FILE, OPENROUTER_URL, generate_example_config, load_config
+from src.console import HAVE_RICH, Panel, Table, console, print_error, print_panel, print_success, print_warning
+from src.gui.core import HAVE_GUI, show_settings_window_blocking
+from src.key_store import KeyStore
+from src.session_manager import list_sessions, load_sessions
+from src.terminal import print_commands_box, terminal_session_manager
+from src.version import __version__
 
 # System tray support
 HAVE_TRAY = False
 try:
-    from src.tray import TrayApp, hide_console, show_console, HAVE_SYSTRAY
+    from src.tray import HAVE_SYSTRAY, TrayApp, hide_console, show_console
     HAVE_TRAY = HAVE_SYSTRAY
 except ImportError:
     pass
@@ -124,7 +124,7 @@ def get_base_url(config, provider, profile=None):
 
 def initialize():
     """Initialize the server with compact, informative output"""
-    
+
     # ─── Banner ───────────────────────────────────────────────────────────
     if HAVE_RICH:
         console.print()
@@ -140,7 +140,7 @@ def initialize():
         print("│  AI Desktop Tools & Integration Bridge                        │")
         print("└" + "─" * 62 + "┘")
         print()
-    
+
     # Load configuration
     config = load_config()
     ai_params = {}
@@ -167,20 +167,20 @@ def initialize():
     base_url = get_base_url(config, provider, profile=active_profile)
     streaming = active_profile.streaming
     thinking = active_profile.thinking
-    
+
     if HAVE_RICH:
         # Create a nice table for configuration
         table = Table(show_header=False, box=None, padding=(0, 2))
         table.add_column("Key", style="dim")
         table.add_column("Value")
-        
+
         table.add_row("📡 Provider", f"[cyan]{provider}[/cyan] → [dim]{base_url}[/dim]")
         table.add_row("🤖 Model", f"[green]{model}[/green]")
         stream_icon = "[green]✓[/green]" if streaming else "[red]✗[/red]"
         think_icon = "[green]✓[/green]" if thinking else "[red]✗[/red]"
         table.add_row("🌊 Streaming", stream_icon)
         table.add_row("💭 Thinking", think_icon)
-        
+
         console.print("[bold]⚙️  Configuration[/bold]")
         console.print(table)
         console.print()
@@ -193,7 +193,7 @@ def initialize():
         print(f"    🌊 Streaming: {stream_icon}")
         print(f"    💭 Thinking:  {think_icon}")
         print()
-    
+
     # ─── API Keys ─────────────────────────────────────────────────────────
     if HAVE_RICH:
         key_parts = []
@@ -218,11 +218,11 @@ def initialize():
                 key_status.append(f"✗ {p}")
         print(f"    {key_status[0]}   {key_status[1]}   {key_status[2]}")
         print()
-    
+
     # ─── Sessions ─────────────────────────────────────────────────────────
     load_sessions()
     sessions = list_sessions()
-    
+
     # Cleanup orphaned attachments from deleted sessions
     # (Runs in background to avoid slowing down startup)
     threading.Thread(target=AttachmentManager.cleanup_orphaned_attachments, daemon=True).start()
@@ -233,7 +233,7 @@ def initialize():
     else:
         print(f"📂 Sessions: {len(sessions)} loaded")
         print()
-    
+
     # Initialize web server (silent)
     web_server.init_web_server(config, ai_params, web_server.KEY_MANAGERS)
 
@@ -243,21 +243,21 @@ def initialize():
 def initialize_text_edit_tool(config, ai_params):
     """Initialize TextEditTool if enabled"""
     global TEXT_EDIT_TOOL_APP
-    
+
     if not HAVE_TEXT_EDIT_TOOL:
         if HAVE_RICH:
             console.print("  [red]✗[/red] TextEditTool: Not available (missing dependencies)")
         else:
             print("  ✗ TextEditTool: Not available (missing dependencies)")
         return None
-    
+
     if not config.get("text_edit_tool_enabled", True):
         if HAVE_RICH:
             console.print("  [red]✗[/red] TextEditTool: Disabled in config")
         else:
             print("  ✗ TextEditTool: Disabled in config")
         return None
-    
+
     try:
         if HAVE_RICH:
             console.print("\nInitializing TextEditTool...")
@@ -269,11 +269,11 @@ def initialize_text_edit_tool(config, ai_params):
             key_managers=web_server.KEY_MANAGERS
         )
         TEXT_EDIT_TOOL_APP.start()
-        
+
         # Register instance for hot-reload
         from src.gui.text_edit_tool import set_instance
         set_instance(TEXT_EDIT_TOOL_APP)
-        
+
         return TEXT_EDIT_TOOL_APP
     except Exception as e:
         if HAVE_RICH:
@@ -286,21 +286,21 @@ def initialize_text_edit_tool(config, ai_params):
 def initialize_snip_tool(config, ai_params):
     """Initialize SnipTool if enabled"""
     global SNIP_TOOL_APP
-    
+
     if not HAVE_SNIP_TOOL:
         if HAVE_RICH:
             console.print("  [red]✗[/red] SnipTool: Not available (missing dependencies)")
         else:
             print("  ✗ SnipTool: Not available (missing dependencies)")
         return None
-    
+
     if not config.get("screen_snip_enabled", True):
         if HAVE_RICH:
             console.print("  [red]✗[/red] SnipTool: Disabled in config")
         else:
             print("  ✗ SnipTool: Disabled in config")
         return None
-    
+
     try:
         SNIP_TOOL_APP = SnipToolApp(
             config=config,
@@ -308,11 +308,11 @@ def initialize_snip_tool(config, ai_params):
             key_managers=web_server.KEY_MANAGERS
         )
         SNIP_TOOL_APP.start()
-        
+
         # Register instance for hot-reload
         from src.gui.snip_tool import set_instance
         set_instance(SNIP_TOOL_APP)
-        
+
         return SNIP_TOOL_APP
     except Exception as e:
         if HAVE_RICH:
@@ -325,21 +325,21 @@ def initialize_snip_tool(config, ai_params):
 def initialize_audio_tool(config, ai_params):
     """Initialize AudioTool if enabled"""
     global AUDIO_TOOL_APP
-    
+
     if not HAVE_AUDIO_TOOL:
         if HAVE_RICH:
             console.print("  [red]✗[/red] AudioTool: Not available (missing dependencies)")
         else:
             print("  ✗ AudioTool: Not available (missing dependencies)")
         return None
-    
+
     if not config.get("audio_tool_enabled", True):
         if HAVE_RICH:
             console.print("  [red]✗[/red] AudioTool: Disabled in config")
         else:
             print("  ✗ AudioTool: Disabled in config")
         return None
-    
+
     try:
         AUDIO_TOOL_APP = AudioToolApp(
             config=config,
@@ -347,11 +347,11 @@ def initialize_audio_tool(config, ai_params):
             key_managers=web_server.KEY_MANAGERS
         )
         AUDIO_TOOL_APP.start()
-        
+
         # Register instance for hot-reload
         from src.gui.audio_tool import set_instance
         set_instance(AUDIO_TOOL_APP)
-        
+
         return AUDIO_TOOL_APP
     except Exception as e:
         if HAVE_RICH:
@@ -364,17 +364,17 @@ def initialize_audio_tool(config, ai_params):
 def initialize_tts_tool(config, ai_params):
     """Initialize TTSTool if enabled"""
     global TTS_TOOL_APP
-    
+
     if not HAVE_TTS_TOOL:
         if HAVE_RICH:
             console.print("  [red]✗[/red] TTSTool: Not available (missing dependencies)")
         else:
             print("  ✗ TTSTool: Not available (missing dependencies)")
         return None
-    
+
     if not config.get("tts_enabled", True):
         return None
-    
+
     # Check if Gemini key is available (TTS is Gemini-only)
     gemini_key_manager = web_server.KEY_MANAGERS.get("google")
     if not gemini_key_manager or not gemini_key_manager.has_keys():
@@ -391,11 +391,11 @@ def initialize_tts_tool(config, ai_params):
             key_managers=web_server.KEY_MANAGERS
         )
         TTS_TOOL_APP.start()
-        
+
         # Register instance for hot-reload
         from src.gui.tts_tool import set_instance
         set_instance(TTS_TOOL_APP)
-        
+
         return TTS_TOOL_APP
     except Exception as e:
         if HAVE_RICH:
@@ -408,7 +408,7 @@ def initialize_tts_tool(config, ai_params):
 def cleanup():
     """Cleanup on shutdown"""
     global TEXT_EDIT_TOOL_APP, SNIP_TOOL_APP, AUDIO_TOOL_APP, TTS_TOOL_APP
-    
+
     if TEXT_EDIT_TOOL_APP:
         if HAVE_RICH:
             console.print("\nStopping TextEditTool...")
@@ -416,7 +416,7 @@ def cleanup():
             print("\nStopping TextEditTool...")
         TEXT_EDIT_TOOL_APP.stop()
         TEXT_EDIT_TOOL_APP = None
-    
+
     if SNIP_TOOL_APP:
         if HAVE_RICH:
             console.print("Stopping SnipTool...")
@@ -424,7 +424,7 @@ def cleanup():
             print("Stopping SnipTool...")
         SNIP_TOOL_APP.stop()
         SNIP_TOOL_APP = None
-    
+
     if AUDIO_TOOL_APP:
         if HAVE_RICH:
             console.print("Stopping AudioTool...")
@@ -432,7 +432,7 @@ def cleanup():
             print("Stopping AudioTool...")
         AUDIO_TOOL_APP.stop()
         AUDIO_TOOL_APP = None
-        
+
     if TTS_TOOL_APP:
         if HAVE_RICH:
             console.print("Stopping TTSTool...")
@@ -625,20 +625,20 @@ def acquire_single_instance_mutex():
     """
     if sys.platform != 'win32':
         return "NotWindows"
-        
+
     kernel32 = ctypes.windll.kernel32
     mutex_name = "AIPromptBridge_SingleInstance"
-    
+
     # CreateMutexW(security_attributes, initial_owner, name)
     mutex = kernel32.CreateMutexW(None, False, mutex_name)
-    
+
     # ERROR_ALREADY_EXISTS = 183
     if kernel32.GetLastError() == 183:
         # Another instance owns the mutex
         if mutex:
             kernel32.CloseHandle(mutex)
         return None
-    
+
     # We own the mutex - keep the handle alive for process lifetime
     return mutex
 
@@ -647,7 +647,7 @@ def run_server(config, ai_params):
     """Run the Flask server (used by both tray and terminal modes)"""
     host = web_server.CONFIG.get('host', '127.0.0.1')
     port = int(web_server.CONFIG.get('port', 5000))
-    
+
     try:
         # Run Flask with minimal output
         web_server.app.run(host=host, port=port, use_reloader=False, threaded=True)
@@ -672,19 +672,19 @@ def configure_logging(debug_mode: bool = False):
     noisy_loggers = ['werkzeug', 'PIL', 'PIL.PngImagePlugin', 'PIL.Image']
     for logger_name in noisy_loggers:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
-    
+
     # If not debug mode, just suppress noise and leave Python's default WARNING level
     if not debug_mode:
         return
-    
+
     # Debug mode: configure INFO/DEBUG level with Rich handler
     level = logging.DEBUG
-    
+
     # Try to use Rich's logging handler for better output
     if HAVE_RICH:
         try:
             from rich.logging import RichHandler
-            
+
             # Configure with Rich handler - use force=True to reconfigure
             logging.basicConfig(
                 level=level,
@@ -714,7 +714,7 @@ def configure_logging(debug_mode: bool = False):
             format="[%(levelname)s] %(name)s: %(message)s",
             force=True
         )
-    
+
     logging.debug("Debug logging enabled (--show-console)")
 
 
@@ -726,7 +726,7 @@ def main():
     # Set up workspace (CWD resolution for compiled mode)
     if not setup_workspace(args.launched_mode):
         sys.exit(1)
-    
+
     # ─── Startup Recovery ──────────────────────────────────────────────────
     # Check for interrupted updates and recover before anything else
     try:
@@ -734,7 +734,7 @@ def main():
         startup_recovery()
     except Exception:
         pass  # Non-critical, don't block startup
-    
+
     # Single instance check via named mutex (Windows only)
     # We do this early to prevent multiple instances
     mutex_handle = None
@@ -744,12 +744,12 @@ def main():
             if args.show_console:
                 # If console is visible, we might want to alert
                 pass
-            
+
             if HAVE_RICH:
                 print_error("Another instance of AIPromptBridge is already running!")
             else:
                 print("❌ ERROR: Another instance of AIPromptBridge is already running!")
-            
+
             # If we are in tray mode (hidden console), just exit silently
             # User probably just double clicked the icon again
             if not args.show_console:
@@ -761,17 +761,17 @@ def main():
             except EOFError:
                 pass
             sys.exit(1)
-            
+
     # Configure global logging (DEBUG if --show-console, otherwise INFO)
     configure_logging(debug_mode=args.show_console)
-    
+
     # Determine if we have a real console (for WT relaunch and console toggle)
     # - GUI mode: No console (skip WT, no toggle)
     # - Console mode: Has console (WT check, toggle enabled)
     # - No launched-mode + compiled (Internal.exe): No console (attach mode, skip WT)
     # - No launched-mode + source (python main.py): Has console (WT check, toggle enabled)
     is_compiled = _is_compiled()
-    
+
     if args.launched_mode == "gui":
         has_real_console = False
     elif args.launched_mode == "console":
@@ -779,15 +779,15 @@ def main():
     else:
         # No launcher: compiled (direct Internal.exe) has no console, source does
         has_real_console = not is_compiled
-        
+
     # Suppress Flask startup banner
     import flask.cli
     flask.cli.show_server_banner = lambda *args: None
-    
+
     # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    
+
     # Create example config if needed (don't use tray mode for first-run config creation)
     if not Path(CONFIG_FILE).exists():
         if HAVE_RICH:
@@ -802,7 +802,7 @@ def main():
             print_success(f"Created '{CONFIG_FILE}'")
         else:
             print(f"✅ Created '{CONFIG_FILE}'")
-    
+
     # Check for prompts.json creation notification
     from src.gui.prompts import PROMPTS_FILE, PromptsConfig
     if not Path(PROMPTS_FILE).exists():
@@ -816,15 +816,15 @@ def main():
             print_success(f"Created '{PROMPTS_FILE}'")
         else:
             print(f"✅ Created '{PROMPTS_FILE}'")
-    
+
     # Initialize (new compact output)
     config, ai_params = initialize()
-    
+
     # Check if onboarding completed
     onboarding_completed = config.get("onboarding_completed", False)
     if isinstance(onboarding_completed, str):
         onboarding_completed = onboarding_completed.strip().lower() in ("true", "1")
-        
+
     if not onboarding_completed and HAVE_GUI:
         if HAVE_RICH:
             console.print("[bold cyan]🚀 Starting Onboarding Wizard...[/bold cyan]")
@@ -832,30 +832,30 @@ def main():
         else:
             print("🚀 Starting Onboarding Wizard...")
             print()
-            
+
         from src.gui.windows import show_onboarding_blocking
         show_onboarding_blocking()
-        
+
         # Reload configuration and key managers after onboarding closes
         config = load_config()
         web_server.CONFIG = config
-        
+
         key_store = KeyStore.get_instance()
         key_store.load()
         web_server.KEY_MANAGERS = key_store.build_key_managers()
-        
+
         from src.connection_profiles import ProfileStore
         profile_store = ProfileStore.get_instance()
         # This will reload active profile settings
         profile_store.reload()
-    
+
     # ─── Background Update Check ───────────────────────────────────────────
     try:
         from src.updater import background_update_check
         background_update_check(config)
     except Exception:
         pass  # Non-critical
-    
+
     # Check for API keys
     has_any_keys = any(km.has_keys() for km in web_server.KEY_MANAGERS.values())
     if not has_any_keys:
@@ -868,14 +868,14 @@ def main():
                 print("⚠️  No API keys configured!")
                 print("   Opening Settings Window...")
                 print()
-            
+
             # Open Settings Window directly (blocking)
             # Use GUICoordinator to keep the root alive and avoid re-init delays
             show_settings_window_blocking(initial_tab="API Keys")
-            
+
             # Reload keys after settings window closes
             has_any_keys = any(km.has_keys() for km in web_server.KEY_MANAGERS.values())
-            
+
         if not has_any_keys:
             if HAVE_RICH:
                 console.print("[bold yellow]⚠️  WARNING: No API keys configured![/bold yellow]")
@@ -885,11 +885,11 @@ def main():
                 print("⚠️  WARNING: No API keys configured!")
                 print("   Please add your API keys. Use the Settings window.")
                 print()
-    
+
     # ─── Server Info ──────────────────────────────────────────────────────
     host = web_server.CONFIG.get('host', '127.0.0.1')
     configured_port = int(web_server.CONFIG.get('port', 5000))
-    
+
     # Auto-switch port if occupied
     try:
         actual_port = find_available_port(host, configured_port)
@@ -915,12 +915,12 @@ def main():
             print_warning(f"Port {configured_port} occupied, using {actual_port} instead")
         else:
             print(f"⚠️ Port {configured_port} occupied, using {actual_port} instead")
-        
+
         # Update config in memory (so run_server picks it up)
         web_server.CONFIG['port'] = actual_port
-    
+
     port = actual_port
-    
+
     if HAVE_RICH:
         console.print(f"[bold green]🚀 Server Running[/bold green]: [link=http://{host}:{port}]http://{host}:{port}[/link]")
         if HAVE_GUI:
@@ -929,35 +929,35 @@ def main():
         print(f"🚀 Server Running: http://{host}:{port}")
         if HAVE_GUI:
             print(" 🖥️ GUI available (on-demand)")
-    
+
     # TextEditTool
     text_tool_result = initialize_text_edit_tool(config, ai_params)
     if text_tool_result:
         hotkey = config.get("text_edit_tool_hotkey", "ctrl+space")
-    
+
     # SnipTool
     snip_tool_result = initialize_snip_tool(config, ai_params)
     if snip_tool_result:
         snip_hotkey = config.get("screen_snip_hotkey", "ctrl+alt+x")
-    
+
     # AudioTool
     audio_tool_result = initialize_audio_tool(config, ai_params)
     if audio_tool_result:
         audio_hotkey = config.get("audio_tool_hotkey", "ctrl+alt+a")
-        
+
     # TTSTool
     tts_tool_result = initialize_tts_tool(config, ai_params)
     if tts_tool_result:
         tts_hotkey = config.get("tts_hotkey", "ctrl+alt+t")
-    
+
     if HAVE_RICH:
         console.print()
     else:
         print()
-    
+
     # ─── Tray Mode vs Terminal Mode ───────────────────────────────────────
     use_tray = HAVE_TRAY and sys.platform == 'win32'
-    
+
     if use_tray:
         # Tray mode: hide console by default, run server in background
         if HAVE_RICH:
@@ -972,25 +972,25 @@ def main():
             if not args.launched_mode == "gui":
                 print("   Double-click tray icon to show console")
             print()
-        
+
         # Start terminal session manager
         terminal_thread = threading.Thread(
             target=lambda: terminal_session_manager(),
             daemon=True
         )
         terminal_thread.start()
-        
+
         # Start Flask server in background thread
         server_thread = threading.Thread(
             target=lambda: run_server(config, ai_params),
             daemon=True
         )
         server_thread.start()
-        
+
         # Determine if console toggling is allowed
         # Uses has_real_console computed earlier (handles source vs compiled)
         allow_console_toggle = has_real_console
-        
+
         # Start tray (this blocks until exit)
         # Edit file items only show when --show-console is used
         tray = TrayApp(
@@ -1000,7 +1000,7 @@ def main():
         )
         hide_on_start = not args.show_console
         tray.start(hide_console_on_start=hide_on_start)
-        
+
     else:
         # Terminal mode: normal behavior
         if not HAVE_TRAY:
@@ -1011,14 +1011,14 @@ def main():
                 print("📟 Running in terminal mode (tray not available)")
                 print("   Install with: pip install infi.systray")
         print()
-        
+
         # Start terminal session manager
         terminal_thread = threading.Thread(
             target=lambda: terminal_session_manager(),
             daemon=True
         )
         terminal_thread.start()
-        
+
         # Run server in main thread
         run_server(config, ai_params)
 

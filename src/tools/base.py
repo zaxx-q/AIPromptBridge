@@ -7,8 +7,8 @@ Provides common interface and utilities for all tools.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class ToolStatus(Enum):
@@ -33,7 +33,7 @@ class ToolResult:
     total_count: int = 0
     elapsed_time: float = 0.0
     errors: List[Dict[str, str]] = field(default_factory=list)
-    
+
     def add_error(self, file_path: str, error: str):
         """Add an error for a specific file"""
         self.errors.append({"path": file_path, "error": error})
@@ -51,7 +51,7 @@ class BaseTool(ABC):
     - Pause/Resume functionality
     - Checkpoint persistence
     """
-    
+
     def __init__(self, name: str, config: Dict[str, Any] = None):
         """
         Initialize a tool.
@@ -65,35 +65,35 @@ class BaseTool(ABC):
         self.status = ToolStatus.IDLE
         self._abort_requested = False
         self._pause_requested = False
-    
+
     @property
     def is_running(self) -> bool:
         """Check if tool is currently running"""
         return self.status == ToolStatus.RUNNING
-    
+
     @property
     def is_paused(self) -> bool:
         """Check if tool is paused"""
         return self.status == ToolStatus.PAUSED
-    
+
     def request_abort(self):
         """Request the tool to abort processing"""
         self._abort_requested = True
-    
+
     def request_pause(self):
         """Request the tool to pause processing"""
         self._pause_requested = True
-    
+
     def request_resume(self):
         """Request the tool to resume processing"""
         self._pause_requested = False
         if self.status == ToolStatus.PAUSED:
             self.status = ToolStatus.RUNNING
-    
+
     def check_abort(self) -> bool:
         """Check if abort was requested"""
         return self._abort_requested
-    
+
     def check_pause(self) -> bool:
         """
         Check if pause was requested.
@@ -107,13 +107,13 @@ class BaseTool(ABC):
             # Will be handled by the processing loop
             return False
         return True
-    
+
     def reset(self):
         """Reset tool state for new run"""
         self.status = ToolStatus.IDLE
         self._abort_requested = False
         self._pause_requested = False
-    
+
     @abstractmethod
     def run_interactive(self) -> ToolResult:
         """
@@ -129,7 +129,7 @@ class BaseTool(ABC):
             ToolResult with processing outcome
         """
         raise NotImplementedError
-    
+
     @abstractmethod
     def run_batch(
         self,
@@ -151,7 +151,7 @@ class BaseTool(ABC):
             ToolResult with processing outcome
         """
         raise NotImplementedError
-    
+
     def get_config_value(self, key: str, default: Any = None) -> Any:
         """Get a configuration value with fallback to default"""
         return self.config.get(key, default)

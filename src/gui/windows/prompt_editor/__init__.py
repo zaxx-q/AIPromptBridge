@@ -21,15 +21,15 @@ Public API:
 """
 
 from .editor import (
-    PromptEditorWindow,
     AttachedPromptEditorWindow,
+    PromptEditorWindow,
     create_attached_prompt_editor_window,
     show_prompt_editor,
 )
 
 __all__ = [
-    'PromptEditorWindow',
     'AttachedPromptEditorWindow',
+    'PromptEditorWindow',
     'create_attached_prompt_editor_window',
     'show_prompt_editor',
 ]

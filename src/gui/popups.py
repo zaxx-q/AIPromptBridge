@@ -21,7 +21,7 @@ import math
 import sys
 import time
 import tkinter as tk
-from typing import Callable, Optional, Dict, List, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 # Windows-specific imports for transparent windows
 if sys.platform == "win32":
@@ -35,25 +35,29 @@ else:
     HAVE_WIN32 = False
 
 # Import CustomTkinter with fallback
+from .custom_widgets import create_emoji_button
 from .platform import HAVE_CTK, ctk
 
 # Import theme system
 from .themes import (
-    ThemeRegistry, ThemeColors,
-    get_colors as _get_theme_colors,
-    is_dark_mode, get_ctk_font,
-    get_ctk_button_colors, get_ctk_frame_colors,
-    get_ctk_entry_colors, sync_ctk_appearance,
+    CatppuccinLatte,
     # Legacy compatibility classes (deprecated but kept for transition)
-    CatppuccinMocha, CatppuccinLatte
+    CatppuccinMocha,
+    ThemeColors,
+    ThemeRegistry,
+    get_ctk_button_colors,
+    get_ctk_entry_colors,
+    get_ctk_font,
+    get_ctk_frame_colors,
+    is_dark_mode,
+    sync_ctk_appearance,
 )
-
+from .themes import get_colors as _get_theme_colors
 from .utils import hide_from_taskbar
-from .custom_widgets import create_emoji_button
 
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
 try:
-    from .emoji_renderer import get_emoji_renderer, HAVE_PIL
+    from .emoji_renderer import HAVE_PIL, get_emoji_renderer
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
@@ -119,7 +123,7 @@ class SegmentedToggle:
     Similar to iOS/macOS segmented controls.
     Uses CTkSegmentedButton when available.
     """
-    
+
     def __init__(
         self,
         parent,
@@ -133,14 +137,14 @@ class SegmentedToggle:
         self.on_change = on_change
         self.current_value = default_value or options[0][1]
         self.tooltips_map = tooltips or {}
-        
+
         self.colors = get_colors()
         self.frame = None
         self.segments: List = []
         self._segment_tooltips: List[Tooltip] = []
-        
+
         self._create_widget()
-    
+
     def _create_widget(self):
         """Create the segmented toggle widget."""
         if HAVE_CTK:
@@ -148,7 +152,7 @@ class SegmentedToggle:
             values = [text for text, _ in self.options]
             self.value_map = {text: value for text, value in self.options}
             self.reverse_map = {value: text for text, value in self.options}
-            
+
             self.frame = ctk.CTkSegmentedButton(
                 self.parent,
                 values=values,
@@ -163,7 +167,7 @@ class SegmentedToggle:
                 text_color=self.colors.fg,
                 text_color_disabled=self.colors.overlay0
             )
-            
+
             # Set initial value
             initial_text = self.reverse_map.get(self.current_value, values[0])
             self.frame.set(initial_text)
@@ -175,10 +179,10 @@ class SegmentedToggle:
                 highlightbackground=self.colors.surface2,
                 highlightthickness=1
             )
-            
+
             for i, (display_text, value) in enumerate(self.options):
                 is_selected = value == self.current_value
-                
+
                 segment = tk.Label(
                     self.frame,
                     text=display_text,
@@ -193,17 +197,17 @@ class SegmentedToggle:
                 segment.bind('<Button-1>', lambda e, v=value: self._on_click(v))
                 segment.bind('<Enter>', lambda e, seg=segment, v=value: self._on_hover(seg, v, True))
                 segment.bind('<Leave>', lambda e, seg=segment, v=value: self._on_hover(seg, v, False))
-                
+
                 self.segments.append(segment)
-        
+
         # Apply tooltips to individual segments
         self._apply_tooltips()
-    
+
     def _apply_tooltips(self):
         """Attach tooltips to individual segment buttons."""
         if not self.tooltips_map:
             return
-        
+
         if HAVE_CTK and hasattr(self.frame, '_buttons_dict'):
             # CTkSegmentedButton stores internal buttons in _buttons_dict
             for display_text, btn in self.frame._buttons_dict.items():
@@ -216,7 +220,7 @@ class SegmentedToggle:
                 tip_text = self.tooltips_map.get(display_text, "")
                 if tip_text:
                     self._segment_tooltips.append(Tooltip(segment, tip_text))
-    
+
     def _on_ctk_select(self, selected_text: str):
         """Handle CTk segmented button selection."""
         value = self.value_map.get(selected_text, "default")
@@ -224,7 +228,7 @@ class SegmentedToggle:
             self.current_value = value
             if self.on_change:
                 self.on_change(value)
-    
+
     def _on_click(self, value: str):
         """Handle segment click (tk fallback)."""
         if value != self.current_value:
@@ -232,17 +236,17 @@ class SegmentedToggle:
             self._update_segments()
             if self.on_change:
                 self.on_change(value)
-    
+
     def _on_hover(self, segment, value: str, entering: bool):
         """Handle hover effect (tk fallback)."""
         if value == self.current_value:
             return
-        
+
         if entering:
             segment.config(bg=self.colors.surface1)
         else:
             segment.config(bg=self.colors.surface0)
-    
+
     def _update_segments(self):
         """Update segment appearance (tk fallback)."""
         for segment, (_, value) in zip(self.segments, self.options):
@@ -251,11 +255,11 @@ class SegmentedToggle:
                 bg=self.colors.blue if is_selected else self.colors.surface0,
                 fg=self.colors.accent_fg if is_selected else self.colors.text
             )
-    
+
     def get(self) -> str:
         """Get current value."""
         return self.current_value
-    
+
     def pack(self, **kwargs):
         """Pack the widget."""
         self.frame.pack(**kwargs)
@@ -266,9 +270,9 @@ class Tooltip:
     A tooltip that appears after hovering over a widget for a specified delay.
     Uses add='+' to not override existing event bindings.
     """
-    
+
     DELAY_MS = 500
-    
+
     def __init__(self, widget, text: str, delay_ms: int = None):
         self.widget = widget
         self.text = text
@@ -276,43 +280,43 @@ class Tooltip:
         self.tooltip_window: Optional[tk.Toplevel] = None
         self.after_id: Optional[str] = None
         self.colors = get_colors()
-        
+
         self.widget.bind('<Enter>', self._on_enter, add='+')
         self.widget.bind('<Leave>', self._on_leave, add='+')
         self.widget.bind('<Button-1>', self._on_leave, add='+')
-    
+
     def _on_enter(self, event):
         """Schedule tooltip display."""
         self._cancel_scheduled()
         self.after_id = self.widget.after(self.delay_ms, self._show_tooltip)
-    
+
     def _on_leave(self, event=None):
         """Cancel scheduled tooltip or hide if visible."""
         self._cancel_scheduled()
         self._hide_tooltip()
-    
+
     def _cancel_scheduled(self):
         """Cancel any scheduled tooltip display."""
         if self.after_id:
             self.widget.after_cancel(self.after_id)
             self.after_id = None
-    
+
     def _show_tooltip(self):
         """Display the tooltip."""
         if not self.text:
             return
-        
+
         self.after_id = None
-        
+
         x = self.widget.winfo_rootx()
         y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
-        
+
         # Get the root window for the toplevel
         root = self.widget.winfo_toplevel()
         self.tooltip_window = tk.Toplevel(root)
         self.tooltip_window.wm_overrideredirect(True)
         self.tooltip_window.wm_attributes('-topmost', True)
-        
+
         # Apply transparency for rounded corners on Windows
         if sys.platform == "win32":
             try:
@@ -320,7 +324,7 @@ class Tooltip:
                 self.tooltip_window.configure(bg=TRANSPARENCY_COLOR)
             except tk.TclError:
                 pass
-        
+
         if HAVE_CTK:
             frame = ctk.CTkFrame(
                 self.tooltip_window,
@@ -330,7 +334,7 @@ class Tooltip:
                 corner_radius=6
             )
             frame.pack()
-            
+
             label = ctk.CTkLabel(
                 frame,
                 text=self.text,
@@ -348,7 +352,7 @@ class Tooltip:
                 highlightthickness=1
             )
             frame.pack()
-            
+
             label = tk.Label(
                 frame,
                 text=self.text,
@@ -361,9 +365,9 @@ class Tooltip:
                 justify=tk.LEFT
             )
             label.pack()
-        
+
         self.tooltip_window.wm_geometry(f"+{x}+{y}")
-    
+
     def _hide_tooltip(self):
         """Hide the tooltip."""
         if self.tooltip_window:
@@ -376,7 +380,7 @@ class ModifierBar:
     A horizontally scrollable bar of toggle buttons for modifiers.
     Supports mouse wheel scrolling for horizontal navigation.
     """
-    
+
     def __init__(
         self,
         parent,
@@ -387,19 +391,19 @@ class ModifierBar:
         self.parent = parent
         self.modifiers = modifiers
         self.on_change = on_change
-        
+
         self.colors = get_colors()
         self.active_modifiers: set = set(default_active) if default_active else set()
         self.buttons: Dict[str, object] = {}
         self.tooltips: List[Tooltip] = []
-        
+
         self._create_widget()
-    
+
     def _create_widget(self):
         """Create the scrollable modifier bar."""
         if HAVE_CTK:
             self.frame = ctk.CTkFrame(self.parent, fg_color="transparent")
-            
+
             # Container with border
             self.container = ctk.CTkFrame(
                 self.frame,
@@ -411,7 +415,7 @@ class ModifierBar:
             )
             self.container.pack(fill="x", pady=(0, 8))
             self.container.pack_propagate(False)
-            
+
             # Scrollable frame for buttons
             self.scroll_frame = ctk.CTkScrollableFrame(
                 self.container,
@@ -420,18 +424,18 @@ class ModifierBar:
                 height=48
             )
             self.scroll_frame.pack(fill="both", expand=True, padx=4)
-            
+
             # Bind events to various elements to catch all hover zones
             # Bind to container (bg)
             self.container.bind("<MouseWheel>", self._on_mousewheel_ctk)
             self.container.bind("<Button-4>", self._on_mousewheel_ctk)
             self.container.bind("<Button-5>", self._on_mousewheel_ctk)
-            
+
             # Bind to scroll frame widget itself
             self.scroll_frame.bind("<MouseWheel>", self._on_mousewheel_ctk)
             self.scroll_frame.bind("<Button-4>", self._on_mousewheel_ctk)
             self.scroll_frame.bind("<Button-5>", self._on_mousewheel_ctk)
-            
+
             # Bind events to the scroll frame's internal canvas
             if hasattr(self.scroll_frame, "_parent_canvas"):
                 self.scroll_frame._parent_canvas.bind("<MouseWheel>", self._on_mousewheel_ctk, add="+")
@@ -444,7 +448,7 @@ class ModifierBar:
         else:
             # Fallback to tk
             self.frame = tk.Frame(self.parent, bg=self.colors.base)
-            
+
             self.container = tk.Frame(
                 self.frame,
                 bg=self.colors.mantle,
@@ -454,7 +458,7 @@ class ModifierBar:
             )
             self.container.pack(fill=tk.X, pady=(0, 8))
             self.container.pack_propagate(False)
-            
+
             self.canvas = tk.Canvas(
                 self.container,
                 bg=self.colors.mantle,
@@ -463,16 +467,16 @@ class ModifierBar:
                 bd=0
             )
             self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-            
+
             self.inner_frame = tk.Frame(self.canvas, bg=self.colors.mantle)
             self.canvas_window = self.canvas.create_window((0, 0), window=self.inner_frame, anchor=tk.NW)
-            
+
             for mod in self.modifiers:
                 self._create_modifier_button_tk(mod)
-            
+
             self.inner_frame.bind('<Configure>', self._on_inner_configure)
             self.canvas.bind('<Configure>', self._on_canvas_configure)
-            
+
             # Bind mousewheel to all components
             self.canvas.bind('<MouseWheel>', self._on_mousewheel)
             self.canvas.bind('<Button-4>', self._on_mousewheel)
@@ -480,18 +484,18 @@ class ModifierBar:
             self.inner_frame.bind('<MouseWheel>', self._on_mousewheel)
             self.inner_frame.bind('<Button-4>', self._on_mousewheel)
             self.inner_frame.bind('<Button-5>', self._on_mousewheel)
-        
+
         # Apply default-active button states and notify parent
         if self.active_modifiers:
             self._update_button_states()
             if self.on_change:
                 self.on_change(list(self.active_modifiers))
-    
+
     def _on_mousewheel_ctk(self, event):
         """Handle mouse wheel for horizontal scrolling in CTk."""
         if not hasattr(self.scroll_frame, "_parent_canvas"):
             return
-            
+
         if event.num == 4: # Linux scroll up/left
             delta = -1
         elif event.num == 5: # Linux scroll down/right
@@ -500,7 +504,7 @@ class ModifierBar:
             # Depending on platform, delta might be 120 (windows) or smaller (mac)
             # Normalizing to direction roughly
             delta = -1 if event.delta > 0 else 1
-            
+
         # Increase scroll speed by using a multiplier (e.g. 50 units)
         self.scroll_frame._parent_canvas.xview_scroll(delta * 50, "units")
         return "break"
@@ -511,7 +515,7 @@ class ModifierBar:
         icon = mod.get("icon", "")
         label = mod.get("label", key)
         tooltip_text = mod.get("tooltip", "")
-        
+
         btn = create_emoji_button(
             self.scroll_frame,
             text=label,
@@ -530,25 +534,25 @@ class ModifierBar:
             text_color=self.colors.text
         )
         btn.pack(side="left", padx=3, pady=2)
-        
+
         # Bind scrolling to button
         btn.bind("<MouseWheel>", self._on_mousewheel_ctk)
         btn.bind("<Button-4>", self._on_mousewheel_ctk)
         btn.bind("<Button-5>", self._on_mousewheel_ctk)
-        
+
         self.buttons[key] = btn
-        
+
         if tooltip_text:
             tooltip = Tooltip(btn, tooltip_text)
             self.tooltips.append(tooltip)
-    
+
     def _create_modifier_button_tk(self, mod: Dict):
         """Create a tk modifier button (fallback)."""
         key = mod.get("key", "")
         icon = mod.get("icon", "")
         label = mod.get("label", key)
         tooltip_text = mod.get("tooltip", "")
-        
+
         btn = tk.Label(
             self.inner_frame,
             text=f"{icon} {label}",
@@ -560,39 +564,39 @@ class ModifierBar:
             cursor="hand2"
         )
         btn.pack(side=tk.LEFT, padx=2, pady=4)
-        
+
         btn.bind('<Button-1>', lambda e, k=key: self._toggle_modifier(k))
         btn.bind('<Enter>', lambda e, b=btn, k=key: self._on_hover_tk(b, k, True))
         btn.bind('<Leave>', lambda e, b=btn, k=key: self._on_hover_tk(b, k, False))
-        
+
         # Enable scrolling while hovering over buttons
         btn.bind('<MouseWheel>', self._on_mousewheel)
         btn.bind('<Button-4>', self._on_mousewheel)
         btn.bind('<Button-5>', self._on_mousewheel)
-        
+
         self.buttons[key] = btn
-        
+
         if tooltip_text:
             tooltip = Tooltip(btn, tooltip_text)
             self.tooltips.append(tooltip)
-    
+
     def _toggle_modifier(self, key: str):
         """Toggle a modifier on/off."""
         if key in self.active_modifiers:
             self.active_modifiers.remove(key)
         else:
             self.active_modifiers.add(key)
-        
+
         self._update_button_states()
-        
+
         if self.on_change:
             self.on_change(list(self.active_modifiers))
-    
+
     def _update_button_states(self):
         """Update button appearance based on active state."""
         for key, btn in self.buttons.items():
             is_active = key in self.active_modifiers
-            
+
             if HAVE_CTK:
                 btn.configure(
                     fg_color=self.colors.blue if is_active else self.colors.surface0,
@@ -603,26 +607,26 @@ class ModifierBar:
                     bg=self.colors.blue if is_active else self.colors.surface0,
                     fg=self.colors.accent_fg if is_active else self.colors.text
                 )
-    
+
     def _on_hover_tk(self, btn, key: str, entering: bool):
         """Handle hover effect (tk fallback)."""
         is_active = key in self.active_modifiers
         if is_active:
             return
-        
+
         if entering:
             btn.config(bg=self.colors.surface2)
         else:
             btn.config(bg=self.colors.surface1)
-    
+
     def _on_inner_configure(self, event):
         """Update scroll region (tk fallback)."""
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-    
+
     def _on_canvas_configure(self, event):
         """Update inner frame height (tk fallback)."""
         self.canvas.itemconfig(self.canvas_window, height=event.height)
-    
+
     def _on_mousewheel(self, event):
         """Handle mouse wheel (tk fallback)."""
         if event.num == 4:
@@ -631,14 +635,14 @@ class ModifierBar:
             delta = 1
         else:
             delta = -1 if event.delta > 0 else 1
-        
+
         self.canvas.xview_scroll(delta * 2, "units")
         return "break"
-    
+
     def get_active_modifiers(self) -> List[str]:
         """Get list of active modifier keys."""
         return list(self.active_modifiers)
-    
+
     def pack(self, **kwargs):
         """Pack the widget."""
         self.frame.pack(**kwargs)
@@ -649,7 +653,7 @@ class GroupedButtonList:
     A list of buttons organized by groups with inline headers.
     Each group displays all its items together without pagination.
     """
-    
+
     def __init__(
         self,
         parent,
@@ -661,27 +665,27 @@ class GroupedButtonList:
         self.groups = groups
         self.on_click = on_click
         self.on_group_changed = on_group_changed
-        
+
         self.colors = get_colors()
         self.current_group_idx = 0
         self.total_groups = len(groups)
-        
+
         self.buttons_frame = None
         self.nav_frame = None
         self.dot_labels: List = []
         self.tooltips: List[Tooltip] = []
-        
+
         self._create_widget()
-    
+
     def _create_widget(self):
         """Create the grouped button list widget."""
         if HAVE_CTK:
             self.frame = ctk.CTkFrame(self.parent, fg_color="transparent")
-            
+
             # Content with navigation
             self.content_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
             self.content_frame.pack(fill="both", expand=True)
-            
+
             # Navigation arrows
             if self.total_groups > 1:
                 self.left_arrow = ctk.CTkButton(
@@ -696,10 +700,10 @@ class GroupedButtonList:
                     command=self._prev_group
                 )
                 self.left_arrow.pack(side="left", fill="y", padx=(0, 4))
-            
+
             self.buttons_container = ctk.CTkFrame(self.content_frame, fg_color="transparent")
             self.buttons_container.pack(side="left", fill="both", expand=True)
-            
+
             if self.total_groups > 1:
                 self.right_arrow = ctk.CTkButton(
                     self.content_frame,
@@ -713,12 +717,12 @@ class GroupedButtonList:
                     command=self._next_group
                 )
                 self.right_arrow.pack(side="right", fill="y", padx=(4, 0))
-            
+
             # Dots
             if self.total_groups > 1:
                 self.nav_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
                 self.nav_frame.pack(pady=(8, 0))
-                
+
                 for i in range(self.total_groups):
                     dot = ctk.CTkLabel(
                         self.nav_frame,
@@ -735,7 +739,7 @@ class GroupedButtonList:
             self.frame = tk.Frame(self.parent, bg=self.colors.base)
             self.content_frame = tk.Frame(self.frame, bg=self.colors.base)
             self.content_frame.pack(fill=tk.BOTH, expand=True)
-            
+
             if self.total_groups > 1:
                 self.left_arrow = tk.Label(
                     self.content_frame, text="◀", font=("Arial", 12),
@@ -744,10 +748,10 @@ class GroupedButtonList:
                 )
                 self.left_arrow.pack(side=tk.LEFT, fill=tk.Y)
                 self.left_arrow.bind('<Button-1>', lambda e: self._prev_group())
-            
+
             self.buttons_container = tk.Frame(self.content_frame, bg=self.colors.base)
             self.buttons_container.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-            
+
             if self.total_groups > 1:
                 self.right_arrow = tk.Label(
                     self.content_frame, text="▶", font=("Arial", 12),
@@ -756,12 +760,12 @@ class GroupedButtonList:
                 )
                 self.right_arrow.pack(side=tk.RIGHT, fill=tk.Y)
                 self.right_arrow.bind('<Button-1>', lambda e: self._next_group())
-            
+
             # Dots (only if multiple groups)
             if self.total_groups > 1:
                 self.nav_frame = tk.Frame(self.frame, bg=self.colors.base)
                 self.nav_frame.pack(pady=(8, 0))
-                
+
                 for i in range(self.total_groups):
                     dot = tk.Label(
                         self.nav_frame,
@@ -775,23 +779,23 @@ class GroupedButtonList:
                     dot.pack(side=tk.LEFT)
                     dot.bind('<Button-1>', lambda e, idx=i: self._go_to_group(idx))
                     self.dot_labels.append(dot)
-        
+
         self._render_group()
-    
+
     def _render_group(self):
         """Render the current group."""
         # Clear existing
         for widget in self.buttons_container.winfo_children():
             widget.destroy()
         self.tooltips.clear()
-        
+
         if not self.groups:
             return
-        
+
         current_group = self.groups[self.current_group_idx]
         group_name = current_group.get("name", "")
         items = current_group.get("items", [])
-        
+
         if HAVE_CTK:
             # Header
             if group_name:
@@ -802,14 +806,14 @@ class GroupedButtonList:
                     text_color=self.colors.overlay0
                 )
                 header.pack(pady=(0, 6))
-            
+
             # Buttons
             for item in items:
                 key = item[0]
                 display_text = item[1]
                 icon = item[2] if len(item) > 2 else ""
                 tooltip_text = item[3] if len(item) > 3 else None
-                
+
                 btn = create_emoji_button(
                     self.buttons_container,
                     text=display_text,
@@ -828,7 +832,7 @@ class GroupedButtonList:
                     text_color=self.colors.text
                 )
                 btn.pack(fill="x", pady=1)
-                
+
                 if tooltip_text:
                     tooltip = Tooltip(btn, tooltip_text)
                     self.tooltips.append(tooltip)
@@ -843,25 +847,25 @@ class GroupedButtonList:
                     fg=self.colors.overlay0
                 )
                 header.pack(pady=(0, 4))
-            
+
             for item in items:
                 key = item[0]
                 display_text = item[1]
                 icon = item[2] if len(item) > 2 else ""
                 tooltip_text = item[3] if len(item) > 3 else None
-                
+
                 row = tk.Frame(self.buttons_container, bg=self.colors.surface1, cursor="hand2")
                 row.pack(fill=tk.X, pady=1)
-                
+
                 icon_lbl = tk.Label(row, text=icon, bg=self.colors.surface1, fg=self.colors.text, width=3, pady=8)
                 icon_lbl.pack(side=tk.LEFT, padx=(8, 0))
-                
+
                 text_lbl = tk.Label(row, text=display_text, bg=self.colors.surface1, fg=self.colors.text, anchor=tk.W, pady=8)
                 text_lbl.pack(side=tk.LEFT, padx=(4, 8), fill=tk.X, expand=True)
-                
+
                 def on_enter(e, widgets=[row, icon_lbl, text_lbl]):
                     for w in widgets: w.configure(bg=self.colors.surface2)
-                
+
                 def on_leave(e, widgets=[row, icon_lbl, text_lbl]):
                     for w in widgets: w.configure(bg=self.colors.surface1)
 
@@ -869,13 +873,13 @@ class GroupedButtonList:
                     widget.bind('<Button-1>', lambda e, k=key: self.on_click(k))
                     widget.bind('<Enter>', on_enter)
                     widget.bind('<Leave>', on_leave)
-                
+
                 if tooltip_text:
                     tooltip = Tooltip(text_lbl, tooltip_text)
                     self.tooltips.append(tooltip)
-        
+
         self._update_dots()
-    
+
     def _update_dots(self):
         """Update dot indicators."""
         for i, dot in enumerate(self.dot_labels):
@@ -889,21 +893,21 @@ class GroupedButtonList:
                     text="●" if i == self.current_group_idx else "○",
                     fg=self.colors.blue if i == self.current_group_idx else self.colors.overlay0
                 )
-    
+
     def _next_group(self):
         """Go to next group."""
         self.current_group_idx = (self.current_group_idx + 1) % self.total_groups
         self._render_group()
         if self.on_group_changed:
             self.on_group_changed()
-    
+
     def _prev_group(self):
         """Go to previous group."""
         self.current_group_idx = (self.current_group_idx - 1) % self.total_groups
         self._render_group()
         if self.on_group_changed:
             self.on_group_changed()
-    
+
     def _go_to_group(self, idx: int):
         """Go to specific group."""
         if 0 <= idx < self.total_groups:
@@ -911,7 +915,7 @@ class GroupedButtonList:
             self._render_group()
             if self.on_group_changed:
                 self.on_group_changed()
-    
+
     def pack(self, **kwargs):
         """Pack the widget."""
         self.frame.pack(**kwargs)
@@ -922,9 +926,9 @@ class CarouselButtonList:
     A carousel-style list of buttons with pagination.
     Shows a configurable number of items per page with navigation arrows.
     """
-    
+
     DEFAULT_ITEMS_PER_PAGE = 4
-    
+
     def __init__(
         self,
         parent,
@@ -936,26 +940,26 @@ class CarouselButtonList:
         self.items = items
         self.on_click = on_click
         self.items_per_page = items_per_page or self.DEFAULT_ITEMS_PER_PAGE
-        
+
         self.colors = get_colors()
         self.current_page = 0
         self.total_pages = max(1, math.ceil(len(items) / self.items_per_page))
-        
+
         self.buttons_frame = None
         self.nav_frame = None
         self.dot_labels: List = []
         self.tooltips: List[Tooltip] = []
-        
+
         self._create_widget()
-    
+
     def _create_widget(self):
         """Create the carousel widget."""
         if HAVE_CTK:
             self.frame = ctk.CTkFrame(self.parent, fg_color="transparent")
-            
+
             self.content_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
             self.content_frame.pack(fill="both", expand=True)
-            
+
             # Arrows
             if self.total_pages > 1:
                 self.left_arrow = ctk.CTkButton(
@@ -970,10 +974,10 @@ class CarouselButtonList:
                     command=self._prev_page
                 )
                 self.left_arrow.pack(side="left", fill="y", padx=(0, 2))  # Reduced padding
-            
+
             self.buttons_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
             self.buttons_frame.pack(side="left", fill="both", expand=True)
-            
+
             if self.total_pages > 1:
                 self.right_arrow = ctk.CTkButton(
                     self.content_frame,
@@ -987,12 +991,12 @@ class CarouselButtonList:
                     command=self._next_page
                 )
                 self.right_arrow.pack(side="right", fill="y", padx=(2, 0))  # Reduced padding
-            
+
             # Dots
             if self.total_pages > 1:
                 self.nav_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
                 self.nav_frame.pack(pady=(8, 0))
-                
+
                 for i in range(self.total_pages):
                     dot = ctk.CTkLabel(
                         self.nav_frame,
@@ -1009,7 +1013,7 @@ class CarouselButtonList:
             self.frame = tk.Frame(self.parent, bg=self.colors.base)
             self.content_frame = tk.Frame(self.frame, bg=self.colors.base)
             self.content_frame.pack(fill=tk.BOTH, expand=True)
-            
+
             if self.total_pages > 1:
                 self.left_arrow = tk.Label(
                     self.content_frame, text="◀", font=("Arial", 12),
@@ -1017,10 +1021,10 @@ class CarouselButtonList:
                 )
                 self.left_arrow.pack(side=tk.LEFT, fill=tk.Y)
                 self.left_arrow.bind('<Button-1>', lambda e: self._prev_page())
-            
+
             self.buttons_frame = tk.Frame(self.content_frame, bg=self.colors.base)
             self.buttons_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-            
+
             if self.total_pages > 1:
                 self.right_arrow = tk.Label(
                     self.content_frame, text="▶", font=("Arial", 12),
@@ -1028,11 +1032,11 @@ class CarouselButtonList:
                 )
                 self.right_arrow.pack(side=tk.RIGHT, fill=tk.Y)
                 self.right_arrow.bind('<Button-1>', lambda e: self._next_page())
-            
+
             if self.total_pages > 1:
                 self.nav_frame = tk.Frame(self.frame, bg=self.colors.base)
                 self.nav_frame.pack(pady=(8, 0))
-                
+
                 for i in range(self.total_pages):
                     dot = tk.Label(
                         self.nav_frame, text="●" if i == 0 else "○", font=("Arial", 8),
@@ -1042,25 +1046,25 @@ class CarouselButtonList:
                     dot.pack(side=tk.LEFT)
                     dot.bind('<Button-1>', lambda e, page=i: self._go_to_page(page))
                     self.dot_labels.append(dot)
-        
+
         self._render_page()
-    
+
     def _render_page(self):
         """Render the current page."""
         for widget in self.buttons_frame.winfo_children():
             widget.destroy()
         self.tooltips.clear()
-        
+
         start_idx = self.current_page * self.items_per_page
         end_idx = start_idx + self.items_per_page
         page_items = self.items[start_idx:end_idx]
-        
+
         for item in page_items:
             key = item[0]
             display_text = item[1]
             icon = item[2] if len(item) > 2 else ""
             tooltip_text = item[3] if len(item) > 3 else None
-            
+
             if HAVE_CTK:
                 btn = create_emoji_button(
                     self.buttons_frame,
@@ -1080,23 +1084,23 @@ class CarouselButtonList:
                     text_color=self.colors.text
                 )
                 btn.pack(fill="x", pady=1)
-                
+
                 if tooltip_text:
                     tooltip = Tooltip(btn, tooltip_text)
                     self.tooltips.append(tooltip)
             else:
                 row = tk.Frame(self.buttons_frame, bg=self.colors.surface1, cursor="hand2")
                 row.pack(fill=tk.X, pady=1)
-                
+
                 icon_lbl = tk.Label(row, text=icon, bg=self.colors.surface1, fg=self.colors.text, width=3, pady=10)
                 icon_lbl.pack(side=tk.LEFT, padx=(8, 0))
-                
+
                 text_lbl = tk.Label(row, text=display_text, bg=self.colors.surface1, fg=self.colors.text, anchor=tk.W, pady=10)
                 text_lbl.pack(side=tk.LEFT, padx=(4, 8))
-                
+
                 def on_enter(e, widgets=[row, icon_lbl, text_lbl]):
                     for w in widgets: w.configure(bg=self.colors.surface2)
-                
+
                 def on_leave(e, widgets=[row, icon_lbl, text_lbl]):
                     for w in widgets: w.configure(bg=self.colors.surface1)
 
@@ -1104,13 +1108,13 @@ class CarouselButtonList:
                     widget.bind('<Button-1>', lambda e, k=key: self.on_click(k))
                     widget.bind('<Enter>', on_enter)
                     widget.bind('<Leave>', on_leave)
-                
+
                 if tooltip_text:
                     tooltip = Tooltip(text_lbl, tooltip_text)
                     self.tooltips.append(tooltip)
-        
+
         self._update_dots()
-    
+
     def _update_dots(self):
         """Update dot indicators."""
         for i, dot in enumerate(self.dot_labels):
@@ -1124,20 +1128,20 @@ class CarouselButtonList:
                     text="●" if i == self.current_page else "○",
                     fg=self.colors.blue if i == self.current_page else self.colors.overlay0
                 )
-    
+
     def _next_page(self):
         self.current_page = (self.current_page + 1) % self.total_pages
         self._render_page()
-    
+
     def _prev_page(self):
         self.current_page = (self.current_page - 1) % self.total_pages
         self._render_page()
-    
+
     def _go_to_page(self, page: int):
         if 0 <= page < self.total_pages:
             self.current_page = page
             self._render_page()
-    
+
     def pack(self, **kwargs):
         self.frame.pack(**kwargs)
 
@@ -1154,9 +1158,9 @@ def create_profile_dropdown_ctk(parent, colors):
     """
     from ..connection_profiles import ProfileStore
     profile_names = ProfileStore.get_instance().get_profile_names()
-    
+
     frame = ctk.CTkFrame(parent, fg_color="transparent")
-    
+
     profile_var = tk.StringVar(value="(Default)")
     dropdown = ctk.CTkOptionMenu(
         frame,
@@ -1175,7 +1179,7 @@ def create_profile_dropdown_ctk(parent, colors):
     )
     dropdown.pack(side="left", fill="x", expand=True)
     Tooltip(dropdown, "Override connection profile for this request")
-    
+
     return profile_var, dropdown, frame
 
 
@@ -1187,9 +1191,9 @@ def create_profile_dropdown_tk(parent, root, colors):
     """
     from ..connection_profiles import ProfileStore
     profile_names = ProfileStore.get_instance().get_profile_names()
-    
+
     frame = tk.Frame(parent, bg=colors.base)
-    
+
     profile_var = tk.StringVar(master=root, value="(Default)")
     dropdown = tk.OptionMenu(
         frame,
@@ -1207,7 +1211,7 @@ def create_profile_dropdown_tk(parent, root, colors):
         activeforeground=colors.text
     )
     dropdown.pack(side=tk.LEFT, fill=tk.X, expand=True)
-    
+
     return profile_var, dropdown, frame
 
 
@@ -1229,13 +1233,13 @@ def get_profile_override_value(profile_var):
 
 class BasePopup:
     """Base class for popup windows"""
-    
+
     def __init__(self):
         self.root = None
         self.dark_mode = is_dark_mode()
         self.colors = get_colors()
         self._setup_colors()
-    
+
     def _setup_colors(self):
         """Setup color scheme (legacy compatibility)."""
         c = self.colors
@@ -1246,13 +1250,13 @@ class BasePopup:
         self.input_bg = c.surface0
         self.border_color = c.surface2
         self.accent_color = c.blue
-    
+
     def _close(self):
         """Close the popup window."""
         if self.root:
             self.root.destroy()
             self.root = None
-    
+
     def is_open(self) -> bool:
         """Check if the popup is currently open."""
         return self.root is not None and self.root.winfo_exists()
@@ -1263,7 +1267,7 @@ class InputPopup(BasePopup):
     Simple input popup for when no text is selected.
     Uses CTk for modern look when available.
     """
-    
+
     def __init__(
         self,
         on_submit: Callable[[str, str], None],
@@ -1274,7 +1278,7 @@ class InputPopup(BasePopup):
         self.on_close_callback = on_close
         self.input_var = None
         self.response_toggle = None
-    
+
     def show(self, x: Optional[int] = None, y: Optional[int] = None):
         """Show the input popup."""
         if HAVE_CTK:
@@ -1282,18 +1286,18 @@ class InputPopup(BasePopup):
             self.root = ctk.CTk()
         else:
             self.root = tk.Tk()
-        
+
         self.root.withdraw()
         self.root.title("AI Chat")
         self.root.overrideredirect(True)
         self.root.attributes('-topmost', True)
-        
+
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
-        
+
         # Hide from taskbar
         hide_from_taskbar(self.root)
-        
+
         if HAVE_CTK:
             main_frame = ctk.CTkFrame(
                 self.root,
@@ -1303,14 +1307,14 @@ class InputPopup(BasePopup):
                 border_width=1
             )
             main_frame.pack(fill="both", expand=True, padx=1, pady=1)
-            
+
             content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
             content_frame.pack(fill="both", expand=True, padx=8, pady=8)
-            
+
             # Close button
             top_bar = ctk.CTkFrame(content_frame, fg_color="transparent")
             top_bar.pack(fill="x", pady=(0, 8))
-            
+
             close_btn = ctk.CTkButton(
                 top_bar,
                 text="×",
@@ -1324,11 +1328,11 @@ class InputPopup(BasePopup):
                 command=self._close
             )
             close_btn.pack(side="right")
-            
+
             # Response toggle
             toggle_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
             toggle_frame.pack(fill="x", pady=(0, 8))
-            
+
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
@@ -1341,11 +1345,11 @@ class InputPopup(BasePopup):
                 }
             )
             self.response_toggle.pack(anchor="center")
-            
+
             # Input area
             input_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
             input_frame.pack(fill="x")
-            
+
             self.input_entry = ctk.CTkEntry(
                 input_frame,
                 placeholder_text="Ask your AI...",
@@ -1360,7 +1364,7 @@ class InputPopup(BasePopup):
             )
             self.input_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
             self.input_entry.bind('<Return>', lambda e: self._submit())
-            
+
             send_btn = ctk.CTkButton(
                 input_frame,
                 text="➤",
@@ -1379,14 +1383,14 @@ class InputPopup(BasePopup):
             self.root.configure(bg=self.bg_color)
             main_frame = tk.Frame(self.root, bg=self.bg_color, highlightbackground=self.border_color, highlightthickness=1)
             main_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
-            
+
             content_frame = tk.Frame(main_frame, bg=self.bg_color)
             content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-            
+
             # Close button
             top_bar = tk.Frame(content_frame, bg=self.bg_color)
             top_bar.pack(fill=tk.X, pady=(0, 5))
-            
+
             close_btn = tk.Button(
                 top_bar,
                 text="×",
@@ -1399,11 +1403,11 @@ class InputPopup(BasePopup):
                 command=self._close
             )
             close_btn.pack(side=tk.RIGHT)
-            
+
             # Response mode toggle
             toggle_frame = tk.Frame(content_frame, bg=self.bg_color)
             toggle_frame.pack(fill=tk.X, pady=(0, 8))
-            
+
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
@@ -1416,14 +1420,14 @@ class InputPopup(BasePopup):
                 }
             )
             self.response_toggle.pack(anchor=tk.CENTER)
-            
+
             # Input area
             input_frame = tk.Frame(content_frame, bg=self.bg_color)
             input_frame.pack(fill=tk.X)
-            
+
             self.input_var = tk.StringVar()
             placeholder = "Ask your AI..."
-            
+
             self.input_entry = tk.Entry(
                 input_frame,
                 textvariable=self.input_var,
@@ -1439,21 +1443,21 @@ class InputPopup(BasePopup):
             self.input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5), ipady=8)
             self.input_entry.insert(0, placeholder)
             self.input_entry.config(fg='gray')
-            
+
             def on_focus_in(event):
                 if self.input_entry.get() == placeholder:
                     self.input_entry.delete(0, tk.END)
                     self.input_entry.config(fg=self.fg_color)
-            
+
             def on_focus_out(event):
                 if not self.input_entry.get():
                     self.input_entry.insert(0, placeholder)
                     self.input_entry.config(fg='gray')
-            
+
             self.input_entry.bind('<FocusIn>', on_focus_in)
             self.input_entry.bind('<FocusOut>', on_focus_out)
             self.input_entry.bind('<Return>', lambda e: self._submit())
-            
+
             # Send button
             send_btn = tk.Button(
                 input_frame,
@@ -1469,7 +1473,7 @@ class InputPopup(BasePopup):
                 command=self._submit
             )
             send_btn.pack(side=tk.RIGHT)
-        
+
         # Position window and force rendering before showing
         self._position_window(x, y)
         self.root.update_idletasks()
@@ -1478,29 +1482,29 @@ class InputPopup(BasePopup):
         self.root.lift()
         self.root.focus_force()
         self.input_entry.focus_set()
-        
+
         self._run_event_loop()
-    
+
     def _position_window(self, x, y):
         """Position the window."""
         self.root.update_idletasks()
-        
+
         if x is None or y is None:
             x = self.root.winfo_pointerx()
             y = self.root.winfo_pointery() + 20
-        
+
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
-        
+
         if x + window_width > screen_width:
             x = screen_width - window_width - 10
         if y + window_height > screen_height:
             y = y - window_height - 30
-        
+
         self.root.geometry(f"+{x}+{y}")
-    
+
     def _run_event_loop(self):
         """Run event loop without blocking."""
         try:
@@ -1514,19 +1518,19 @@ class InputPopup(BasePopup):
                     break
         except Exception:
             pass
-    
+
     def _submit(self):
         """Handle submit."""
         if HAVE_CTK:
             text = self.input_entry.get().strip()
         else:
             text = self.input_var.get().strip() if self.input_var else ""
-        
+
         if text and text != "Ask your AI...":
             response_mode = self.response_toggle.get() if self.response_toggle else "default"
             self._close()
             self.on_submit(text, response_mode)
-    
+
     def _close(self):
         super()._close()
         if self.on_close_callback:
@@ -1537,7 +1541,7 @@ class PromptSelectionPopup(BasePopup):
     """
     Popup with prompt selection buttons for when text is selected.
     """
-    
+
     def __init__(
         self,
         options: Dict,
@@ -1550,28 +1554,28 @@ class PromptSelectionPopup(BasePopup):
         self.on_close_callback = on_close
         self.selected_text = ""
         self.response_toggle = None
-    
+
     def show(self, selected_text: str, x: Optional[int] = None, y: Optional[int] = None):
         """Show the popup window."""
         self.selected_text = selected_text
-        
+
         if HAVE_CTK:
             sync_ctk_appearance()
             self.root = ctk.CTk()
         else:
             self.root = tk.Tk()
-        
+
         self.root.withdraw()
         self.root.title("Text Edit Tool")
         self.root.overrideredirect(True)
         self.root.attributes('-topmost', True)
-        
+
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
-        
+
         # Hide from taskbar
         hide_from_taskbar(self.root)
-        
+
         if HAVE_CTK:
             main_frame = ctk.CTkFrame(
                 self.root,
@@ -1581,14 +1585,14 @@ class PromptSelectionPopup(BasePopup):
                 border_width=1
             )
             main_frame.pack(fill="both", expand=True, padx=1, pady=1)
-            
+
             content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
             content_frame.pack(fill="both", expand=True, padx=8, pady=8)
-            
+
             # Close button
             top_bar = ctk.CTkFrame(content_frame, fg_color="transparent")
             top_bar.pack(fill="x", pady=(0, 8))
-            
+
             close_btn = ctk.CTkButton(
                 top_bar,
                 text="×",
@@ -1602,11 +1606,11 @@ class PromptSelectionPopup(BasePopup):
                 command=self._close
             )
             close_btn.pack(side="right")
-            
+
             # Response toggle
             toggle_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
             toggle_frame.pack(fill="x", pady=(0, 8))
-            
+
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
@@ -1619,11 +1623,11 @@ class PromptSelectionPopup(BasePopup):
                 }
             )
             self.response_toggle.pack(anchor="center")
-            
+
             # Input area
             input_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
             input_frame.pack(fill="x", pady=(0, 8))
-            
+
             self.input_entry = ctk.CTkEntry(
                 input_frame,
                 placeholder_text="Explain your changes...",
@@ -1637,7 +1641,7 @@ class PromptSelectionPopup(BasePopup):
             )
             self.input_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
             self.input_entry.bind('<Return>', lambda e: self._on_custom_submit())
-            
+
             send_btn = ctk.CTkButton(
                 input_frame,
                 text="➤",
@@ -1651,7 +1655,7 @@ class PromptSelectionPopup(BasePopup):
                 command=self._on_custom_submit
             )
             send_btn.pack(side="right")
-            
+
             # Option buttons
             self._create_option_buttons_ctk(content_frame)
         else:
@@ -1664,14 +1668,14 @@ class PromptSelectionPopup(BasePopup):
                 highlightthickness=1
             )
             main_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
-            
+
             content_frame = tk.Frame(main_frame, bg=self.bg_color)
             content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-            
+
             # Close button
             top_bar = tk.Frame(content_frame, bg=self.bg_color)
             top_bar.pack(fill=tk.X, pady=(0, 5))
-            
+
             close_btn = tk.Button(
                 top_bar,
                 text="×",
@@ -1684,11 +1688,11 @@ class PromptSelectionPopup(BasePopup):
                 command=self._close
             )
             close_btn.pack(side=tk.RIGHT)
-            
+
             # Response mode toggle
             toggle_frame = tk.Frame(content_frame, bg=self.bg_color)
             toggle_frame.pack(fill=tk.X, pady=(0, 8))
-            
+
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
@@ -1701,14 +1705,14 @@ class PromptSelectionPopup(BasePopup):
                 }
             )
             self.response_toggle.pack(anchor=tk.CENTER)
-            
+
             # Input area
             input_frame = tk.Frame(content_frame, bg=self.bg_color)
             input_frame.pack(fill=tk.X, pady=(0, 10))
-            
+
             self.input_var = tk.StringVar()
             placeholder = "Explain your changes.."
-            
+
             self.input_entry = tk.Entry(
                 input_frame,
                 textvariable=self.input_var,
@@ -1723,21 +1727,21 @@ class PromptSelectionPopup(BasePopup):
             self.input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5), ipady=8)
             self.input_entry.insert(0, placeholder)
             self.input_entry.config(fg='gray')
-            
+
             def on_focus_in(event):
                 if self.input_entry.get() == placeholder:
                     self.input_entry.delete(0, tk.END)
                     self.input_entry.config(fg=self.fg_color)
-            
+
             def on_focus_out(event):
                 if not self.input_entry.get():
                     self.input_entry.insert(0, placeholder)
                     self.input_entry.config(fg='gray')
-            
+
             self.input_entry.bind('<FocusIn>', on_focus_in)
             self.input_entry.bind('<FocusOut>', on_focus_out)
             self.input_entry.bind('<Return>', lambda e: self._on_custom_submit())
-            
+
             # Send button
             send_btn = tk.Button(
                 input_frame,
@@ -1753,10 +1757,10 @@ class PromptSelectionPopup(BasePopup):
                 command=self._on_custom_submit
             )
             send_btn.pack(side=tk.RIGHT)
-            
+
             # Option buttons
             self._create_option_buttons_tk(content_frame)
-        
+
         # Position window and force rendering before showing
         self._position_window(x, y)
         self.root.update_idletasks()
@@ -1765,20 +1769,20 @@ class PromptSelectionPopup(BasePopup):
         self.root.lift()
         self.root.focus_force()
         self.input_entry.focus_set()
-        
+
         self._run_event_loop()
-    
+
     def _create_option_buttons_ctk(self, parent):
         """Create option buttons with CTk."""
         buttons_frame = ctk.CTkFrame(parent, fg_color="transparent")
         buttons_frame.pack(fill="both", expand=True)
-        
+
         for key, option in self.options.items():
             if key == "Custom" or key.startswith("_"):
                 continue
-            
+
             icon = option.get("icon", "")
-            
+
             btn = create_emoji_button(
                 buttons_frame,
                 text=key,
@@ -1796,27 +1800,27 @@ class PromptSelectionPopup(BasePopup):
                 text_color=self.colors.text
             )
             btn.pack(fill="x", pady=1)
-    
+
     def _position_window(self, x, y):
         """Position the window."""
         self.root.update_idletasks()
-        
+
         if x is None or y is None:
             x = self.root.winfo_pointerx()
             y = self.root.winfo_pointery() + 20
-        
+
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
-        
+
         if x + window_width > screen_width:
             x = screen_width - window_width - 10
         if y + window_height > screen_height:
             y = y - window_height - 30
-        
+
         self.root.geometry(f"+{x}+{y}")
-    
+
     def _run_event_loop(self):
         """Run event loop."""
         try:
@@ -1830,19 +1834,19 @@ class PromptSelectionPopup(BasePopup):
                     break
         except Exception:
             pass
-    
+
     def _create_option_buttons_tk(self, parent):
         """Create option buttons for tk fallback."""
         buttons_frame = tk.Frame(parent, bg=self.bg_color)
         buttons_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         row = 0
         col = 0
-        
+
         for key, option in self.options.items():
             if key == "Custom" or key.startswith("_"):
                 continue
-            
+
             btn = tk.Button(
                 buttons_frame,
                 text=key,
@@ -1859,38 +1863,38 @@ class PromptSelectionPopup(BasePopup):
                 command=lambda k=key: self._on_option_click(k)
             )
             btn.grid(row=row, column=col, padx=3, pady=3, sticky=tk.EW)
-            
+
             btn.bind('<Enter>', lambda e, b=btn: b.config(bg=self.button_hover))
             btn.bind('<Leave>', lambda e, b=btn: b.config(bg=self.button_bg))
-            
+
             col += 1
             if col > 1:
                 col = 0
                 row += 1
-        
+
         buttons_frame.columnconfigure(0, weight=1)
         buttons_frame.columnconfigure(1, weight=1)
-    
+
     def _on_option_click(self, option_key: str):
         """Handle option button click."""
         response_mode = self.response_toggle.get() if self.response_toggle else "default"
         self._close()
         self.on_option_selected(option_key, self.selected_text, None, response_mode)
-    
+
     def _on_custom_submit(self):
         """Handle custom input submission."""
         if HAVE_CTK:
             custom_text = self.input_entry.get().strip()
         else:
             custom_text = self.input_var.get().strip() if self.input_var else ""
-        
+
         if not custom_text or custom_text == "Explain your changes..":
             return
-        
+
         response_mode = self.response_toggle.get() if self.response_toggle else "default"
         self._close()
         self.on_option_selected("_Custom", self.selected_text, custom_text, response_mode)
-    
+
     def _close(self):
         super()._close()
         if self.on_close_callback:
@@ -1906,9 +1910,9 @@ class AttachedInputPopup:
     Input popup as CTkToplevel attached to coordinator's root.
     Modern CustomTkinter-styled with segmented toggle.
     """
-    
+
     PLACEHOLDER = "Ask AI anything..."
-    
+
     def __init__(
         self,
         parent_root,
@@ -1924,35 +1928,35 @@ class AttachedInputPopup:
         self.x = x
         self.y = y
         self.on_tts_callback = on_tts
-        
+
         self.colors = get_colors()
         self.root = None
         self.response_toggle = None
         self.profile_var = None
         self.profile_dropdown = None
-        
+
         self._create_window()
-    
+
     def _create_window(self):
         """Create the styled input popup window."""
         if HAVE_CTK:
             self.root = ctk.CTkToplevel(self.parent_root)
         else:
             self.root = tk.Toplevel(self.parent_root)
-        
+
         # Hide window while building UI (prevents flickering)
         self.root.withdraw()
-        
+
         self.root.title("AI Chat")
         self.root.overrideredirect(True)
         self.root.attributes('-topmost', True)
-        
+
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
-        
+
         # Hide from taskbar
         hide_from_taskbar(self.root)
-        
+
         if HAVE_CTK:
             main_frame = ctk.CTkFrame(
                 self.root,
@@ -1962,14 +1966,14 @@ class AttachedInputPopup:
                 border_width=1
             )
             main_frame.pack(fill="both", expand=True, padx=1, pady=1)
-            
+
             content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
             content_frame.pack(fill="both", expand=True, padx=8, pady=8)
-            
+
             # Close button
             top_bar = ctk.CTkFrame(content_frame, fg_color="transparent")
             top_bar.pack(fill="x", pady=(0, 8))
-            
+
             close_btn = ctk.CTkButton(
                 top_bar,
                 text="×",
@@ -1983,7 +1987,7 @@ class AttachedInputPopup:
                 command=self._close
             )
             close_btn.pack(side="right")
-            
+
             # TTS button in top bar (only if callback provided) - pack before profile so order is: TTS | Profile | Close
             if self.on_tts_callback:
                 tts_btn = create_emoji_button(
@@ -2005,15 +2009,15 @@ class AttachedInputPopup:
                 tts_btn.pack(side="left", padx=(4, 0))
                 self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window")
                 self.tts_btn = tts_btn
-            
+
             # Connection profile dropdown in top bar
             self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_ctk(top_bar, self.colors)
             profile_frame.pack(side="left", expand=True)
-            
+
             # Response toggle
             toggle_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
             toggle_frame.pack(fill="x", pady=(0, 8))
-            
+
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
@@ -2026,11 +2030,11 @@ class AttachedInputPopup:
                 }
             )
             self.response_toggle.pack(anchor="center")
-            
+
             # Input area
             input_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
             input_frame.pack(fill="x")
-            
+
             self.input_entry = ctk.CTkEntry(
                 input_frame,
                 placeholder_text=self.PLACEHOLDER,
@@ -2045,7 +2049,7 @@ class AttachedInputPopup:
             )
             self.input_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
             self.input_entry.bind('<Return>', lambda e: self._submit())
-            
+
             send_btn = ctk.CTkButton(
                 input_frame,
                 text="➤",
@@ -2062,7 +2066,7 @@ class AttachedInputPopup:
         else:
             # Fallback to tk
             self.root.configure(bg=self.colors.base)
-            
+
             main_frame = tk.Frame(
                 self.root,
                 bg=self.colors.base,
@@ -2070,14 +2074,14 @@ class AttachedInputPopup:
                 highlightthickness=1
             )
             main_frame.pack(fill=tk.BOTH, expand=True)
-            
+
             content_frame = tk.Frame(main_frame, bg=self.colors.base)
             content_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
-            
+
             # Top bar with close button
             top_bar = tk.Frame(content_frame, bg=self.colors.base)
             top_bar.pack(fill=tk.X, pady=(0, 8))
-            
+
             close_btn = tk.Label(
                 top_bar,
                 text="×",
@@ -2090,7 +2094,7 @@ class AttachedInputPopup:
             close_btn.bind('<Button-1>', lambda e: self._close())
             close_btn.bind('<Enter>', lambda e: close_btn.config(fg=self.colors.red))
             close_btn.bind('<Leave>', lambda e: close_btn.config(fg=self.colors.overlay0))
-            
+
             # TTS button in top bar (only if callback provided) - pack before profile so order is: TTS | Profile | Close
             if self.on_tts_callback:
                 tts_btn = tk.Label(
@@ -2107,15 +2111,15 @@ class AttachedInputPopup:
                 tts_btn.bind('<Leave>', lambda e: tts_btn.config(fg=self.colors.overlay0))
                 self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window")
                 self.tts_btn = tts_btn
-            
+
             # Connection profile dropdown in top bar
             self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_tk(top_bar, self.root, self.colors)
             profile_frame.pack(side=tk.LEFT, expand=True)
-            
+
             # Response mode toggle
             toggle_frame = tk.Frame(content_frame, bg=self.colors.base)
             toggle_frame.pack(fill=tk.X, pady=(0, 12))
-            
+
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
@@ -2128,11 +2132,11 @@ class AttachedInputPopup:
                 }
             )
             self.response_toggle.pack(anchor=tk.CENTER)
-            
+
             # Input area with modern styling
             input_frame = tk.Frame(content_frame, bg=self.colors.base)
             input_frame.pack(fill=tk.X)
-            
+
             # Input container with border
             input_container = tk.Frame(
                 input_frame,
@@ -2141,9 +2145,9 @@ class AttachedInputPopup:
                 highlightthickness=1
             )
             input_container.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
-            
+
             self.input_var = tk.StringVar(master=self.root)
-            
+
             self.input_entry = tk.Entry(
                 input_container,
                 textvariable=self.input_var,
@@ -2158,11 +2162,11 @@ class AttachedInputPopup:
             self.input_entry.pack(fill=tk.X, padx=10, pady=10)
             self.input_entry.insert(0, self.PLACEHOLDER)
             self.input_entry.config(fg=self.colors.overlay0)
-            
+
             self.input_entry.bind('<FocusIn>', self._on_focus_in)
             self.input_entry.bind('<FocusOut>', self._on_focus_out)
             self.input_entry.bind('<Return>', lambda e: self._submit())
-            
+
             # Send button
             send_btn = tk.Label(
                 input_frame,
@@ -2178,13 +2182,13 @@ class AttachedInputPopup:
             send_btn.bind('<Button-1>', lambda e: self._submit())
             send_btn.bind('<Enter>', lambda e: send_btn.config(bg=self.colors.lavender))
             send_btn.bind('<Leave>', lambda e: send_btn.config(bg=self.colors.blue))
-        
+
         # Force Tk to process all pending drawing commands before showing
         self._position_window()
         self.root.update_idletasks()
         # Use delayed deiconify to let CTk finish internal rendering
         self.root.after(10, self._show_and_focus)
-    
+
     def _show_and_focus(self):
         """Show window after CTk has finished rendering (prevents flickering)."""
         if not self.root:
@@ -2197,48 +2201,48 @@ class AttachedInputPopup:
             self.input_entry.focus_set()
         except tk.TclError:
             pass
-    
+
     def _position_window(self):
         """Position the window near the cursor."""
         self.root.update_idletasks()
-        
+
         x = self.x
         y = self.y
         if x is None or y is None:
             x = self.root.winfo_pointerx()
             y = self.root.winfo_pointery() + 20
-        
+
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
-        
+
         if x + window_width > screen_width:
             x = screen_width - window_width - 10
         if y + window_height > screen_height:
             y = y - window_height - 30
-        
+
         self.root.geometry(f"+{x}+{y}")
-    
+
     def _on_focus_in(self, event):
         """Handle input focus in."""
         if self.input_entry.get() == self.PLACEHOLDER:
             self.input_entry.delete(0, tk.END)
             self.input_entry.config(fg=self.colors.text)
-    
+
     def _on_focus_out(self, event):
         """Handle input focus out."""
         if not self.input_entry.get():
             self.input_entry.insert(0, self.PLACEHOLDER)
             self.input_entry.config(fg=self.colors.overlay0)
-    
+
     def _submit(self):
         """Handle form submission."""
         text = self.input_entry.get().strip()
-        
+
         # Check if empty (handling placeholder check for Tk)
         is_empty = not text or (not HAVE_CTK and text == self.PLACEHOLDER)
-        
+
         if not is_empty:
             response_mode = self.response_toggle.get() if self.response_toggle else "default"
             profile_override = get_profile_override_value(self.profile_var)
@@ -2246,21 +2250,21 @@ class AttachedInputPopup:
             self.on_submit(text, response_mode, profile_override)
         else:
             self._flash_input_error()
-    
+
     def _on_tts(self):
         """Handle TTS button click - grab text and open TTS Window."""
         text = self.input_entry.get().strip()
-        
+
         # Check if empty (handling placeholder check for Tk)
         is_empty = not text or (not HAVE_CTK and text == self.PLACEHOLDER)
-        
+
         if not is_empty and self.on_tts_callback:
             self._close()
             self.on_tts_callback(text)
         elif self.on_tts_callback:
             # Visual feedback: Flash input border red
             self._flash_input_error()
-            
+
     def _flash_input_error(self):
         """Briefly flash input red to indicate error."""
         try:
@@ -2275,7 +2279,7 @@ class AttachedInputPopup:
                 self.root.after(300, lambda: self.input_entry.config(bg=orig_bg))
         except Exception:
             pass
-            
+
     def _safe_restore_border(self, color):
         """Restore border color if widget still exists."""
         try:
@@ -2283,7 +2287,7 @@ class AttachedInputPopup:
                 self.input_entry.configure(border_color=color)
         except Exception:
             pass
-    
+
     def _close(self):
         """Close the popup."""
         if self.root:
@@ -2326,10 +2330,10 @@ class AttachedPromptPopup:
     Prompt selection popup as CTkToplevel attached to coordinator's root.
     Modern CustomTkinter-styled with segmented toggle and action buttons.
     """
-    
+
     PLACEHOLDER_EDIT = "Explain your changes..."
     PLACEHOLDER_ASK = "Ask about this text..."
-    
+
     def __init__(
         self,
         parent_root,
@@ -2351,7 +2355,7 @@ class AttachedPromptPopup:
         self.y = y
         self.on_tts_callback = on_tts
         self.on_request_compare_text = on_request_compare_text
-        
+
         self.colors = get_colors()
         self.root = None
         self.response_toggle = None
@@ -2359,33 +2363,33 @@ class AttachedPromptPopup:
         self.active_modifiers: List[str] = []
         self.profile_var = None
         self.profile_dropdown = None
-        
+
         # Compare mode state
         self._compare_text: Optional[str] = None
         self._pending_compare_action: Optional[tuple] = None  # (option_key, custom_input)
-        
+
         self._create_window()
-    
+
     def _create_window(self):
         """Create the styled prompt popup window."""
         if HAVE_CTK:
             self.root = ctk.CTkToplevel(self.parent_root)
         else:
             self.root = tk.Toplevel(self.parent_root)
-        
+
         # Hide window while building UI (prevents flickering)
         self.root.withdraw()
-        
+
         self.root.title("Text Edit Tool")
         self.root.overrideredirect(True)
         self.root.attributes('-topmost', True)
-        
+
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
-        
+
         # Hide from taskbar
         hide_from_taskbar(self.root)
-        
+
         if HAVE_CTK:
             main_frame = ctk.CTkFrame(
                 self.root,
@@ -2395,14 +2399,14 @@ class AttachedPromptPopup:
                 border_width=1
             )
             main_frame.pack(fill="both", expand=True, padx=1, pady=1)
-            
+
             content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
             content_frame.pack(fill="both", expand=True, padx=8, pady=8)
-            
+
             # Close button
             top_bar = ctk.CTkFrame(content_frame, fg_color="transparent")
             top_bar.pack(fill="x", pady=(0, 8))
-            
+
             close_btn = ctk.CTkButton(
                 top_bar,
                 text="×",
@@ -2416,7 +2420,7 @@ class AttachedPromptPopup:
                 command=self._close
             )
             close_btn.pack(side="right")
-            
+
             # TTS button in top bar (only if callback provided)
             if self.on_tts_callback:
                 tts_btn = create_emoji_button(
@@ -2437,11 +2441,11 @@ class AttachedPromptPopup:
                 )
                 tts_btn.pack(side="left", padx=(4, 0))
                 self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window with selected text")
-            
+
             # Response toggle
             toggle_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
             toggle_frame.pack(fill="x", pady=(0, 8))
-            
+
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
@@ -2454,11 +2458,11 @@ class AttachedPromptPopup:
                 }
             )
             self.response_toggle.pack(anchor="center")
-            
+
             # Connection profile dropdown
             self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_ctk(content_frame, self.colors)
             profile_frame.pack(anchor="center", pady=(0, 8))
-            
+
             # Modifier bar - get from global settings
             from .prompts import get_prompts_config
             modifiers = get_prompts_config().get_modifiers()
@@ -2471,7 +2475,7 @@ class AttachedPromptPopup:
                     default_active=default_active
                 )
                 self.modifier_bar.pack(fill="x")
-            
+
             # Edit input
             edit_frame = ctk.CTkFrame(
                 content_frame,
@@ -2481,7 +2485,7 @@ class AttachedPromptPopup:
                 border_width=1
             )
             edit_frame.pack(fill="x", pady=(0, 6))
-            
+
             self.edit_input = ctk.CTkEntry(
                 edit_frame,
                 placeholder_text=self.PLACEHOLDER_EDIT,
@@ -2518,7 +2522,7 @@ class AttachedPromptPopup:
             # Ensure proper styling
             edit_btn.configure(corner_radius=8)
             edit_btn.pack(fill="both", expand=True)
-            
+
             self.edit_input = ctk.CTkEntry(
                 edit_frame,
                 placeholder_text=self.PLACEHOLDER_EDIT,
@@ -2533,7 +2537,7 @@ class AttachedPromptPopup:
             self.edit_input.pack(side="left", fill="x", expand=True, padx=(10, 0))
             self.edit_input.bind('<Return>', lambda e: self._on_custom_submit())
             Tooltip(edit_btn, "Edit text with custom instructions")
-            
+
             # Ask input with split buttons (Ask + Compare)
             ask_frame = ctk.CTkFrame(
                 content_frame,
@@ -2543,14 +2547,14 @@ class AttachedPromptPopup:
                 border_width=1
             )
             ask_frame.pack(fill="x", pady=(0, 8))
-            
+
             # Container for both buttons
             ask_btns_container = ctk.CTkFrame(
                 ask_frame,
                 fg_color="transparent"
             )
             ask_btns_container.pack(side="right")
-            
+
             # Compare button (left of Ask button)
             compare_btn_container = ctk.CTkFrame(
                 ask_btns_container,
@@ -2614,13 +2618,13 @@ class AttachedPromptPopup:
             )
             self.ask_input.pack(side="left", fill="x", expand=True, padx=(10, 0))
             self.ask_input.bind('<Return>', lambda e: self._on_ask_submit())
-            
+
             # Action buttons
             self._create_carousel(content_frame)
         else:
             # Fallback to tk
             self.root.configure(bg=self.colors.base)
-            
+
             main_frame = tk.Frame(
                 self.root,
                 bg=self.colors.base,
@@ -2628,14 +2632,14 @@ class AttachedPromptPopup:
                 highlightthickness=1
             )
             main_frame.pack(fill=tk.BOTH, expand=True)
-            
+
             content_frame = tk.Frame(main_frame, bg=self.colors.base)
             content_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
-            
+
             # Top bar with close button
             top_bar = tk.Frame(content_frame, bg=self.colors.base)
             top_bar.pack(fill=tk.X, pady=(0, 8))
-            
+
             close_btn = tk.Label(
                 top_bar,
                 text="×",
@@ -2648,7 +2652,7 @@ class AttachedPromptPopup:
             close_btn.bind('<Button-1>', lambda e: self._close())
             close_btn.bind('<Enter>', lambda e: close_btn.config(fg=self.colors.red))
             close_btn.bind('<Leave>', lambda e: close_btn.config(fg=self.colors.overlay0))
-            
+
             # TTS button in top bar (only if callback provided)
             if self.on_tts_callback:
                 tts_btn = tk.Label(
@@ -2664,11 +2668,11 @@ class AttachedPromptPopup:
                 tts_btn.bind('<Enter>', lambda e: tts_btn.config(fg=self.colors.text))
                 tts_btn.bind('<Leave>', lambda e: tts_btn.config(fg=self.colors.overlay0))
                 self.tts_tooltip = Tooltip(tts_btn, "Open TTS Window with selected text")
-            
+
             # Response mode toggle
             toggle_frame = tk.Frame(content_frame, bg=self.colors.base)
             toggle_frame.pack(fill=tk.X, pady=(0, 12))
-            
+
             self.response_toggle = SegmentedToggle(
                 toggle_frame,
                 options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
@@ -2681,11 +2685,11 @@ class AttachedPromptPopup:
                 }
             )
             self.response_toggle.pack(anchor=tk.CENTER)
-            
+
             # Connection profile dropdown
             self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_tk(content_frame, self.root, self.colors)
             profile_frame.pack(anchor=tk.CENTER, pady=(0, 8))
-            
+
             # Modifier bar - get from global settings
             from .prompts import get_prompts_config
             modifiers = get_prompts_config().get_modifiers()
@@ -2698,7 +2702,7 @@ class AttachedPromptPopup:
                     default_active=default_active
                 )
                 self.modifier_bar.pack(fill=tk.X)
-            
+
             # Edit input area
             edit_container = tk.Frame(
                 content_frame,
@@ -2707,7 +2711,7 @@ class AttachedPromptPopup:
                 highlightthickness=1
             )
             edit_container.pack(fill=tk.X, pady=(0, 8))
-            
+
             # Edit send button
             edit_send_btn = tk.Label(
                 edit_container,
@@ -2724,9 +2728,9 @@ class AttachedPromptPopup:
             edit_send_btn.bind('<Enter>', lambda e: edit_send_btn.config(bg=self.colors.lavender))
             edit_send_btn.bind('<Leave>', lambda e: edit_send_btn.config(bg=self.colors.blue))
             Tooltip(edit_send_btn, "Edit text with custom instructions")
-            
+
             self.edit_input_var = tk.StringVar(master=self.root)
-            
+
             self.edit_input = tk.Entry(
                 edit_container,
                 textvariable=self.edit_input_var,
@@ -2740,11 +2744,11 @@ class AttachedPromptPopup:
             self.edit_input.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
             self.edit_input.insert(0, self.PLACEHOLDER_EDIT)
             self.edit_input.config(fg=self.colors.overlay0)
-            
+
             self.edit_input.bind('<FocusIn>', lambda e: self._on_edit_focus_in())
             self.edit_input.bind('<FocusOut>', lambda e: self._on_edit_focus_out())
             self.edit_input.bind('<Return>', lambda e: self._on_custom_submit())
-            
+
             # Ask input area with split buttons (Ask + Compare)
             ask_container = tk.Frame(
                 content_frame,
@@ -2753,7 +2757,7 @@ class AttachedPromptPopup:
                 highlightthickness=1
             )
             ask_container.pack(fill=tk.X, pady=(0, 12))
-            
+
             # Compare button (left of Ask button)
             compare_btn = tk.Label(
                 ask_container,
@@ -2770,7 +2774,7 @@ class AttachedPromptPopup:
             compare_btn.bind('<Enter>', lambda e: compare_btn.config(bg=self.colors.surface2))
             compare_btn.bind('<Leave>', lambda e: compare_btn.config(bg=self.colors.surface1))
             Tooltip(compare_btn, "Compare with another text selection")
-            
+
             # Ask send button
             ask_send_btn = tk.Label(
                 ask_container,
@@ -2787,9 +2791,9 @@ class AttachedPromptPopup:
             ask_send_btn.bind('<Enter>', lambda e: ask_send_btn.config(bg=self.colors.peach))
             ask_send_btn.bind('<Leave>', lambda e: ask_send_btn.config(bg=self.colors.green))
             Tooltip(ask_send_btn, "Ask a question about the text")
-            
+
             self.ask_input_var = tk.StringVar(master=self.root)
-            
+
             self.ask_input = tk.Entry(
                 ask_container,
                 textvariable=self.ask_input_var,
@@ -2803,20 +2807,20 @@ class AttachedPromptPopup:
             self.ask_input.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
             self.ask_input.insert(0, self.PLACEHOLDER_ASK)
             self.ask_input.config(fg=self.colors.overlay0)
-            
+
             self.ask_input.bind('<FocusIn>', lambda e: self._on_ask_focus_in())
             self.ask_input.bind('<FocusOut>', lambda e: self._on_ask_focus_out())
             self.ask_input.bind('<Return>', lambda e: self._on_ask_submit())
-            
+
             # Action buttons carousel
             self._create_carousel_tk(content_frame)
-        
+
         # Force Tk to process all pending drawing commands before showing
         self._position_window()
         self.root.update_idletasks()
         # Use delayed deiconify to let CTk finish internal rendering
         self.root.after(10, self._show_and_focus)
-    
+
     def _show_and_focus(self):
         """Show window after CTk has finished rendering (prevents flickering)."""
         if not self.root:
@@ -2830,12 +2834,12 @@ class AttachedPromptPopup:
                 self.edit_input.focus_set()
         except tk.TclError:
             pass
-    
+
     def _create_carousel(self, parent):
         """Create the carousel with action buttons."""
         settings = self.options.get("_settings", {})
         use_groups = settings.get("popup_use_groups", False)
-        
+
         if use_groups:
             popup_groups = settings.get("popup_groups", [])
             if popup_groups:
@@ -2845,7 +2849,7 @@ class AttachedPromptPopup:
                         continue
                     group_name = group_def.get("name", "")
                     item_keys = group_def.get("items", [])
-                    
+
                     items = []
                     for key in item_keys:
                         option = self.options.get(key)
@@ -2853,10 +2857,10 @@ class AttachedPromptPopup:
                             icon = option.get("icon", None)
                             tooltip = option.get("task", None)
                             items.append((key, key, icon, tooltip))
-                    
+
                     if items:
                         groups.append({"name": group_name, "items": items})
-                
+
                 if groups:
                     self.grouped_list = GroupedButtonList(
                         parent,
@@ -2866,7 +2870,7 @@ class AttachedPromptPopup:
                     )
                     self.grouped_list.pack(fill="x")
                     return
-        
+
         # Flat carousel
         items_per_page = settings.get("popup_items_per_page", CarouselButtonList.DEFAULT_ITEMS_PER_PAGE)
         items = []
@@ -2876,7 +2880,7 @@ class AttachedPromptPopup:
             icon = option.get("icon", None)
             tooltip = option.get("task", None)
             items.append((key, key, icon, tooltip))
-        
+
         if items:
             carousel = CarouselButtonList(
                 parent,
@@ -2885,12 +2889,12 @@ class AttachedPromptPopup:
                 items_per_page=items_per_page
             )
             carousel.pack(fill="x")
-    
+
     def _create_carousel_tk(self, parent):
         """Create the carousel with action buttons (tk fallback)."""
         settings = self.options.get("_settings", {})
         use_groups = settings.get("popup_use_groups", False)
-        
+
         if use_groups:
             popup_groups = settings.get("popup_groups", [])
             if popup_groups:
@@ -2900,7 +2904,7 @@ class AttachedPromptPopup:
                         continue
                     group_name = group_def.get("name", "")
                     item_keys = group_def.get("items", [])
-                    
+
                     items = []
                     for key in item_keys:
                         option = self.options.get(key)
@@ -2908,10 +2912,10 @@ class AttachedPromptPopup:
                             icon = option.get("icon", None)
                             tooltip = option.get("task", None)
                             items.append((key, key, icon, tooltip))
-                    
+
                     if items:
                         groups.append({"name": group_name, "items": items})
-                
+
                 if groups:
                     self.grouped_list = GroupedButtonList(
                         parent,
@@ -2921,7 +2925,7 @@ class AttachedPromptPopup:
                     )
                     self.grouped_list.pack(fill=tk.X)
                     return
-        
+
         # Flat carousel
         items_per_page = settings.get("popup_items_per_page", CarouselButtonList.DEFAULT_ITEMS_PER_PAGE)
         items = []
@@ -2931,7 +2935,7 @@ class AttachedPromptPopup:
             icon = option.get("icon", None)
             tooltip = option.get("task", None)
             items.append((key, key, icon, tooltip))
-        
+
         if items:
             carousel = CarouselButtonList(
                 parent,
@@ -2940,85 +2944,85 @@ class AttachedPromptPopup:
                 items_per_page=items_per_page
             )
             carousel.pack(fill=tk.X)
-    
+
     def _on_edit_focus_in(self):
         """Handle edit input focus in (tk fallback)."""
         if self.edit_input.get() == self.PLACEHOLDER_EDIT:
             self.edit_input.delete(0, tk.END)
             self.edit_input.config(fg=self.colors.text)
-    
+
     def _on_edit_focus_out(self):
         """Handle edit input focus out (tk fallback)."""
         if not self.edit_input.get():
             self.edit_input.insert(0, self.PLACEHOLDER_EDIT)
             self.edit_input.config(fg=self.colors.overlay0)
-    
+
     def _on_ask_focus_in(self):
         """Handle ask input focus in (tk fallback)."""
         if self.ask_input.get() == self.PLACEHOLDER_ASK:
             self.ask_input.delete(0, tk.END)
             self.ask_input.config(fg=self.colors.text)
-    
+
     def _on_ask_focus_out(self):
         """Handle ask input focus out (tk fallback)."""
         if not self.ask_input.get():
             self.ask_input.insert(0, self.PLACEHOLDER_ASK)
             self.ask_input.config(fg=self.colors.overlay0)
-    
+
     def _position_window(self):
         """Position the window."""
         self.root.update_idletasks()
-        
+
         x = self.x
         y = self.y
         if x is None or y is None:
             x = self.root.winfo_pointerx()
             y = self.root.winfo_pointery() + 20
-        
+
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
-        
+
         if x + window_width > screen_width:
             x = screen_width - window_width - 10
         if y + window_height > screen_height:
             y = screen_height - window_height - 10
-        
+
         x = max(10, x)
         y = max(10, y)
-        
+
         self.root.geometry(f"+{x}+{y}")
-    
+
     def _reposition_window(self):
         """Reposition after content changes."""
         if not self.root:
             return
-        
+
         self.root.update_idletasks()
-        
+
         x = self.root.winfo_x()
         y = self.root.winfo_y()
-        
+
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
-        
+
         if x + window_width > screen_width:
             x = screen_width - window_width - 10
         if y + window_height > screen_height:
             y = screen_height - window_height - 10
-        
+
         x = max(10, x)
         y = max(10, y)
-        
+
         self.root.geometry(f"+{x}+{y}")
-    
+
     def _on_modifiers_changed(self, active_modifiers: List[str]):
         """Handle modifier toggle changes."""
         self.active_modifiers = active_modifiers
-    
+
     def _on_option_click(self, option_key: str):
         """Handle action button click.
         
@@ -3032,12 +3036,12 @@ class AttachedPromptPopup:
             self._pending_compare_action = (option_key, None)
             self._initiate_compare_text()
             return
-        
+
         response_mode = self._get_effective_response_mode(option_key)
         profile_override = get_profile_override_value(self.profile_var)
         self._close()
         self.on_option_selected(option_key, self.selected_text, None, response_mode, self.active_modifiers, None, profile_override)
-    
+
     def _initiate_compare_text(self):
         """Hide popup and request a second text selection from the user."""
         if not self.root:
@@ -3046,16 +3050,16 @@ class AttachedPromptPopup:
             self.root.withdraw()
         except tk.TclError:
             pass
-        
+
         self.on_request_compare_text(
             self._on_compare_text_captured,
             self._on_compare_text_cancelled
         )
-    
+
     def _on_compare_text_captured(self, text: str):
         """Handle second text capture - execute pending action with compare text."""
         self._compare_text = text
-        
+
         # Execute the pending action with the captured compare text
         if self._pending_compare_action:
             option_key, custom_input = self._pending_compare_action
@@ -3067,12 +3071,12 @@ class AttachedPromptPopup:
         else:
             # No pending action (shouldn't happen), just close
             self._close()
-    
+
     def _on_compare_text_cancelled(self):
         """Handle cancellation of second text capture - re-show popup."""
         self._pending_compare_action = None
         self._compare_text = None
-        
+
         if self.root:
             try:
                 self.root.deiconify()
@@ -3080,55 +3084,55 @@ class AttachedPromptPopup:
                 self.root.focus_force()
             except tk.TclError:
                 pass
-    
+
     def _on_custom_submit(self):
         """Handle custom edit submission."""
         if HAVE_CTK:
             custom_text = self.edit_input.get().strip()
         else:
             custom_text = self.edit_input_var.get().strip() if hasattr(self, 'edit_input_var') and self.edit_input_var else ""
-        
+
         if not custom_text or custom_text == self.PLACEHOLDER_EDIT:
             return
-        
+
         response_mode = self._get_effective_response_mode("_Custom")
         profile_override = get_profile_override_value(self.profile_var)
         self._close()
         self.on_option_selected("_Custom", self.selected_text, custom_text, response_mode, self.active_modifiers, None, profile_override)
-    
+
     def _on_ask_submit(self):
         """Handle ask submission."""
         if HAVE_CTK:
             ask_text = self.ask_input.get().strip()
         else:
             ask_text = self.ask_input_var.get().strip() if hasattr(self, 'ask_input_var') and self.ask_input_var else ""
-        
+
         if not ask_text or ask_text == self.PLACEHOLDER_ASK:
             return
-        
+
         response_mode = self._get_effective_response_mode("_Ask")
         profile_override = get_profile_override_value(self.profile_var)
         self._close()
         self.on_option_selected("_Ask", self.selected_text, ask_text, response_mode, self.active_modifiers, None, profile_override)
-    
+
     def _on_ask_compare_submit(self):
         """Handle ask with compare mode - triggers second text selection."""
         if HAVE_CTK:
             ask_text = self.ask_input.get().strip()
         else:
             ask_text = self.ask_input_var.get().strip() if hasattr(self, 'ask_input_var') and self.ask_input_var else ""
-        
+
         if not ask_text or ask_text == self.PLACEHOLDER_ASK:
             return
-        
+
         # Store the pending action and initiate compare text capture
         self._pending_compare_action = ("_Ask", ask_text)
         self._initiate_compare_text()
-    
+
     def _get_effective_response_mode(self, option_key: str) -> str:
         """Get effective response mode, considering modifiers."""
         user_mode = self.response_toggle.get() if self.response_toggle else "default"
-        
+
         if self.active_modifiers:
             # Get modifiers from global settings
             from .prompts import get_prompts_config
@@ -3138,15 +3142,15 @@ class AttachedPromptPopup:
                     if mod.get("forces_chat_window", False):
                         if user_mode != "replace":
                             return "show"
-        
+
         return user_mode
-    
+
     def _on_tts(self):
         """Handle TTS button click - pass selected text to TTS Window."""
         if self.on_tts_callback and self.selected_text:
             self._close()
             self.on_tts_callback(self.selected_text)
-    
+
     def _close(self):
         """Close the popup."""
         if self.root:
@@ -3225,10 +3229,10 @@ class TypingIndicator:
     Displays near the mouse cursor and shows abort hotkey.
     Uses CustomTkinter for modern appearance.
     """
-    
+
     OFFSET_X = 20
     OFFSET_Y = 20
-    
+
     def __init__(
         self,
         parent_root,
@@ -3238,37 +3242,37 @@ class TypingIndicator:
         self.parent_root = parent_root
         self.abort_hotkey = abort_hotkey
         self.on_dismiss = on_dismiss
-        
+
         self.colors = get_colors()
         self.root = None
         self.is_visible = False
-        
+
         self._create_window()
-    
+
     def _create_window(self):
         """Create the indicator window."""
         if HAVE_CTK:
             self.root = ctk.CTkToplevel(self.parent_root)
         else:
             self.root = tk.Toplevel(self.parent_root)
-        
+
         # Hide window while building UI (prevents flickering)
         self.root.withdraw()
-        
+
         self.root.overrideredirect(True)
         self.root.attributes('-topmost', True)
-        
+
         try:
             self.root.attributes('-alpha', 0.95)
         except tk.TclError:
             pass
-        
+
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
-        
+
         # Hide from taskbar
         hide_from_taskbar(self.root)
-        
+
         if HAVE_CTK:
             main_frame = ctk.CTkFrame(
                 self.root,
@@ -3278,10 +3282,10 @@ class TypingIndicator:
                 border_width=2
             )
             main_frame.pack(fill="both", expand=True)
-            
+
             content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
             content_frame.pack(padx=10, pady=8)
-            
+
             # Try to use emoji image for typing indicator
             typing_emoji_img = None
             typing_text = "✍️ Typing..."
@@ -3290,7 +3294,7 @@ class TypingIndicator:
                 typing_emoji_img = renderer.get_ctk_image("✍️", size=16)
                 if typing_emoji_img:
                     typing_text = "Typing..."  # Remove emoji from text
-            
+
             # Build typing label kwargs - only include image/compound if we have an image
             typing_label_kwargs = {
                 "text": typing_text,
@@ -3300,10 +3304,10 @@ class TypingIndicator:
             if typing_emoji_img:
                 typing_label_kwargs["image"] = typing_emoji_img
                 typing_label_kwargs["compound"] = "left"
-            
+
             typing_label = ctk.CTkLabel(content_frame, **typing_label_kwargs)
             typing_label.pack(side="left")
-            
+
             hotkey_display = self.abort_hotkey.title() if self.abort_hotkey else "Escape"
             abort_label = ctk.CTkLabel(
                 content_frame,
@@ -3321,10 +3325,10 @@ class TypingIndicator:
                 highlightthickness=2
             )
             main_frame.pack(fill=tk.BOTH, expand=True)
-            
+
             content_frame = tk.Frame(main_frame, bg=self.colors.surface0)
             content_frame.pack(padx=8, pady=6)
-            
+
             tk.Label(
                 content_frame,
                 text="✍️ Typing...",
@@ -3332,7 +3336,7 @@ class TypingIndicator:
                 bg=self.colors.surface0,
                 fg=self.colors.text
             ).pack(side=tk.LEFT)
-            
+
             hotkey_display = self.abort_hotkey.title() if self.abort_hotkey else "Escape"
             tk.Label(
                 content_frame,
@@ -3341,12 +3345,12 @@ class TypingIndicator:
                 bg=self.colors.surface0,
                 fg=self.colors.overlay0
             ).pack(side=tk.LEFT)
-        
+
         # Force Tk to process all pending drawing commands before showing
         self.root.update_idletasks()
         # Use delayed deiconify for smoother appearance
         self.root.after(10, self._show_indicator)
-    
+
     def _show_indicator(self):
         """Show indicator after CTk has finished rendering."""
         if not self.root:
@@ -3357,36 +3361,36 @@ class TypingIndicator:
             self._update_position()
         except tk.TclError:
             pass
-    
+
     def _update_position(self):
         """Set window position near cursor."""
         if not self.root or not self.is_visible:
             return
-        
+
         try:
             x = self.root.winfo_pointerx() + self.OFFSET_X
             y = self.root.winfo_pointery() + self.OFFSET_Y
-            
+
             screen_width = self.root.winfo_screenwidth()
             screen_height = self.root.winfo_screenheight()
-            
+
             self.root.update_idletasks()
             window_width = self.root.winfo_width()
             window_height = self.root.winfo_height()
-            
+
             if x + window_width > screen_width:
                 x = self.root.winfo_pointerx() - window_width - 10
             if y + window_height > screen_height:
                 y = self.root.winfo_pointery() - window_height - 10
-            
+
             self.root.geometry(f"+{x}+{y}")
         except tk.TclError:
             pass
-    
+
     def dismiss(self):
         """Dismiss the indicator."""
         self.is_visible = False
-        
+
         if self.root:
             try:
                 self.root.withdraw()  # Immediate visual feedback
@@ -3394,7 +3398,7 @@ class TypingIndicator:
             except tk.TclError:
                 pass
             self.root = None
-        
+
         if self.on_dismiss:
             try:
                 self.on_dismiss()
@@ -3413,10 +3417,10 @@ def create_typing_indicator(
 ) -> TypingIndicator:
     """Create and show a typing indicator."""
     global _current_typing_indicator
-    
+
     if _current_typing_indicator:
         _current_typing_indicator.dismiss()
-    
+
     _current_typing_indicator = TypingIndicator(parent_root, abort_hotkey, on_dismiss)
     return _current_typing_indicator
 
@@ -3424,7 +3428,7 @@ def create_typing_indicator(
 def dismiss_typing_indicator():
     """Dismiss the current typing indicator if any."""
     global _current_typing_indicator
-    
+
     if _current_typing_indicator:
         _current_typing_indicator.dismiss()
         _current_typing_indicator = None
@@ -3439,7 +3443,7 @@ class ErrorPopup:
     Error dialog popup for displaying API failures.
     Matches the theme and style of other popups.
     """
-    
+
     def __init__(
         self,
         parent_root,
@@ -3453,27 +3457,27 @@ class ErrorPopup:
         self.message = message
         self.details = details
         self.on_close_callback = on_close
-        
+
         self.colors = get_colors()
         self.root = None
-        
+
         self._create_window()
-    
+
     def _create_window(self):
         """Create the error popup window."""
         if HAVE_CTK:
             self.root = ctk.CTkToplevel(self.parent_root)
         else:
             self.root = tk.Toplevel(self.parent_root)
-        
+
         self.root.withdraw()
         self.root.title("Error")
         self.root.overrideredirect(True)
         self.root.attributes('-topmost', True)
-        
+
         setup_transparent_popup(self.root, self.colors)
         hide_from_taskbar(self.root)
-        
+
         if HAVE_CTK:
             main_frame = ctk.CTkFrame(
                 self.root,
@@ -3483,18 +3487,18 @@ class ErrorPopup:
                 border_width=2
             )
             main_frame.pack(fill="both", expand=True, padx=1, pady=1)
-            
+
             content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
             content_frame.pack(fill="both", expand=True, padx=12, pady=12)
-            
+
             # Header with error icon
             header_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
             header_frame.pack(fill="x", pady=(0, 8))
-            
+
             # Try to use emoji image
             error_icon_text = "❌ Error"
             header_label_created = False
-            
+
             if HAVE_EMOJI:
                 try:
                     renderer = get_emoji_renderer()
@@ -3511,7 +3515,7 @@ class ErrorPopup:
                         header_label_created = True
                 except Exception:
                     pass
-            
+
             if not header_label_created:
                 ctk.CTkLabel(
                     header_frame,
@@ -3519,7 +3523,7 @@ class ErrorPopup:
                     font=get_ctk_font(size=14, weight="bold"),
                     text_color=self.colors.red
                 ).pack(side="left")
-            
+
             # Close button
             close_btn = ctk.CTkButton(
                 header_frame,
@@ -3534,7 +3538,7 @@ class ErrorPopup:
                 command=self._close
             )
             close_btn.pack(side="right")
-            
+
             # Title
             if self.title:
                 ctk.CTkLabel(
@@ -3544,7 +3548,7 @@ class ErrorPopup:
                     text_color=self.colors.text,
                     wraplength=350
                 ).pack(anchor="w", pady=(0, 4))
-            
+
             # Message
             ctk.CTkLabel(
                 content_frame,
@@ -3554,7 +3558,7 @@ class ErrorPopup:
                 wraplength=350,
                 justify="left"
             ).pack(anchor="w", pady=(0, 8))
-            
+
             # Details (scrollable)
             if self.details:
                 details_frame = ctk.CTkFrame(
@@ -3563,7 +3567,7 @@ class ErrorPopup:
                     corner_radius=6
                 )
                 details_frame.pack(fill="x", pady=(0, 8))
-                
+
                 details_text = ctk.CTkTextbox(
                     details_frame,
                     height=100,
@@ -3575,11 +3579,11 @@ class ErrorPopup:
                 details_text.pack(fill="x", padx=8, pady=8)
                 details_text.insert("0.0", self.details)
                 details_text.configure(state="disabled")
-            
+
             # Buttons
             btn_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
             btn_frame.pack(fill="x")
-            
+
             # Copy to clipboard button (if details)
             if self.details:
                 copy_btn = create_emoji_button(
@@ -3597,7 +3601,7 @@ class ErrorPopup:
                 # Override to match surface0 background of details area
                 copy_btn.configure(fg_color=self.colors.surface0)
                 copy_btn.pack(side="left", padx=(0, 8))
-            
+
             # OK button
             ok_btn = ctk.CTkButton(
                 btn_frame,
@@ -3612,11 +3616,11 @@ class ErrorPopup:
                 command=self._close
             )
             ok_btn.pack(side="right")
-        
+
         else:
             # Fallback tk implementation
             self.root.configure(bg=self.colors.base)
-            
+
             main_frame = tk.Frame(
                 self.root,
                 bg=self.colors.base,
@@ -3624,14 +3628,14 @@ class ErrorPopup:
                 highlightthickness=2
             )
             main_frame.pack(fill=tk.BOTH, expand=True)
-            
+
             content_frame = tk.Frame(main_frame, bg=self.colors.base)
             content_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
-            
+
             # Header
             header_frame = tk.Frame(content_frame, bg=self.colors.base)
             header_frame.pack(fill=tk.X, pady=(0, 8))
-            
+
             tk.Label(
                 header_frame,
                 text="❌ Error",
@@ -3639,7 +3643,7 @@ class ErrorPopup:
                 bg=self.colors.base,
                 fg=self.colors.red
             ).pack(side=tk.LEFT)
-            
+
             close_btn = tk.Label(
                 header_frame,
                 text="×",
@@ -3650,7 +3654,7 @@ class ErrorPopup:
             )
             close_btn.pack(side=tk.RIGHT)
             close_btn.bind('<Button-1>', lambda e: self._close())
-            
+
             # Title
             if self.title:
                 tk.Label(
@@ -3663,7 +3667,7 @@ class ErrorPopup:
                     anchor="w",
                     justify=tk.LEFT
                 ).pack(anchor="w", pady=(0, 4))
-            
+
             # Message
             tk.Label(
                 content_frame,
@@ -3675,7 +3679,7 @@ class ErrorPopup:
                 anchor="w",
                 justify=tk.LEFT
             ).pack(anchor="w", pady=(0, 8))
-            
+
             # Details
             if self.details:
                 details_frame = tk.Frame(
@@ -3685,7 +3689,7 @@ class ErrorPopup:
                     highlightthickness=1
                 )
                 details_frame.pack(fill=tk.X, pady=(0, 8))
-                
+
                 details_text = tk.Text(
                     details_frame,
                     height=5,
@@ -3699,11 +3703,11 @@ class ErrorPopup:
                 details_text.pack(fill=tk.X, padx=8, pady=8)
                 details_text.insert("1.0", self.details)
                 details_text.configure(state=tk.DISABLED)
-            
+
             # Buttons
             btn_frame = tk.Frame(content_frame, bg=self.colors.base)
             btn_frame.pack(fill=tk.X)
-            
+
             if self.details:
                 copy_btn = tk.Label(
                     btn_frame,
@@ -3717,7 +3721,7 @@ class ErrorPopup:
                 )
                 copy_btn.pack(side=tk.LEFT, padx=(0, 8))
                 copy_btn.bind('<Button-1>', lambda e: self._copy_to_clipboard())
-            
+
             ok_btn = tk.Label(
                 btn_frame,
                 text="OK",
@@ -3730,11 +3734,11 @@ class ErrorPopup:
             )
             ok_btn.pack(side=tk.RIGHT)
             ok_btn.bind('<Button-1>', lambda e: self._close())
-        
+
         self._position_window()
         self.root.update_idletasks()
         self.root.after(10, self._show_and_focus)
-    
+
     def _show_and_focus(self):
         if not self.root:
             return
@@ -3746,21 +3750,21 @@ class ErrorPopup:
             self.root.focus_force()
         except tk.TclError:
             pass
-    
+
     def _position_window(self):
         """Position window at center of screen."""
         self.root.update_idletasks()
-        
+
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_width = max(400, self.root.winfo_reqwidth())
         window_height = self.root.winfo_reqheight()
-        
+
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
-        
+
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
-    
+
     def _copy_to_clipboard(self):
         """Copy error details to clipboard."""
         import pyperclip
@@ -3771,7 +3775,7 @@ class ErrorPopup:
             pyperclip.copy(text)
         except Exception:
             pass
-    
+
     def _close(self):
         if self.root:
             try:
@@ -3827,12 +3831,12 @@ class ToastNotification:
     Shows a preview of copied content and auto-dismisses.
     Matches the theme and style of other popups.
     """
-    
+
     PREVIEW_MAX_CHARS = 150
     DEFAULT_TIMEOUT_MS = 4000
     MARGIN_X = 20
     MARGIN_Y = 20
-    
+
     def __init__(
         self,
         parent_root,
@@ -3846,54 +3850,54 @@ class ToastNotification:
         self.message = message
         self.timeout_ms = timeout_ms
         self.on_dismiss = on_dismiss
-        
+
         self.colors = get_colors()
         self.root = None
-        
+
         # Animation state
         self.target_x = 0
         self.target_y = 0
         self.timeout_job = None
         self.fade_job = None
         self.hover_job = None
-        
+
         self._create_window()
-    
+
     def _create_window(self):
         """Create the toast window."""
         if HAVE_CTK:
             self.root = ctk.CTkToplevel(self.parent_root)
         else:
             self.root = tk.Toplevel(self.parent_root)
-        
+
         # Hide window while building
         self.root.withdraw()
-        
+
         self.root.overrideredirect(True)
         self.root.attributes('-topmost', True)
-        
+
         # Start transparent for fade-in
         try:
             self.root.attributes('-alpha', 0.0)
         except tk.TclError:
             pass
-        
+
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
-        
+
         # Hide from taskbar
         hide_from_taskbar(self.root)
-        
+
         if HAVE_CTK:
             self._build_ctk_ui()
         else:
             self._build_tk_ui()
-        
+
         # Position and show with animation
         self._position_window()
         self.root.update_idletasks()
         self.root.after(10, self._show)
-    
+
     def _build_ctk_ui(self):
         """Build CustomTkinter UI."""
         main_frame = ctk.CTkFrame(
@@ -3904,25 +3908,25 @@ class ToastNotification:
             border_width=2
         )
         main_frame.pack(fill="both", expand=True, padx=1, pady=1)
-        
+
         # Bind verify hover to main elements to be responsive
         def on_click(e): self.dismiss()
         main_frame.bind("<Button-1>", on_click)
-        
+
         content = ctk.CTkFrame(main_frame, fg_color="transparent")
         content.pack(fill="both", expand=True, padx=12, pady=10)
         content.bind("<Button-1>", on_click)
-        
+
         # Header
         header = ctk.CTkFrame(content, fg_color="transparent")
         header.pack(fill="x", pady=(0, 4))
         header.bind("<Button-1>", on_click)
-        
+
         # Icon and Title
         icon_frame = ctk.CTkFrame(header, fg_color="transparent")
         icon_frame.pack(side="left")
         icon_frame.bind("<Button-1>", on_click)
-        
+
         # Try to use emoji image
         icon_text = "📋 " + self.title
         label_kwargs = {
@@ -3930,7 +3934,7 @@ class ToastNotification:
             "font": get_ctk_font(size=12, weight="bold"),
             "text_color": self.colors.text
         }
-        
+
         if HAVE_EMOJI:
             try:
                 renderer = get_emoji_renderer()
@@ -3943,16 +3947,16 @@ class ToastNotification:
                     label_kwargs["compound"] = "left"
             except Exception:
                 pass
-        
+
         title_lbl = ctk.CTkLabel(icon_frame, **label_kwargs)
         title_lbl.pack(side="left")
         title_lbl.bind("<Button-1>", on_click)
-        
+
         # Message preview
         preview_text = self.message
         if len(preview_text) > self.PREVIEW_MAX_CHARS:
             preview_text = preview_text[:self.PREVIEW_MAX_CHARS] + "..."
-            
+
         msg_lbl = ctk.CTkLabel(
             content,
             text=preview_text,
@@ -3963,7 +3967,7 @@ class ToastNotification:
         )
         msg_lbl.pack(anchor="w")
         msg_lbl.bind("<Button-1>", on_click)
-        
+
         # Footer text (click to dismiss)
         footer = ctk.CTkLabel(
             content,
@@ -3977,7 +3981,7 @@ class ToastNotification:
     def _build_tk_ui(self):
         """Build standard Tkinter UI."""
         self.root.configure(bg=self.colors.base)
-        
+
         main_frame = tk.Frame(
             self.root,
             bg=self.colors.surface0,
@@ -3986,16 +3990,16 @@ class ToastNotification:
         )
         main_frame.pack(fill=tk.BOTH, expand=True)
         main_frame.bind("<Button-1>", lambda e: self.dismiss())
-        
+
         content = tk.Frame(main_frame, bg=self.colors.surface0)
         content.pack(fill=tk.BOTH, expand=True, padx=12, pady=10)
         content.bind("<Button-1>", lambda e: self.dismiss())
-        
+
         # Header
         header = tk.Frame(content, bg=self.colors.surface0)
         header.pack(fill=tk.X, pady=(0, 4))
         header.bind("<Button-1>", lambda e: self.dismiss())
-        
+
         tk.Label(
             header,
             text="✅ " + self.title,
@@ -4003,12 +4007,12 @@ class ToastNotification:
             bg=self.colors.surface0,
             fg=self.colors.text
         ).pack(side=tk.LEFT)
-        
+
         # Message preview
         preview_text = self.message
         if len(preview_text) > self.PREVIEW_MAX_CHARS:
             preview_text = preview_text[:self.PREVIEW_MAX_CHARS] + "..."
-            
+
         msg_lbl = tk.Label(
             content,
             text=preview_text,
@@ -4024,60 +4028,60 @@ class ToastNotification:
     def _position_window(self):
         """Calculate target position at bottom right of screen."""
         self.root.update_idletasks()
-        
+
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
-        
+
         # Position with margin from bottom-right corner
         self.target_x = screen_width - window_width - self.MARGIN_X
         # Target Y is the final resting position
         self.target_y = screen_height - window_height - self.MARGIN_Y - 40 # Account for taskbar
-        
+
         # Start from bottom of screen (off-screen)
         self.start_rise_y = screen_height
-        
+
         self.root.geometry(f"+{self.target_x}+{self.start_rise_y}")
-    
+
     def _show(self):
         """Show the window and start entry animation."""
         if not self.root:
             return
-        
+
         try:
             self.root.deiconify()
             self.root.lift()
-            
+
             # Start entry animation (rise + fade in)
             self._animate_entry()
-            
+
             # Start hover monitor
             self._start_hover_monitor()
-            
+
         except tk.TclError:
             pass
-    
+
     def _animate_entry(self, step=0):
         """Animate window entering (rise up from bottom)."""
         if not self.root: return
-        
+
         total_steps = 15
         progress = (step + 1) / total_steps
         if progress > 1.0: progress = 1.0
-        
+
         try:
             # Fade in (Alpha 0 -> 1)
             self.root.attributes('-alpha', progress)
-            
+
             # Rise up (from bottom screen to target)
             # Use sinusoidal easing for smooth pop-up
             ease = math.sin(progress * math.pi / 2)
-            
+
             dist = self.start_rise_y - self.target_y
             current_y = int(self.start_rise_y - (dist * ease))
             self.root.geometry(f"+{self.target_x}+{current_y}")
-            
+
             if progress < 1.0:
                 self.root.after(16, lambda: self._animate_entry(step + 1))
             else:
@@ -4090,22 +4094,22 @@ class ToastNotification:
         if self.fade_job:
             self.root.after_cancel(self.fade_job)
             self.fade_job = None
-            
+
         # Update every 50ms
         interval = 50
         total_steps = int(self.timeout_ms / interval)
         if total_steps < 1: total_steps = 1
-        
+
         self._run_fade_step(total_steps, total_steps)
-        
+
     def _run_fade_step(self, remaining_steps, total_steps):
         """Run single step of fade out."""
         if not self.root: return
-        
+
         try:
             alpha = remaining_steps / total_steps
             self.root.attributes('-alpha', alpha)
-            
+
             if remaining_steps > 0:
                 self.fade_job = self.root.after(50, lambda: self._run_fade_step(remaining_steps - 1, total_steps))
             else:
@@ -4118,21 +4122,21 @@ class ToastNotification:
         if not self.root: return
         self._check_hover()
         self.hover_job = self.root.after(100, self._start_hover_monitor)
-        
+
     def _check_hover(self):
         """Check if mouse is over window and manage state."""
         if not self.root: return
-        
+
         try:
             x, y = self.root.winfo_pointerxy()
             wx = self.root.winfo_rootx()
             wy = self.root.winfo_rooty()
             ww = self.root.winfo_width()
             wh = self.root.winfo_height()
-            
+
             # Check collision
             is_hovering = (wx <= x <= wx + ww) and (wy <= y <= wy + wh)
-            
+
             if is_hovering:
                 # Cancel fade out, restore full opacity
                 if self.fade_job:
@@ -4145,7 +4149,7 @@ class ToastNotification:
                 # If not hovering and no fade job, start fading
                 if self.fade_job is None:
                     self._start_gradual_fade()
-                    
+
         except Exception:
             pass
 
@@ -4155,18 +4159,18 @@ class ToastNotification:
         if self.timeout_job: self.root.after_cancel(self.timeout_job)
         if self.fade_job: self.root.after_cancel(self.fade_job)
         if self.hover_job: self.root.after_cancel(self.hover_job)
-        
+
         self.timeout_job = None
         self.fade_job = None
         self.hover_job = None
-            
+
         if self.root:
             try:
                 self.root.destroy()
             except tk.TclError:
                 pass
             self.root = None
-        
+
         if self.on_dismiss:
             try:
                 self.on_dismiss()
@@ -4186,14 +4190,14 @@ def create_toast_notification(
 ):
     """Create and show a toast notification."""
     global _current_toast
-    
+
     # Dismiss any existing toast first
     if _current_toast:
         try:
             _current_toast.dismiss()
         except Exception:
             pass
-    
+
     _current_toast = ToastNotification(parent_root, title, message, timeout_ms)
     return _current_toast
 
@@ -4201,7 +4205,7 @@ def create_toast_notification(
 def dismiss_toast_notification():
     """Dismiss the current toast notification if any."""
     global _current_toast
-    
+
     if _current_toast:
         try:
             _current_toast.dismiss()

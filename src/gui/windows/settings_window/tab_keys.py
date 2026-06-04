@@ -18,9 +18,9 @@ Provider → Pool assignment is in the Provider tab (tab_provider.py).
 import tkinter as tk
 from tkinter import simpledialog
 
-from ...platform import HAVE_CTK, ctk
-from ...themes import get_ctk_font, get_ctk_label_colors, get_ctk_entry_colors
 from ...custom_widgets import ScrollableButtonList, create_emoji_button, create_section_header
+from ...platform import HAVE_CTK, ctk
+from ...themes import get_ctk_entry_colors, get_ctk_font, get_ctk_label_colors
 
 
 class KeysTabMixin:

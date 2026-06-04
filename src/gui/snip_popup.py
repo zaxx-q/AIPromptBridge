@@ -17,33 +17,41 @@ import gc
 import io
 import logging
 import tkinter as tk
-from typing import Callable, Optional, Dict, List, Any
+from typing import Any, Callable, Dict, List, Optional
 
 from PIL import Image, ImageTk
 
+from .custom_widgets import create_emoji_button
+from .emoji_renderer import get_emoji_renderer, prepare_emoji_content
+
 # Import CustomTkinter with fallback
 from .platform import HAVE_CTK, ctk
+from .popups import (
+    TRANSPARENCY_COLOR,
+    CarouselButtonList,
+    GroupedButtonList,
+    ModifierBar,
+    SegmentedToggle,
+    Tooltip,
+    create_profile_dropdown_ctk,
+    create_profile_dropdown_tk,
+    get_profile_override_value,
+    setup_transparent_popup,
+)
+from .prompts import get_prompts_config
+from .screen_snip import CaptureResult
 
 # Import theme system
 from .themes import (
-    get_colors, ThemeColors,
-    get_ctk_font, get_ctk_button_colors,
-    get_ctk_frame_colors, get_ctk_entry_colors,
-    sync_ctk_appearance
+    ThemeColors,
+    get_colors,
+    get_ctk_button_colors,
+    get_ctk_entry_colors,
+    get_ctk_font,
+    get_ctk_frame_colors,
+    sync_ctk_appearance,
 )
-
 from .utils import hide_from_taskbar
-from .custom_widgets import create_emoji_button
-from .popups import (
-    Tooltip, GroupedButtonList, CarouselButtonList,
-    setup_transparent_popup, TRANSPARENCY_COLOR,
-    ModifierBar, SegmentedToggle,
-    create_profile_dropdown_ctk, create_profile_dropdown_tk,
-    get_profile_override_value
-)
-from .screen_snip import CaptureResult
-from .prompts import get_prompts_config
-from .emoji_renderer import prepare_emoji_content, get_emoji_renderer
 
 
 def _neutralize_tk_var(var):
@@ -66,10 +74,10 @@ class AttachedSnipPopup:
     """
     Popup for interacting with captured screenshot.
     """
-    
+
     PLACEHOLDER = "Ask about this image..."
     THUMBNAIL_MAX_SIZE = (120, 120)
-    
+
     def __init__(
         self,
         parent_root: tk.Tk,
@@ -108,47 +116,47 @@ class AttachedSnipPopup:
         self.on_request_compare_capture = on_request_compare_capture
         self.x = x
         self.y = y
-        
+
         self.colors = get_colors()
         self.root = None
-        
+
         # Current action source: "snip", "text_edit", or "file_processor"
         self.action_source = "snip"
-        
+
         # Load File Processor prompts (filtered for image type)
         self.file_processor_prompts = self._load_file_processor_prompts()
-        
+
         # Compare mode state
         self.compare_mode_enabled = False
         self.compare_capture: Optional[CaptureResult] = None
         self.compare_checkbox = None
-        
+
         # Pending action (for after compare capture)
         self._pending_action: Optional[tuple] = None
-        
+
         # UI references
         self.source_dropdown = None
         self.input_entry = None
         self.actions_frame = None
         self.carousel = None
         self.modifier_bar = None
-        
+
         # Active modifiers
         self.active_modifiers: List[str] = []
-        
+
         # Connection profile override
         self.profile_var = None
         self.profile_dropdown = None
-        
+
         # Thumbnail
         self.thumbnail_photo = None
-        
+
         self._create_window()
-    
+
     def _load_file_processor_prompts(self) -> Dict[str, Any]:
         """Load and filter file processor prompts for images."""
         try:
-            from ..tools.config import load_tools_config, get_file_processor_prompts
+            from ..tools.config import get_file_processor_prompts, load_tools_config
             config = load_tools_config(create_if_missing=False)
             prompts = get_file_processor_prompts(config)
             # Filter to image-compatible prompts only
@@ -159,7 +167,7 @@ class AttachedSnipPopup:
         except Exception as e:
             logging.debug(f"[SnipPopup] Could not load file processor prompts: {e}")
             return {}
-    
+
     def _create_window(self):
         """Create the popup window."""
         if HAVE_CTK:
@@ -167,28 +175,28 @@ class AttachedSnipPopup:
             self.root = ctk.CTkToplevel(self.parent_root)
         else:
             self.root = tk.Toplevel(self.parent_root)
-        
+
         # Hide while building
         self.root.withdraw()
-        
+
         self.root.title("Screen Snip")
         self.root.overrideredirect(True)
         self.root.attributes('-topmost', True)
-        
+
         # Transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
         hide_from_taskbar(self.root)
-        
+
         if HAVE_CTK:
             self._build_ctk_ui()
         else:
             self._build_tk_ui()
-        
+
         # Position and show
         self._position_window()
         self.root.update_idletasks()
         self.root.after(10, self._show_and_focus)
-    
+
     def _build_ctk_ui(self):
         """Build CustomTkinter UI."""
         # Main container with rounded corners
@@ -200,14 +208,14 @@ class AttachedSnipPopup:
             border_width=1
         )
         main_frame.pack(fill="both", expand=True, padx=1, pady=1)
-        
+
         content = ctk.CTkFrame(main_frame, fg_color="transparent")
         content.pack(fill="both", expand=True, padx=12, pady=12)
-        
+
         # Top bar with close button
         top_bar = ctk.CTkFrame(content, fg_color="transparent")
         top_bar.pack(fill="x", pady=(0, 10))
-        
+
         # Title with proper emoji rendering
         title_content = prepare_emoji_content("📷 Screen Capture", size=16)
         title_label = ctk.CTkLabel(
@@ -219,7 +227,7 @@ class AttachedSnipPopup:
             text_color=self.colors.text
         )
         title_label.pack(side="left")
-        
+
         # Close button
         close_btn = ctk.CTkButton(
             top_bar,
@@ -234,15 +242,15 @@ class AttachedSnipPopup:
             command=self._close
         )
         close_btn.pack(side="right")
-        
+
         # Image preview and input row
         preview_row = ctk.CTkFrame(content, fg_color="transparent")
         preview_row.pack(fill="x", pady=(0, 10))
-        
+
         # Thumbnail container with resolution text below
         thumb_container = ctk.CTkFrame(preview_row, fg_color="transparent")
         thumb_container.pack(side="left", padx=(0, 12))
-        
+
         # Thumbnail frame
         thumb_frame = ctk.CTkFrame(
             thumb_container,
@@ -253,9 +261,9 @@ class AttachedSnipPopup:
         )
         thumb_frame.pack(side="top")
         thumb_frame.pack_propagate(False)
-        
+
         self._create_thumbnail(thumb_frame)
-        
+
         # Resolution text below thumbnail
         info_text = f"{self.capture_result.width} × {self.capture_result.height} px"
         ctk.CTkLabel(
@@ -264,22 +272,22 @@ class AttachedSnipPopup:
             font=get_ctk_font(size=10),
             text_color=self.colors.overlay0
         ).pack(side="top", pady=(4, 0))
-        
+
         # Right side: source selector and input
         right_side = ctk.CTkFrame(preview_row, fg_color="transparent")
         right_side.pack(side="left", fill="both", expand=True)
-        
+
         # Source selector
         source_frame = ctk.CTkFrame(right_side, fg_color="transparent")
         source_frame.pack(fill="x", pady=(0, 8))
-        
+
         # Dropdown for action source
         sources = ["Snip Actions"]
         if "text_edit_tool" in self.prompts_config:
             sources.append("Text Edit Actions")
         if self.file_processor_prompts:
             sources.append("File Processor")
-        
+
         self.source_var = tk.StringVar(value=sources[0])
         self.source_dropdown = ctk.CTkOptionMenu(
             source_frame,
@@ -298,7 +306,7 @@ class AttachedSnipPopup:
         )
         self.source_dropdown.pack(side="left", fill="x", expand=True)
         Tooltip(self.source_dropdown, "Select action source category")
-        
+
         # Connection profile dropdown
         self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_ctk(right_side, self.colors)
         profile_frame.pack(fill="x", pady=(0, 8))
@@ -306,7 +314,7 @@ class AttachedSnipPopup:
         # Response mode toggle
         toggle_frame = ctk.CTkFrame(right_side, fg_color="transparent")
         toggle_frame.pack(fill="x", pady=(0, 8))
-        
+
         self.response_toggle = SegmentedToggle(
             toggle_frame,
             options=[("Default", "default"), ("Copy", "copy"), ("Show", "show"), ("Type", "type")],
@@ -319,7 +327,7 @@ class AttachedSnipPopup:
             }
         )
         self.response_toggle.pack(anchor="center")
-        
+
         # Custom input with send button
         input_frame = ctk.CTkFrame(
             right_side,
@@ -329,7 +337,7 @@ class AttachedSnipPopup:
             border_width=1
         )
         input_frame.pack(fill="x")
-        
+
         self.input_entry = ctk.CTkEntry(
             input_frame,
             placeholder_text=self.PLACEHOLDER,
@@ -341,12 +349,12 @@ class AttachedSnipPopup:
             text_color=self.colors.text,
             placeholder_text_color=self.colors.overlay0
         )
-        
+
         # Send button container
         send_container = ctk.CTkFrame(input_frame, width=38, height=38, fg_color="transparent")
         send_container.pack(side="right")
         send_container.pack_propagate(False)
-        
+
         send_btn = create_emoji_button(
             send_container,
             text="",
@@ -360,16 +368,16 @@ class AttachedSnipPopup:
         )
         send_btn.configure(corner_radius=8)
         send_btn.pack(fill="both", expand=True)
-        
+
         self.input_entry.pack(side="left", fill="x", expand=True, padx=(10, 0))
         self.input_entry.bind('<Return>', lambda e: self._on_custom_submit())
-        
+
         Tooltip(send_btn, "Ask a question about this image")
-        
+
         # Compare Mode checkbox row
         compare_row = ctk.CTkFrame(right_side, fg_color="transparent")
         compare_row.pack(fill="x", pady=(8, 0))
-        
+
         self.compare_var = tk.BooleanVar(value=False)
         self.compare_checkbox = ctk.CTkCheckBox(
             compare_row,
@@ -387,7 +395,7 @@ class AttachedSnipPopup:
         )
         self.compare_checkbox.pack(side="left")
         Tooltip(self.compare_checkbox, "Enable to capture a second image for comparison")
-        
+
         # Compare capture indicator (hidden initially)
         self.compare_indicator = ctk.CTkLabel(
             compare_row,
@@ -396,7 +404,7 @@ class AttachedSnipPopup:
             text_color=self.colors.green
         )
         self.compare_indicator.pack(side="left", padx=(8, 0))
-        
+
         # Modifier bar (get from global settings)
         global_modifiers = get_prompts_config().get_modifiers()
         default_active = get_prompts_config().get_default_modifier_keys_for_tool("snip_tool")
@@ -408,17 +416,17 @@ class AttachedSnipPopup:
                 default_active=default_active
             )
             self.modifier_bar.pack(fill="x", pady=(0, 8))
-        
+
         # Actions area
         self.actions_frame = ctk.CTkFrame(content, fg_color="transparent")
         self.actions_frame.pack(fill="both", expand=True)
-        
+
         self._create_action_buttons()
-    
+
     def _build_tk_ui(self):
         """Build standard Tkinter UI (fallback)."""
         self.root.configure(bg=self.colors.base)
-        
+
         main_frame = tk.Frame(
             self.root,
             bg=self.colors.base,
@@ -426,14 +434,14 @@ class AttachedSnipPopup:
             highlightthickness=1
         )
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         content = tk.Frame(main_frame, bg=self.colors.base)
         content.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
-        
+
         # Top bar
         top_bar = tk.Frame(content, bg=self.colors.base)
         top_bar.pack(fill=tk.X, pady=(0, 10))
-        
+
         tk.Label(
             top_bar,
             text="📷 Screen Capture",
@@ -441,7 +449,7 @@ class AttachedSnipPopup:
             bg=self.colors.base,
             fg=self.colors.text
         ).pack(side=tk.LEFT)
-        
+
         close_btn = tk.Label(
             top_bar,
             text="×",
@@ -454,15 +462,15 @@ class AttachedSnipPopup:
         close_btn.bind('<Button-1>', lambda e: self._close())
         close_btn.bind('<Enter>', lambda e: close_btn.config(fg=self.colors.red))
         close_btn.bind('<Leave>', lambda e: close_btn.config(fg=self.colors.overlay0))
-        
+
         # Preview row
         preview_row = tk.Frame(content, bg=self.colors.base)
         preview_row.pack(fill=tk.X, pady=(0, 10))
-        
+
         # Thumbnail container with resolution text below
         thumb_container = tk.Frame(preview_row, bg=self.colors.base)
         thumb_container.pack(side=tk.LEFT, padx=(0, 12))
-        
+
         # Thumbnail frame
         thumb_frame = tk.Frame(
             thumb_container,
@@ -474,9 +482,9 @@ class AttachedSnipPopup:
         )
         thumb_frame.pack(side=tk.TOP)
         thumb_frame.pack_propagate(False)
-        
+
         self._create_thumbnail_tk(thumb_frame)
-        
+
         # Resolution text below thumbnail
         info_text = f"{self.capture_result.width} × {self.capture_result.height} px"
         tk.Label(
@@ -486,15 +494,15 @@ class AttachedSnipPopup:
             bg=self.colors.base,
             fg=self.colors.overlay0
         ).pack(side=tk.TOP, pady=(4, 0))
-        
+
         # Right side
         right_side = tk.Frame(preview_row, bg=self.colors.base)
         right_side.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
+
         # Source selector (simplified for tk)
         source_frame = tk.Frame(right_side, bg=self.colors.base)
         source_frame.pack(fill=tk.X, pady=(0, 8))
-        
+
         # For tk, use a simple label toggle instead of dropdown
         self.source_label = tk.Label(
             source_frame,
@@ -509,15 +517,15 @@ class AttachedSnipPopup:
         self.source_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.source_label.bind('<Button-1>', self._toggle_source_tk)
         Tooltip(self.source_label, "Select action source category")
-        
+
         # Connection profile dropdown
         self.profile_var, self.profile_dropdown, profile_frame = create_profile_dropdown_tk(right_side, self.root, self.colors)
         profile_frame.pack(fill=tk.X, pady=(0, 8))
-        
+
         # Response mode toggle
         toggle_frame = tk.Frame(right_side, bg=self.colors.base)
         toggle_frame.pack(fill=tk.X, pady=(0, 8))
-        
+
         self.response_toggle = SegmentedToggle(
             toggle_frame,
             options=[("Default", "default"), ("Copy", "copy"), ("Show", "show"), ("Type", "type")],
@@ -530,7 +538,7 @@ class AttachedSnipPopup:
             }
         )
         self.response_toggle.pack(anchor=tk.CENTER)
-        
+
         # Input
         input_container = tk.Frame(
             right_side,
@@ -539,7 +547,7 @@ class AttachedSnipPopup:
             highlightthickness=1
         )
         input_container.pack(fill=tk.X)
-        
+
         self.input_var = tk.StringVar(master=self.root)
         self.input_entry = tk.Entry(
             input_container,
@@ -554,11 +562,11 @@ class AttachedSnipPopup:
         self.input_entry.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
         self.input_entry.insert(0, self.PLACEHOLDER)
         self.input_entry.config(fg=self.colors.overlay0)
-        
+
         self.input_entry.bind('<FocusIn>', self._on_input_focus_in)
         self.input_entry.bind('<FocusOut>', self._on_input_focus_out)
         self.input_entry.bind('<Return>', lambda e: self._on_custom_submit())
-        
+
         # Send button
         send_btn = tk.Label(
             input_container,
@@ -574,11 +582,11 @@ class AttachedSnipPopup:
         send_btn.bind('<Button-1>', lambda e: self._on_custom_submit())
         send_btn.bind('<Enter>', lambda e: send_btn.config(bg=self.colors.lavender))
         send_btn.bind('<Leave>', lambda e: send_btn.config(bg=self.colors.blue))
-        
+
         # Compare Mode checkbox row (tk version)
         compare_row = tk.Frame(right_side, bg=self.colors.base)
         compare_row.pack(fill=tk.X, pady=(8, 0))
-        
+
         self.compare_var = tk.BooleanVar(value=False)
         self.compare_checkbox = tk.Checkbutton(
             compare_row,
@@ -593,7 +601,7 @@ class AttachedSnipPopup:
             selectcolor=self.colors.surface0
         )
         self.compare_checkbox.pack(side=tk.LEFT)
-        
+
         # Compare capture indicator (hidden initially)
         self.compare_indicator = tk.Label(
             compare_row,
@@ -603,7 +611,7 @@ class AttachedSnipPopup:
             fg=self.colors.green
         )
         self.compare_indicator.pack(side=tk.LEFT, padx=(8, 0))
-        
+
         # Modifier bar (get from global settings) - tk version
         global_modifiers = get_prompts_config().get_modifiers()
         default_active = get_prompts_config().get_default_modifier_keys_for_tool("snip_tool")
@@ -615,13 +623,13 @@ class AttachedSnipPopup:
                 default_active=default_active
             )
             self.modifier_bar.pack(fill=tk.X, pady=(10, 0))
-        
+
         # Actions area
         self.actions_frame = tk.Frame(content, bg=self.colors.base)
         self.actions_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
-        
+
         self._create_action_buttons()
-    
+
     def _create_thumbnail(self, parent):
         """Create clickable thumbnail preview (CTk version)."""
         if not self.capture_result.pil_image:
@@ -633,13 +641,13 @@ class AttachedSnipPopup:
                 text_color=self.colors.overlay0
             ).pack(expand=True)
             return
-        
+
         try:
             # Create thumbnail
             thumb = self.capture_result.pil_image.copy()
             thumb.thumbnail(self.THUMBNAIL_MAX_SIZE, Image.Resampling.LANCZOS)
             self.thumbnail_photo = ImageTk.PhotoImage(thumb)
-            
+
             # Display in label (use tk.Label for image display with click handler)
             label = tk.Label(
                 parent,
@@ -648,11 +656,11 @@ class AttachedSnipPopup:
                 cursor="hand2"  # Show clickable cursor
             )
             label.pack(expand=True)
-            
+
             # Bind click to show enlarged image
             label.bind('<Button-1>', self._on_thumbnail_click)
             Tooltip(label, "Click to view full size")
-            
+
         except Exception as e:
             logging.error(f"[SnipPopup] Thumbnail error: {e}")
             ctk.CTkLabel(
@@ -661,7 +669,7 @@ class AttachedSnipPopup:
                 font=get_ctk_font(size=32),
                 text_color=self.colors.overlay0
             ).pack(expand=True)
-    
+
     def _create_thumbnail_tk(self, parent):
         """Create clickable thumbnail preview (tk version)."""
         if not self.capture_result.pil_image:
@@ -673,12 +681,12 @@ class AttachedSnipPopup:
                 fg=self.colors.overlay0
             ).pack(expand=True)
             return
-        
+
         try:
             thumb = self.capture_result.pil_image.copy()
             thumb.thumbnail(self.THUMBNAIL_MAX_SIZE, Image.Resampling.LANCZOS)
             self.thumbnail_photo = ImageTk.PhotoImage(thumb)
-            
+
             label = tk.Label(
                 parent,
                 image=self.thumbnail_photo,
@@ -686,10 +694,10 @@ class AttachedSnipPopup:
                 cursor="hand2"  # Show clickable cursor
             )
             label.pack(expand=True)
-            
+
             # Bind click to show enlarged image
             label.bind('<Button-1>', self._on_thumbnail_click)
-            
+
         except Exception as e:
             logging.error(f"[SnipPopup] Thumbnail error: {e}")
             tk.Label(
@@ -699,28 +707,28 @@ class AttachedSnipPopup:
                 bg=self.colors.surface0,
                 fg=self.colors.overlay0
             ).pack(expand=True)
-    
+
     def _on_thumbnail_click(self, event):
         """Show enlarged image in a modal window."""
         if not self.capture_result.pil_image:
             return
-        
+
         try:
             # Get original image
             img = self.capture_result.pil_image.copy()
             orig_width, orig_height = img.size
-            
+
             # Scale to fit screen (max 80% of screen size)
             screen_w = self.root.winfo_screenwidth()
             screen_h = self.root.winfo_screenheight()
             max_w = int(screen_w * 0.8)
             max_h = int(screen_h * 0.8)
-            
+
             if orig_width > max_w or orig_height > max_h:
                 img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
-            
+
             photo = ImageTk.PhotoImage(img)
-            
+
             # Create modal window
             if HAVE_CTK:
                 modal = ctk.CTkToplevel(self.root)
@@ -728,12 +736,12 @@ class AttachedSnipPopup:
             else:
                 modal = tk.Toplevel(self.root)
                 modal.configure(bg=self.colors.base)
-            
+
             modal.title("Image Preview")
             modal.transient(self.root)
             modal.attributes('-topmost', True)
             modal.overrideredirect(True)  # No window decorations for cleaner look
-            
+
             # Center on screen
             modal.update_idletasks()
             w = photo.width() + 20
@@ -741,7 +749,7 @@ class AttachedSnipPopup:
             x = (screen_w - w) // 2
             y = (screen_h - h) // 2
             modal.geometry(f"{w}x{h}+{x}+{y}")
-            
+
             # Main container
             if HAVE_CTK:
                 container = ctk.CTkFrame(modal, fg_color=self.colors.base, corner_radius=12)
@@ -749,24 +757,24 @@ class AttachedSnipPopup:
             else:
                 container = tk.Frame(modal, bg=self.colors.base)
                 container.pack(fill=tk.BOTH, expand=True)
-            
+
             # Display image
             img_label = tk.Label(container, image=photo, bg=self.colors.base)
             img_label.image = photo  # Keep reference
             img_label.pack(padx=10, pady=10)
-            
+
             # Resolution info and close button row
             if HAVE_CTK:
                 bottom_row = ctk.CTkFrame(container, fg_color="transparent")
                 bottom_row.pack(fill="x", padx=10, pady=(0, 10))
-                
+
                 ctk.CTkLabel(
                     bottom_row,
                     text=f"{orig_width} × {orig_height} px",
                     font=get_ctk_font(size=11),
                     text_color=self.colors.overlay0
                 ).pack(side="left")
-                
+
                 close_btn = ctk.CTkButton(
                     bottom_row,
                     text="Close",
@@ -780,7 +788,7 @@ class AttachedSnipPopup:
             else:
                 bottom_row = tk.Frame(container, bg=self.colors.base)
                 bottom_row.pack(fill=tk.X, padx=10, pady=(0, 10))
-                
+
                 tk.Label(
                     bottom_row,
                     text=f"{orig_width} × {orig_height} px",
@@ -788,7 +796,7 @@ class AttachedSnipPopup:
                     bg=self.colors.base,
                     fg=self.colors.overlay0
                 ).pack(side=tk.LEFT)
-                
+
                 close_btn = tk.Button(
                     bottom_row,
                     text="Close",
@@ -800,37 +808,37 @@ class AttachedSnipPopup:
                     pady=4
                 )
                 close_btn.pack(side=tk.RIGHT)
-            
+
             # Close on Escape or click outside
             modal.bind("<Escape>", lambda e: modal.destroy())
             img_label.bind("<Button-1>", lambda e: modal.destroy())
             modal.focus_set()
             modal.grab_set()  # Modal behavior
-            
+
         except Exception as e:
             logging.error(f"[SnipPopup] Failed to show image preview: {e}")
-    
+
     def _create_action_buttons(self):
         """Create action buttons based on current source."""
         # Clear existing
         for widget in self.actions_frame.winfo_children():
             widget.destroy()
-        
+
         # Handle File Processor source separately
         if self.action_source == "file_processor":
             self._create_file_processor_buttons()
             return
-        
+
         # Get actions for current source
         if self.action_source == "snip":
             config = self.prompts_config.get("snip_tool", {})
         else:
             config = self.prompts_config.get("text_edit_tool", {})
-        
+
         settings = config.get("_settings", {})
         use_groups = settings.get("popup_use_groups", True)
         popup_groups = settings.get("popup_groups", [])
-        
+
         # Only use groups if popup_use_groups is True AND groups are defined
         if use_groups and popup_groups:
             groups = []
@@ -839,7 +847,7 @@ class AttachedSnipPopup:
                     continue
                 group_name = group_def.get("name", "")
                 item_keys = group_def.get("items", [])
-                
+
                 items = []
                 for key in item_keys:
                     action = config.get(key)
@@ -847,10 +855,10 @@ class AttachedSnipPopup:
                         icon = action.get("icon", "")
                         tooltip = action.get("task", "")
                         items.append((key, key, icon, tooltip))
-                
+
                 if items:
                     groups.append({"name": group_name, "items": items})
-            
+
             if groups:
                 self.carousel = GroupedButtonList(
                     self.actions_frame,
@@ -860,21 +868,21 @@ class AttachedSnipPopup:
                 )
                 self.carousel.pack(fill="both" if HAVE_CTK else tk.BOTH, expand=True)
                 return
-        
+
         # Flat carousel (when popup_use_groups is False or no groups defined)
         items_per_page = settings.get("popup_items_per_page", 6)
         items = []
-        
+
         for key, action in config.items():
             if key.startswith("_"):
                 continue
             if not isinstance(action, dict):
                 continue
-            
+
             icon = action.get("icon", "")
             tooltip = action.get("task", "")
             items.append((key, key, icon, tooltip))
-        
+
         if items:
             self.carousel = CarouselButtonList(
                 self.actions_frame,
@@ -883,7 +891,7 @@ class AttachedSnipPopup:
                 items_per_page=items_per_page
             )
             self.carousel.pack(fill="both" if HAVE_CTK else tk.BOTH, expand=True)
-    
+
     def _create_file_processor_buttons(self):
         """Create action buttons for File Processor prompts."""
         items = []
@@ -893,7 +901,7 @@ class AttachedSnipPopup:
             icon = prompt.get("icon", "📄")
             tooltip = prompt.get("description", "")
             items.append((key, key, icon, tooltip))
-        
+
         if items:
             self.carousel = CarouselButtonList(
                 self.actions_frame,
@@ -902,7 +910,7 @@ class AttachedSnipPopup:
                 items_per_page=6
             )
             self.carousel.pack(fill="both" if HAVE_CTK else tk.BOTH, expand=True)
-    
+
     def _on_source_changed(self, value: str):
         """Handle action source dropdown change."""
         if "Text Edit" in value:
@@ -911,10 +919,10 @@ class AttachedSnipPopup:
             self.action_source = "file_processor"
         else:
             self.action_source = "snip"
-        
+
         self._create_action_buttons()
         self._reposition_window()
-    
+
     def _toggle_source_tk(self, event):
         """Toggle action source (tk fallback)."""
         # Cycle through available sources
@@ -935,18 +943,18 @@ class AttachedSnipPopup:
         else:  # file_processor
             self.action_source = "snip"
             self.source_label.config(text="[Snip Actions]")
-        
+
         self._create_action_buttons()
         self._reposition_window()
-    
+
     def _on_modifiers_changed(self, active_modifiers: List[str]):
         """Handle modifier toggle changes."""
         self.active_modifiers = active_modifiers
-    
+
     def _on_compare_mode_changed(self):
         """Handle Compare Mode checkbox toggle."""
         self.compare_mode_enabled = self.compare_var.get()
-        
+
         # If enabling and we have a callback for second capture
         if self.compare_mode_enabled and self.on_request_compare_capture and not self.compare_capture:
             self._initiate_compare_capture()
@@ -954,26 +962,26 @@ class AttachedSnipPopup:
             # Clear compare capture when disabling
             self.compare_capture = None
             self._update_compare_indicator()
-    
+
     def _initiate_compare_capture(self):
         """Initiate second capture for comparison."""
         if not self.on_request_compare_capture:
             return
-        
+
         # Hide popup temporarily
         self.root.withdraw()
-        
+
         # Request second capture
         self.on_request_compare_capture(
             self._on_compare_captured,
             self._on_compare_cancelled
         )
-    
+
     def _on_compare_captured(self, capture_result: CaptureResult):
         """Handle second capture completion."""
         self.compare_capture = capture_result
         self._update_compare_indicator()
-        
+
         # If we have a pending action, execute it directly without re-showing popup
         if self._pending_action:
             source, action_key, custom_input = self._pending_action
@@ -984,7 +992,7 @@ class AttachedSnipPopup:
             self.root.deiconify()
             self.root.lift()
             self.root.focus_force()
-    
+
     def _on_compare_cancelled(self):
         """Handle cancellation of second capture."""
         # Uncheck compare mode since capture was cancelled
@@ -992,32 +1000,32 @@ class AttachedSnipPopup:
         self.compare_mode_enabled = False
         self.compare_capture = None
         self._update_compare_indicator()
-        
+
         # Show popup again
         self.root.deiconify()
         self.root.lift()
         self.root.focus_force()
-        
+
         # Clear pending action
         self._pending_action = None
-    
+
     def _update_compare_indicator(self):
         """Update the compare capture indicator text."""
         if self.compare_capture:
             text = f"✓ 2nd image: {self.compare_capture.width}×{self.compare_capture.height}px"
         else:
             text = ""
-        
+
         if HAVE_CTK and hasattr(self.compare_indicator, 'configure'):
             self.compare_indicator.configure(text=text)
         else:
             self.compare_indicator.config(text=text)
-    
+
     def _on_action_click(self, action_key: str):
         """Handle action button click."""
         # Check if this action has compare_prompts flag
         action_requires_compare = self._action_requires_compare(action_key)
-        
+
         # If action requires compare and we don't have second capture yet, trigger it
         if action_requires_compare and not self.compare_capture and self.on_request_compare_capture:
             self._pending_action = (self.action_source, action_key, None)
@@ -1025,9 +1033,9 @@ class AttachedSnipPopup:
             self.compare_mode_enabled = True
             self._initiate_compare_capture()
             return
-        
+
         self._execute_action(self.action_source, action_key, None)
-    
+
     def _action_requires_compare(self, action_key: str) -> bool:
         """Check if action has compare_prompts: true flag."""
         if self.action_source == "snip":
@@ -1035,11 +1043,11 @@ class AttachedSnipPopup:
             action = config.get(action_key, {})
             return action.get("compare_prompts", False)
         return False
-    
+
     def _execute_action(self, source: str, action_key: str, custom_input: Optional[str]):
         """Execute the action with current state."""
         response_mode = self.response_toggle.get() if hasattr(self, 'response_toggle') and self.response_toggle else "default"
-        
+
         profile_override = get_profile_override_value(self.profile_var)
         self._close()
         # on_action signature: (source, action_key, custom_input, active_modifiers, compare_mode, compare_capture, response_mode, profile_override)
@@ -1053,104 +1061,104 @@ class AttachedSnipPopup:
             response_mode,
             profile_override
         )
-    
+
     def _on_custom_submit(self):
         """Handle custom question submission."""
         if HAVE_CTK:
             text = self.input_entry.get().strip()
         else:
             text = self.input_var.get().strip() if hasattr(self, 'input_var') else ""
-        
+
         if not text or text == self.PLACEHOLDER:
             return
-        
+
         # If compare mode enabled and we don't have second capture, trigger it
         if self.compare_mode_enabled and not self.compare_capture and self.on_request_compare_capture:
             self._pending_action = (self.action_source, "_Custom", text)
             self._initiate_compare_capture()
             return
-        
+
         self._execute_action(self.action_source, "_Custom", text)
-    
+
     def _on_input_focus_in(self, event):
         """Handle input focus in (tk fallback)."""
         if self.input_entry.get() == self.PLACEHOLDER:
             self.input_entry.delete(0, tk.END)
             self.input_entry.config(fg=self.colors.text)
-    
+
     def _on_input_focus_out(self, event):
         """Handle input focus out (tk fallback)."""
         if not self.input_entry.get():
             self.input_entry.insert(0, self.PLACEHOLDER)
             self.input_entry.config(fg=self.colors.overlay0)
-    
+
     def _position_window(self):
         """Position the window."""
         self.root.update_idletasks()
-        
+
         x = self.x
         y = self.y
         if x is None or y is None:
             x = self.root.winfo_pointerx()
             y = self.root.winfo_pointery() + 20
-        
+
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
-        
+
         # Ensure window stays on screen
         if x + window_width > screen_width:
             x = screen_width - window_width - 10
         if y + window_height > screen_height:
             y = screen_height - window_height - 10
-        
+
         x = max(10, x)
         y = max(10, y)
-        
+
         self.root.geometry(f"+{x}+{y}")
-    
+
     def _reposition_window(self):
         """Reposition after content changes."""
         if not self.root:
             return
-        
+
         self.root.update_idletasks()
-        
+
         x = self.root.winfo_x()
         y = self.root.winfo_y()
-        
+
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
-        
+
         if x + window_width > screen_width:
             x = screen_width - window_width - 10
         if y + window_height > screen_height:
             y = screen_height - window_height - 10
-        
+
         x = max(10, x)
         y = max(10, y)
-        
+
         self.root.geometry(f"+{x}+{y}")
-    
+
     def _show_and_focus(self):
         """Show window after UI is built."""
         if not self.root:
             return
-        
+
         try:
             self.root.deiconify()
             self.root.bind('<Escape>', lambda e: self._close())
             self.root.lift()
             self.root.focus_force()
-            
+
             if HAVE_CTK:
                 self.input_entry.focus_set()
         except tk.TclError:
             pass
-    
+
     def _close(self):
         """Close the popup."""
         if self.root:

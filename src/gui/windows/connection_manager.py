@@ -16,20 +16,25 @@ import tkinter as tk
 from tkinter import messagebox
 from typing import List, Optional
 
-from ..platform import HAVE_CTK, ctk
-from ..themes import (
-    ThemeColors, get_colors,
-    get_ctk_entry_colors,
-    get_ctk_combobox_colors, get_ctk_label_colors,
-    get_ctk_font
-)
-from ..custom_widgets import (
-    ScrollableButtonList, ScrollableComboBox, create_emoji_button,
-    TkScrollableFrame, ask_themed_string
-)
-from ..popups import Tooltip
-from .utils import set_window_icon
 from ...model_defaults import get_fallback_models
+from ..custom_widgets import (
+    ScrollableButtonList,
+    ScrollableComboBox,
+    TkScrollableFrame,
+    ask_themed_string,
+    create_emoji_button,
+)
+from ..platform import HAVE_CTK, ctk
+from ..popups import Tooltip
+from ..themes import (
+    ThemeColors,
+    get_colors,
+    get_ctk_combobox_colors,
+    get_ctk_entry_colors,
+    get_ctk_font,
+    get_ctk_label_colors,
+)
+from .utils import set_window_icon
 
 try:
     from ..emoji_renderer import HAVE_PIL, prepare_emoji_content
@@ -302,10 +307,10 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             ctk.CTkFrame(editor, fg_color=c.surface1, height=1).pack(fill="x", pady=(10, 4))
         else:
             tk.Frame(editor, bg=c.surface1, height=1).pack(fill="x", pady=(10, 4))
-    
+
         self._summary_frame = ctk.CTkFrame(editor, fg_color=c.surface0, corner_radius=8) if self.use_ctk else tk.Frame(editor, bg=c.surface0)
         self._summary_frame.pack(fill="x", pady=(0, 5))
-    
+
         # Summary header
         if self.use_ctk:
             if HAVE_EMOJI and prepare_emoji_content:
@@ -318,7 +323,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         else:
             tk.Label(self._summary_frame, text="Profile Summary", font=("Segoe UI", 11, "bold"),
                 bg=c.surface0, fg=c.fg).pack(anchor="w", padx=12, pady=(8, 2))
-    
+
         # Summary content area (rebuilt dynamically in _update_summary)
         self._summary_content = ctk.CTkFrame(self._summary_frame, fg_color="transparent") if self.use_ctk else tk.Frame(self._summary_frame, bg=c.surface0)
         self._summary_content.pack(fill="x", padx=12, pady=(0, 8))
@@ -656,10 +661,10 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         base_url_info = self.field_widgets.get("base_url")
         base_url_value = base_url_info["var"].get() if base_url_info else ""
-    
+
         api_key_pool_info = self.field_widgets.get("api_key_pool")
         api_key_pool_value = api_key_pool_info["var"].get().strip() if api_key_pool_info else ""
-    
+
         api_key_name_info = self.field_widgets.get("api_key_name")
         api_key_name_value = api_key_name_info["var"].get().strip() if api_key_name_info else ""
 
@@ -667,13 +672,13 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         def _fetch():
             try:
-                from ...key_store import KeyStore
-                from ...key_manager import KeyManager
-                from ...providers import create_provider
                 from ... import web_server as _ws
-    
+                from ...key_manager import KeyManager
+                from ...key_store import KeyStore
+                from ...providers import create_provider
+
                 key_store = KeyStore.get_instance()
-    
+
                 # Resolve key manager using profile's api_key_pool and api_key_name
                 # (mirrors the logic in _test_profile)
                 if api_key_pool_value:
@@ -689,7 +694,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         self._schedule_ui(lambda: self._set_model_status("No API keys", "error"))
                         return
                     temp_km = KeyManager(key_strings, provider)
-    
+
                 if api_key_name_value:
                     source_pool = api_key_pool_value or key_store.get_provider_pool_id(provider)
                     pool_keys = key_store.get_pool(source_pool)
@@ -704,12 +709,12 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         self._schedule_ui(lambda k=_key_err: self._set_model_status(f"Key '{k}' not found", "error"))
                         return
                 temp_config = {"request_timeout": 30}
-    
+
                 if base_url_value:
                     temp_config["base_url"] = base_url_value
                 else:
                     temp_config["base_url"] = _ws.get_active_setting("base_url", "")
-                
+
                 if provider == "custom" and not temp_config["base_url"]:
                     self._schedule_ui(lambda: self._set_model_status("No base URL", "error"))
                     return
@@ -998,33 +1003,31 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
         def _test_thread():
             try:
-                from ...key_manager import KeyManager
-                from ...request_pipeline import (
-                    RequestPipeline, RequestContext, RequestOrigin, StreamCallback
-                )
                 from ... import web_server as _ws
-    
+                from ...key_manager import KeyManager
+                from ...request_pipeline import RequestContext, RequestOrigin, RequestPipeline, StreamCallback
+
                 # Build config from profile data directly (no load_config needed)
                 config = {}
                 ai_params = {}
-    
+
                 from ...key_store import KeyStore
                 key_store = KeyStore.get_instance()
                 key_managers = key_store.build_key_managers()
-    
+
                 provider = profile_data.get("provider") or _ws.get_active_setting("provider", "google")
                 model = profile_data.get("model") or _ws.get_active_setting("model", "")
-    
+
                 config["default_provider"] = provider
                 config[f"{provider}_model"] = model
-    
+
                 if "streaming" in profile_data:
                     config["streaming_enabled"] = profile_data["streaming"]
                 if "thinking" in profile_data:
                     config["thinking_enabled"] = profile_data["thinking"]
                 for field in ("thinking_budget", "thinking_level", "reasoning_effort",
                               "request_timeout", "base_url"):
-                    if field in profile_data and profile_data[field]:
+                    if profile_data.get(field):
                         config[field] = profile_data[field]
                 if "temperature" in profile_data and profile_data["temperature"] is not None:
                     ai_params["temperature"] = profile_data["temperature"]
@@ -1057,9 +1060,9 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         return
 
                 thinking_enabled = config.get("thinking_enabled", False)
-            
+
                 messages = [{"role": "user", "content": "Say 'Hello! Profile test successful.' in exactly those words."}]
-            
+
                 # Create RequestContext for pipeline logging
                 ctx = RequestContext(
                     origin=RequestOrigin.POPUP_PROMPT,
@@ -1289,7 +1292,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         self._last_saved_values = None
         name = ask_themed_string(self, "New Profile", "Enter profile name:", self.colors)
         if name:
-            from ...connection_profiles import ProfileStore, ConnectionProfile
+            from ...connection_profiles import ConnectionProfile, ProfileStore
             store = ProfileStore.get_instance()
             store.set_profile(name, ConnectionProfile())
             self.current_profile = name
@@ -1345,13 +1348,13 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self._update_summary()
             self._last_saved_values = None
             self.title("Connection Profiles")
-    
+
     def _on_close_attempt(self):
         """Handle window close — check for unsaved changes first."""
         if not self._prompt_unsaved_if_dirty():
             return  # User cancelled — keep window open
         self.destroy()
-    
+
     def destroy(self):
         self._destroyed = True
         # Unsubscribe from KeyStore notifications
