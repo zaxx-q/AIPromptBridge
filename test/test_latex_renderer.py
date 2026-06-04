@@ -1,191 +1,347 @@
 #!/usr/bin/env python3
-"""
-Tests for the LaTeX-to-Unicode renderer.
-"""
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+"""Tests for the LaTeX-to-Unicode renderer."""
 
-from src.gui.latex_renderer import latex_to_unicode, extract_latex_blocks
-
-passed = 0
-failed = 0
-
-def check(label, result, expected):
-    global passed, failed
-    if result == expected:
-        passed += 1
-        print(f"  PASS: {label}")
-    else:
-        failed += 1
-        print(f"  FAIL: {label}")
-        print(f"        Expected: {expected!r}")
-        print(f"        Got:      {result!r}")
-
-
-print("=" * 60)
-print("LaTeX Renderer Tests")
-print("=" * 60)
+from src.gui.latex_renderer import extract_latex_blocks, latex_to_unicode
 
 # --- Greek letters ---
-print("\n[Greek Letters]")
-check("alpha", latex_to_unicode(r"\alpha"), "α")
-check("beta", latex_to_unicode(r"\beta"), "β")
-check("Omega", latex_to_unicode(r"\Omega"), "Ω")
-check("gamma delta", latex_to_unicode(r"\gamma + \delta"), "γ + δ")
+
+
+def test_alpha():
+    assert latex_to_unicode(r"\alpha") == "α"
+
+
+def test_beta():
+    assert latex_to_unicode(r"\beta") == "β"
+
+
+def test_omega():
+    assert latex_to_unicode(r"\Omega") == "Ω"
+
+
+def test_gamma_delta():
+    assert latex_to_unicode(r"\gamma + \delta") == "γ + δ"
+
 
 # --- Operators ---
-print("\n[Operators]")
-check("times", latex_to_unicode(r"a \times b"), "a × b")
-check("neq", latex_to_unicode(r"a \neq b"), "a ≠ b")
-check("leq", latex_to_unicode(r"x \leq y"), "x ≤ y")
-check("approx", latex_to_unicode(r"\approx"), "≈")
-check("pm", latex_to_unicode(r"\pm"), "±")
-check("cdot", latex_to_unicode(r"a \cdot b"), "a · b")
+
+
+def test_times():
+    assert latex_to_unicode(r"a \times b") == "a × b"
+
+
+def test_neq():
+    assert latex_to_unicode(r"a \neq b") == "a ≠ b"
+
+
+def test_leq():
+    assert latex_to_unicode(r"x \leq y") == "x ≤ y"
+
+
+def test_approx():
+    assert latex_to_unicode(r"\approx") == "≈"
+
+
+def test_pm():
+    assert latex_to_unicode(r"\pm") == "±"
+
+
+def test_cdot():
+    assert latex_to_unicode(r"a \cdot b") == "a · b"
+
 
 # --- Arrows ---
-print("\n[Arrows]")
-check("rightarrow", latex_to_unicode(r"\rightarrow"), "→")
-check("Rightarrow", latex_to_unicode(r"\Rightarrow"), "⇒")
-check("implies", latex_to_unicode(r"\implies"), "⟹")
+
+
+def test_rightarrow():
+    assert latex_to_unicode(r"\rightarrow") == "→"
+
+
+def test_double_rightarrow():
+    assert latex_to_unicode(r"\Rightarrow") == "⇒"
+
+
+def test_implies():
+    assert latex_to_unicode(r"\implies") == "⟹"
+
 
 # --- Set theory ---
-print("\n[Set Theory & Logic]")
-check("in", latex_to_unicode(r"x \in A"), "x ∈ A")
-check("forall", latex_to_unicode(r"\forall x"), "∀ x")
-check("exists", latex_to_unicode(r"\exists y"), "∃ y")
-check("subset", latex_to_unicode(r"A \subset B"), "A ⊂ B")
-check("emptyset", latex_to_unicode(r"\emptyset"), "∅")
+
+
+def test_in_operator():
+    assert latex_to_unicode(r"x \in A") == "x ∈ A"
+
+
+def test_forall():
+    assert latex_to_unicode(r"\forall x") == "∀ x"
+
+
+def test_exists():
+    assert latex_to_unicode(r"\exists y") == "∃ y"
+
+
+def test_subset():
+    assert latex_to_unicode(r"A \subset B") == "A ⊂ B"
+
+
+def test_emptyset():
+    assert latex_to_unicode(r"\emptyset") == "∅"
+
 
 # --- Superscripts ---
-print("\n[Superscripts]")
-check("x^2", latex_to_unicode(r"x^2"), "x²")
-check("x^{10}", latex_to_unicode(r"x^{10}"), "x¹⁰")
-check("x^{n+1}", latex_to_unicode(r"x^{n+1}"), "xⁿ⁺¹")
-check("e^{ipi} fallback", latex_to_unicode(r"e^{i\pi}"), "e^(iπ)")  # π has no superscript → clean fallback
+
+
+def test_x_squared():
+    assert latex_to_unicode(r"x^2") == "x²"
+
+
+def test_x_power_10():
+    assert latex_to_unicode(r"x^{10}") == "x¹⁰"
+
+
+def test_x_power_n_plus_1():
+    assert latex_to_unicode(r"x^{n+1}") == "xⁿ⁺¹"
+
+
+def test_euler_fallback():
+    assert latex_to_unicode(r"e^{i\pi}") == "e^(iπ)"
+
 
 # --- Subscripts ---
-print("\n[Subscripts]")
-check("a_0", latex_to_unicode(r"a_0"), "a₀")
-check("x_{ij}", latex_to_unicode(r"x_{ij}"), "xᵢⱼ")
-check("a_n", latex_to_unicode(r"a_n"), "aₙ")
+
+
+def test_a_subscript_0():
+    assert latex_to_unicode(r"a_0") == "a₀"
+
+
+def test_x_subscript_ij():
+    assert latex_to_unicode(r"x_{ij}") == "xᵢⱼ"
+
+
+def test_a_subscript_n():
+    assert latex_to_unicode(r"a_n") == "aₙ"
+
 
 # --- Fractions ---
-print("\n[Fractions]")
-check("frac simple", latex_to_unicode(r"\frac{a}{b}"), "a⁄b")
-check("frac 1/2", latex_to_unicode(r"\frac{1}{2}"), "1⁄2")
-check("frac complex", latex_to_unicode(r"\frac{x+1}{y-1}"), "(x+1)⁄(y-1)")
+
+
+def test_frac_simple():
+    assert latex_to_unicode(r"\frac{a}{b}") == "a⁄b"
+
+
+def test_frac_half():
+    assert latex_to_unicode(r"\frac{1}{2}") == "1⁄2"
+
+
+def test_frac_complex():
+    assert latex_to_unicode(r"\frac{x+1}{y-1}") == "(x+1)⁄(y-1)"
+
 
 # --- Square roots ---
-print("\n[Square Roots]")
-check("sqrt simple", latex_to_unicode(r"\sqrt{x}"), "√x")
-check("sqrt expr", latex_to_unicode(r"\sqrt{a+b}"), "√(a+b)")
-check("cbrt", latex_to_unicode(r"\sqrt[3]{x}"), "∛x")
-check("4th root", latex_to_unicode(r"\sqrt[4]{x}"), "∜x")
+
+
+def test_sqrt_simple():
+    assert latex_to_unicode(r"\sqrt{x}") == "√x"
+
+
+def test_sqrt_expr():
+    assert latex_to_unicode(r"\sqrt{a+b}") == "√(a+b)"
+
+
+def test_cbrt():
+    assert latex_to_unicode(r"\sqrt[3]{x}") == "∛x"
+
+
+def test_fourth_root():
+    assert latex_to_unicode(r"\sqrt[4]{x}") == "∜x"
+
 
 # --- Big operators ---
-print("\n[Big Operators]")
-check("sum", latex_to_unicode(r"\sum"), "∑")
-check("int", latex_to_unicode(r"\int"), "∫")
-check("prod", latex_to_unicode(r"\prod"), "∏")
-check("infty", latex_to_unicode(r"\infty"), "∞")
+
+
+def test_sum():
+    assert latex_to_unicode(r"\sum") == "∑"
+
+
+def test_integral():
+    assert latex_to_unicode(r"\int") == "∫"
+
+
+def test_product():
+    assert latex_to_unicode(r"\prod") == "∏"
+
+
+def test_infinity():
+    assert latex_to_unicode(r"\infty") == "∞"
+
 
 # --- Math functions ---
-print("\n[Math Functions]")
-check("sin", latex_to_unicode(r"\sin(x)"), "sin(x)")
-check("log", latex_to_unicode(r"\log(x)"), "log(x)")
-check("lim", latex_to_unicode(r"\lim"), "lim")
+
+
+def test_sin():
+    assert latex_to_unicode(r"\sin(x)") == "sin(x)"
+
+
+def test_log():
+    assert latex_to_unicode(r"\log(x)") == "log(x)"
+
+
+def test_lim():
+    assert latex_to_unicode(r"\lim") == "lim"
+
 
 # --- Spacing commands ---
-print("\n[Spacing Commands]")
-check("thin space \\,", latex_to_unicode(r"a \, b"), "a\u2009b")
-check("medium space \\;", latex_to_unicode(r"a \; b"), "a\u2005b")
-check("quad", latex_to_unicode(r"a \quad b"), "a\u2003b")
-check("negative \\!", latex_to_unicode(r"a \! b"), "ab")
 
-# --- Combined expressions ---
-print("\n[Full Expressions]")
-check("E=mc^2", latex_to_unicode(r"E = mc^2"), "E = mc²")
-check("quadratic", latex_to_unicode(r"x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}"),
-      "x = (-b ± √(b² - 4ac))⁄(2a)")
-check("euler fallback", latex_to_unicode(r"e^{i\pi} + 1 = 0"), "e^(iπ) + 1 = 0")
-check("integral with dx", latex_to_unicode(r"\int_0^1 f(x) dx"), "∫₀¹ f(x) dx")
-check("sum series", latex_to_unicode(r"\sum_{i=1}^{n} i^2"), "∑ᵢ₌₁ⁿ i²")
-# The problematic formula from user report:
-check("integral with \\,", latex_to_unicode(r"\int_a^b f(x) \, dx"), "∫ₐᵇ f(x)\u2009dx")
-check("sum to infinity", latex_to_unicode(r"\sum_{n=1}^{\infty} \frac{1}{n^2}"), "∑ₙ₌₁^(∞) 1⁄n²")
+
+def test_thin_space():
+    assert latex_to_unicode(r"a \, b") == "a\u2009b"
+
+
+def test_medium_space():
+    assert latex_to_unicode(r"a \; b") == "a\u2005b"
+
+
+def test_quad():
+    assert latex_to_unicode(r"a \quad b") == "a\u2003b"
+
+
+def test_negative_space():
+    assert latex_to_unicode(r"a \! b") == "ab"
+
+
+# --- Full expressions ---
+
+
+def test_emc2():
+    assert latex_to_unicode(r"E = mc^2") == "E = mc²"
+
+
+def test_quadratic():
+    assert latex_to_unicode(r"x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}") == "x = (-b ± √(b² - 4ac))⁄(2a)"
+
+
+def test_euler():
+    assert latex_to_unicode(r"e^{i\pi} + 1 = 0") == "e^(iπ) + 1 = 0"
+
+
+def test_integral_with_dx():
+    assert latex_to_unicode(r"\int_0^1 f(x) dx") == "∫₀¹ f(x) dx"
+
+
+def test_sum_series():
+    assert latex_to_unicode(r"\sum_{i=1}^{n} i^2") == "∑ᵢ₌₁ⁿ i²"
+
+
+def test_integral_with_thin_space():
+    assert latex_to_unicode(r"\int_a^b f(x) \, dx") == "∫ₐᵇ f(x)\u2009dx"
+
+
+def test_sum_to_infinity():
+    assert latex_to_unicode(r"\sum_{n=1}^{\infty} \frac{1}{n^2}") == "∑ₙ₌₁^(∞) 1⁄n²"
+
 
 # --- Text commands ---
-print("\n[Text Commands]")
-check("text", latex_to_unicode(r"\text{hello}"), "hello")
-check("mathrm", latex_to_unicode(r"\mathrm{d}x"), "dx")
+
+
+def test_text_command():
+    assert latex_to_unicode(r"\text{hello}") == "hello"
+
+
+def test_mathrm():
+    assert latex_to_unicode(r"\mathrm{d}x") == "dx"
+
 
 # --- Decorations ---
-print("\n[Decorations]")
-check("hat", latex_to_unicode(r"\hat{x}"), "x\u0302")
-check("bar", latex_to_unicode(r"\bar{x}"), "x\u0304")
-check("vec", latex_to_unicode(r"\vec{v}"), "v\u20D7")
+
+
+def test_hat():
+    assert latex_to_unicode(r"\hat{x}") == "x\u0302"
+
+
+def test_bar():
+    assert latex_to_unicode(r"\bar{x}") == "x\u0304"
+
+
+def test_vec():
+    assert latex_to_unicode(r"\vec{v}") == "v\u20d7"
+
 
 # --- Matrices ---
-print("\n[Matrices]")
-mat_2x2 = latex_to_unicode(r"\begin{pmatrix} a & b \\ c & d \end{pmatrix}")
-check("pmatrix has lines", '\n' in mat_2x2, True)
-check("pmatrix has ╭", '╭' in mat_2x2, True)
-check("pmatrix has ╰", '╰' in mat_2x2, True)
-check("pmatrix has a", 'a' in mat_2x2, True)
-check("pmatrix has d", 'd' in mat_2x2, True)
 
-bmat = latex_to_unicode(r"\begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}")
-check("bmatrix has ┌", '┌' in bmat, True)
-check("bmatrix has └", '└' in bmat, True)
+
+def test_pmatrix_structure():
+    mat = latex_to_unicode(r"\begin{pmatrix} a & b \\ c & d \end{pmatrix}")
+    assert "\n" in mat
+    assert "╭" in mat
+    assert "╰" in mat
+    assert "a" in mat
+    assert "d" in mat
+
+
+def test_bmatrix_structure():
+    bmat = latex_to_unicode(r"\begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}")
+    assert "┌" in bmat
+    assert "└" in bmat
+
 
 # --- Alignment ---
-print("\n[Matrix Alignment]")
-aligned = latex_to_unicode(r"A = \begin{pmatrix} a \\ b \end{pmatrix}")
-# latex_to_unicode strips 'A = ' in some cases? No.
-lines = aligned.split('\n')
-if len(lines) >= 2:
-    check("aligned line 1 starts with A", lines[0].strip().startswith("A ="), True)
-    # Check that line 2 starts with spaces (padding)
-    # Since 'A = ' is 4 chars, we expect indentation
-    padding_match = len(lines[1]) - len(lines[1].lstrip())
-    check("aligned line 2 indent", padding_match >= 4, True)
-else:
-    check("not aligned (single line?)", False, True)
 
-# --- \\ line breaks ---
-print("\n[Line Breaks]")
-check("double backslash", '\n' in latex_to_unicode(r"a \\ b"), True)
+
+def test_matrix_alignment():
+    aligned = latex_to_unicode(r"A = \begin{pmatrix} a \\ b \end{pmatrix}")
+    lines = aligned.split("\n")
+    assert len(lines) >= 2
+    assert lines[0].strip().startswith("A =")
+    padding = len(lines[1]) - len(lines[1].lstrip())
+    assert padding >= 4
+
+
+# --- Line breaks ---
+
+
+def test_double_backslash():
+    assert "\n" in latex_to_unicode(r"a \\ b")
+
 
 # --- Edge cases ---
-print("\n[Edge Cases]")
-check("empty string", latex_to_unicode(""), "")
-check("plain text", latex_to_unicode("hello world"), "hello world")
-check("number only", latex_to_unicode("42"), "42")
-check("dot products", latex_to_unicode(r"\ldots"), "…")
-check("left right", latex_to_unicode(r"\left( x \right)"), "( x )")
+
+
+def test_empty_string():
+    assert latex_to_unicode("") == ""
+
+
+def test_plain_text():
+    assert latex_to_unicode("hello world") == "hello world"
+
+
+def test_number_only():
+    assert latex_to_unicode("42") == "42"
+
+
+def test_ldots():
+    assert latex_to_unicode(r"\ldots") == "…"
+
+
+def test_left_right():
+    assert latex_to_unicode(r"\left( x \right)") == "( x )"
+
 
 # --- Block extraction ---
-print("\n[Block Extraction]")
-blocks = extract_latex_blocks(r"Text with $x^2$ inline and $$E = mc^2$$ display")
-check("found 2 blocks", len(blocks), 2)
-if len(blocks) >= 2:
-    check("inline content", blocks[0][0], "x^2")
-    check("inline is_display", blocks[0][3], False)
-    check("display content", blocks[1][0], "E = mc^2")
-    check("display is_display", blocks[1][3], True)
 
-# Currency skip
-blocks2 = extract_latex_blocks("Price is $100 and $200")
-check("currency not matched", len(blocks2), 0)
 
-# Mixed
-blocks3 = extract_latex_blocks(r"We have $\alpha + \beta$ and also $50 total")
-check("mixed: 1 block (skips currency)", len(blocks3), 1)
+def test_extract_inline_and_display():
+    blocks = extract_latex_blocks(r"Text with $x^2$ inline and $$E = mc^2$$ display")
+    assert len(blocks) == 2
+    assert blocks[0][0] == "x^2"
+    assert blocks[0][3] is False  # not display
+    assert blocks[1][0] == "E = mc^2"
+    assert blocks[1][3] is True  # display
 
-# --- Summary ---
-print("\n" + "=" * 60)
-print(f"Results: {passed} passed, {failed} failed, {passed + failed} total")
-print("=" * 60)
 
-sys.exit(0 if failed == 0 else 1)
+def test_currency_not_matched():
+    blocks = extract_latex_blocks("Price is $100 and $200")
+    assert len(blocks) == 0
+
+
+def test_mixed_latex_and_currency():
+    blocks = extract_latex_blocks(r"We have $\alpha + \beta$ and also $50 total")
+    assert len(blocks) == 1

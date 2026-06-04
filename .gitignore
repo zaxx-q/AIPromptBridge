@@ -20,3 +20,6 @@ session_attachments
 audio_output
 keys.json
 profiles.json
+
+# Testing
+.pytest_cache/

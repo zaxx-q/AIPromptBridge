@@ -1,0 +1,8 @@
+# Development dependencies — install with: uv pip install -r requirements-dev.txt
+-r requirements.txt
+
+# Testing
+pytest>=8.0
+
+# Linting & Formatting
+ruff>=0.8.0

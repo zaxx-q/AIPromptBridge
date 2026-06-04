@@ -18,15 +18,14 @@ Run:
     uv run test/test_self_update.py
 """
 
-import os
-import sys
 import json
+import os
 import shutil
-import zipfile
+import sys
 import tempfile
 import traceback
+import zipfile
 from pathlib import Path
-from dataclasses import dataclass
 
 # ── Resolve project root ────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -68,6 +67,7 @@ def section(title: str):
 # ════════════════════════════════════════════════════════════════════════════
 # HELPERS: create a realistic fake "release zip" on disk
 # ════════════════════════════════════════════════════════════════════════════
+
 
 def create_fake_release_zip(
     zip_path: str,
@@ -143,10 +143,11 @@ def create_fake_current_install(root_dir: str, version: str = "4.0.0"):
 # TEST 1: Version Parsing
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def test_version_parsing():
     section("TEST 1: Version Parsing & Comparison")
 
-    from src.updater import parse_version, is_newer_version
+    from src.updater import is_newer_version, parse_version
 
     # Basic parsing
     cases = [
@@ -166,24 +167,24 @@ def test_version_parsing():
     # Comparison
     comparison_cases = [
         ("v5.5.0", "5.4.0", True),
-        ("v5.4.0", "5.4.0", False),   # same version
-        ("v5.3.0", "5.4.0", False),   # older
-        ("v5.10.0", "5.9.0", True),   # numeric, not lexicographic
+        ("v5.4.0", "5.4.0", False),  # same version
+        ("v5.3.0", "5.4.0", False),  # older
+        ("v5.10.0", "5.9.0", True),  # numeric, not lexicographic
         ("v1.0.0", "0.9.99", True),
-        ("v4.0.0", "4.0.0", False),   # exact match = not newer
+        ("v4.0.0", "4.0.0", False),  # exact match = not newer
     ]
     for remote, local, expected in comparison_cases:
         result = is_newer_version(remote, local)
         if result == expected:
             ok(f"is_newer_version('{remote}', '{local}') == {expected}")
         else:
-            fail(f"is_newer_version('{remote}', '{local}')",
-                 f"expected {expected}, got {result}")
+            fail(f"is_newer_version('{remote}', '{local}')", f"expected {expected}, got {result}")
 
 
 # ════════════════════════════════════════════════════════════════════════════
 # TEST 2: GitHub API Response Parsing (Mocked)
 # ══════════════════════════════════════════════════════════════════��═════════
+
 
 def test_github_api_parsing():
     section("TEST 2: GitHub API Response Parsing (Mocked)")
@@ -262,9 +263,7 @@ def test_github_api_parsing():
 
     # Test with no zip assets
     mock_release_no_zip = dict(mock_release)
-    mock_release_no_zip["assets"] = [
-        {"name": "checksums.txt", "browser_download_url": "http://...", "size": 100}
-    ]
+    mock_release_no_zip["assets"] = [{"name": "checksums.txt", "browser_download_url": "http://...", "size": 100}]
     found = False
     for asset in mock_release_no_zip["assets"]:
         if asset.get("name", "").lower().endswith(".zip"):
@@ -279,10 +278,11 @@ def test_github_api_parsing():
 # TEST 3: Prepare Update (Zip Extraction + Manifest)
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def test_prepare_update():
     section("TEST 3: Prepare Update (Zip → Staging + Manifest)")
 
-    from src.updater import UpdateInfo, STAGING_DIR, MANIFEST_FILE
+    from src.updater import MANIFEST_FILE, STAGING_DIR, UpdateInfo
 
     work_dir = tempfile.mkdtemp(prefix="aipb_test_prepare_")
     original_cwd = os.getcwd()
@@ -388,12 +388,13 @@ def test_prepare_update():
 # TEST 4: Apply Update (Launcher Logic)
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def test_apply_update():
     section("TEST 4: apply_update() — Full File Replacement")
 
     # Import launcher functions directly
     sys.path.insert(0, str(PROJECT_ROOT / "src" / "launchers"))
-    from launcher_console import apply_update, MANIFEST_FILE, STAGING_DIR, BACKUP_DIR
+    from launcher_console import BACKUP_DIR, MANIFEST_FILE, STAGING_DIR, apply_update
 
     work_dir = tempfile.mkdtemp(prefix="aipb_test_apply_")
     original_cwd = os.getcwd()
@@ -526,10 +527,11 @@ def test_apply_update():
 # TEST 5: Startup Recovery
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def test_startup_recovery():
     section("TEST 5: Startup Recovery (Interrupted Update)")
 
-    from src.updater import STAGING_DIR, BACKUP_DIR, MANIFEST_FILE
+    from src.updater import BACKUP_DIR, MANIFEST_FILE, STAGING_DIR
 
     # ── Case 1: bin/ missing + _bin_old/ exists → rollback ──
     work_dir = tempfile.mkdtemp(prefix="aipb_test_recovery1_")
@@ -543,6 +545,7 @@ def test_startup_recovery():
         (backup / "AIPromptBridge_Internal.exe").write_text("BACKUP_INTERNAL")
 
         from src.updater import startup_recovery
+
         startup_recovery()
 
         bin_dir = Path("bin")
@@ -631,11 +634,12 @@ def test_startup_recovery():
 # TEST 6: Root File Update Strategy
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def test_root_file_update():
     section("TEST 6: Root File Update Strategy (rename trick)")
 
     sys.path.insert(0, str(PROJECT_ROOT / "src" / "launchers"))
-    from launcher_console import update_root_files, ROOT_UPDATE_ALLOWLIST
+    from launcher_console import update_root_files
 
     work_dir = tempfile.mkdtemp(prefix="aipb_test_rootfiles_")
 
@@ -644,8 +648,12 @@ def test_root_file_update():
         staging_dir = os.path.join(work_dir, "_staging")
 
         # Create current root files
-        for name in ["AIPromptBridge.exe", "AIPromptBridge-NoConsole.exe",
-                      "python313.dll", "frozen_application_license.txt"]:
+        for name in [
+            "AIPromptBridge.exe",
+            "AIPromptBridge-NoConsole.exe",
+            "python313.dll",
+            "frozen_application_license.txt",
+        ]:
             Path(root_dir, name).write_text(f"OLD_{name}")
 
         os.makedirs(os.path.join(root_dir, "lib"), exist_ok=True)
@@ -653,8 +661,12 @@ def test_root_file_update():
 
         # Create staging root files
         os.makedirs(staging_dir, exist_ok=True)
-        for name in ["AIPromptBridge.exe", "AIPromptBridge-NoConsole.exe",
-                      "python313.dll", "frozen_application_license.txt"]:
+        for name in [
+            "AIPromptBridge.exe",
+            "AIPromptBridge-NoConsole.exe",
+            "python313.dll",
+            "frozen_application_license.txt",
+        ]:
             Path(staging_dir, name).write_text(f"NEW_{name}")
 
         os.makedirs(os.path.join(staging_dir, "lib"), exist_ok=True)
@@ -664,8 +676,12 @@ def test_root_file_update():
         update_root_files(root_dir, staging_dir)
 
         # Verify files were updated
-        for name in ["AIPromptBridge.exe", "AIPromptBridge-NoConsole.exe",
-                      "python313.dll", "frozen_application_license.txt"]:
+        for name in [
+            "AIPromptBridge.exe",
+            "AIPromptBridge-NoConsole.exe",
+            "python313.dll",
+            "frozen_application_license.txt",
+        ]:
             target = Path(root_dir, name)
             if target.exists():
                 content = target.read_text()
@@ -696,11 +712,12 @@ def test_root_file_update():
 # TEST 7: .old File Cleanup
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def test_old_file_cleanup():
     section("TEST 7: .old File Cleanup (launcher startup)")
 
     sys.path.insert(0, str(PROJECT_ROOT / "src" / "launchers"))
-    from launcher_console import cleanup_old_files, ROOT_UPDATE_ALLOWLIST
+    from launcher_console import ROOT_UPDATE_ALLOWLIST, cleanup_old_files
 
     work_dir = tempfile.mkdtemp(prefix="aipb_test_cleanup_")
 
@@ -756,6 +773,7 @@ def test_old_file_cleanup():
 # TEST 8: Source Mode Detection
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def test_source_mode():
     section("TEST 8: Source Mode Detection")
 
@@ -773,6 +791,7 @@ def test_source_mode():
 # ════════════════════════════════════════════════════════════════════════════
 # TEST 9: Config Integration
 # ════════════════════════════════════════════════════════════════════════════
+
 
 def test_config_integration():
     section("TEST 9: Config Integration")
@@ -793,19 +812,20 @@ def test_config_integration():
 # TEST 10: Constants Consistency
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def test_constants_consistency():
     section("TEST 10: Constants Consistency (updater ↔ launcher)")
 
-    from src.updater import UPDATE_EXIT_CODE as UEC_UPDATER
-    from src.updater import STAGING_DIR as SD_UPDATER
     from src.updater import BACKUP_DIR as BD_UPDATER
     from src.updater import MANIFEST_FILE as MF_UPDATER
+    from src.updater import STAGING_DIR as SD_UPDATER
+    from src.updater import UPDATE_EXIT_CODE as UEC_UPDATER
 
     sys.path.insert(0, str(PROJECT_ROOT / "src" / "launchers"))
-    from launcher_console import UPDATE_EXIT_CODE as UEC_LAUNCHER
-    from launcher_console import STAGING_DIR as SD_LAUNCHER
     from launcher_console import BACKUP_DIR as BD_LAUNCHER
     from launcher_console import MANIFEST_FILE as MF_LAUNCHER
+    from launcher_console import STAGING_DIR as SD_LAUNCHER
+    from launcher_console import UPDATE_EXIT_CODE as UEC_LAUNCHER
 
     pairs = [
         ("UPDATE_EXIT_CODE", UEC_UPDATER, UEC_LAUNCHER),
@@ -824,6 +844,7 @@ def test_constants_consistency():
 # ════════════════════════════════════════════════════════════════════════════
 # TEST 11: Launcher Exit Code & --apply-update Handling
 # ════════════════════════════════════════════════════════════════════════════
+
 
 def test_launcher_signal_flow():
     section("TEST 11: Launcher Signal Flow Verification")
@@ -867,6 +888,7 @@ def test_launcher_signal_flow():
 # TEST 12: Main.py Integration
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def test_main_integration():
     section("TEST 12: main.py Integration")
 
@@ -889,6 +911,7 @@ def test_main_integration():
 # ════════════════════════════════════════════════════════════════════════════
 # TEST 13: Tray Integration
 # ════════════════════════════════════════════════════════════════════════════
+
 
 def test_tray_integration():
     section("TEST 13: Tray & Terminal Integration")
@@ -925,6 +948,7 @@ def test_tray_integration():
 # TEST 14: Settings Window Integration
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def test_settings_integration():
     section("TEST 14: Settings Window Integration")
 
@@ -956,6 +980,7 @@ def test_settings_integration():
 # TEST 15: cx_Freeze Excludes Verification
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def test_cx_freeze_excludes():
     section("TEST 15: cx_Freeze Setup Verification")
 
@@ -967,7 +992,6 @@ def test_cx_freeze_excludes():
     # Let's check that json and shutil are NOT in the excludes list
 
     # Parse the excludes list from the source
-    import ast
 
     # Find the excludes list between "excludes" and the closing bracket
     excludes_start = setup_source.find('"excludes": [')
@@ -1014,10 +1038,11 @@ def test_cx_freeze_excludes():
 # TEST 16: Full End-to-End Simulation
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def test_end_to_end():
     section("TEST 16: Full End-to-End Simulation")
 
-    from src.updater import STAGING_DIR, BACKUP_DIR, MANIFEST_FILE, UpdateInfo
+    from src.updater import BACKUP_DIR, MANIFEST_FILE, STAGING_DIR
 
     sys.path.insert(0, str(PROJECT_ROOT / "src" / "launchers"))
     from launcher_console import apply_update, cleanup_old_files
@@ -1142,6 +1167,7 @@ def test_end_to_end():
 
         print("\n  ── Phase 5: Verify startup recovery is safe on clean state ──")
         from src.updater import startup_recovery
+
         startup_recovery()  # Should be a no-op
         ok("startup_recovery() is safe on clean installation")
 
@@ -1153,6 +1179,7 @@ def test_end_to_end():
 # ════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ════════════════════════════════════════════════════════════════════════════
+
 
 def main():
     print()
@@ -1183,7 +1210,7 @@ def main():
     for test_fn in tests:
         try:
             test_fn()
-        except Exception as e:
+        except Exception:
             fail(f"EXCEPTION in {test_fn.__name__}", traceback.format_exc())
 
     # ── Summary ──
