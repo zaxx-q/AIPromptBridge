@@ -5,9 +5,11 @@
 ## ✨ Features
 
 ### 🎯 TextEditTool
+
 <img src="docs/images/feature_text_edit.png" align="right" width="200" />
 
 Press **Ctrl+Space** anywhere to invoke AI on selected text:
+
 - **Understand** - **Explain**, **Generate Summaries**, or **Keypoints**
 - **Edit** - **Proofread** (✏️), **Rewrite** (📝), or make it **Casual** (😎)
 - **Q&A** - Use the second input box in the popup to ask any question about the text
@@ -19,9 +21,11 @@ Works in any application: browsers, IDEs, Notepad, Word, everywhere.
 <br clear="right"/>
 
 ### 📸 Screen Snip (SnipTool)
+
 <img src="docs/images/feature_snip.png" align="right" width="300" />
 
 Press **Ctrl+Alt+X** to capture a region of your screen and analyze it with AI:
+
 - **OCR** - **Extract Text** or **OCR to Markdown** for clean formatting
 - **Analysis** - **Describe**, **Summarize**, or **Explain Code**
 - **Data** - **Extract Data** to tables, **Transcribe** handwriting, or **Smart Cleanup** notes
@@ -31,9 +35,11 @@ Press **Ctrl+Alt+X** to capture a region of your screen and analyze it with AI:
 <br clear="right"/>
 
 ### 🎤 Audio Analyzer
+
 ![Audio Analyzer](docs/images/feature_audio.png)
 
 Press **Ctrl+Alt+A** to record and analyze audio:
+
 - **Record** - Capture microphone input or system audio (loopback)
 - **Transcribe** - High-fidelity transcription with timestamps and speaker identification
 - **Analyze** - Summarize meetings, extract key points, or analyze tone
@@ -41,9 +47,11 @@ Press **Ctrl+Alt+A** to record and analyze audio:
 - **Integration** - Send audio directly to chat context for follow-up questions
 
 ### 🔊 Text-to-Speech (TTS)
+
 ![TTS Tool](docs/images/feature_tts.png)
 
 Convert text into expressive speech using Gemini TTS models:
+
 - **30 Voices** - Choose from 30 prebuilt voices with distinct styles (Bright, Firm, Upbeat, etc.)
 - **AI Director** - Automatically generates style instructions for expressive, nuanced speech
 - **Two Models** - Flash (fast) and Pro (quality) TTS model options
@@ -53,33 +61,41 @@ Convert text into expressive speech using Gemini TTS models:
 - **Entry Points** - 🔊 button in popups, `[T]` terminal key, hotkey `Ctrl+Alt+T`, and system tray menu
 
 ### 💬 Chat Interface
+
 ![Chat Interface](docs/images/feature_chat.png)
 
 Lightweight chat windows with:
+
 - Streaming responses (real-time typing)
 - Markdown rendering
 - Session history (browse and restore)
-- Multi-theme UI with 6 color schemes
+- Multi-theme UI with 9 color schemes
 
 ### 🎨 Theme System
 
-The app supports 6 distinct themes with both Dark and Light variants:
+The app supports 9 distinct themes with both Dark and Light variants:
 
-| Catppuccin | Dracula | Nord |
-|------------|---------|------|
+| Catppuccin                                                      | Dracula                                                      | Nord                                                      |
+| --------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------- |
 | <img src="docs/images/themes/theme_catppuccin.png" width="250"> | <img src="docs/images/themes/theme_dracula.png" width="250"> | <img src="docs/images/themes/theme_nord.png" width="250"> |
 
-| Gruvbox | Minimal | High Contrast |
-|---------|---------|---------------|
+| Gruvbox                                                      | Minimal                                                      | High Contrast                                                     |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ----------------------------------------------------------------- |
 | <img src="docs/images/themes/theme_gruvbox.png" width="250"> | <img src="docs/images/themes/theme_minimal.png" width="250"> | <img src="docs/images/themes/theme_highcontrast.png" width="250"> |
 
+| Rose                                                      | Coffee                                                      | Violet                                                      |
+| --------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
+| <img src="docs/images/themes/theme_rose.png" width="250"> | <img src="docs/images/themes/theme_coffee.png" width="250"> | <img src="docs/images/themes/theme_violet.png" width="250"> |
+
 Customizable appearance with:
-- **6 themes**: Catppuccin, Dracula, Nord, Gruvbox, Minimal, High Contrast
+
+- **9 themes**: Catppuccin, Dracula, Nord, Gruvbox, Minimal, High Contrast, Rose, Coffee, Violet
 - **Dark/Light modes**: Each theme has both variants
 - **System detection**: Auto-switches based on Windows theme
 - **Live preview**: See theme changes instantly in Settings
 
 ### 🔄 Robust Backend
+
 - **Multi-provider support** - Google Gemini, Anthropic Claude, OpenAI, OpenRouter, xAI (Grok), Mistral, Cohere, and Custom OpenAI-compatible endpoints
 - **Connection Profiles** - Dedicated connection profiles (`profiles.json`) for provider, model, thinking, streaming, and advanced params — assignable per-action or globally
 - **Automatic key rotation** - Switch API keys on rate limits (429, 401, 403)
@@ -91,7 +107,9 @@ Customizable appearance with:
 - **Self-Update** - Check for updates and install directly from the app (via tray menu, terminal `U` key, or on startup)
 
 ### 🧰 Tools System (Not accessible in No Console mode)
+
 The **File Processor** tool enables bulk operations:
+
 - **Batch Processing**: Process folders of Images, Audio, Code, Text, or PDFs
 - **Audio Optimization**: Reduce file size (mono, sample rate) for efficient AI processing
 - **Configurable**: On-demand `tools_config.json` creation
@@ -101,6 +119,7 @@ The **File Processor** tool enables bulk operations:
   - **Interactive Mode**: Pause (`P`), Stop (`S`), or Abort (`Esc`) during processing
 
 The **TTS Processor** tool enables batch text-to-speech generation:
+
 - **Text Splitting**: Lines, paragraphs, sentences, or whole file modes
 - **Voice Selection**: 30 prebuilt Gemini voices with single or multi-speaker support
 - **Style Instructions**: Manual, default, no style, or AI Director (single/per-segment)
@@ -135,6 +154,7 @@ python main.py
 <img src="docs/images/tray.png" align="right" width="200" />
 
 Right-click the tray icon for:
+
 - **Toggle Console or Double click tray icon** - Toggle console visibility (Not visible in No Console mode)
 - **Session Browser** - View chat history
 - **Direct Chat** - Open text input popup (Ctrl+Space)
@@ -178,41 +198,45 @@ Right-click the tray icon for:
 
 When console is visible, press these keys:
 
-| Key | Action |
-|-----|--------|
-| `S` | Open session browser (Sessions) |
-| `A` | Open Audio Analyzer |
-| `T` | Open TTSTool window (Text-to-Speech) |
-| `X` | Open Tools menu |
-| `L` | List recent saved sessions |
-| `I` | Show system info (Status) |
-| `P` | Switch connection profile |
-| `K` | Toggle thinking mode (session-scoped) |
+| Key | Action                                                   |
+| --- | -------------------------------------------------------- |
+| `S` | Open session browser (Sessions)                          |
+| `A` | Open Audio Analyzer                                      |
+| `T` | Open TTSTool window (Text-to-Speech)                     |
+| `X` | Open Tools menu                                          |
+| `L` | List recent saved sessions                               |
+| `I` | Show system info (Status)                                |
+| `P` | Switch connection profile                                |
+| `K` | Toggle thinking mode (session-scoped)                    |
 | `M` | List available models (Use `?N` for details, e.g., `?1`) |
-| `R` | Toggle streaming mode (session-scoped) |
-| `G` | Open Settings window |
-| `W` | Open prompt editor |
-| `U` | Check for updates |
-| `H` | Show help |
+| `R` | Toggle streaming mode (session-scoped)                   |
+| `G` | Open Settings window                                     |
+| `W` | Open prompt editor                                       |
+| `U` | Check for updates                                        |
+| `H` | Show help                                                |
 
 ## ⚙️ Configuration
 
 AIPromptBridge features a comprehensive GUI for all configuration needs, making it easy to manage settings without touching configuration files.
 
 ### 🎛️ Settings Window
+
 ![Settings Window](docs/images/window_settings.png)
 
 Access via **System Tray > Settings**. This window manages the core application configuration (`config.ini`):
+
 - **API Keys**: Manage keys for Google Gemini, OpenRouter, and Custom providers.
 - **Providers**: Select active connection profile
 - **Tools**: Configure hotkeys and behavior for TextEditTool, SnipTool, and AudioTool.
-- **Theme**: Switch between 7 themes and toggle Dark/Light modes.
+- **Theme**: Switch between 9 themes and toggle Dark/Light modes.
 - **System**: Configure server host/port, startup options, and auto-update checks.
 
 ### ✏️ Prompt Editor
+
 ![Prompt Editor](docs/images/window_prompt_editor.png)
 
 Access via **System Tray > Prompt Editor**. This window lets you customize how the AI responds (`prompts.json`):
+
 - **Actions**: Create, edit, and organize actions for Text, Snip, and Audio tools.
 - **Connection Profiles**: Assign per-action connection profiles (provider, model, thinking, streaming, temperature, etc.).
 - **Modifiers**: Customize the modifier bar buttons (e.g., "Shorter", "Professional").
@@ -220,9 +244,11 @@ Access via **System Tray > Prompt Editor**. This window lets you customize how t
 - **Hot-Reload**: Changes apply immediately without restarting the app.
 
 ### 🔌 Connection Profile Manager
+
 ![Connection Profile Manager](docs/images/window_connection_profiles.png)
 
 Access via **System Tray > Profiles**, terminal `C` key, or **Settings > Provider > Manage Profiles**. Manages connection profiles (`profiles.json`):
+
 - **Profiles**: Create, edit, duplicate, and delete connection profiles.
 - **Per-Profile Settings**: Provider, model, streaming, thinking, temperature, max tokens, and timeout configuration.
 - **Active Profile**: Set any profile as the global default — all tools and actions use it unless overridden.
@@ -231,7 +257,9 @@ Access via **System Tray > Profiles**, terminal `C` key, or **Settings > Provide
 - **Test**: Verify a profile's connection with a quick API test.
 
 ### 📂 Manual Configuration
+
 For advanced users, configuration files are stored in the application root:
+
 - `config.ini`: Core app settings (connection settings are in profiles, API keys in keys.json).
 - `prompts.json`: AI system prompts and tool configurations.
 - `profiles.json`: Connection profiles (provider, model, and parameter profiles).
@@ -239,17 +267,20 @@ For advanced users, configuration files are stored in the application root:
 ## 💡 Tips
 
 ### For Faster Responses
+
 - Use non-reasoning models (e.g., `gemini-3.1-flash-lite-preview` instead of `gemini-3.1-pro-preview`)
 - Disable thinking parameter: Press `T` in console or set `thinking_enabled = false`
 - Keep streaming enabled for perceived faster responses
 
 ### For Better Results
+
 - Enable thinking mode for complex tasks
 - Edit the actions/prompts to your needs in Prompt Editor
 - Add (more) context when selecting text or asking questions.
 - Set the right temperature for the task (e.g., low temperature for OCR tasks, high temp for more creativity)
 
 ### Getting API Keys
+
 - **Google Gemini (Recommended)**: Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
 - **Anthropic Claude**: Get an API key from [Anthropic Console](https://platform.claude.com/settings/workspaces/default/keys)
 - **OpenRouter**: Get an API key from [OpenRouter](https://openrouter.ai/keys)
@@ -259,6 +290,7 @@ For advanced users, configuration files are stored in the application root:
 - **Cohere**: Get an API key from [Cohere Dashboard](https://dashboard.cohere.com/)
 
 ### API Key Management
+
 - Add multiple API keys in pools for each provider for automatic rotation
 - If one key hits rate limits, the next one is used automatically
 - The system tracks exhausted keys and skips them
