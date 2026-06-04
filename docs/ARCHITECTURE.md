@@ -356,7 +356,7 @@ Per-session profile override (chat window dropdown)
 | `streaming` | bool | Enable streaming responses |
 | `thinking` | bool | Enable thinking/reasoning |
 | `thinking_budget` | int | Gemini 2.5 thinking token budget (-1 = auto) |
-| `thinking_level` | `low`, `high` | Gemini 3.x thinking level |
+| `thinking_level` | `low`, `medium`, `high` | Gemini 3.x thinking level |
 | `reasoning_effort` | `low`, `medium`, `high` | OpenAI-compatible reasoning effort |
 | `temperature` | float or null | Sampling temperature |
 | `max_tokens` | int or null | Max output tokens |
@@ -411,7 +411,7 @@ Different providers have different thinking mechanisms:
 | ---------- | ----------- | -------- |
 | OpenAI-compatible | `reasoning_effort` | `low`, `medium`, `high` |
 | Gemini 2.5 | `thinking_budget` | Integer (tokens, -1 = auto) |
-| Gemini 3.x | `thinking_level` | `low`, `high` |
+| Gemini 3.x | `thinking_level` | `low`, `medium`, `high` |
 
 ## Configuration System
 

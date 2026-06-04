@@ -32,7 +32,7 @@ from .utils import set_window_icon
 from ...model_defaults import get_fallback_models
 
 try:
-    from ..emoji_renderer import get_emoji_renderer, HAVE_PIL, prepare_emoji_content
+    from ..emoji_renderer import HAVE_PIL, prepare_emoji_content
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
@@ -46,7 +46,7 @@ PROFILE_FIELDS = [
     ("streaming", "Streaming", "toggle", None),
     ("thinking", "Thinking", "toggle", None),
     ("thinking_budget", "Thinking Budget", "entry", None),
-    ("thinking_level", "Thinking Level", "combobox", ["", "low", "high"]),
+    ("thinking_level", "Thinking Level", "combobox", ["", "low", "medium", "high"]),
     ("reasoning_effort", "Reasoning Effort", "combobox", ["", "low", "medium", "high"]),
     ("temperature", "Temperature", "entry", None),
     ("max_tokens", "Max Tokens", "entry", None),
