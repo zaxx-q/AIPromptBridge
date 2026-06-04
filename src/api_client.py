@@ -103,6 +103,9 @@ def call_api_stream_unified(
             usage_data = content
             callback("usage", content)
         
+        elif cb_type == CallbackType.RESPONSE_PARTS:
+            callback("response_parts", content)
+        
         elif cb_type == CallbackType.DONE:
             callback("done", None)
         
@@ -172,6 +175,8 @@ def call_custom_api_stream(key_manager, url, model, messages, ai_params, timeout
         elif cb_type == CallbackType.USAGE:
             usage_data = content
             callback("usage", content)
+        elif cb_type == CallbackType.RESPONSE_PARTS:
+            callback("response_parts", content)
         elif cb_type == CallbackType.DONE:
             callback("done", None)
         elif cb_type == CallbackType.ERROR:
@@ -210,7 +215,7 @@ def call_custom_api_stream(key_manager, url, model, messages, ai_params, timeout
 # NON-STREAMING API - Uses new provider classes  
 # ============================================================
 
-def call_api_with_retry(provider, messages, model_override, config, ai_params, key_managers, abort_event=None):
+def call_api_with_retry(provider, messages, model_override, config, ai_params, key_managers, abort_event=None, result_out=None):
     """
     Call API with retry logic and key rotation.
     """
@@ -263,6 +268,8 @@ def call_api_with_retry(provider, messages, model_override, config, ai_params, k
         )
         
         if result.success:
+            if isinstance(result_out, dict):
+                result_out["gemini_parts"] = result.gemini_parts
             return result.content, None
         else:
             return None, result.error
@@ -284,7 +291,7 @@ def call_api_simple(provider, prompt, image_base64, mime_type, model_override, c
     return call_api_with_retry(provider, messages, model_override, config, ai_params, key_managers, abort_event=abort_event)
 
 
-def call_api_chat(session, config, ai_params, key_managers, provider_override=None, model_override=None, system_instruction=None, abort_event=None):
+def call_api_chat(session, config, ai_params, key_managers, provider_override=None, model_override=None, system_instruction=None, abort_event=None, result_out=None):
     """
     API call for chat session.
     Uses current config settings for provider/model, not session-stored values.
@@ -297,7 +304,7 @@ def call_api_chat(session, config, ai_params, key_managers, provider_override=No
     
     provider = provider_override or config.get("default_provider", "google")
     model = model_override or config.get(f"{provider}_model")
-    return call_api_with_retry(provider, messages, model, config, ai_params, key_managers, abort_event=abort_event)
+    return call_api_with_retry(provider, messages, model, config, ai_params, key_managers, abort_event=abort_event, result_out=result_out)
 
 
 def call_api_chat_stream(

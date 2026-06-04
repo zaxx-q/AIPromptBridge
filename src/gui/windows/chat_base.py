@@ -1473,7 +1473,7 @@ class ChatWindowBase(ABC):
                 if ctx.error:
                     self._update_status(f"Error: {ctx.error}", self.theme.accent_red)
                 else:
-                    self.session.add_message("assistant", ctx.response_text)
+                    self.session.add_message("assistant", ctx.response_text, gemini_parts=ctx.gemini_parts)
                     thinking_content = self.streaming_thinking or ctx.reasoning_text
                     if thinking_content and len(self.session.messages) > 0:
                         self.session.messages[-1]["thinking"] = thinking_content
@@ -2403,7 +2403,7 @@ class ChatWindowBase(ABC):
                     self._update_status(f"Error: {ctx.error}", self.theme.accent_red)
                     # Don't pop user message - keep it for retry via Regen button
                 else:
-                    self.session.add_message("assistant", ctx.response_text)
+                    self.session.add_message("assistant", ctx.response_text, gemini_parts=ctx.gemini_parts)
                     thinking_content = self.streaming_thinking or ctx.reasoning_text
                     if thinking_content and len(self.session.messages) > 0:
                         self.session.messages[-1]["thinking"] = thinking_content

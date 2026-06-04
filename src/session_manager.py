@@ -49,7 +49,7 @@ class ChatSession:
         # Per-session profile override (None = no profile selected)
         self.profile_override = None
     
-    def add_message(self, role, content, attachments=None):
+    def add_message(self, role, content, attachments=None, gemini_parts=None):
         """
         Add a message to the session.
         
@@ -57,6 +57,7 @@ class ChatSession:
             role: "user" or "assistant"
             content: Text content
             attachments: Optional list of attachment dicts [{"path": "...", "mime_type": "..."}]
+            gemini_parts: Optional list of raw Gemini parts (containing thought signatures, etc.)
         """
         message = {
             "role": role,
@@ -65,6 +66,8 @@ class ChatSession:
         }
         if attachments:
             message["attachments"] = attachments
+        if gemini_parts:
+            message["gemini_parts"] = gemini_parts
         self.messages.append(message)
         self.updated_at = datetime.now().isoformat()
         if not self.title and role == "user":
@@ -135,13 +138,22 @@ class ChatSession:
                     
                     # Add text content last (context -> question ordering)
                     content_parts.append({"type": "text", "text": content})
-                    messages.append({"role": "user", "content": content_parts})
+                    api_msg = {"role": "user", "content": content_parts}
+                    if "gemini_parts" in msg:
+                        api_msg["gemini_parts"] = msg["gemini_parts"]
+                    messages.append(api_msg)
                 else:
                     # Simple string format for user messages without media
-                    messages.append({"role": "user", "content": content})
+                    api_msg = {"role": "user", "content": content}
+                    if "gemini_parts" in msg:
+                        api_msg["gemini_parts"] = msg["gemini_parts"]
+                    messages.append(api_msg)
             else:
                 # Preserve original role (system, assistant, etc.)
-                messages.append({"role": role, "content": content})
+                api_msg = {"role": role, "content": content}
+                if "gemini_parts" in msg:
+                    api_msg["gemini_parts"] = msg["gemini_parts"]
+                messages.append(api_msg)
         
         return messages
     

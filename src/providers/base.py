@@ -25,6 +25,7 @@ class CallbackType(Enum):
     DONE = "done"
     ERROR = "error"
     ABORTED = "aborted"
+    RESPONSE_PARTS = "response_parts"
 
 
 class AbortedError(Exception):
@@ -61,6 +62,10 @@ class ProviderResult:
     retry_count: int = 0
     status_code: Optional[int] = None
     _retryable: bool = False
+    # Raw Gemini response parts with thoughtSignature fields preserved.
+    # Used to maintain reasoning context across multi-turn conversations.
+    # Only populated by GeminiNativeProvider; None for other providers.
+    gemini_parts: Optional[List[Dict]] = None
     
     def has_content(self) -> bool:
         """Check if result has any meaningful content"""
