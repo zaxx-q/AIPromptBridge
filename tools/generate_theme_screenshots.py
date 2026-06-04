@@ -23,8 +23,8 @@ src.web_server.CONFIG = {
     "ui_force_standard_tk": False,
 }
 
-from src.gui.popups import AttachedPromptPopup
-from src.gui.themes import ThemeRegistry, sync_ctk_appearance
+from src.gui.popups import AttachedPromptPopup  # noqa: E402
+from src.gui.themes import ThemeRegistry, sync_ctk_appearance  # noqa: E402
 
 # Dummy options for the popup
 MOCK_OPTIONS = {

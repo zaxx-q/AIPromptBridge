@@ -100,7 +100,7 @@ class SettingsWindow(
         # Determine if we can use CTk
         self.use_ctk = _can_use_ctk()
 
-    def show(self, initial_tab: str = None):
+    def show(self, initial_tab: str | None = None):
         """
         Create and show the settings window.
 

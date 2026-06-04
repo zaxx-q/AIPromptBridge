@@ -71,7 +71,9 @@ _cached_wt_pid = None
 
 
 class PROCESSENTRY32(ctypes.Structure):
-    _fields_ = [
+    from typing import ClassVar, List, Tuple
+
+    _fields_: ClassVar[List[Tuple[str, type]]] = [
         ("dwSize", wintypes.DWORD),
         ("cntUsage", wintypes.DWORD),
         ("th32ProcessID", wintypes.DWORD),
@@ -465,7 +467,7 @@ class TrayApp:
                     # Remove --launched-mode arg as launcher adds it
                     new_args = [arg for arg in sys.argv[1:] if not arg.startswith("--launched-mode")]
 
-                    cmd = [str(launcher_path)] + new_args
+                    cmd = [str(launcher_path), *new_args]
 
                     # Detached process group
                     subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
@@ -484,14 +486,14 @@ class TrayApp:
                     flags |= subprocess.CREATE_NEW_CONSOLE
 
                 if script.endswith(".py"):
-                    subprocess.Popen([sys.executable, script] + args, creationflags=flags, start_new_session=True)
+                    subprocess.Popen([sys.executable, script, *args], creationflags=flags, start_new_session=True)
                 else:
-                    subprocess.Popen([script] + args, creationflags=flags, start_new_session=True)
+                    subprocess.Popen([script, *args], creationflags=flags, start_new_session=True)
             except Exception as e:
                 print(f"[Error] Failed to start new process: {e}")
                 return
         else:
-            os.execv(sys.executable, [sys.executable, script] + args)
+            os.execv(sys.executable, [sys.executable, script, *args])
 
         os._exit(0)
 

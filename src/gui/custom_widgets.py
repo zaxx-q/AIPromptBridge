@@ -67,7 +67,7 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
         if not HAVE_CTK:
             self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
-    def add_item(self, item_id: str, text: str, icon: str = None, font_weight: str = "normal"):
+    def add_item(self, item_id: str, text: str, icon: str | None = None, font_weight: str = "normal"):
         """Add an item to the list."""
         if item_id in self.buttons:
             return
@@ -196,7 +196,7 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
     def size(self) -> int:
         return len(self.items)
 
-    def update_item(self, item_id: str, text: str, icon: str = None):
+    def update_item(self, item_id: str, text: str, icon: str | None = None):
         """Update an existing item's text and icon."""
         if item_id not in self.buttons:
             return
@@ -248,7 +248,7 @@ def upgrade_tabview_with_icons(tabview, icon_size: int = 24, font_size: int = 14
         print(f"Error upgrading tabs: {e}")
 
 
-def create_section_header(parent, text: str, colors: ThemeColors, emoji: str = None, top_padding: int = 0):
+def create_section_header(parent, text: str, colors: ThemeColors, emoji: str | None = None, top_padding: int = 0):
     """
     Create a section header with optional emoji support.
     Handles both explicit emoji arg or parsing emoji from start of text.
@@ -298,7 +298,7 @@ def create_emoji_button(
     variant: str = "primary",
     width: int = 140,
     height: int = 38,
-    command: Callable = None,
+    command: Callable | None = None,
     font_size: int = 13,
     **kwargs,
 ):
@@ -381,9 +381,9 @@ class ScrollableComboBox:
         self,
         master,
         colors: ThemeColors,
-        values: List[str] = None,
-        variable: tk.StringVar = None,
-        command: Callable[[str], None] = None,
+        values: List[str] | None = None,
+        variable: tk.StringVar | None = None,
+        command: Callable[[str], None] | None = None,
         width: int = 220,
         height: int = 32,
         font_size: int = 13,
@@ -613,7 +613,7 @@ class ScrollableComboBox:
         if self._debounce_id:
             try:
                 self.frame.after_cancel(self._debounce_id)
-            except:
+            except Exception:
                 pass
 
         # Schedule new filter with debounce
@@ -854,7 +854,7 @@ class ScrollableComboBox:
         try:
             root = self.master.winfo_toplevel()
             root.bind("<Button-1>", self._on_click_outside, add="+")
-        except:
+        except Exception:
             pass
 
         # Start periodic focus check

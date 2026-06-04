@@ -781,7 +781,7 @@ class TTSWindow:
             target=self._run_director, args=(input_text, director_model_override, voice_info), daemon=True
         ).start()
 
-    def _run_director(self, input_text: str, director_model_override: str, voice_info: dict = None):
+    def _run_director(self, input_text: str, director_model_override: str, voice_info: dict | None = None):
         """Run the AI Director in a background thread."""
         from ...gui.tts_tool import get_instance as get_tts_tool
 
@@ -878,7 +878,11 @@ class TTSWindow:
         threading.Thread(target=self._run_tts_generation, args=(full_prompt, multi_config), daemon=True).start()
 
     def _auto_direct_then_generate(
-        self, input_text: str, director_model_override: str, multi_config: Optional[List[Dict]], voice_info: dict = None
+        self,
+        input_text: str,
+        director_model_override: str,
+        multi_config: Optional[List[Dict]],
+        voice_info: dict | None = None,
     ):
         """Run director first, then generate audio (auto mode)."""
         from ...gui.tts_tool import get_instance as get_tts_tool
@@ -1157,7 +1161,7 @@ class TTSWindow:
             else:
                 self.play_pause_btn.configure(text="▶", bg=self.colors.green, fg=self.colors.accent_fg)
 
-    def _update_status(self, text: str, color: str = None):
+    def _update_status(self, text: str, color: str | None = None):
         """Update status bar. Handles both CTk and Tk label widgets."""
         if self.status_label and not self._destroyed:
             self.status_label.configure(text=text)

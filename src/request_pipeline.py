@@ -271,7 +271,7 @@ class RequestPipeline:
 
         # Execute the actual API call — pass model_override so per-session
         # model selection is respected in the streaming path
-        text, reasoning, usage, error = call_api_chat_stream(
+        text, reasoning, _usage, error = call_api_chat_stream(
             session,
             config,
             ai_params,
@@ -440,7 +440,7 @@ class RequestPipeline:
                 if callbacks.on_error:
                     callbacks.on_error("Request aborted")
 
-        text, reasoning, usage, error = call_api_stream_unified(
+        text, reasoning, _usage, error = call_api_stream_unified(
             provider_type=ctx.provider,
             messages=messages,
             model=ctx.model,

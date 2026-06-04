@@ -67,7 +67,7 @@ def main():
             # If we are testing this script as python launcher_gui.py:
             print(f"Internal executable not found at: {internal_exe}")
             print("Assuming development mode, running main.py...")
-            subprocess.Popen([sys.executable, "main.py", "--launched-mode=gui"] + sys.argv[1:])
+            subprocess.Popen([sys.executable, "main.py", "--launched-mode=gui", *sys.argv[1:]])
             return
 
         # Simple exit on error to avoid ctypes dependency
@@ -75,7 +75,7 @@ def main():
 
     # 4. Prepare Arguments
     # Pass through original arguments, prepend our mode flag
-    cmd_args = [str(internal_exe), "--launched-mode=gui"] + sys.argv[1:]
+    cmd_args = [str(internal_exe), "--launched-mode=gui", *sys.argv[1:]]
 
     # 5. Launch
     try:

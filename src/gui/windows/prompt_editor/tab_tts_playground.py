@@ -405,12 +405,13 @@ class TTSPlaygroundMixin:
                 self.queue.put(_update)
 
             except Exception as e:
+                error_msg = str(e)
 
-                def _err():
+                def _err(err=error_msg):
                     if not self._destroyed:
                         self.tts_pg_is_directing = False
                         self.tts_pg_director_btn.configure(state="normal")
-                        self._set_tts_status(self.tts_pg_director_status, f"❌ {e}", self.colors.accent_red)
+                        self._set_tts_status(self.tts_pg_director_status, f"❌ {err}", self.colors.accent_red)
 
                 self.queue.put(_err)
 
@@ -520,12 +521,13 @@ class TTSPlaygroundMixin:
                 import traceback
 
                 traceback.print_exc()
+                error_msg = str(e)
 
-                def _err():
+                def _err(err=error_msg):
                     if not self._destroyed:
                         self.tts_pg_is_generating = False
                         self.tts_pg_generate_btn.configure(state="normal")
-                        self._set_tts_status(self.tts_pg_gen_status, f"❌ {e}", self.colors.accent_red)
+                        self._set_tts_status(self.tts_pg_gen_status, f"❌ {err}", self.colors.accent_red)
 
                 self.queue.put(_err)
 

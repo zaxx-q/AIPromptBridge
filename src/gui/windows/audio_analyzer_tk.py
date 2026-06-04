@@ -217,7 +217,7 @@ def _create_top_action_bar_tk(window, parent):
     window.model_label_widget.pack(side="left", padx=(0, 5))
 
     if window._use_profile_mode:
-        initial_values = ["(Default)"] + window._get_profile_names()
+        initial_values = ["(Default)", *window._get_profile_names()]
         initial_display = "(Default)"
     else:
         initial_values = ["(loading...)"]

@@ -301,13 +301,13 @@ def terminal_session_manager():
                 tty.setcbreak(sys.stdin.fileno())
                 if select.select([sys.stdin], [], [], 0.1)[0]:
                     return sys.stdin.read(1).lower()
-            except:
+            except Exception:
                 pass
             finally:
                 if old_settings:
                     try:
                         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-                    except:
+                    except Exception:
                         pass
             return None
 
@@ -451,7 +451,7 @@ def terminal_session_manager():
                                 return f"{v:.2f}"
 
                             return f"${fmt(p_val)}/${fmt(c_val)}"
-                        except:
+                        except Exception:
                             return ""
 
                     if HAVE_RICH:
@@ -492,7 +492,7 @@ def terminal_session_manager():
                                         price_str = "Free"
                                     else:
                                         price_str = f"${p * 1000000:.1f}/${c * 1000000:.1f}"
-                                except:
+                                except Exception:
                                     pass
                             print(f"   {i + 1:>3}  {m['id']:<35}{marker} {ctx:>8} {price_str:>14} {thinking}")
 
@@ -534,7 +534,7 @@ def terminal_session_manager():
                             # Switch profile or edit on Connection Manager for persistent changes.
                             web_server.SESSION_OVERRIDES["model"] = new_model
                             print(f" ✅ Model: {new_model} (session)")
-                    except:
+                    except Exception:
                         pass
                 else:
                     print("   No models available")
@@ -688,7 +688,7 @@ def terminal_session_manager():
                                 show_chat_gui(session)
                     else:
                         print(f"✗ Session '{session_id}' not found.\n")
-                except:
+                except Exception:
                     pass
 
             elif key == "d":
@@ -703,7 +703,7 @@ def terminal_session_manager():
                                 print(f"✅ Session {session_id} deleted.\n")
                     else:
                         print(f"✗ Session '{session_id}' not found.\n")
-                except:
+                except Exception:
                     pass
 
             elif key == "g":
@@ -824,7 +824,7 @@ def _show_model_details(model: dict):
             return "[dim]Unknown[/dim]" if rich else "Unknown"
         try:
             return f"{int(n):,}"
-        except:
+        except Exception:
             return str(n)
 
     def fmt_money(val, rich=True):
@@ -839,7 +839,7 @@ def _show_model_details(model: dict):
             # Show price per 1M tokens
             per_million = fval * 1000000
             return f"${per_million:,.2f}" + (" [dim]per 1M[/dim]" if rich else " per 1M")
-        except:
+        except Exception:
             return str(val)
 
     if HAVE_RICH:

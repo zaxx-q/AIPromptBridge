@@ -322,7 +322,7 @@ class TextEditToolApp:
         selected_text: str,
         custom_input: Optional[str],
         response_mode: str = "default",
-        active_modifiers: list = None,
+        active_modifiers: list | None = None,
         compare_text: Optional[str] = None,
         profile_override: Optional[str] = None,
     ):
@@ -923,7 +923,7 @@ class TextEditToolApp:
         selected_text: str,
         custom_input: Optional[str],
         response_mode: str = "default",
-        active_modifiers: list = None,
+        active_modifiers: list | None = None,
         compare_text: Optional[str] = None,
         profile_override: Optional[str] = None,
     ):

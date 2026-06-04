@@ -116,7 +116,7 @@ class FileProcessorCheckpoint:
         self.current_index = len(self.completed_files) + len(self.failed_files)
         self.updated_at = datetime.now().isoformat()
 
-    def append_combined_content(self, file_path: str, content: str, separator: str = None):
+    def append_combined_content(self, file_path: str, content: str, separator: str | None = None):
         """Append content to combined output (for combined mode)"""
         if separator is None:
             separator = f"\n\n---\n## {Path(file_path).name}\n\n"
@@ -260,7 +260,7 @@ class CheckpointManager:
     DEFAULT_CHECKPOINT_FILE = ".file_processor_checkpoint.json"
     FAILED_CHECKPOINT_FILE = ".file_processor_failed.json"
 
-    def __init__(self, checkpoint_file: str = None, checkpoint_dir: Path = None):
+    def __init__(self, checkpoint_file: str | None = None, checkpoint_dir: Path | None = None):
         """
         Initialize CheckpointManager.
 
@@ -492,7 +492,7 @@ class CheckpointManager:
             return checkpoint.get_summary()
         return None
 
-    def can_resume(self, input_path: str = None) -> bool:
+    def can_resume(self, input_path: str | None = None) -> bool:
         """
         Check if checkpoint can be resumed.
 
@@ -686,7 +686,7 @@ class TTSCheckpointManager:
     DEFAULT_CHECKPOINT_FILE = ".tts_processor_checkpoint.json"
     FAILED_CHECKPOINT_FILE = ".tts_processor_failed.json"
 
-    def __init__(self, checkpoint_dir: Path = None):
+    def __init__(self, checkpoint_dir: Path | None = None):
         self.checkpoint_dir = Path(checkpoint_dir) if checkpoint_dir else Path(".")
 
     @property

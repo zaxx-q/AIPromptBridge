@@ -102,7 +102,7 @@ def is_insufficient_credits_error(error_msg, response_json=None):
             msg = str(response_json.get("error", {}).get("message", "")).lower()
             if any(p in msg for p in patterns):
                 return True
-        except:
+        except Exception:
             pass
     return False
 

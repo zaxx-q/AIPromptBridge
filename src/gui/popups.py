@@ -131,7 +131,7 @@ class SegmentedToggle:
         self,
         parent,
         options: List[Tuple[str, str]],  # [(display_text, value), ...]
-        default_value: str = None,
+        default_value: str | None = None,
         on_change: Optional[Callable[[str], None]] = None,
         tooltips: Optional[Dict[str, str]] = None,
     ):
@@ -273,7 +273,7 @@ class Tooltip:
 
     DELAY_MS = 500
 
-    def __init__(self, widget, text: str, delay_ms: int = None):
+    def __init__(self, widget, text: str, delay_ms: int | None = None):
         self.widget = widget
         self.text = text
         self.delay_ms = delay_ms or self.DELAY_MS
@@ -858,13 +858,18 @@ class GroupedButtonList:
                 )
                 text_lbl.pack(side=tk.LEFT, padx=(4, 8), fill=tk.X, expand=True)
 
-                def on_enter(e, widgets=[row, icon_lbl, text_lbl]):
-                    for w in widgets:
-                        w.configure(bg=self.colors.surface2)
+                def make_hover_handlers(r, i, t):
+                    def enter(e):
+                        for w in (r, i, t):
+                            w.configure(bg=self.colors.surface2)
 
-                def on_leave(e, widgets=[row, icon_lbl, text_lbl]):
-                    for w in widgets:
-                        w.configure(bg=self.colors.surface1)
+                    def leave(e):
+                        for w in (r, i, t):
+                            w.configure(bg=self.colors.surface1)
+
+                    return enter, leave
+
+                on_enter, on_leave = make_hover_handlers(row, icon_lbl, text_lbl)
 
                 for widget in (row, icon_lbl, text_lbl):
                     widget.bind("<Button-1>", lambda e, k=key: self.on_click(k))
@@ -931,7 +936,7 @@ class CarouselButtonList:
         parent,
         items: List[Tuple[str, str, Optional[str], Optional[str]]],
         on_click: Callable[[str], None],
-        items_per_page: int = None,
+        items_per_page: int | None = None,
     ):
         self.parent = parent
         self.items = items
@@ -1109,13 +1114,18 @@ class CarouselButtonList:
                 )
                 text_lbl.pack(side=tk.LEFT, padx=(4, 8))
 
-                def on_enter(e, widgets=[row, icon_lbl, text_lbl]):
-                    for w in widgets:
-                        w.configure(bg=self.colors.surface2)
+                def make_hover_handlers(r, i, t):
+                    def enter(e):
+                        for w in (r, i, t):
+                            w.configure(bg=self.colors.surface2)
 
-                def on_leave(e, widgets=[row, icon_lbl, text_lbl]):
-                    for w in widgets:
-                        w.configure(bg=self.colors.surface1)
+                    def leave(e):
+                        for w in (r, i, t):
+                            w.configure(bg=self.colors.surface1)
+
+                    return enter, leave
+
+                on_enter, on_leave = make_hover_handlers(row, icon_lbl, text_lbl)
 
                 for widget in (row, icon_lbl, text_lbl):
                     widget.bind("<Button-1>", lambda e, k=key: self.on_click(k))
@@ -1179,7 +1189,7 @@ def create_profile_dropdown_ctk(parent, colors):
     profile_var = tk.StringVar(value="(Default)")
     dropdown = ctk.CTkOptionMenu(
         frame,
-        values=["(Default)"] + profile_names,
+        values=["(Default)", *profile_names],
         variable=profile_var,
         width=140,
         height=28,

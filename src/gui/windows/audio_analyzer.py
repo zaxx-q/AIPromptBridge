@@ -356,7 +356,7 @@ class AudioAnalyzerWindow:
         self.model_label_widget.pack(side="left", padx=(0, 5))
 
         if self._use_profile_mode:
-            initial_values = ["(Default)"] + self._get_profile_names()
+            initial_values = ["(Default)", *self._get_profile_names()]
             initial_display = "(Default)"
         else:
             initial_values = ["(loading...)"]
@@ -1959,7 +1959,7 @@ class AudioAnalyzerWindow:
     # Send Audio for Analysis
     # =========================================================================
 
-    def _send_audio(self, action_key: str = None):
+    def _send_audio(self, action_key: str | None = None):
         """Send audio to AI for analysis."""
         # Use selected action if not provided
         if action_key is None:
@@ -2012,9 +2012,10 @@ class AudioAnalyzerWindow:
             self._process_or_callback(action_key, audio_data, mime_type, custom_text)
 
         except Exception as e:
-            logging.error(f"[AudioAnalyzer] Compression error: {e}")
+            err_msg = str(e)
+            logging.error(f"[AudioAnalyzer] Compression error: {err_msg}")
             GUICoordinator.get_instance().run_on_gui_thread(
-                lambda: self._update_status(f"Compression error: {e}", self.colors.red)
+                lambda: self._update_status(f"Compression error: {err_msg}", self.colors.red)
             )
             self.is_processing = False
             GUICoordinator.get_instance().run_on_gui_thread(lambda: self.send_btn.configure(state="normal"))
@@ -2077,11 +2078,12 @@ class AudioAnalyzerWindow:
                 )
 
             except Exception as e:
-                logging.error(f"[AudioAnalyzer] Callback error: {e}")
+                err_msg = str(e)
+                logging.error(f"[AudioAnalyzer] Callback error: {err_msg}")
                 self.is_processing = False
                 GUICoordinator.get_instance().run_on_gui_thread(lambda: self.send_btn.configure(state="normal"))
                 GUICoordinator.get_instance().run_on_gui_thread(
-                    lambda: self._update_status(f"Error: {e}", self.colors.red)
+                    lambda: self._update_status(f"Error: {err_msg}", self.colors.red)
                 )
         else:
             # Process internally (Standalone mode OR show_chat_window=False)
@@ -2192,7 +2194,7 @@ class AudioAnalyzerWindow:
     # Status & Cleanup
     # =========================================================================
 
-    def _update_status(self, text: str, color: str = None):
+    def _update_status(self, text: str, color: str | None = None):
         """Update status bar."""
         if self.status_label and not self._destroyed:
             self.status_label.configure(text=text)

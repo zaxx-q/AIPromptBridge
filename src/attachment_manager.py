@@ -54,8 +54,10 @@ class AttachmentManager:
     Thread-safe for concurrent access from multiple windows/threads.
     """
 
+    from typing import ClassVar, Dict, Set, Tuple
+
     # Supported image formats with their MIME types
-    FORMAT_MIME_MAP = {
+    FORMAT_MIME_MAP: ClassVar[Dict[str, str]] = {
         # Images
         "png": "image/png",
         "jpg": "image/jpeg",
@@ -77,7 +79,7 @@ class AttachmentManager:
     }
 
     # Reverse mapping: MIME type to extension
-    MIME_FORMAT_MAP = {
+    MIME_FORMAT_MAP: ClassVar[Dict[str, str]] = {
         # Images
         "image/png": "png",
         "image/jpeg": "jpg",
@@ -104,7 +106,7 @@ class AttachmentManager:
     DEFAULT_QUALITY = 85
 
     # Formats that should be treated as images for conversion/thumbnailing
-    IMAGE_FORMATS = {"png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif"}
+    IMAGE_FORMATS: ClassVar[Set[str]] = {"png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif"}
 
     @classmethod
     def _get_config(cls) -> Tuple[str, int]:

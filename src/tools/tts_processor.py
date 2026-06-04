@@ -47,7 +47,7 @@ def split_text_sentences(text: str) -> List[str]:
 class TTSProcessor(BaseTool):
     """Batch TTS Processor — convert text segments to WAV audio via Gemini TTS."""
 
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Dict[str, Any] | None = None):
         super().__init__("tts_processor", config)
         self.checkpoint_manager = TTSCheckpointManager()
         self._current_checkpoint: Optional[TTSCheckpoint] = None

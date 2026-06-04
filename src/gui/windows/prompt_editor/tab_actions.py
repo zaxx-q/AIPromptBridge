@@ -635,7 +635,7 @@ class ActionsTabMixin:
         from ....connection_profiles import ProfileStore
 
         profile_names = ProfileStore.get_instance().get_profile_names()
-        values = ["(None)"] + profile_names
+        values = ["(None)", *profile_names]
 
         if "profile_combo" in self.editor_widgets:
             combo = self.editor_widgets["profile_combo"]

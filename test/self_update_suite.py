@@ -933,7 +933,7 @@ def test_tray_integration():
     terminal_path = PROJECT_ROOT / "src" / "terminal.py"
     terminal_source = terminal_path.read_text()
 
-    if "key == 'u'" in terminal_source:
+    if "key == 'u'" in terminal_source or 'key == "u"' in terminal_source:
         ok("Terminal has 'U' key handler for updates")
     else:
         fail("Terminal 'U' key handler", "not found")

@@ -108,7 +108,7 @@ class FormFieldsMixin:
         self.widgets: Dict[str, Any]
     """
 
-    def _add_entry_field(self, parent, key: str, label: str, value: str, size: str = "md", hint: str = None):
+    def _add_entry_field(self, parent, key: str, label: str, value: str, size: str = "md", hint: str | None = None):
         """
         Add a text entry field with uniform layout.
 
@@ -171,7 +171,9 @@ class FormFieldsMixin:
         if hint:
             self._add_hint(parent, hint)
 
-    def _add_toggle_field(self, parent, key: str, label: str, value: bool, hint: str = None, command: Callable = None):
+    def _add_toggle_field(
+        self, parent, key: str, label: str, value: bool, hint: str | None = None, command: Callable | None = None
+    ):
         """
         Add a toggle switch field with uniform layout.
 
@@ -217,7 +219,7 @@ class FormFieldsMixin:
                 self._add_hint(parent, hint)
 
     def _add_spinbox_field(
-        self, parent, key: str, label: str, value: int, min_val: int, max_val: int, hint: str = None
+        self, parent, key: str, label: str, value: int, min_val: int, max_val: int, hint: str | None = None
     ):
         """
         Add a spinbox/number entry field with uniform layout.
@@ -288,8 +290,8 @@ class FormFieldsMixin:
         value: str,
         options: List[str],
         size: str = "sm",
-        hint: str = None,
-        command: Callable = None,
+        hint: str | None = None,
+        command: Callable | None = None,
     ):
         """
         Add a dropdown/combobox field with uniform layout.
@@ -360,7 +362,7 @@ class FormFieldsMixin:
                 self._add_hint(parent, hint)
 
     def _add_scrollable_dropdown_field(
-        self, parent, key: str, label: str, value: str, options: List[str], size: str = "lg", hint: str = None
+        self, parent, key: str, label: str, value: str, options: List[str], size: str = "lg", hint: str | None = None
     ):
         """
         Add a scrollable dropdown field (for long lists like voices/models).

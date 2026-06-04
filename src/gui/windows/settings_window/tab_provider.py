@@ -193,7 +193,7 @@ class ProviderTabMixin:
                 side="left", padx=(12, 0)
             )
 
-    def _on_profile_selected(self, name: str = None):
+    def _on_profile_selected(self, name: str | None = None):
         """Handle profile selection from dropdown."""
         if not name:
             name = self._profile_var.get()

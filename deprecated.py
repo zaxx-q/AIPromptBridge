@@ -329,9 +329,8 @@ def load_config(filepath=CONFIG_FILE):
                         multiline_key = None
                         multiline_value = []
 
-            elif current_section in keys:
-                if stripped and not stripped.startswith("#"):
-                    keys[current_section].append(stripped)
+            elif current_section in keys and stripped and not stripped.startswith("#"):
+                keys[current_section].append(stripped)
 
         if multiline_key and current_section == "endpoints":
             endpoints[multiline_key] = " ".join(multiline_value)
@@ -452,7 +451,7 @@ def is_insufficient_credits_error(error_msg, response_json=None):
             msg = str(response_json.get("error", {}).get("message", "")).lower()
             if any(p in msg for p in patterns):
                 return True
-        except:
+        except Exception:
             pass
     return False
 
@@ -624,10 +623,11 @@ def call_api_with_retry(provider, messages, model_override=None):
                 continue
 
             resp_json = None
-            try:
+
+            import contextlib
+
+            with contextlib.suppress(Exception):
                 resp_json = response.json()
-            except:
-                pass
 
             if is_invalid_key_error(response.text, response.status_code):
                 print(f"    [Error] Invalid API key #{key_num}")
@@ -877,7 +877,7 @@ def copy_to_clipboard(text):
 
                 process = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE)
                 process.communicate(text.encode("utf-8"))
-            except:
+            except Exception:
                 process = subprocess.Popen(["xsel", "--clipboard", "--input"], stdin=subprocess.PIPE)
                 process.communicate(text.encode("utf-8"))
         return True
@@ -950,7 +950,7 @@ def init_dearpygui():
                             FONTS["header1"] = dpg.add_font(font_path, 26)
                             FONTS["header2"] = dpg.add_font(font_path, 20)
                             break
-                        except:
+                        except Exception:
                             continue
 
             if DEFAULT_FONT:
@@ -1025,7 +1025,7 @@ def gui_main_loop():
                     create_session_browser_window()
 
                 GUI_QUEUE.task_done()
-        except:
+        except Exception:
             pass
 
         dpg.render_dearpygui_frame()
@@ -1238,7 +1238,7 @@ def create_chat_window(session, initial_response=None):
             )
         else:
             # Rich mode: Colored text blocks
-            for i, msg in enumerate(session.messages):
+            for _i, msg in enumerate(session.messages):
                 role = msg["role"]
                 content = msg["content"]
                 if not state["markdown"]:
@@ -1751,14 +1751,14 @@ def terminal_session_manager():
                 tty.setcbreak(sys.stdin.fileno())
                 if select.select([sys.stdin], [], [], 0.1)[0]:
                     return sys.stdin.read(1).lower()
-            except:
+            except Exception:
                 pass
             finally:
                 if old_settings:
-                    try:
+                    import contextlib
+
+                    with contextlib.suppress(Exception):
                         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-                    except:
-                        pass
             return None
 
     while True:
@@ -1773,7 +1773,7 @@ def terminal_session_manager():
                 if not sessions:
                     print("  (No sessions)")
                 else:
-                    for i, s in enumerate(sessions[:10]):
+                    for _i, s in enumerate(sessions[:10]):
                         print(f"  [{s['id']}] {s['title'][:40]} ({s['messages']} msgs, {s['provider']})")
                     if len(sessions) > 10:
                         print(f"  ... and {len(sessions) - 10} more")
@@ -1822,7 +1822,7 @@ def terminal_session_manager():
                                 show_chat_gui(session)
                     else:
                         print(f"Session '{session_id}' not found.\n")
-                except:
+                except Exception:
                     pass
 
             elif key == "d":
@@ -1838,7 +1838,7 @@ def terminal_session_manager():
                             print(f"Session {session_id} deleted.\n")
                     else:
                         print(f"Session '{session_id}' not found.\n")
-                except:
+                except Exception:
                     pass
 
             elif key == "c":
@@ -1849,7 +1849,7 @@ def terminal_session_manager():
                             CHAT_SESSIONS.clear()
                         save_sessions()
                         print("All sessions cleared.\n")
-                except:
+                except Exception:
                     pass
 
             elif key == "h":

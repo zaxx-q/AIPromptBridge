@@ -503,7 +503,9 @@ class ThemeRegistry:
         themes = ThemeRegistry.list_themes()
     """
 
-    _themes: Dict[str, tuple] = {
+    from typing import ClassVar
+
+    _themes: ClassVar[Dict[str, tuple]] = {
         "catppuccin": (CATPPUCCIN_DARK, CATPPUCCIN_LIGHT),
         "dracula": (DRACULA_DARK, DRACULA_LIGHT),
         "nord": (NORD_DARK, NORD_LIGHT),
@@ -691,7 +693,7 @@ def list_themes() -> list:
 # =============================================================================
 
 
-def get_ctk_font(size: int = 12, weight: str = "normal", family: str = None):
+def get_ctk_font(size: int = 12, weight: str = "normal", family: str | None = None):
     """
     Get a font specification with appropriate defaults for the platform.
 
@@ -957,7 +959,7 @@ def sync_ctk_appearance(config: Optional[Dict] = None):
         ctk.set_appearance_mode("dark")
 
 
-def apply_hover_effect(widget, colors: ThemeColors, normal_color: str = None, hover_color: str = None):
+def apply_hover_effect(widget, colors: ThemeColors, normal_color: str | None = None, hover_color: str | None = None):
     """
     Apply hover effect to a CTk widget.
 
@@ -978,13 +980,13 @@ def apply_hover_effect(widget, colors: ThemeColors, normal_color: str = None, ho
     def on_enter(e):
         try:
             widget.configure(fg_color=hover_color)
-        except:
+        except Exception:
             pass
 
     def on_leave(e):
         try:
             widget.configure(fg_color=normal_color)
-        except:
+        except Exception:
             pass
 
     widget.bind("<Enter>", on_enter, add="+")

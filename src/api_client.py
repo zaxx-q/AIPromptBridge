@@ -303,7 +303,7 @@ def call_api_chat(
 
     # Prepend system instruction if provided
     if system_instruction:
-        messages = [{"role": "system", "content": system_instruction}] + messages
+        messages = [{"role": "system", "content": system_instruction}, *messages]
 
     provider = provider_override or config.get("default_provider", "google")
     model = model_override or config.get(f"{provider}_model")
@@ -331,7 +331,7 @@ def call_api_chat_stream(
 
     # Prepend system instruction if provided
     if system_instruction:
-        messages = [{"role": "system", "content": system_instruction}] + messages
+        messages = [{"role": "system", "content": system_instruction}, *messages]
 
     # Use provided overrides or get from current config
     provider = provider_override or config.get("default_provider", "google")

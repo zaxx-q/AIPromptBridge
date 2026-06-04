@@ -54,7 +54,7 @@ class BaseTool(ABC):
     - Checkpoint persistence
     """
 
-    def __init__(self, name: str, config: Dict[str, Any] = None):
+    def __init__(self, name: str, config: Dict[str, Any] | None = None):
         """
         Initialize a tool.
 

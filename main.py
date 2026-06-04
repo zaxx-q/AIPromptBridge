@@ -550,10 +550,10 @@ def setup_workspace(launched_mode):
         except Exception:
             # Fallback if no GUI
             print(f"❌ {msg}")
-            try:
+            import contextlib
+
+            with contextlib.suppress(EOFError):
                 input("Press Enter to exit...")
-            except EOFError:
-                pass
         return False
 
     # Compiled with launcher: CWD = root directory (parent of bin/)
@@ -737,11 +737,11 @@ def main():
             if not args.show_console:
                 sys.exit(0)
 
+            import contextlib
+
             print("Press Enter to exit...")
-            try:
+            with contextlib.suppress(EOFError):
                 input()
-            except EOFError:
-                pass
             sys.exit(1)
 
     # Configure global logging (DEBUG if --show-console, otherwise INFO)
@@ -891,10 +891,10 @@ def main():
             print(f"❌ ERROR: Could not find an available port: {e}")
             print()
             print("Press Enter to exit...")
-        try:
+        import contextlib
+
+        with contextlib.suppress(EOFError):
             input()
-        except EOFError:
-            pass
         sys.exit(1)
 
     if actual_port != configured_port:
@@ -952,13 +952,13 @@ def main():
         if HAVE_RICH:
             console.print("[bold blue]🔲 Starting in tray mode...[/bold blue]")
             console.print("   Right-click tray icon for menu")
-            if not args.launched_mode == "gui":
+            if args.launched_mode != "gui":
                 console.print("   Double-click tray icon to show console")
             console.print()
         else:
             print("🔲 Starting in tray mode...")
             print("   Right-click tray icon for menu")
-            if not args.launched_mode == "gui":
+            if args.launched_mode != "gui":
                 print("   Double-click tray icon to show console")
             print()
 

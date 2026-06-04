@@ -170,7 +170,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             pools = []
         for field in PROFILE_FIELDS:
             if field[0] == "api_key_pool":
-                self.profile_fields.append(("api_key_pool", "API Key Pool", "combobox", [""] + pools))
+                self.profile_fields.append(("api_key_pool", "API Key Pool", "combobox", ["", *pools]))
             else:
                 self.profile_fields.append(field)
 
@@ -600,7 +600,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
     # ─── Provider-aware visibility ────────────────────────────────────────
 
-    def _on_provider_change(self, provider: str = None):
+    def _on_provider_change(self, provider: str | None = None):
         if not provider:
             provider_info = self.field_widgets.get("provider")
             provider = provider_info["var"].get() if provider_info else ""
@@ -694,7 +694,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         names.append(name)
                         seen.add(name)
 
-            self._api_key_name_dropdown.configure(values=[""] + names)
+            self._api_key_name_dropdown.configure(values=["", *names])
         except Exception:
             pass
 

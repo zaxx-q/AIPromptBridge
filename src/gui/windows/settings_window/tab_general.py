@@ -310,7 +310,7 @@ class GeneralTabMixin:
                 text_color = self.colors.fg if unlocked else self.colors.surface2
                 self.widgets["port"].configure(text_color=text_color)
 
-    def _add_startup_toggle_field(self, parent, key: str, label: str, hint: str = None):
+    def _add_startup_toggle_field(self, parent, key: str, label: str, hint: str | None = None):
         """Add a startup toggle field that reads/writes to registry immediately."""
         row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
         row.pack(fill="x", pady=4)

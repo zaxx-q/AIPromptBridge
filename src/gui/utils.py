@@ -114,7 +114,7 @@ def copy_to_clipboard(text: str, root=None) -> bool:
 
                 process = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE)
                 process.communicate(text.encode("utf-8"))
-            except:
+            except Exception:
                 process = subprocess.Popen(["xsel", "--clipboard", "--input"], stdin=subprocess.PIPE)
                 process.communicate(text.encode("utf-8"))
         return True
@@ -216,7 +216,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         else:
             mono_font = "DejaVu Sans Mono"
             base_font = "DejaVu Sans"
-    except:
+    except Exception:
         mono_font = "TkFixedFont"
         base_font = "TkDefaultFont"
 
@@ -887,7 +887,7 @@ def render_markdown(
 
                     for char in line_str:
                         if char in symbol_chars:
-                            char_tags = tuple(list(tags) + ["latex_symbols"])
+                            char_tags = tuple([*list(tags), "latex_symbols"])
                             _insert_with_emojis(text_widget, char, char_tags, False)
                         else:
                             _insert_with_emojis(text_widget, char, tags, False)
@@ -1061,7 +1061,7 @@ def _merge_latex_tags(
     """
     if not base_tags:
         return (latex_tag,)
-    return (latex_tag,) + base_tags[1:]
+    return (latex_tag, *base_tags[1:])
 
 
 def _insert_with_latex_segments(

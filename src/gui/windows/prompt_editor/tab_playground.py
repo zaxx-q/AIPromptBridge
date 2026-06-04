@@ -697,7 +697,7 @@ class PlaygroundTabMixin:
             default_provider = _ws.get_active_setting("provider", "google")
             self.playground_provider_var.set(default_provider)
             self.playground_model_var.set(_ws.get_active_setting("model", ""))
-        except:
+        except Exception:
             pass
 
         # Test button
@@ -1578,7 +1578,7 @@ class PlaygroundTabMixin:
             if self.playground_recorder:
                 try:
                     self.playground_recorder.cleanup()
-                except:
+                except Exception:
                     pass
             self.playground_recorder = None
 
@@ -1657,7 +1657,7 @@ class PlaygroundTabMixin:
                     self.playground_test_status.configure(
                         text="⏳ Sending request...", image=None, compound="left", text_color=self.colors.fg
                     )
-                except:
+                except Exception:
                     pass
         else:
             self.playground_test_status.configure(text="⏳ Sending request...", fg=self.colors.fg)
@@ -1853,8 +1853,9 @@ class PlaygroundTabMixin:
                 self.queue.put(self._update_status_success)
 
             except Exception as e:
-                dialog.append_error(str(e))
-                self.queue.put(lambda: self._update_status_error(str(e)))
+                error_msg = str(e)
+                dialog.append_error(error_msg)
+                self.queue.put(lambda err=error_msg: self._update_status_error(err))
 
         # Start thread
         threading.Thread(target=_target, daemon=True).start()

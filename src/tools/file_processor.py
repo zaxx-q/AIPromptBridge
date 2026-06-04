@@ -90,7 +90,7 @@ class FileProcessor(BaseTool):
     - Large file handling (Files API or FFmpeg chunking)
     """
 
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Dict[str, Any] | None = None):
         """
         Initialize File Processor.
 
@@ -2089,7 +2089,7 @@ class FileProcessor(BaseTool):
             keyboard_thread = self._start_keyboard_listener()
 
         # Resolve settings to print correct provider and model
-        provider, model, resolved = self._resolve_execution_settings(cp)
+        provider, model, _resolved = self._resolve_execution_settings(cp)
 
         if interactive:
             self._print_header("📁 FILE PROCESSOR - Processing")

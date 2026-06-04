@@ -166,7 +166,7 @@ class EmojiRenderer:
     DEFAULT_SIZE = 18  # Default emoji size in pixels
     CTK_DEFAULT_SIZE = 18  # Default size for CTkImage buttons
 
-    def __init__(self, size: int = None):
+    def __init__(self, size: int | None = None):
         """
         Initialize the emoji renderer.
 

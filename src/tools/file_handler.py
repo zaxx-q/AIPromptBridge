@@ -85,8 +85,10 @@ class FileHandler:
     - unknown: Unrecognized file types
     """
 
+    from typing import ClassVar, Dict, List
+
     # Default file type mappings
-    DEFAULT_FILE_TYPES = {
+    DEFAULT_FILE_TYPES: ClassVar[Dict[str, List[str]]] = {
         "image": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".tif"],
         "audio": [".mp3", ".wav", ".aiff", ".aac", ".ogg", ".flac", ".m4a", ".wma"],
         "text": [".txt", ".md", ".rst", ".log", ".csv"],
@@ -145,7 +147,7 @@ class FileHandler:
         ],
     }
 
-    def __init__(self, file_types: Dict[str, List[str]] = None):
+    def __init__(self, file_types: Dict[str, List[str]] | None = None):
         """
         Initialize FileHandler.
 
@@ -174,7 +176,7 @@ class FileHandler:
         return self._ext_to_type.get(ext, "unknown")
 
     # Audio MIME type mapping (Gemini supported formats)
-    AUDIO_MIME_TYPES = {
+    AUDIO_MIME_TYPES: ClassVar[Dict[str, str]] = {
         ".mp3": "audio/mp3",
         ".wav": "audio/wav",
         ".aiff": "audio/aiff",

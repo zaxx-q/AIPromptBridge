@@ -60,7 +60,9 @@ class _MOUSEINPUT(ctypes.Structure):
 
 
 class _INPUT_UNION(ctypes.Union):
-    _fields_ = [("mi", _MOUSEINPUT), ("ki", _KEYBDINPUT)]
+    from typing import ClassVar, List, Tuple
+
+    _fields_: ClassVar[List[Tuple[str, type]]] = [("mi", _MOUSEINPUT), ("ki", _KEYBDINPUT)]
 
 
 class _INPUT(ctypes.Structure):

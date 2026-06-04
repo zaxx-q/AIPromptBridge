@@ -126,8 +126,8 @@ def split_pdf(filepath: Path, pages: List[int], output_dir: Path) -> List[Path]:
         # Try to decrypt empty password, common for some PDFs
         try:
             reader.decrypt("")
-        except Exception:
-            raise ValueError(f"PDF '{filepath.name}' is encrypted and could not be decrypted.")
+        except Exception as err:
+            raise ValueError(f"PDF '{filepath.name}' is encrypted and could not be decrypted.") from err
 
     split_paths: List[Path] = []
     base_name = filepath.stem

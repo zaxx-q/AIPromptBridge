@@ -292,7 +292,7 @@ class ChatWindowBase(ABC):
             # Model/Profile dropdown (right-aligned)
             dropdown_label = "Profile:" if self._use_profile_mode else "Model:"
             if self._use_profile_mode:
-                initial_values = ["(Use Global)"] + self._get_profile_names()
+                initial_values = ["(Use Global)", *self._get_profile_names()]
                 initial_display = self.session.profile_override or "(Use Global)"
             else:
                 initial_values = ["(loading...)"]
@@ -389,7 +389,7 @@ class ChatWindowBase(ABC):
             # Model/Profile dropdown (right-aligned)
             dropdown_label = "Profile:" if self._use_profile_mode else "Model:"
             if self._use_profile_mode:
-                initial_values = ["(Use Global)"] + self._get_profile_names()
+                initial_values = ["(Use Global)", *self._get_profile_names()]
                 initial_display = self.session.profile_override or "(Use Global)"
             else:
                 initial_values = ["(loading...)"]
@@ -995,7 +995,7 @@ class ChatWindowBase(ABC):
                 line_num = int(gap_pos.split(".")[0])
                 if line_num > 1:
                     self.chat_text.delete(f"{line_num - 1}.0", tk.END)
-        except:
+        except Exception:
             pass
 
         # Add gap before streaming message
@@ -1097,7 +1097,7 @@ class ChatWindowBase(ABC):
     # Status & Models
     # =========================================================================
 
-    def _update_status(self, text: str, color: str = None):
+    def _update_status(self, text: str, color: str | None = None):
         """Update status label."""
         if not self.status_label:
             return
@@ -1137,7 +1137,7 @@ class ChatWindowBase(ABC):
                     try:
                         # Prepend dynamic global sentinel to dropdown values
                         sentinel = self._get_global_sentinel()
-                        dropdown_values = [sentinel] + model_ids
+                        dropdown_values = [sentinel, *model_ids]
 
                         if HAVE_CTK:
                             self.model_dropdown.configure(values=dropdown_values)
@@ -1171,7 +1171,7 @@ class ChatWindowBase(ABC):
                             return
                         try:
                             sentinel = self._get_global_sentinel()
-                            dropdown_values = [sentinel] + fallback_ids
+                            dropdown_values = [sentinel, *fallback_ids]
 
                             if HAVE_CTK:
                                 self.model_dropdown.configure(values=dropdown_values)
@@ -1207,7 +1207,7 @@ class ChatWindowBase(ABC):
                             return
                         try:
                             sentinel = self._get_global_sentinel()
-                            dropdown_values = [sentinel] + fallback_ids
+                            dropdown_values = [sentinel, *fallback_ids]
 
                             if HAVE_CTK:
                                 self.model_dropdown.configure(values=dropdown_values)
@@ -1255,7 +1255,7 @@ class ChatWindowBase(ABC):
                 # Rebuild dropdown values with updated sentinel
                 if self.available_models:
                     model_ids = [m["id"] for m in self.available_models]
-                    dropdown_values = [new_sentinel] + model_ids
+                    dropdown_values = [new_sentinel, *model_ids]
 
                     if HAVE_CTK:
                         self.model_dropdown.configure(values=dropdown_values)
@@ -1289,7 +1289,7 @@ class ChatWindowBase(ABC):
         if self._use_profile_mode:
             # Switch to profile mode
             profile_names = self._get_profile_names()
-            values = ["(Use Global)"] + profile_names
+            values = ["(Use Global)", *profile_names]
             self.model_dropdown.configure(values=values)
             self.model_dropdown.set(self.session.profile_override or "(Use Global)")
         else:
@@ -1787,7 +1787,7 @@ class ChatWindowBase(ABC):
 
             try:
                 # Load and create thumbnail for images
-                b64, mime = AttachmentManager.load_image(file_path)
+                b64, _mime = AttachmentManager.load_image(file_path)
                 if not b64:
                     continue
 
@@ -2044,7 +2044,7 @@ class ChatWindowBase(ABC):
             from ...attachment_manager import AttachmentManager
 
             # Load full image
-            b64, mime = AttachmentManager.load_image(file_path)
+            b64, _mime = AttachmentManager.load_image(file_path)
             if not b64:
                 return
 

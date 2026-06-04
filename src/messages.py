@@ -149,7 +149,9 @@ def build_text_comparison_message(text1: str, text2: str, task: str, system_prom
     return [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_content}]
 
 
-def build_file_message(file_uri: str, mime_type: str, task: str, system_prompt: str = None) -> List[Dict[str, Any]]:
+def build_file_message(
+    file_uri: str, mime_type: str, task: str, system_prompt: str | None = None
+) -> List[Dict[str, Any]]:
     """
     Build a multimodal message with a file reference (Files API).
 
@@ -180,7 +182,9 @@ def build_file_message(file_uri: str, mime_type: str, task: str, system_prompt: 
     return messages
 
 
-def build_inline_message(data_b64: str, mime_type: str, task: str, system_prompt: str = None) -> List[Dict[str, Any]]:
+def build_inline_message(
+    data_b64: str, mime_type: str, task: str, system_prompt: str | None = None
+) -> List[Dict[str, Any]]:
     """
     Build a multimodal message with inline data (generic).
 

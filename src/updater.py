@@ -101,7 +101,7 @@ def parse_version(version_str: str) -> Tuple[int, ...]:
     return tuple(parts)
 
 
-def is_newer_version(remote_version: str, local_version: str = None) -> bool:
+def is_newer_version(remote_version: str, local_version: str | None = None) -> bool:
     """
     Check if the remote version is newer than the local version.
 

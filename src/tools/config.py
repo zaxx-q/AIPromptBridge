@@ -233,7 +233,7 @@ def get_file_type_mappings(config: Dict[str, Any]) -> Dict[str, List[str]]:
     return config.get("file_processor", {}).get("file_type_mappings", {})
 
 
-def list_available_prompts(config: Dict[str, Any], filter_input_type: str = None) -> List[Dict[str, Any]]:
+def list_available_prompts(config: Dict[str, Any], filter_input_type: str | None = None) -> List[Dict[str, Any]]:
     """
     List all available prompts for file processor.
 

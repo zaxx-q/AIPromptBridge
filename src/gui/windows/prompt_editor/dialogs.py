@@ -175,7 +175,7 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         else:
             self._safe_insert(f"\n❌ Error: {text}\n", "error")
 
-    def mark_done(self, usage: dict = None):
+    def mark_done(self, usage: dict | None = None):
         """Mark the test as complete with optional usage stats."""
         self._completed = True
         if self.thinking_started:

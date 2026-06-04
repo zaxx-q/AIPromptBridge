@@ -488,10 +488,10 @@ class OpenAICompatibleProvider(BaseProvider):
 
         try:
             data = response.json()
-        except Exception:
+        except Exception as err:
             response_text = response.text
             if not response_text or not response_text.strip():
-                raise ValueError("Empty response body from server")
+                raise ValueError("Empty response body from server") from err
             data = json.loads(response_text)
 
         choices = data.get("choices", [])

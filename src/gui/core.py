@@ -591,7 +591,7 @@ class GUICoordinator:
         if self._running:
             self._request_queue.put({"type": "dismiss_toast_notification"})
 
-    def request_settings_window(self, on_close: Optional[Callable] = None, initial_tab: str = None):
+    def request_settings_window(self, on_close: Optional[Callable] = None, initial_tab: str | None = None):
         """Request creation of a settings window (thread-safe)"""
         self.ensure_running()
         self._request_queue.put({"type": "settings", "on_close": on_close, "initial_tab": initial_tab})
@@ -744,14 +744,14 @@ def dismiss_typing_indicator():
     coordinator.request_dismiss_typing_indicator()
 
 
-def show_settings_window(initial_tab: str = None):
+def show_settings_window(initial_tab: str | None = None):
     """Show settings window (thread-safe)"""
     coordinator = GUICoordinator.get_instance()
     coordinator.request_settings_window(initial_tab=initial_tab)
     return True
 
 
-def show_settings_window_blocking(initial_tab: str = None):
+def show_settings_window_blocking(initial_tab: str | None = None):
     """
     Show settings window and block until it is closed.
     Uses the GUICoordinator to ensure thread safety and keep the GUI root alive.

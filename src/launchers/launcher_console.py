@@ -250,18 +250,18 @@ def relaunch_from_manifest(root_dir, manifest=None):
     try:
         if launched_mode == "gui":
             subprocess.Popen(
-                [launcher_path] + original_args,
+                [launcher_path, *original_args],
                 creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
             )
         else:
             # For console mode, use os.execv to replace current process
             if sys.platform == "win32":
                 subprocess.Popen(
-                    [launcher_path] + original_args,
+                    [launcher_path, *original_args],
                     creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
                 )
             else:
-                os.execv(launcher_path, [launcher_path] + original_args)
+                os.execv(launcher_path, [launcher_path, *original_args])
     except Exception as e:
         print(f"⚠️  Failed to relaunch: {e}")
 
@@ -383,7 +383,7 @@ def main():
         if os.path.exists(main_py):
             print(f"Internal executable not found at: {internal_exe}")
             print("Assuming development mode, running main.py...")
-            subprocess.call([sys.executable, "main.py", "--launched-mode=console"] + sys.argv[1:])
+            subprocess.call([sys.executable, "main.py", "--launched-mode=console", *sys.argv[1:]])
             return
 
         print(f"❌ Critical Error: Could not find application binary at:\n{internal_exe}")
@@ -394,7 +394,7 @@ def main():
     # --launched-mode=console tells main.py to behave in console mode
     # Filter out --no-wt as it's handled by the launcher and not recognized by main.py
     app_args = [arg for arg in sys.argv[1:] if arg != "--no-wt"]
-    cmd_args = [str(internal_exe), "--launched-mode=console"] + app_args
+    cmd_args = [str(internal_exe), "--launched-mode=console", *app_args]
 
     # 5. Launch (Blocking)
     # We use subprocess.call (or run) because we want this launcher to stay alive
@@ -425,7 +425,7 @@ def main():
             # Relaunch anyway so the user doesn't lose their app
             try:
                 subprocess.Popen(
-                    [sys.argv[0]] + app_args,
+                    [sys.argv[0], *app_args],
                     creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
                 )
             except Exception:
