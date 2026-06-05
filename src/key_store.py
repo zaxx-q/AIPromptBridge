@@ -18,8 +18,8 @@ Migration
 On first load (``keys.json`` missing), the store auto-migrates keys from
 ``config.ini`` using the legacy ``load_config()`` / ``load_key_names()``
 helpers.  Environment variable fallbacks (``GEMINI_API_KEY``, etc.) are
-included in migration only — once ``keys.json`` exists, env vars are
-ignored.
+checked unconditionally on every load and appended to the respective pools
+if detected and not already present.
 """
 
 import base64
@@ -169,6 +169,7 @@ class KeyStore:
         path = Path(self._file_path)
         if not path.exists():
             self._migrate_from_config()
+            self._append_env_keys()
             self.save()
             return
 
@@ -180,12 +181,17 @@ class KeyStore:
 
             print_error(f"Failed to load {self._file_path}: {exc}")
             self._ensure_builtin_pools()
+            self._append_env_keys()
+            self.save()
             return
 
         with self._data_lock:
             self._pools = data.get("pools", {})
             self._provider_pool_map = data.get("provider_pool_map", {})
             self._ensure_builtin_pools()
+
+        if self._append_env_keys():
+            self.save()
 
     def save(self, filepath: Optional[str] = None) -> bool:
         """Persist current state to disk."""
@@ -317,6 +323,54 @@ class KeyStore:
                 self._pools[provider] = {"display_name": display, "keys": []}
             if provider not in self._provider_pool_map:
                 self._provider_pool_map[provider] = provider
+
+    def _append_env_keys(self) -> bool:
+        """Check environment variables and append to matching pools if not already present.
+
+        Returns:
+            True if any new keys were appended (and need saving).
+        """
+        env_map = {
+            "google": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+            "openrouter": ["OPENROUTER_API_KEY"],
+            "custom": ["CUSTOM_API_KEY"],
+            "anthropic": ["ANTHROPIC_API_KEY"],
+            "openai": ["OPENAI_API_KEY"],
+            "xai": ["XAI_API_KEY"],
+            "mistral": ["MISTRAL_API_KEY"],
+            "cohere": ["COHERE_API_KEY"],
+        }
+
+        appended = False
+        from .console import print_success
+
+        with self._data_lock:
+            for pool_id, env_vars in env_map.items():
+                if pool_id not in self._pools:
+                    continue
+                pool = self._pools[pool_id]
+                existing_plaintext_keys = []
+                for kd in pool.get("keys", []):
+                    k = deobfuscate(kd.get("key", ""))
+                    if k:
+                        existing_plaintext_keys.append(k.strip())
+
+                for env_name in env_vars:
+                    val = os.environ.get(env_name, "").strip()
+                    if val:
+                        if val not in existing_plaintext_keys:
+                            pool["keys"].append(
+                                {
+                                    "key": obfuscate(val),
+                                    "name": f"env:{env_name}",
+                                }
+                            )
+                            existing_plaintext_keys.append(val)
+                            appended = True
+                            print_success(
+                                f"[KeyStore] Appended API key from env variable {env_name} to pool '{pool_id}'"
+                            )
+        return appended
 
     @staticmethod
     def _slugify(name: str) -> str:
