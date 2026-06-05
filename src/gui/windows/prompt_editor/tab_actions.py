@@ -644,6 +644,10 @@ class ActionsTabMixin:
             else:
                 combo["values"] = values
 
+        # Also sync to the playground tab if it exists
+        if hasattr(self, "_refresh_playground_profiles"):
+            self._refresh_playground_profiles()
+
     def _open_profile_manager(self):
         """Open the Manage Profiles dialog."""
         try:

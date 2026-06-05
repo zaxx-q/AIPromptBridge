@@ -617,17 +617,129 @@ class PlaygroundTabMixin:
         # API Settings section (below sample text)
         create_section_header(self.standard_api_container, "API Settings", self.colors, "⚙️")
 
-        api_frame = (
+        # Toggle Switch Row
+        toggle_frame = (
             ctk.CTkFrame(self.standard_api_container, fg_color="transparent")
             if self.use_ctk
             else tk.Frame(self.standard_api_container, bg=self.colors.bg)
         )
-        api_frame.pack(fill="x", pady=(0, 10))
+        toggle_frame.pack(fill="x", pady=(0, 8))
 
-        # Provider & Model
+        self.playground_manual_mode_var = tk.BooleanVar(value=False)
+
+        if self.use_ctk:
+            self.playground_mode_switch = ctk.CTkSwitch(
+                toggle_frame,
+                text="Manual Connection Settings",
+                variable=self.playground_manual_mode_var,
+                font=get_ctk_font(12),
+                fg_color=self.colors.surface2,
+                progress_color=self.colors.accent,
+                text_color=self.colors.fg,
+                command=self._on_playground_toggle_mode,
+            )
+            self.playground_mode_switch.pack(anchor="w")
+        else:
+            self.playground_mode_switch = tk.Checkbutton(
+                toggle_frame,
+                text="Manual Connection Settings",
+                variable=self.playground_manual_mode_var,
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+                selectcolor=self.colors.input_bg,
+                command=self._on_playground_toggle_mode,
+            )
+            self.playground_mode_switch.pack(anchor="w")
+
+        # Content frames container (holds both modes, we toggle their packed state)
+        self.playground_mode_container = (
+            ctk.CTkFrame(self.standard_api_container, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self.standard_api_container, bg=self.colors.bg)
+        )
+        self.playground_mode_container.pack(fill="x")
+
+        # 1. Connection Profile Selection Frame
+        self.api_profile_frame = (
+            ctk.CTkFrame(self.playground_mode_container, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self.playground_mode_container, bg=self.colors.bg)
+        )
+
         if self.use_ctk:
             ctk.CTkLabel(
-                api_frame,
+                self.api_profile_frame,
+                text="Profile:",
+                font=get_ctk_font(12),
+                width=80,
+                anchor="w",
+                **get_ctk_label_colors(self.colors),
+            ).pack(side="left")
+            self.playground_profile_var = tk.StringVar()
+            self.playground_profile_combo = ctk.CTkComboBox(
+                self.api_profile_frame,
+                variable=self.playground_profile_var,
+                values=[],
+                width=220,
+                height=32,
+                state="readonly",
+                font=get_ctk_font(12),
+                **get_ctk_combobox_colors(self.colors),
+                command=lambda x: self._update_playground_preview(),
+            )
+            self.playground_profile_combo.pack(side="left", padx=(8, 12))
+
+            # Manage button
+            ctk.CTkButton(
+                self.api_profile_frame,
+                text="Manage...",
+                font=get_ctk_font(11),
+                width=80,
+                height=32,
+                **get_ctk_button_colors(self.colors, "secondary"),
+                command=self._open_profile_manager,
+            ).pack(side="left")
+        else:
+            from tkinter import ttk
+
+            tk.Label(
+                self.api_profile_frame, text="Profile:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg
+            ).pack(side="left")
+            self.playground_profile_var = tk.StringVar()
+            self.playground_profile_combo = ttk.Combobox(
+                self.api_profile_frame,
+                textvariable=self.playground_profile_var,
+                values=[],
+                state="readonly",
+                width=25,
+            )
+            self.playground_profile_combo.pack(side="left", padx=(8, 10))
+            self.playground_profile_combo.bind("<<ComboboxSelected>>", lambda e: self._update_playground_preview())
+
+            tk.Button(
+                self.api_profile_frame,
+                text="Manage...",
+                font=("Segoe UI", 9),
+                bg=self.colors.surface1,
+                fg=self.colors.fg,
+                command=self._open_profile_manager,
+            ).pack(side="left")
+
+        # 2. Manual Settings Frame (originally api_frame)
+        self.api_manual_frame = (
+            ctk.CTkFrame(self.playground_mode_container, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self.playground_mode_container, bg=self.colors.bg)
+        )
+
+        from ....providers.registry import PROVIDER_REGISTRY
+
+        provider_values = sorted(list(PROVIDER_REGISTRY.keys()))
+
+        if self.use_ctk:
+            ctk.CTkLabel(
+                self.api_manual_frame,
                 text="Provider:",
                 font=get_ctk_font(12),
                 width=80,
@@ -635,19 +747,21 @@ class PlaygroundTabMixin:
                 **get_ctk_label_colors(self.colors),
             ).pack(side="left")
             self.playground_provider_var = tk.StringVar(value="google")
-            ctk.CTkComboBox(
-                api_frame,
+            self.playground_provider_combo = ctk.CTkComboBox(
+                self.api_manual_frame,
                 variable=self.playground_provider_var,
-                values=["google", "openrouter", "custom"],
+                values=provider_values,
                 width=130,
                 height=32,
                 state="readonly",
                 font=get_ctk_font(12),
                 **get_ctk_combobox_colors(self.colors),
-            ).pack(side="left", padx=(8, 15))
+                command=self._on_playground_provider_change,
+            )
+            self.playground_provider_combo.pack(side="left", padx=(8, 15))
 
             ctk.CTkLabel(
-                api_frame,
+                self.api_manual_frame,
                 text="Model:",
                 font=get_ctk_font(12),
                 width=60,
@@ -655,50 +769,55 @@ class PlaygroundTabMixin:
                 **get_ctk_label_colors(self.colors),
             ).pack(side="left")
             self.playground_model_var = tk.StringVar()
-            ctk.CTkEntry(
-                api_frame,
-                textvariable=self.playground_model_var,
-                font=get_ctk_font(12),
+            self.playground_model_combo = ctk.CTkComboBox(
+                self.api_manual_frame,
+                variable=self.playground_model_var,
+                values=[],
+                width=180,
                 height=32,
-                **get_ctk_entry_colors(self.colors),
-            ).pack(side="left", padx=(8, 0), fill="x", expand=True)
+                font=get_ctk_font(12),
+                **get_ctk_combobox_colors(self.colors),
+            )
+            self.playground_model_combo.pack(side="left", padx=(8, 0), fill="x", expand=True)
+            self.playground_model_combo.bind("<KeyRelease>", lambda e: self._update_playground_preview())
+            # CTkComboBox is editable by default (state is 'normal'), allows entry
         else:
             from tkinter import ttk
 
-            tk.Label(api_frame, text="Provider:", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.fg).pack(
-                side="left"
-            )
+            tk.Label(
+                self.api_manual_frame, text="Provider:", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.fg
+            ).pack(side="left")
             self.playground_provider_var = tk.StringVar(value="google")
-            ttk.Combobox(
-                api_frame,
+            self.playground_provider_combo = ttk.Combobox(
+                self.api_manual_frame,
                 textvariable=self.playground_provider_var,
-                values=["google", "openrouter", "custom"],
+                values=provider_values,
                 state="readonly",
                 width=12,
-            ).pack(side="left", padx=(5, 10))
-
-            tk.Label(api_frame, text="Model:", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.fg).pack(
-                side="left"
             )
+            self.playground_provider_combo.pack(side="left", padx=(5, 10))
+            self.playground_provider_combo.bind("<<ComboboxSelected>>", self._on_playground_provider_change)
+
+            tk.Label(
+                self.api_manual_frame, text="Model:", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.fg
+            ).pack(side="left")
             self.playground_model_var = tk.StringVar()
-            tk.Entry(
-                api_frame,
+            self.playground_model_combo = ttk.Combobox(
+                self.api_manual_frame,
                 textvariable=self.playground_model_var,
-                font=("Segoe UI", 9),
-                bg=self.colors.input_bg,
-                fg=self.colors.fg,
-                width=15,
-            ).pack(side="left", padx=(5, 0), fill="x", expand=True)
+                values=[],
+                width=20,
+            )
+            self.playground_model_combo.pack(side="left", padx=(5, 0), fill="x", expand=True)
+            self.playground_model_combo.bind("<KeyRelease>", lambda e: self._update_playground_preview())
+            self.playground_model_combo.bind("<<ComboboxSelected>>", lambda e: self._update_playground_preview())
 
-        # Load defaults from active profile
-        try:
-            from .... import web_server as _ws
+        # Load active profile list and active selection
+        self._refresh_playground_profiles()
+        self._on_playground_provider_change()
 
-            default_provider = _ws.get_active_setting("provider", "google")
-            self.playground_provider_var.set(default_provider)
-            self.playground_model_var.set(_ws.get_active_setting("model", ""))
-        except Exception:
-            pass
+        # Render active layout based on toggle
+        self._on_playground_toggle_mode()
 
         # Test button
         btn_frame = (
@@ -1154,10 +1273,19 @@ class PlaygroundTabMixin:
                 response_mode = "Result Panel"
 
         # Build metadata text - Type is only for TextEditTool
-        if mode == "action_text":
-            meta_text = f"📊 Tokens: ~{token_estimate} | Type: {prompt_type} | Mode: {response_mode}"
+        active_connection = ""
+        if self.playground_manual_mode_var.get():
+            active_connection = f"Manual ({self.playground_provider_var.get()} - {self.playground_model_var.get()})"
         else:
-            meta_text = f"📊 Tokens: ~{token_estimate} | Mode: {response_mode}"
+            profile_name = self.playground_profile_var.get()
+            active_connection = f"Profile: {profile_name}"
+
+        if mode == "action_text":
+            meta_text = (
+                f"📊 Tokens: ~{token_estimate} | Type: {prompt_type} | Mode: {response_mode} | {active_connection}"
+            )
+        else:
+            meta_text = f"📊 Tokens: ~{token_estimate} | Mode: {response_mode} | {active_connection}"
 
         if self.use_ctk:
             self.playground_meta_label.configure(text=meta_text)
@@ -1776,16 +1904,33 @@ class PlaygroundTabMixin:
         """Helper to get common request config."""
         from .... import web_server as _ws
         from ....key_store import KeyStore
-        from ....profile_resolver import resolve_profile
+        from ....profile_resolver import resolve_profile, resolve_profile_by_name
 
         key_store = KeyStore.get_instance()
         key_managers = key_store.build_key_managers()
 
-        # Resolve profile to get merged config with connection keys
-        resolved = resolve_profile(None, _ws.CONFIG, _ws.AI_PARAMS, key_managers)
+        # If manual connection settings is selected, we override
+        if self.playground_manual_mode_var.get():
+            # Resolve the active global profile as base, then override provider and model
+            resolved = resolve_profile(None, _ws.CONFIG, _ws.AI_PARAMS, key_managers)
+            provider = self.playground_provider_var.get()
+            model = self.playground_model_var.get()
 
-        provider = self.playground_provider_var.get()
-        model = self.playground_model_var.get()
+            # Re-resolve or inject manual settings
+            # We can also do resolved = resolve_profile_by_name(None, ...), let's ensure base URL / custom keys are respected for that provider
+            # Writing config-style connection keys
+            resolved.provider = provider
+            resolved.model = model
+            resolved.config["default_provider"] = provider
+            resolved.config[f"{provider}_model"] = model
+        else:
+            profile_name = self.playground_profile_var.get()
+            if profile_name and profile_name != "(None)":
+                resolved = resolve_profile_by_name(profile_name, _ws.CONFIG, _ws.AI_PARAMS, key_managers)
+            else:
+                resolved = resolve_profile(None, _ws.CONFIG, _ws.AI_PARAMS, key_managers)
+            provider = resolved.provider
+            model = resolved.model
 
         return {
             "messages": messages,
@@ -1888,3 +2033,70 @@ class PlaygroundTabMixin:
                 self.playground_test_status.configure(text="")
         except Exception:
             pass
+
+    # --- Playground Mode, Provider and Profile Helpers ---
+
+    def _on_playground_toggle_mode(self):
+        """Toggle layout between manual and connection profiles."""
+        is_manual = self.playground_manual_mode_var.get()
+        if is_manual:
+            self.api_profile_frame.pack_forget()
+            self.api_manual_frame.pack(fill="x")
+        else:
+            self.api_manual_frame.pack_forget()
+            self.api_profile_frame.pack(fill="x")
+        self._update_playground_preview()
+
+    def _on_playground_provider_change(self, event=None):
+        """Update manual model choices based on provider."""
+        provider = self.playground_provider_var.get()
+        from ....model_defaults import get_fallback_models
+
+        models = get_fallback_models(provider)
+
+        # Populate model combo values
+        if self.use_ctk:
+            self.playground_model_combo.configure(values=models)
+            if models:
+                self.playground_model_combo.set(models[0])
+                self.playground_model_var.set(models[0])
+            else:
+                self.playground_model_combo.set("")
+                self.playground_model_var.set("")
+        else:
+            self.playground_model_combo["values"] = models
+            if models:
+                self.playground_model_combo.current(0)
+            else:
+                self.playground_model_var.set("")
+        self._update_playground_preview()
+
+    def _refresh_playground_profiles(self):
+        """Load profile names from store and set default."""
+        if not hasattr(self, "playground_profile_combo"):
+            # Playground tab is not yet loaded/created (lazy-loaded tabs)
+            return
+
+        from ....connection_profiles import ProfileStore
+
+        store = ProfileStore.get_instance()
+        profile_names = store.get_profile_names()
+
+        values = ["(None)", *profile_names]
+        active_p = store.get_active_profile_name()
+
+        if self.use_ctk:
+            self.playground_profile_combo.configure(values=values)
+            if active_p in profile_names:
+                self.playground_profile_combo.set(active_p)
+                self.playground_profile_var.set(active_p)
+            elif values:
+                self.playground_profile_combo.set(values[0])
+                self.playground_profile_var.set(values[0])
+        else:
+            self.playground_profile_combo["values"] = values
+            if active_p in profile_names:
+                idx = values.index(active_p)
+                self.playground_profile_combo.current(idx)
+            elif values:
+                self.playground_profile_combo.current(0)

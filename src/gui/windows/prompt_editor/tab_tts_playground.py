@@ -352,9 +352,8 @@ class TTSPlaygroundMixin:
         def _target():
             try:
                 from .... import web_server as _ws
-                from ....key_manager import KeyManager
                 from ....key_store import KeyStore
-                from ....profile_resolver import resolve_profile
+                from ....profile_resolver import resolve_profile, resolve_profile_by_name
                 from ....request_pipeline import RequestContext, RequestOrigin, RequestPipeline
 
                 key_store = KeyStore.get_instance()
@@ -364,18 +363,30 @@ class TTSPlaygroundMixin:
 
                 messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": task}]
 
-                provider = _ws.get_active_setting("provider", "google")
-                model = _ws.get_active_setting("model", "")
-
-                # Resolve profile to get merged config with connection keys
-                resolved = resolve_profile(None, _ws.CONFIG, _ws.AI_PARAMS, key_managers)
+                # Respect playground's profile/manual connection toggle for director generation
+                if self.playground_manual_mode_var.get():
+                    resolved = resolve_profile(None, _ws.CONFIG, _ws.AI_PARAMS, key_managers)
+                    provider = self.playground_provider_var.get()
+                    model = self.playground_model_var.get()
+                    resolved.provider = provider
+                    resolved.model = model
+                    resolved.config["default_provider"] = provider
+                    resolved.config[f"{provider}_model"] = model
+                else:
+                    profile_name = self.playground_profile_var.get()
+                    if profile_name and profile_name != "(None)":
+                        resolved = resolve_profile_by_name(profile_name, _ws.CONFIG, _ws.AI_PARAMS, key_managers)
+                    else:
+                        resolved = resolve_profile(None, _ws.CONFIG, _ws.AI_PARAMS, key_managers)
+                    provider = resolved.provider
+                    model = resolved.model
 
                 ctx = RequestContext(
                     origin=RequestOrigin.TTS_TOOL,
                     provider=provider,
                     model=model,
                     streaming=False,
-                    thinking_enabled=False,
+                    thinking_enabled=resolved.config.get("thinking_enabled", False),
                 )
                 ctx = RequestPipeline.execute_simple(
                     ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers
