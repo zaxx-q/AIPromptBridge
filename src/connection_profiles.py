@@ -38,6 +38,7 @@ PROFILE_DEFAULTS: Dict[str, Any] = {
     "base_url": "",
     "api_key_name": "",
     "api_key_pool": "",
+    "enabled": True,
 }
 
 
@@ -59,6 +60,7 @@ class ConnectionProfile:
     base_url: str = ""
     api_key_name: str = ""
     api_key_pool: str = ""
+    enabled: bool = True
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -257,8 +259,10 @@ class ProfileStore:
         self._save()
         return True
 
-    def get_profile_names(self) -> List[str]:
-        return sorted(self._profiles.keys())
+    def get_profile_names(self, include_disabled: bool = False) -> List[str]:
+        if include_disabled:
+            return sorted(self._profiles.keys())
+        return sorted([name for name, p in self._profiles.items() if p.get("enabled", True)])
 
     def profile_exists(self, name: str) -> bool:
         return name in self._profiles

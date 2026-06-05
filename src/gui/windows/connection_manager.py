@@ -54,6 +54,7 @@ PROFILE_FIELDS = [
         ["google", "anthropic", "openai", "openrouter", "xai", "mistral", "cohere", "custom"],
     ),
     ("model", "Model", "model_dropdown", None),
+    ("enabled", "Enabled", "toggle", None),
     ("streaming", "Streaming", "toggle", None),
     ("thinking", "Thinking", "toggle", None),
     ("thinking_budget", "Thinking Budget", "entry", None),
@@ -86,6 +87,7 @@ CONDITIONAL_REQUIRED = {"base_url": {"custom"}}
 FIELD_HELP = {
     "provider": "API provider for this profile. Required.",
     "model": "Model ID to use. Required. Click 🔄 to fetch available models.",
+    "enabled": "Whether this profile is enabled. Disabled profiles are hidden from dropdown menus and quick selectors.",
     "streaming": "Stream responses token-by-token instead of waiting for the full response.",
     "thinking": "Enable sending thinking parameters. When enabled, thinking-related fields below become available.",
     "thinking_budget": "Token budget for thinking (Gemini 2.5 models only). -1 = auto/unlimited. Leave empty for default.",
@@ -103,6 +105,7 @@ FIELD_HELP = {
 SUMMARY_ICONS = {
     "provider": "📡",
     "model": "🤖",
+    "enabled": "🟢",
     "streaming": "🌊",
     "thinking": "💭",
     "request_timeout": "⏱️",
@@ -1279,8 +1282,15 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         active = store.get_active_profile_name()
 
         self.profile_listbox.clear()
-        for name in store.get_profile_names():
-            icon = "⭐" if name == active else "🔌"
+        for name in store.get_profile_names(include_disabled=True):
+            prof = store.get_profile(name)
+            enabled = prof.enabled if prof else True
+            if name == active:
+                icon = "⭐"
+            elif not enabled:
+                icon = "❌"  # Or some other indicator for disabled, e.g. "🚫" or "💤" or "🔌" (but maybe different icon or text style)
+            else:
+                icon = "🔌"
             self.profile_listbox.add_item(name, name, icon)
 
     def _on_profile_select(self, name):

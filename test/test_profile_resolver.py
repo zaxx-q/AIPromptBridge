@@ -66,6 +66,30 @@ class TestProfileResolverOverrides(unittest.TestCase):
         self.assertEqual(resolved.ai_params.get("temperature"), 0.7)
         self.assertEqual(resolved.ai_params.get("max_tokens"), 150)
 
+    def test_disabled_profile_fallback(self):
+        # 1. Active profile
+        active_profile = ConnectionProfile(
+            provider="openai", model="gpt-4o", base_url="https://active.custom.url/v1", temperature=0.7
+        )
+        self.store._profiles["ActiveProf"] = active_profile.to_dict()
+        self.store._active_profile_name = "ActiveProf"
+        web_server.ACTIVE_PROFILE = active_profile
+        web_server.SESSION_OVERRIDES = {}
+
+        # 2. Disabled profile
+        disabled_profile = ConnectionProfile(provider="google", model="gemini-1.5-pro", enabled=False, temperature=0.2)
+        self.store._profiles["DisabledProf"] = disabled_profile.to_dict()
+
+        # Action dict specifying the disabled profile
+        action = {"connection_profile": "DisabledProf"}
+
+        # Resolve should fall back to active profile because DisabledProf is disabled
+        resolved = resolve_profile(action, {}, {}, {})
+
+        self.assertEqual(resolved.provider, "openai")
+        self.assertEqual(resolved.model, "gpt-4o")
+        self.assertEqual(resolved.ai_params.get("temperature"), 0.7)
+
 
 if __name__ == "__main__":
     unittest.main()

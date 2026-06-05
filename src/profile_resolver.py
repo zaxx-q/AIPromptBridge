@@ -71,6 +71,11 @@ def resolve_profile(
             profile = _get_profile(profile_name)
             if not profile:
                 logging.warning(f"[ProfileResolver] Profile '{profile_name}' not found, using defaults")
+            elif not profile.enabled:
+                logging.warning(
+                    f"[ProfileResolver] Profile '{profile_name}' is disabled, falling back to active profile"
+                )
+                profile = None
 
     # Effective profile to extract configuration parameters from
     effective_profile = profile if profile else active
