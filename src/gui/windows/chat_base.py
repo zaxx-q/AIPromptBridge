@@ -298,7 +298,7 @@ class ChatWindowBase(ABC):
                 btn_frame,
                 **rename_content,
                 font=get_ctk_font(size=12),
-                width=32,
+                width=28,
                 height=28,
                 corner_radius=6,
                 command=self._rename_session,
@@ -312,7 +312,7 @@ class ChatWindowBase(ABC):
                 btn_frame,
                 **delete_content,
                 font=get_ctk_font(size=12),
-                width=32,
+                width=28,
                 height=28,
                 corner_radius=6,
                 command=self._delete_session,
@@ -327,7 +327,7 @@ class ChatWindowBase(ABC):
                 btn_frame,
                 text="Wrap: ON",
                 font=get_ctk_font(size=11),
-                width=85,
+                width=70,
                 height=28,
                 corner_radius=6,
                 command=self._toggle_wrap,
@@ -339,7 +339,7 @@ class ChatWindowBase(ABC):
                 btn_frame,
                 text="Markdown",
                 font=get_ctk_font(size=11),
-                width=85,
+                width=70,
                 height=28,
                 corner_radius=6,
                 command=self._toggle_markdown,
@@ -349,9 +349,9 @@ class ChatWindowBase(ABC):
 
             self.scroll_btn = ctk.CTkButton(
                 btn_frame,
-                text="Autoscroll: ON",
+                text="Scroll: ON",
                 font=get_ctk_font(size=11),
-                width=100,
+                width=80,
                 height=28,
                 corner_radius=6,
                 command=self._toggle_autoscroll,
@@ -364,18 +364,19 @@ class ChatWindowBase(ABC):
             right_container.pack(side="right")
 
             # Toggle button (always visible, leftmost in right group)
-            toggle_text = "📋 Profile" if self._manual_mode else "⚙️ Manual"
+            toggle_text = "⚙️ Manual" if self._manual_mode else "📋 Profile"
+            toggle_content = prepare_emoji_content(toggle_text, size=14)
             self.manual_toggle_btn = ctk.CTkButton(
                 right_container,
-                text=toggle_text,
+                **toggle_content,
                 font=get_ctk_font(size=11),
-                width=90,
+                width=80,
                 height=28,
                 corner_radius=6,
                 command=self._toggle_manual_mode,
                 **btn_colors,
             )
-            self.manual_toggle_btn.pack(side="left", padx=(0, 8))
+            self.manual_toggle_btn.pack(side="left", padx=(0, 6))
 
             # ---- Profile mode frame ----
             self._profile_widgets_frame = ctk.CTkFrame(right_container, fg_color="transparent")
@@ -422,7 +423,7 @@ class ChatWindowBase(ABC):
                 self._manual_widgets_frame,
                 colors=self.theme,
                 values=provider_ids,
-                width=120,
+                width=95,
                 height=28,
                 command=self._on_manual_provider_select,
             )
@@ -438,7 +439,7 @@ class ChatWindowBase(ABC):
                 self._manual_widgets_frame,
                 colors=self.theme,
                 values=["(select provider)"],
-                width=220,
+                width=140,
                 height=28,
                 command=self._on_manual_model_select,
             )
@@ -527,7 +528,7 @@ class ChatWindowBase(ABC):
 
             self.scroll_btn = tk.Button(
                 btn_frame,
-                text="Autoscroll: ON",
+                text="Scroll: ON",
                 font=("Segoe UI", 9),
                 bg=self.colors["button_bg"],
                 fg=self.colors["fg"],
@@ -544,7 +545,7 @@ class ChatWindowBase(ABC):
             right_container.pack(side=tk.RIGHT)
 
             # Toggle button
-            toggle_text = "📋 Profile" if self._manual_mode else "⚙️ Manual"
+            toggle_text = "⚙️ Manual" if self._manual_mode else "📋 Profile"
             self.manual_toggle_btn = tk.Button(
                 right_container,
                 text=toggle_text,
@@ -604,7 +605,7 @@ class ChatWindowBase(ABC):
             self.provider_label_widget.pack(side=tk.LEFT, padx=(0, 3))
 
             self.provider_dropdown = ttk.Combobox(
-                self._manual_widgets_frame, values=provider_ids, width=12, state="readonly"
+                self._manual_widgets_frame, values=provider_ids, width=9, state="readonly"
             )
             self.provider_dropdown.pack(side=tk.LEFT, padx=(0, 8))
             self.provider_dropdown.bind(
@@ -621,7 +622,7 @@ class ChatWindowBase(ABC):
             self.manual_model_label_widget.pack(side=tk.LEFT, padx=(0, 3))
 
             self.manual_model_dropdown = ttk.Combobox(
-                self._manual_widgets_frame, values=["(select provider)"], width=25, state="readonly"
+                self._manual_widgets_frame, values=["(select provider)"], width=16, state="readonly"
             )
             self.manual_model_dropdown.pack(side=tk.LEFT)
             self.manual_model_dropdown.bind(
@@ -1072,9 +1073,9 @@ class ChatWindowBase(ABC):
                 self.md_btn.configure(text="Markdown" if self.markdown else "Raw Text")
         if self.scroll_btn:
             if HAVE_CTK:
-                self.scroll_btn.configure(text=f"Autoscroll: {'ON' if self.auto_scroll else 'OFF'}")
+                self.scroll_btn.configure(text=f"Scroll: {'ON' if self.auto_scroll else 'OFF'}")
             else:
-                self.scroll_btn.configure(text=f"Autoscroll: {'ON' if self.auto_scroll else 'OFF'}")
+                self.scroll_btn.configure(text=f"Scroll: {'ON' if self.auto_scroll else 'OFF'}")
 
         # Render messages with card-style layout
         for i, msg in enumerate(self.session.messages):
@@ -1306,9 +1307,9 @@ class ChatWindowBase(ABC):
         self.auto_scroll = not self.auto_scroll
         if self.scroll_btn:
             if HAVE_CTK:
-                self.scroll_btn.configure(text=f"Autoscroll: {'ON' if self.auto_scroll else 'OFF'}")
+                self.scroll_btn.configure(text=f"Scroll: {'ON' if self.auto_scroll else 'OFF'}")
             else:
-                self.scroll_btn.configure(text=f"Autoscroll: {'ON' if self.auto_scroll else 'OFF'}")
+                self.scroll_btn.configure(text=f"Scroll: {'ON' if self.auto_scroll else 'OFF'}")
         self._update_status(f"Autoscroll: {'ON' if self.auto_scroll else 'OFF'}")
 
     def _toggle_thinking(self, message_index: int):
@@ -1367,7 +1368,8 @@ class ChatWindowBase(ABC):
             self._manual_widgets_frame.pack(side="left" if HAVE_CTK else tk.LEFT)
 
             if HAVE_CTK:
-                self.manual_toggle_btn.configure(text="📋 Profile")
+                content = prepare_emoji_content("📋 Profile", size=14)
+                self.manual_toggle_btn.configure(**content)
             else:
                 self.manual_toggle_btn.configure(text="📋 Profile")
 
@@ -1387,7 +1389,8 @@ class ChatWindowBase(ABC):
             self._profile_widgets_frame.pack(side="left" if HAVE_CTK else tk.LEFT)
 
             if HAVE_CTK:
-                self.manual_toggle_btn.configure(text="⚙️ Manual")
+                content = prepare_emoji_content("⚙️ Manual", size=14)
+                self.manual_toggle_btn.configure(**content)
             else:
                 self.manual_toggle_btn.configure(text="⚙️ Manual")
 
