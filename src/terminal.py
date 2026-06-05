@@ -586,13 +586,88 @@ def terminal_session_manager():
                 if HAVE_RICH:
                     console.print("\n[bold]🔌 Connection Profiles[/bold]")
                     console.print(f"   Active: [green]{active}[/green]\n")
+
+                    table = Table(show_header=True, box=None)
+                    table.add_column("#", style="bold cyan", justify="right", width=5)
+                    table.add_column("Profile Name", style="bold", min_width=15)
+                    table.add_column("Provider", style="cyan", width=12)
+                    table.add_column("Model", style="green", min_width=20)
+                    table.add_column("Base URL", style="dim white", min_width=15)
+                    table.add_column("S/T", justify="center", width=6)
+                    table.add_column("Pool/Key", style="magenta", width=15)
+                    table.add_column("Configured Params", style="yellow", min_width=15)
+
+                    for i, name in enumerate(names):
+                        prof = store.get_profile(name)
+                        if not prof:
+                            continue
+
+                        is_active = name == active
+                        name_str = f"[bold green]{name} ◄[/bold green]" if is_active else name
+                        provider_str = prof.provider
+                        model_str = prof.model
+
+                        url_str = get_base_url_for_status(web_server.CONFIG, prof.provider, profile=prof)
+                        if url_str == "Not configured" or not url_str:
+                            url_str = "-"
+
+                        s_char = "[green]S[/green]" if prof.streaming else "[dim]-[/dim]"
+                        t_char = "[yellow]T[/yellow]" if prof.thinking else "[dim]-[/dim]"
+                        st_str = f"{s_char}/{t_char}"
+
+                        pool_part = prof.api_key_pool if prof.api_key_pool else "default"
+                        key_part = prof.api_key_name if prof.api_key_name else "any"
+                        pool_key_str = f"{pool_part}/{key_part}"
+
+                        params_list = []
+                        if prof.temperature is not None:
+                            params_list.append(f"temp={prof.temperature}")
+                        if prof.max_tokens is not None:
+                            params_list.append(f"max={prof.max_tokens:,}")
+                        if prof.request_timeout is not None:
+                            params_list.append(f"timeout={prof.request_timeout}s")
+                        params_str = ", ".join(params_list) if params_list else "-"
+
+                        table.add_row(
+                            f"[{i + 1}]", name_str, provider_str, model_str, url_str, st_str, pool_key_str, params_str
+                        )
+                    console.print(table)
                 else:
                     print("\n🔌 Connection Profiles")
                     print(f"   Active: {active}\n")
+                    print(
+                        f"      {'#':>5}  {'Profile Name':<20}  {'Provider':<10}  {'Model':<25}  {'S/T':<5}  {'Pool/Key':<15}  {'Params':<20}  {'Base URL'}"
+                    )
+                    print(
+                        f"      {'-' * 5}  {'-' * 20}  {'-' * 10}  {'-' * 25}  {'-' * 5}  {'-' * 15}  {'-' * 20}  {'-' * 20}"
+                    )
+                    for i, name in enumerate(names):
+                        prof = store.get_profile(name)
+                        if not prof:
+                            continue
+                        marker = " ◄" if name == active else ""
+                        name_str = f"{name}{marker}"
+                        url_str = get_base_url_for_status(web_server.CONFIG, prof.provider, profile=prof)
+                        if url_str == "Not configured" or not url_str:
+                            url_str = "-"
+                        st_str = ("S" if prof.streaming else "-") + "/" + ("T" if prof.thinking else "-")
 
-                for i, name in enumerate(names):
-                    marker = " ◄" if name == active else ""
-                    print(f"      [{i + 1}] {name}{marker}")
+                        pool_part = prof.api_key_pool if prof.api_key_pool else "default"
+                        key_part = prof.api_key_name if prof.api_key_name else "any"
+                        pool_key_str = f"{pool_part}/{key_part}"
+
+                        params_list = []
+                        if prof.temperature is not None:
+                            params_list.append(f"temp={prof.temperature}")
+                        if prof.max_tokens is not None:
+                            params_list.append(f"max={prof.max_tokens:,}")
+                        if prof.request_timeout is not None:
+                            params_list.append(f"timeout={prof.request_timeout}s")
+                        params_str = ", ".join(params_list) if params_list else "-"
+
+                        print(
+                            f"      [{i + 1:>3}]  {name_str:<20}  {prof.provider:<10}  {prof.model:<25}  {st_str:<5}  {pool_key_str:<15}  {params_str:<20}  {url_str}"
+                        )
 
                 print("\n   Enter number/name to switch, [E] edit profiles (q = cancel): ", end="", flush=True)
                 try:
