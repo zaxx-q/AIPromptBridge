@@ -100,6 +100,9 @@ class SettingsWindow(
         # Determine if we can use CTk
         self.use_ctk = _can_use_ctk()
 
+        # Unsaved changes tracking
+        self._last_saved_snapshot: Optional[Dict[str, Any]] = None
+
     def show(self, initial_tab: str | None = None):
         """
         Create and show the settings window.
@@ -181,6 +184,9 @@ class SettingsWindow(
         if self.use_ctk:
             self._load_tab_content(self.tabview.get())
 
+        # Take initial snapshot for unsaved changes tracking
+        self._last_saved_snapshot = self._snapshot_current_values()
+
         # Register and bind
         register_window(self.window_tag)
         self.root.protocol("WM_DELETE_WINDOW", self._close)
@@ -261,6 +267,52 @@ class SettingsWindow(
                 print(f"[Settings] Failed to schedule callback via GUICoordinator: {e}")
         else:
             self._callback_queue.put(callback)
+
+    def _snapshot_current_values(self) -> Dict[str, Any]:
+        """Capture current form values for dirty comparison."""
+        snapshot = {}
+        for key, var in self.vars.items():
+            try:
+                snapshot[key] = var.get()
+            except tk.TclError:
+                snapshot[key] = None
+        return snapshot
+
+    def _is_dirty(self) -> bool:
+        """Check if form values differ from last saved/loaded state."""
+        if self._last_saved_snapshot is None:
+            return False
+        current = self._snapshot_current_values()
+        return current != self._last_saved_snapshot
+
+    def _check_unsaved(self, *args):
+        """Update title bar dirty indicator."""
+        if self._destroyed or not self.root:
+            return
+        if self._last_saved_snapshot is None:
+            return
+        try:
+            indicator = "● " if self._is_dirty() else ""
+            self.root.title(f"{indicator}AIPromptBridge Settings")
+        except Exception:
+            pass
+
+    def _prompt_unsaved_if_dirty(self) -> bool:
+        """Prompt user about unsaved changes. Returns True to proceed, False to abort."""
+        if not self._is_dirty():
+            return True
+        result = messagebox.askyesnocancel(
+            "Unsaved Changes",
+            "You have unsaved settings changes.\n\nSave changes before closing?",
+            parent=self.root,
+        )
+        if result is True:  # Yes — save
+            self._save()
+            return True
+        elif result is False:  # No — discard
+            return True
+        else:  # Cancel
+            return False
 
     def _create_title_bar(self, parent):
         """Create the title bar."""
@@ -375,6 +427,10 @@ class SettingsWindow(
         create_method = getattr(self, method_name, None)
         if create_method and callable(create_method):
             create_method(tab_frame)
+
+        # Update snapshot to include newly created variables from this tab
+        if self._last_saved_snapshot is not None:
+            self._last_saved_snapshot = self._snapshot_current_values()
 
     def _create_button_bar(self, parent):
         """Create the bottom button bar."""
@@ -502,6 +558,10 @@ class SettingsWindow(
             else:
                 self.status_label.configure(text="✅ Settings saved!", fg=self.colors.accent_green)
 
+            # Update saved snapshot
+            self._last_saved_snapshot = self._snapshot_current_values()
+            self.root.title("AIPromptBridge Settings")
+
             self.root.after(1500, self._close)
         else:
             if self.use_ctk:
@@ -594,6 +654,9 @@ class SettingsWindow(
 
     def _close(self):
         """Close the settings window."""
+        if not self._prompt_unsaved_if_dirty():
+            return  # User cancelled
+
         self._destroyed = True
 
         if self.on_close_callback:

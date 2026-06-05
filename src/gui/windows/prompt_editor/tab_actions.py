@@ -698,6 +698,7 @@ class ActionsTabMixin:
             }
             self.action_listbox.add_item(name, name, "⚡")
             self.action_listbox.select(name)
+            self._update_title()
 
     def _duplicate_action(self):
         """Duplicate selected action."""
@@ -716,6 +717,7 @@ class ActionsTabMixin:
 
         icon = tool_data[new_name].get("icon", "")
         self.action_listbox.add_item(new_name, new_name, icon)
+        self._update_title()
 
     def _delete_action(self):
         """Delete selected action."""
@@ -750,6 +752,7 @@ class ActionsTabMixin:
                 self.editor_widgets["name"].configure(text="(select an action)")
             else:
                 self.editor_widgets["name"].configure(text="(select an action)")
+            self._update_title()
 
     def _move_action_up(self):
         """Move selected action up."""
@@ -778,6 +781,7 @@ class ActionsTabMixin:
             self.options_data[self.current_tool] = new_data
             self._refresh_action_list()
             self.action_listbox.select(self.current_action)
+            self._update_title()
 
     def _move_action_down(self):
         """Move selected action down."""
@@ -805,6 +809,7 @@ class ActionsTabMixin:
             self.options_data[self.current_tool] = new_data
             self._refresh_action_list()
             self.action_listbox.select(self.current_action)
+            self._update_title()
 
     def _save_current_action(self):
         """Save the currently edited action."""
@@ -857,3 +862,4 @@ class ActionsTabMixin:
             self.editor_widgets["save_status"].configure(
                 text=f"✅ Saved '{self.current_action}'", fg=self.colors.accent_green
             )
+        self._update_title()

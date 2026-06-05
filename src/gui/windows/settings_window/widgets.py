@@ -128,6 +128,10 @@ class FormFieldsMixin:
 
         self.vars[key] = tk.StringVar(master=self.root, value=value)
 
+        # Track unsaved changes
+        if hasattr(self, "_check_unsaved"):
+            self.vars[key].trace_add("write", self._check_unsaved)
+
         if self.use_ctk:
             ctk.CTkLabel(
                 row,
@@ -190,6 +194,10 @@ class FormFieldsMixin:
 
         self.vars[key] = tk.BooleanVar(master=self.root, value=value)
 
+        # Track unsaved changes
+        if hasattr(self, "_check_unsaved"):
+            self.vars[key].trace_add("write", self._check_unsaved)
+
         if self.use_ctk:
             switch_kwargs = {
                 "text": label,
@@ -238,6 +246,10 @@ class FormFieldsMixin:
 
         # Use StringVar to avoid TclError when field is cleared
         self.vars[key] = tk.StringVar(master=self.root, value=str(value) if value is not None else "")
+
+        # Track unsaved changes
+        if hasattr(self, "_check_unsaved"):
+            self.vars[key].trace_add("write", self._check_unsaved)
 
         # Store metadata for validation and default value restoration
         self.widgets[f"{key}_default"] = value
@@ -314,6 +326,10 @@ class FormFieldsMixin:
 
         self.vars[key] = tk.StringVar(master=self.root, value=value)
 
+        # Track unsaved changes
+        if hasattr(self, "_check_unsaved"):
+            self.vars[key].trace_add("write", self._check_unsaved)
+
         if self.use_ctk:
             ctk.CTkLabel(
                 row,
@@ -383,6 +399,10 @@ class FormFieldsMixin:
         row.pack(fill="x", pady=4)
 
         self.vars[key] = tk.StringVar(master=self.root, value=value)
+
+        # Track unsaved changes
+        if hasattr(self, "_check_unsaved"):
+            self.vars[key].trace_add("write", self._check_unsaved)
 
         if self.use_ctk:
             ctk.CTkLabel(

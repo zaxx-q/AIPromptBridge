@@ -334,6 +334,7 @@ class ModifiersTabMixin:
             )
             idx = len(modifiers) - 1
             self.modifier_listbox.add_item(str(idx), key.title(), "🔧")
+            self._update_title()
 
     def _delete_modifier(self):
         """Delete selected modifier."""
@@ -369,6 +370,7 @@ class ModifiersTabMixin:
                 self.modifier_listbox.clear()
                 for i, mod in enumerate(modifiers):
                     self.modifier_listbox.add_item(str(i), mod.get("label", mod.get("key", "")), mod.get("icon", ""))
+                self._update_title()
 
     def _move_modifier_up(self):
         """Move selected modifier up."""
@@ -394,6 +396,7 @@ class ModifiersTabMixin:
 
             # Restore selection (now at index-1)
             self.modifier_listbox.select(str(index - 1))
+            self._update_title()
 
     def _move_modifier_down(self):
         """Move selected modifier down."""
@@ -419,6 +422,7 @@ class ModifiersTabMixin:
 
             # Restore selection (now at index+1)
             self.modifier_listbox.select(str(index + 1))
+            self._update_title()
 
     def _save_current_modifier(self):
         """Save the currently edited modifier."""
@@ -464,3 +468,4 @@ class ModifiersTabMixin:
             for i, mod in enumerate(modifiers):
                 self.modifier_listbox.add_item(str(i), mod.get("label", mod.get("key", "")), mod.get("icon", ""))
             self.modifier_listbox.select(str(index))
+            self._update_title()

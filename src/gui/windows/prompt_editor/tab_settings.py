@@ -77,6 +77,8 @@ class SettingsTabMixin:
                 else:
                     widget.insert("1.0", str(val))
                 self.settings_widgets[widget_key] = ("text", widget)
+                if hasattr(self, "_update_title"):
+                    widget.bind("<KeyRelease>", lambda e, w=widget: self._update_title(), add="+")
             else:
                 var = tk.StringVar(master=scroll_frame, value=str(val))
                 var.trace_add("write", lambda *args: self._update_playground_preview())
@@ -90,6 +92,8 @@ class SettingsTabMixin:
                     )
                 widget.pack(fill="x", pady=(2, 0))
                 self.settings_widgets[widget_key] = ("entry", var)
+                if hasattr(self, "_update_title"):
+                    var.trace_add("write", lambda *args: self._update_title())
 
         # =====================================================================
         # Global Settings
@@ -173,6 +177,8 @@ class SettingsTabMixin:
                 fg=self.colors.blockquote,
             ).pack(side="left")
         self.settings_widgets["text_edit_tool:popup_items_per_page"] = ("int", tet_items_var)
+        if hasattr(self, "_update_title"):
+            tet_items_var.trace_add("write", lambda *args: self._update_title())
 
         # Use groups
         tet_grp_val = self.options_data.get("text_edit_tool", {}).get("_settings", {}).get("popup_use_groups", True)
@@ -204,6 +210,8 @@ class SettingsTabMixin:
         else:
             tk.Checkbutton(row, text="Use Groups", variable=tet_grp_var).pack(anchor="w")
         self.settings_widgets["text_edit_tool:popup_use_groups"] = ("bool", tet_grp_var)
+        if hasattr(self, "_update_title"):
+            tet_grp_var.trace_add("write", lambda *args: self._update_title())
 
         # =====================================================================
         # Snip Tool Settings
@@ -237,6 +245,8 @@ class SettingsTabMixin:
         else:
             tk.Checkbutton(row, text="Allow Text Edit Actions", variable=allow_var).pack(anchor="w")
         self.settings_widgets["snip_tool:allow_text_edit_actions"] = ("bool", allow_var)
+        if hasattr(self, "_update_title"):
+            allow_var.trace_add("write", lambda *args: self._update_title())
 
         # Popup settings for Snip
         row = (
@@ -294,6 +304,8 @@ class SettingsTabMixin:
                 fg=self.colors.blockquote,
             ).pack(side="left")
         self.settings_widgets["snip_tool:popup_items_per_page"] = ("int", snip_items_var)
+        if hasattr(self, "_update_title"):
+            snip_items_var.trace_add("write", lambda *args: self._update_title())
 
         # Use groups
         snip_grp_val = self.options_data.get("snip_tool", {}).get("_settings", {}).get("popup_use_groups", True)
@@ -325,6 +337,8 @@ class SettingsTabMixin:
         else:
             tk.Checkbutton(row, text="Use Groups", variable=snip_grp_var).pack(anchor="w")
         self.settings_widgets["snip_tool:popup_use_groups"] = ("bool", snip_grp_var)
+        if hasattr(self, "_update_title"):
+            snip_grp_var.trace_add("write", lambda *args: self._update_title())
 
         # =====================================================================
         # Audio Tool Settings
@@ -391,6 +405,8 @@ class SettingsTabMixin:
                 fg=self.colors.blockquote,
             ).pack(side="left")
         self.settings_widgets["audio_tool:items_per_page"] = ("int", audio_items_var)
+        if hasattr(self, "_update_title"):
+            audio_items_var.trace_add("write", lambda *args: self._update_title())
 
         # Use groups (audio_tool is a window, not popup, so uses "use_groups")
         audio_grp_val = self.options_data.get("audio_tool", {}).get("_settings", {}).get("use_groups", True)
@@ -422,6 +438,8 @@ class SettingsTabMixin:
         else:
             tk.Checkbutton(row, text="Use Groups", variable=audio_grp_var).pack(anchor="w")
         self.settings_widgets["audio_tool:use_groups"] = ("bool", audio_grp_var)
+        if hasattr(self, "_update_title"):
+            audio_grp_var.trace_add("write", lambda *args: self._update_title())
 
         # =====================================================================
         # TTS Tool Settings

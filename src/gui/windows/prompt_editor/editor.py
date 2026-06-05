@@ -6,6 +6,8 @@ Composes all tab mixins into the main PromptEditorWindow class.
 Handles window lifecycle, tab routing, save/reset/close operations.
 """
 
+import copy
+import json
 import queue
 import threading
 import time
@@ -89,6 +91,10 @@ class PromptEditorWindow(
         # Determine if we can use CTk (must be in main thread)
         self.use_ctk = HAVE_CTK
 
+        # Unsaved changes tracking
+        self._saved_options_snapshot: Optional[str] = None
+        self._saved_settings_snapshot: Optional[Dict[str, Any]] = None
+
     def show(self):
         """Create and show the prompt editor window."""
         # Only sync CTk if we can use it
@@ -153,6 +159,9 @@ class PromptEditorWindow(
         self.root.lift()
         self.root.focus_force()
 
+        # Take initial snapshot for unsaved changes tracking
+        self._take_snapshot()
+
         # Event loop (only if standalone)
         if not self.master:
             self._run_event_loop()
@@ -188,6 +197,88 @@ class PromptEditorWindow(
                     break
         except Exception:
             pass
+
+    def _take_snapshot(self):
+        """Take a snapshot of current state for dirty comparison."""
+        try:
+            self._saved_options_snapshot = json.dumps(self.options_data, sort_keys=True, ensure_ascii=False)
+        except Exception:
+            self._saved_options_snapshot = None
+        # Snapshot settings widgets if they exist
+        if hasattr(self, "settings_widgets") and self.settings_widgets:
+            self._saved_settings_snapshot = self._snapshot_settings_widgets()
+        else:
+            self._saved_settings_snapshot = {}
+
+    def _snapshot_settings_widgets(self) -> dict:
+        """Capture current settings widget values."""
+        snapshot = {}
+        if not hasattr(self, "settings_widgets"):
+            return snapshot
+        for widget_key, (widget_type, widget) in self.settings_widgets.items():
+            try:
+                if widget_type == "entry":
+                    snapshot[widget_key] = widget.get()
+                elif widget_type == "text":
+                    if self.use_ctk:
+                        snapshot[widget_key] = widget.get("0.0", "end").strip()
+                    else:
+                        snapshot[widget_key] = widget.get("1.0", "end").strip()
+                elif widget_type == "int":
+                    snapshot[widget_key] = widget.get()
+                elif widget_type == "bool":
+                    snapshot[widget_key] = widget.get()
+            except Exception:
+                pass
+        return snapshot
+
+    def _is_dirty(self) -> bool:
+        """Check if options data or settings widgets have changed since last save/load."""
+        if self._saved_options_snapshot is None:
+            return False
+        try:
+            current = json.dumps(self.options_data, sort_keys=True, ensure_ascii=False)
+            if current != self._saved_options_snapshot:
+                return True
+        except Exception:
+            return False
+
+        # Also check settings widgets (they don't mutate options_data until save)
+        if hasattr(self, "_saved_settings_snapshot") and hasattr(self, "settings_widgets"):
+            current_settings = self._snapshot_settings_widgets()
+            if current_settings != self._saved_settings_snapshot:
+                return True
+
+        return False
+
+    def _update_title(self):
+        """Update title bar with dirty indicator."""
+        if self._destroyed or not self.root:
+            return
+        try:
+            indicator = "● " if self._is_dirty() else ""
+            self.root.title(f"{indicator}AIPromptBridge Prompt Editor")
+        except Exception:
+            pass
+
+    def _prompt_unsaved_if_dirty(self) -> bool:
+        """Prompt user about unsaved changes. Returns True to proceed, False to abort."""
+        if not self._is_dirty():
+            return True
+        from tkinter import messagebox
+
+        result = messagebox.askyesnocancel(
+            "Unsaved Changes",
+            "You have unsaved changes to prompts configuration.\n\nSave changes before closing?",
+            parent=self.root,
+        )
+        if result is True:  # Yes — save
+            self._save_all()
+            return True
+        elif result is False:  # No — discard
+            return True
+        else:  # Cancel
+            return False
 
     def _create_title_bar(self, parent):
         """Create the title bar."""
@@ -331,6 +422,10 @@ class PromptEditorWindow(
 
                 traceback.print_exc()
 
+        # Update settings snapshot to include newly created widgets
+        if hasattr(self, "settings_widgets") and self.settings_widgets:
+            self._saved_settings_snapshot = self._snapshot_settings_widgets()
+
     def _create_button_bar(self, parent):
         """Create the bottom button bar."""
         btn_frame = (
@@ -429,6 +524,10 @@ class PromptEditorWindow(
 
             print("[PromptEditor] Prompt configuration hot-reloaded")
 
+            # Update snapshot after successful save
+            self._take_snapshot()
+            self.root.title("AIPromptBridge Prompt Editor")
+
             # Close after brief delay
             self.root.after(1000, self._close)
         else:
@@ -506,6 +605,7 @@ class PromptEditorWindow(
                 )
 
             print("[PromptEditor] Configuration reset to defaults in editor. Click Save All to apply.")
+            self._update_title()
 
         except Exception as e:
             if self.use_ctk:
@@ -518,6 +618,9 @@ class PromptEditorWindow(
 
     def _close(self):
         """Close the prompt editor window."""
+        if not self._prompt_unsaved_if_dirty():
+            return  # User cancelled
+
         # Cleanup TTS recorder
         if hasattr(self, "tts_pg_recorder") and self.tts_pg_recorder:
             try:

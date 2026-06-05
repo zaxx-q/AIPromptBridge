@@ -279,6 +279,7 @@ class GroupsTabMixin:
             groups.append({"name": name, "items": []})
             idx = len(groups) - 1
             self.group_listbox.add_item(str(idx), name, None)
+            self._update_title()
 
     def _delete_group(self):
         """Delete selected group."""
@@ -312,6 +313,7 @@ class GroupsTabMixin:
 
                 del groups[index]
                 self._refresh_group_list()
+                self._update_title()
 
     def _move_group_up(self):
         """Move selected group up."""
@@ -332,6 +334,7 @@ class GroupsTabMixin:
 
             self._refresh_group_list()
             self.group_listbox.select(str(index - 1))
+            self._update_title()
 
     def _move_group_down(self):
         """Move selected group down."""
@@ -352,6 +355,7 @@ class GroupsTabMixin:
 
             self._refresh_group_list()
             self.group_listbox.select(str(index + 1))
+            self._update_title()
 
     def _save_current_group(self):
         """Save the currently edited group."""
@@ -413,3 +417,4 @@ class GroupsTabMixin:
 
             self._refresh_group_list()
             self.group_listbox.select(str(index))
+            self._update_title()
