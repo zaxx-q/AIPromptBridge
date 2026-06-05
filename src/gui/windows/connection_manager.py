@@ -1385,6 +1385,9 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         self.title("Connection Profiles")
 
         self.save_status.configure(text=f"✅ Saved '{name}'")
+        from ...config import notify_config_change
+
+        notify_config_change("_profiles_changed")
         return True
 
     def _new_profile(self):
@@ -1404,6 +1407,9 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self.profile_listbox.select(name)
             self._ignore_select_event = False
             self._on_profile_select(name)
+            from ...config import notify_config_change
+
+            notify_config_change("_profiles_changed")
 
     def _duplicate_profile(self):
         if not self.current_profile:
@@ -1427,6 +1433,9 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self._ignore_select_event = False
             self._on_profile_select(name)
             self.save_status.configure(text=f"✅ Duplicated as '{name}'")
+            from ...config import notify_config_change
+
+            notify_config_change("_profiles_changed")
 
     def _delete_profile(self):
         if not self.current_profile:
@@ -1453,6 +1462,9 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self._update_summary()
             self._last_saved_values = None
             self.title("Connection Profiles")
+            from ...config import notify_config_change
+
+            notify_config_change("_profiles_changed")
 
     def _on_close_attempt(self):
         """Handle window close — check for unsaved changes first."""

@@ -48,6 +48,9 @@ class ChatSession:
         self.model_override = None
         # Per-session profile override (None = no profile selected)
         self.profile_override = None
+        # Manual mode: user selects provider + model directly instead of profile
+        self.manual_mode = False
+        self.provider_override = None  # Provider selected in manual mode
 
     def add_message(self, role, content, attachments=None, gemini_parts=None):
         """
@@ -163,6 +166,10 @@ class ChatSession:
             d["model_override"] = self.model_override
         if self.profile_override is not None:
             d["profile_override"] = self.profile_override
+        if self.manual_mode:
+            d["manual_mode"] = self.manual_mode
+        if self.provider_override is not None:
+            d["provider_override"] = self.provider_override
         return d
 
     @classmethod
@@ -186,6 +193,8 @@ class ChatSession:
         session.messages = data.get("messages", [])
         session.model_override = data.get("model_override", None)
         session.profile_override = data.get("profile_override", None)
+        session.manual_mode = data.get("manual_mode", False)
+        session.provider_override = data.get("provider_override", None)
 
         return session
 
