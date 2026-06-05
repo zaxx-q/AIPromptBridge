@@ -24,14 +24,10 @@ class TTSTabMixin:
         content = self._create_tab_scroll_frame(frame)
 
         # Import TTS constants
-        try:
-            from ....audio.tts_constants import TTS_MODELS, get_voice_list
+        from ....audio.tts_constants import TTS_MODELS, get_voice_list
 
-            tts_models = TTS_MODELS
-            tts_voices = get_voice_list()
-        except ImportError:
-            tts_models = ["gemini-2.5-flash-preview-tts"]
-            tts_voices = ["Kore"]
+        tts_models = TTS_MODELS
+        tts_voices = get_voice_list()
 
         # --- General TTS Settings ---
         create_section_header(content, "🗣️ Text-to-Speech", self.colors)

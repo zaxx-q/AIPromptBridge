@@ -5,7 +5,11 @@ Contains static voice definitions and model lists.
 """
 
 # Gemini TTS Models
-TTS_MODELS = ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"]
+TTS_MODELS = [
+    "gemini-2.5-flash-preview-tts",
+    "gemini-2.5-pro-preview-tts",
+    "gemini-3.1-flash-tts-preview",
+]
 
 # Gemini TTS Voices
 # Format: Name -> {style, gender}

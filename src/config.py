@@ -463,8 +463,8 @@ tts_hotkey = ctrl+alt+t
 tts_default_voice = Kore
 
 # Default TTS model
-# Options: gemini-2.5-flash-preview-tts, gemini-2.5-pro-preview-tts
-tts_default_model = gemini-2.5-flash-preview-tts
+# Options: gemini-2.5-flash-preview-tts, gemini-2.5-pro-preview-tts, gemini-3.1-flash-tts-preview
+tts_default_model = gemini-3.1-flash-tts-preview
 
 # Enable AI Director (auto-generates style instructions for expressive speech)
 tts_director_enabled = true

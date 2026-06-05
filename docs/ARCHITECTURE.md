@@ -679,7 +679,6 @@ The `TTSProcessor` (`src/tools/tts_processor.py`) provides batch text-to-speech 
 - **Voice & Model Configuration**:
   - Single speaker mode with 30 prebuilt Gemini voices
   - Multi-speaker mode (up to 2 speakers) with individual voice assignment
-  - Model selection: `gemini-2.5-flash-preview-tts` (fast) or `gemini-2.5-pro-preview-tts` (quality)
 
 - **Style Instructions**:
   - Manual: Enter custom style instructions

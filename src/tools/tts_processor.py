@@ -289,10 +289,8 @@ class TTSProcessor(BaseTool):
             print(f"✅ Configured {len(multi_speaker_config)} speaker(s)")
 
         # Model selection
-        models = [
-            "gemini-2.5-flash-preview-tts",
-            "gemini-2.5-pro-preview-tts",
-        ]
+        from src.audio.tts_constants import TTS_MODELS as models
+
         print("\nTTS Model:")
         for i, m in enumerate(models, 1):
             marker = " ◄" if m == default_model else ""
