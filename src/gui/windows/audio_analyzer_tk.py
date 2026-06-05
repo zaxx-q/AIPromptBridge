@@ -224,7 +224,13 @@ def _create_top_action_bar_tk(window, parent):
         initial_display = window.model or "(loading...)"
 
     window.model_dropdown = ScrollableComboBox(
-        left_frame, colors=colors, values=initial_values, width=250, height=28, command=window._on_model_changed
+        left_frame,
+        colors=colors,
+        values=initial_values,
+        width=250,
+        height=28,
+        command=window._on_model_changed,
+        item_tooltip_callback=window._get_profile_tooltip if window._use_profile_mode else None,
     )
     window.model_dropdown.pack(side="left")
     window.model_dropdown.set(initial_display)

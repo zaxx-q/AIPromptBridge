@@ -11,6 +11,7 @@ from tkinter import messagebox
 
 from ...custom_widgets import (
     ScrollableButtonList,
+    ScrollableComboBox,
     TkScrollableFrame,
     ask_themed_string,
     create_emoji_button,
@@ -418,18 +419,48 @@ class ActionsTabMixin:
                 anchor="w",
                 **get_ctk_label_colors(self.colors),
             ).pack(side="left")
-            self.editor_widgets["profile_var"] = tk.StringVar(master=self.root, value="(None)")
-            self.editor_widgets["profile_combo"] = ctk.CTkComboBox(
+        else:
+            tk.Label(
                 self.profile_frame,
-                variable=self.editor_widgets["profile_var"],
-                values=["(None)"],
-                width=220,
-                height=34,
-                state="readonly",
-                font=get_ctk_font(13),
-                **get_ctk_combobox_colors(self.colors),
-            )
-            self.editor_widgets["profile_combo"].pack(side="left", padx=(12, 8))
+                text="Connection Profile:",
+                font=("Segoe UI", 10),
+                width=12,
+                anchor="w",
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+            ).pack(side="left")
+
+        self.editor_widgets["profile_var"] = tk.StringVar(master=self.root, value="(None)")
+
+        def _tooltip_callback(name: str) -> str:
+            from ..utils import get_profile_tooltip_text
+
+            return get_profile_tooltip_text(name)
+
+        self.editor_widgets["profile_combo"] = ScrollableComboBox(
+            self.profile_frame,
+            colors=self.colors,
+            values=["(None)"],
+            variable=self.editor_widgets["profile_var"],
+            width=220,
+            height=34,
+            font_size=13,
+            state="readonly",
+            item_tooltip_callback=_tooltip_callback,
+        )
+        self.editor_widgets["profile_combo"].pack(side="left", padx=(12, 8) if self.use_ctk else (10, 5))
+
+        # Tooltip for the closed combobox entry
+        from ...popups import Tooltip
+        from ..utils import get_profile_tooltip_text
+
+        self._profile_combo_tooltip = Tooltip(
+            self.editor_widgets["profile_combo"].entry,
+            get_profile_tooltip_text(self.editor_widgets["profile_var"].get()),
+            delay_ms=400,
+        )
+
+        if self.use_ctk:
             ctk.CTkButton(
                 self.profile_frame,
                 text="Manage...",
@@ -440,26 +471,6 @@ class ActionsTabMixin:
                 command=self._open_profile_manager,
             ).pack(side="left")
         else:
-            from tkinter import ttk
-
-            tk.Label(
-                self.profile_frame,
-                text="Connection Profile:",
-                font=("Segoe UI", 10),
-                width=12,
-                anchor="w",
-                bg=self.colors.bg,
-                fg=self.colors.fg,
-            ).pack(side="left")
-            self.editor_widgets["profile_var"] = tk.StringVar(master=self.root, value="(None)")
-            self.editor_widgets["profile_combo"] = ttk.Combobox(
-                self.profile_frame,
-                textvariable=self.editor_widgets["profile_var"],
-                values=["(None)"],
-                state="readonly",
-                width=20,
-            )
-            self.editor_widgets["profile_combo"].pack(side="left", padx=(10, 5))
             tk.Button(
                 self.profile_frame,
                 text="Manage...",
@@ -468,6 +479,9 @@ class ActionsTabMixin:
                 fg=self.colors.fg,
                 command=self._open_profile_manager,
             ).pack(side="left")
+
+        # Trace profile changes
+        self.editor_widgets["profile_var"].trace_add("write", self._on_profile_var_changed)
 
         # Refresh profile dropdown values
         self._refresh_profile_dropdown()
@@ -627,6 +641,12 @@ class ActionsTabMixin:
             profile_name = action_data.get("connection_profile", "") or ""
             self.editor_widgets["profile_var"].set(profile_name if profile_name else "(None)")
 
+            # Update tooltip
+            if hasattr(self, "_profile_combo_tooltip"):
+                from ..utils import get_profile_tooltip_text
+
+                self._profile_combo_tooltip.text = get_profile_tooltip_text(profile_name)
+
         # Update field visibility
         self._update_editor_visibility()
 
@@ -639,10 +659,7 @@ class ActionsTabMixin:
 
         if "profile_combo" in self.editor_widgets:
             combo = self.editor_widgets["profile_combo"]
-            if self.use_ctk:
-                combo.configure(values=values)
-            else:
-                combo["values"] = values
+            combo.configure(values=values)
 
         # Also sync to the playground tab if it exists
         if hasattr(self, "_refresh_playground_profiles"):
@@ -656,6 +673,14 @@ class ActionsTabMixin:
             ConnectionProfileManager(self.root, colors=self.colors, on_close=self._refresh_profile_dropdown)
         except Exception as e:
             print(f"[PromptEditor] Error opening connection manager: {e}")
+
+    def _on_profile_var_changed(self, *args):
+        """Update profile combo tooltip when selection changes."""
+        if hasattr(self, "_profile_combo_tooltip") and "profile_var" in self.editor_widgets:
+            from ..utils import get_profile_tooltip_text
+
+            name = self.editor_widgets["profile_var"].get()
+            self._profile_combo_tooltip.text = get_profile_tooltip_text(name)
 
     def _add_action(self):
         """Add a new action."""

@@ -171,6 +171,12 @@ class ChatWindowBase(ABC):
         except Exception:
             return []
 
+    def _get_profile_tooltip(self, profile_name: str) -> str:
+        """Build tooltip text for a profile dropdown item."""
+        from .utils import get_profile_tooltip_text
+
+        return get_profile_tooltip_text(profile_name)
+
     def _safe_after(self, delay: int, func):
         """Schedule callback safely. Override for attached windows."""
         if self._destroyed:
@@ -402,6 +408,7 @@ class ChatWindowBase(ABC):
                 width=220,
                 height=28,
                 command=self._on_model_select,
+                item_tooltip_callback=self._get_profile_tooltip if self._use_profile_mode else None,
             )
             self.model_dropdown.pack(side="left", padx=(0, 0))
             self.model_dropdown.set(initial_display)
@@ -581,12 +588,19 @@ class ChatWindowBase(ABC):
             )
             self.model_label_widget.pack(side=tk.LEFT, padx=(0, 5))
 
-            self.model_dropdown = ttk.Combobox(
-                self._profile_widgets_frame, values=initial_values, width=30, state="readonly"
+            self.model_dropdown = ScrollableComboBox(
+                self._profile_widgets_frame,
+                colors=self.theme,
+                values=initial_values,
+                width=220,
+                height=28,
+                font_size=11,
+                state="readonly",
+                command=self._on_model_select,
+                item_tooltip_callback=self._get_profile_tooltip if self._use_profile_mode else None,
             )
             self.model_dropdown.pack(side=tk.LEFT)
             self.model_dropdown.set(initial_display)
-            self.model_dropdown.bind("<<ComboboxSelected>>", lambda e: self._on_model_select(self.model_dropdown.get()))
 
             # ---- Manual mode frame ----
             self._manual_widgets_frame = tk.Frame(right_container, bg=self.colors["bg"])

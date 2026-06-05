@@ -199,6 +199,15 @@ class AudioAnalyzerWindow:
         except Exception:
             return []
 
+    def _get_profile_tooltip(self, profile_name: str) -> str:
+        """Build tooltip text for a profile dropdown item."""
+        # Handle default sentinel
+        if profile_name == "(Default)":
+            return ""
+        from .utils import get_profile_tooltip_text
+
+        return get_profile_tooltip_text(profile_name)
+
     def _create_window(self):
         """Create the main window."""
         if HAVE_CTK:
@@ -363,7 +372,13 @@ class AudioAnalyzerWindow:
             initial_display = self.model or "(loading...)"
 
         self.model_dropdown = ScrollableComboBox(
-            left_frame, colors=self.colors, values=initial_values, width=200, height=32, command=self._on_model_changed
+            left_frame,
+            colors=self.colors,
+            values=initial_values,
+            width=200,
+            height=32,
+            command=self._on_model_changed,
+            item_tooltip_callback=self._get_profile_tooltip if self._use_profile_mode else None,
         )
         self.model_dropdown.pack(side="left")
         self.model_dropdown.set(initial_display)

@@ -1181,29 +1181,31 @@ def create_profile_dropdown_ctk(parent, colors):
     Returns (profile_var, dropdown_widget, frame). Caller must pack the frame.
     """
     from ..connection_profiles import ProfileStore
+    from .custom_widgets import ScrollableComboBox
+    from .windows.utils import get_profile_tooltip_text
 
     profile_names = ProfileStore.get_instance().get_profile_names()
 
     frame = ctk.CTkFrame(parent, fg_color="transparent")
 
     profile_var = tk.StringVar(value="(Default)")
-    dropdown = ctk.CTkOptionMenu(
+
+    def _tooltip_callback(name: str) -> str:
+        if name == "(Default)":
+            return ""
+        return get_profile_tooltip_text(name)
+
+    dropdown = ScrollableComboBox(
         frame,
+        colors=colors,
         values=["(Default)", *profile_names],
         variable=profile_var,
         width=140,
         height=28,
-        corner_radius=6,
-        fg_color=colors.surface0,
-        button_color=colors.surface1,
-        button_hover_color=colors.surface2,
-        dropdown_fg_color=colors.surface0,
-        dropdown_hover_color=colors.surface1,
-        text_color=colors.text,
-        font=get_ctk_font(size=11),
+        font_size=11,
+        item_tooltip_callback=_tooltip_callback,
     )
     dropdown.pack(side="left", fill="x", expand=True)
-    Tooltip(dropdown, "Override connection profile for this request")
 
     return profile_var, dropdown, frame
 
@@ -1215,21 +1217,29 @@ def create_profile_dropdown_tk(parent, root, colors):
     Returns (profile_var, dropdown_widget, frame). Caller must pack the frame.
     """
     from ..connection_profiles import ProfileStore
+    from .custom_widgets import ScrollableComboBox
+    from .windows.utils import get_profile_tooltip_text
 
     profile_names = ProfileStore.get_instance().get_profile_names()
 
     frame = tk.Frame(parent, bg=colors.base)
 
     profile_var = tk.StringVar(master=root, value="(Default)")
-    dropdown = tk.OptionMenu(frame, profile_var, "(Default)", *profile_names)
-    dropdown.config(
-        bg=colors.surface0,
-        fg=colors.text,
-        font=("Arial", 10),
-        highlightthickness=0,
-        relief=tk.FLAT,
-        activebackground=colors.surface1,
-        activeforeground=colors.text,
+
+    def _tooltip_callback(name: str) -> str:
+        if name == "(Default)":
+            return ""
+        return get_profile_tooltip_text(name)
+
+    dropdown = ScrollableComboBox(
+        frame,
+        colors=colors,
+        values=["(Default)", *profile_names],
+        variable=profile_var,
+        width=140,
+        height=28,
+        font_size=11,
+        item_tooltip_callback=_tooltip_callback,
     )
     dropdown.pack(side=tk.LEFT, fill=tk.X, expand=True)
 

@@ -97,6 +97,7 @@ class ProviderTabMixin:
         """Active profile dropdown + Manage Profiles button."""
         from src.connection_profiles import ProfileStore
 
+        from ...custom_widgets import ScrollableComboBox
         from .widgets import DROPDOWN_WIDTH_MD, LABEL_WIDTH
 
         store = ProfileStore.get_instance()
@@ -115,26 +116,6 @@ class ProviderTabMixin:
                 anchor="w",
                 **get_ctk_label_colors(self.colors),
             ).pack(side="left")
-
-            self._profile_var = tk.StringVar(master=self.root, value=active_name)
-            dd = ctk.CTkComboBox(
-                row,
-                variable=self._profile_var,
-                values=profile_names,
-                width=DROPDOWN_WIDTH_MD,
-                height=34,
-                state="readonly",
-                font=get_ctk_font(13),
-                fg_color=self.colors.input_bg,
-                border_color=self.colors.surface1,
-                button_color=self.colors.surface1,
-                button_hover_color=self.colors.accent,
-                dropdown_fg_color=self.colors.surface0,
-                text_color=self.colors.fg,
-                command=self._on_profile_selected,
-            )
-            dd.pack(side="left", padx=(8, 0))
-            self._profile_dropdown = dd
         else:
             tk.Label(
                 row,
@@ -146,19 +127,21 @@ class ProviderTabMixin:
                 fg=self.colors.fg,
             ).pack(side="left")
 
-            self._profile_var = tk.StringVar(master=self.root, value=active_name)
-            from tkinter import ttk
-
-            dd = ttk.Combobox(
-                row,
-                textvariable=self._profile_var,
-                values=profile_names,
-                width=DROPDOWN_WIDTH_MD // 10,
-                state="readonly",
-            )
-            dd.pack(side="left", padx=(8, 0))
-            dd.bind("<<ComboboxSelected>>", lambda e: self._on_profile_selected(self._profile_var.get()))
-            self._profile_dropdown = dd
+        self._profile_var = tk.StringVar(master=self.root, value=active_name)
+        dd = ScrollableComboBox(
+            row,
+            colors=self.colors,
+            values=profile_names,
+            variable=self._profile_var,
+            width=DROPDOWN_WIDTH_MD,
+            height=34,
+            font_size=13,
+            state="readonly",
+            command=self._on_profile_selected,
+            item_tooltip_callback=self._get_profile_tooltip_text,
+        )
+        dd.pack(side="left", padx=(8, 0))
+        self._profile_dropdown = dd
 
         # Status label
         if self.use_ctk:
@@ -218,6 +201,16 @@ class ProviderTabMixin:
         else:
             self._profile_status.configure(text=status_text, fg=color)
 
+        # Update tooltip with new profile info
+        if hasattr(self, "_profile_tooltip"):
+            self._profile_tooltip.text = self._get_profile_tooltip_text(name)
+
+    def _get_profile_tooltip_text(self, name: str) -> str:
+        """Get tooltip text for a profile name."""
+        from ..utils import get_profile_tooltip_text
+
+        return get_profile_tooltip_text(name)
+
     def _open_connection_manager(self):
         """Open the Connection Profile Manager window."""
         try:
@@ -240,6 +233,9 @@ class ProviderTabMixin:
                 self._profile_dropdown.configure(values=names)
             else:
                 self._profile_dropdown.configure(values=names)
+
+            if hasattr(self, "_profile_tooltip"):
+                self._profile_tooltip.text = self._get_profile_tooltip_text(active)
         except Exception:
             pass
 

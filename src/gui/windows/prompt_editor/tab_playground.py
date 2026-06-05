@@ -16,7 +16,7 @@ from typing import Dict
 
 import pyperclip
 
-from ...custom_widgets import TkScrollableFrame, create_emoji_button, create_section_header
+from ...custom_widgets import ScrollableComboBox, TkScrollableFrame, create_emoji_button, create_section_header
 from ...platform import HAVE_CTK, ctk
 from ...themes import (
     get_ctk_button_colors,
@@ -676,20 +676,43 @@ class PlaygroundTabMixin:
                 anchor="w",
                 **get_ctk_label_colors(self.colors),
             ).pack(side="left")
-            self.playground_profile_var = tk.StringVar()
-            self.playground_profile_combo = ctk.CTkComboBox(
-                self.api_profile_frame,
-                variable=self.playground_profile_var,
-                values=[],
-                width=220,
-                height=32,
-                state="readonly",
-                font=get_ctk_font(12),
-                **get_ctk_combobox_colors(self.colors),
-                command=lambda x: self._update_playground_preview(),
-            )
-            self.playground_profile_combo.pack(side="left", padx=(8, 12))
+        else:
+            tk.Label(
+                self.api_profile_frame, text="Profile:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg
+            ).pack(side="left")
 
+        self.playground_profile_var = tk.StringVar()
+        self.playground_profile_var.trace_add("write", self._on_playground_profile_var_changed)
+
+        def _tooltip_callback(name: str) -> str:
+            from ..utils import get_profile_tooltip_text
+
+            return get_profile_tooltip_text(name)
+
+        self.playground_profile_combo = ScrollableComboBox(
+            self.api_profile_frame,
+            colors=self.colors,
+            values=[],
+            variable=self.playground_profile_var,
+            width=220,
+            height=32,
+            font_size=12,
+            state="readonly",
+            command=lambda x: self._update_playground_preview(),
+            item_tooltip_callback=_tooltip_callback,
+        )
+        self.playground_profile_combo.pack(side="left", padx=(8, 12) if self.use_ctk else (8, 10))
+
+        from ...popups import Tooltip
+        from ..utils import get_profile_tooltip_text
+
+        self._playground_profile_tooltip = Tooltip(
+            self.playground_profile_combo.entry,
+            get_profile_tooltip_text(self.playground_profile_var.get()),
+            delay_ms=400,
+        )
+
+        if self.use_ctk:
             # Manage button
             ctk.CTkButton(
                 self.api_profile_frame,
@@ -701,22 +724,6 @@ class PlaygroundTabMixin:
                 command=self._open_profile_manager,
             ).pack(side="left")
         else:
-            from tkinter import ttk
-
-            tk.Label(
-                self.api_profile_frame, text="Profile:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg
-            ).pack(side="left")
-            self.playground_profile_var = tk.StringVar()
-            self.playground_profile_combo = ttk.Combobox(
-                self.api_profile_frame,
-                textvariable=self.playground_profile_var,
-                values=[],
-                state="readonly",
-                width=25,
-            )
-            self.playground_profile_combo.pack(side="left", padx=(8, 10))
-            self.playground_profile_combo.bind("<<ComboboxSelected>>", lambda e: self._update_playground_preview())
-
             tk.Button(
                 self.api_profile_frame,
                 text="Manage...",
@@ -2085,18 +2092,25 @@ class PlaygroundTabMixin:
         values = ["(None)", *profile_names]
         active_p = store.get_active_profile_name()
 
-        if self.use_ctk:
-            self.playground_profile_combo.configure(values=values)
-            if active_p in profile_names:
-                self.playground_profile_combo.set(active_p)
-                self.playground_profile_var.set(active_p)
-            elif values:
-                self.playground_profile_combo.set(values[0])
-                self.playground_profile_var.set(values[0])
-        else:
-            self.playground_profile_combo["values"] = values
-            if active_p in profile_names:
-                idx = values.index(active_p)
-                self.playground_profile_combo.current(idx)
-            elif values:
-                self.playground_profile_combo.current(0)
+        self.playground_profile_combo.configure(values=values)
+        if active_p in profile_names:
+            self.playground_profile_combo.set(active_p)
+            self.playground_profile_var.set(active_p)
+        elif values:
+            self.playground_profile_combo.set(values[0])
+            self.playground_profile_var.set(values[0])
+
+        # Update tooltip for active profile
+        if hasattr(self, "_playground_profile_tooltip"):
+            from ..utils import get_profile_tooltip_text
+
+            selected = self.playground_profile_var.get()
+            self._playground_profile_tooltip.text = get_profile_tooltip_text(selected)
+
+    def _on_playground_profile_var_changed(self, *args):
+        """Update playground profile tooltip when selection changes."""
+        if hasattr(self, "_playground_profile_tooltip"):
+            from ..utils import get_profile_tooltip_text
+
+            name = self.playground_profile_var.get()
+            self._playground_profile_tooltip.text = get_profile_tooltip_text(name)

@@ -6,6 +6,7 @@ Includes ScrollableComboBox for dropdowns with scrollbar support.
 Includes TkScrollableFrame for a fallback scrollable frame for standard Tkinter.
 """
 
+import sys
 import tkinter as tk
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -388,6 +389,7 @@ class ScrollableComboBox:
         height: int = 32,
         font_size: int = 13,
         state: str = "normal",
+        item_tooltip_callback: Callable[[str], str] | None = None,
         **kwargs,
     ):
         self.master = master
@@ -399,6 +401,9 @@ class ScrollableComboBox:
         self.height = height
         self.font_size = font_size
         self.state = state
+        self._item_tooltip_callback = item_tooltip_callback
+        self._item_tooltip_window = None
+        self._item_tooltip_after_id = None
 
         self._dropdown_open = False
         self._dropdown_window = None
@@ -424,6 +429,10 @@ class ScrollableComboBox:
         if variable and variable.get():
             self._selected_value = variable.get()
             self._update_entry_text()
+
+        # Apply initial state
+        if self.state != "normal":
+            self.configure(state=self.state)
 
     def _create_widgets(self):
         """Create the entry field and arrow button."""
@@ -491,6 +500,8 @@ class ScrollableComboBox:
                 font=("Segoe UI", 10),
                 bg=self.colors.input_bg,
                 fg=self.colors.fg,
+                readonlybackground=self.colors.input_bg,
+                disabledbackground=self.colors.input_bg,
                 relief="flat",
                 highlightthickness=0,
                 width=max(1, (self.width - 32) // 8),
@@ -824,11 +835,135 @@ class ScrollableComboBox:
                 if self._filtered_values[line] != self._selected_value:
                     self._text_widget.tag_add("hover", line_start, line_end)
 
+                # Schedule tooltip for this item
+                if self._item_tooltip_callback:
+                    self._schedule_item_tooltip(
+                        self._filtered_values[line],
+                        event.x_root,
+                        event.y_root,
+                    )
+            else:
+                # Mouse moved off items — hide tooltip
+                self._hide_item_tooltip()
+
     def _on_text_leave(self, event):
         """Handle mouse leaving text widget."""
         if self._text_widget:
             self._text_widget.tag_remove("hover", "1.0", "end")
             self._hover_line = -1
+        self._hide_item_tooltip()
+
+    _ITEM_TOOLTIP_DELAY_MS = 350  # Slightly faster than Tooltip's 500ms for dropdown items
+
+    def _show_item_tooltip(self, text: str, x: int, y: int):
+        """Show a tooltip near the hovered dropdown item."""
+        self._hide_item_tooltip()
+
+        if not text or not self._dropdown_window:
+            return
+
+        try:
+            from .popups import TRANSPARENCY_COLOR, Tooltip  # Only for accessing tooltip styling pattern
+        except ImportError:
+            TRANSPARENCY_COLOR = "#010101"
+
+        tw = tk.Toplevel(self._dropdown_window)
+        tw.wm_overrideredirect(True)
+        tw.wm_attributes("-topmost", True)
+
+        # Apply transparency for rounded corners on Windows to avoid white corners
+        if sys.platform == "win32":
+            try:
+                tw.attributes("-transparentcolor", TRANSPARENCY_COLOR)
+                tw.configure(bg=TRANSPARENCY_COLOR)
+            except tk.TclError:
+                pass
+
+        if HAVE_CTK:
+            from .themes import get_ctk_font
+
+            frame = ctk.CTkFrame(
+                tw,
+                fg_color=self.colors.surface0,
+                border_color=self.colors.surface2,
+                border_width=1,
+                corner_radius=6,
+            )
+            frame.pack()
+
+            label = ctk.CTkLabel(
+                frame,
+                text=text,
+                font=get_ctk_font(size=11),
+                text_color=self.colors.text,
+                wraplength=300,
+                justify="left",
+            )
+            label.pack(padx=10, pady=6)
+        else:
+            frame = tk.Frame(
+                tw,
+                bg=self.colors.surface0,
+                highlightbackground=self.colors.surface2,
+                highlightthickness=1,
+            )
+            frame.pack()
+
+            label = tk.Label(
+                frame,
+                text=text,
+                font=("Segoe UI", 10),
+                bg=self.colors.surface0,
+                fg=self.colors.text,
+                padx=8,
+                pady=4,
+                wraplength=300,
+                justify=tk.LEFT,
+            )
+            label.pack()
+
+        # Position next to the mouse cursor instead of beside the dropdown
+        try:
+            tooltip_x = x + 15
+            tooltip_y = y - 10  # Slightly above mouse for readability
+            tw.wm_geometry(f"+{tooltip_x}+{tooltip_y}")
+        except tk.TclError:
+            tw.destroy()
+            return
+
+        self._item_tooltip_window = tw
+
+    def _hide_item_tooltip(self):
+        """Hide the item tooltip if visible."""
+        if self._item_tooltip_after_id:
+            try:
+                self.frame.after_cancel(self._item_tooltip_after_id)
+            except Exception:
+                pass
+            self._item_tooltip_after_id = None
+
+        if self._item_tooltip_window:
+            try:
+                self._item_tooltip_window.destroy()
+            except tk.TclError:
+                pass
+            self._item_tooltip_window = None
+
+    def _schedule_item_tooltip(self, value: str, x_root: int, y_root: int):
+        """Schedule showing a tooltip for a dropdown item after a delay."""
+        self._hide_item_tooltip()
+
+        if not self._item_tooltip_callback:
+            return
+
+        text = self._item_tooltip_callback(value)
+        if not text:
+            return
+
+        self._item_tooltip_after_id = self.frame.after(
+            self._ITEM_TOOLTIP_DELAY_MS,
+            lambda: self._show_item_tooltip(text, x_root, y_root),
+        )
 
     def _start_focus_check(self):
         """Start periodic check for window focus."""
@@ -918,6 +1053,8 @@ class ScrollableComboBox:
         if _value_already_set:
             self._cancel_focus_out()
 
+        self._hide_item_tooltip()
+
         if self._dropdown_window:
             try:
                 self._dropdown_window.destroy()
@@ -968,8 +1105,16 @@ class ScrollableComboBox:
     def _update_entry_text(self):
         """Update the entry text."""
         try:
+            # Temporarily enable entry to allow programmatic updates if in readonly/disabled state
+            old_state = self.entry.cget("state")
+            if old_state in ("readonly", "disabled"):
+                self.entry.configure(state="normal") if HAVE_CTK else self.entry.config(state="normal")
+
             self.entry.delete(0, tk.END)
             self.entry.insert(0, self._selected_value or "")
+
+            if old_state in ("readonly", "disabled"):
+                self.entry.configure(state=old_state) if HAVE_CTK else self.entry.config(state=old_state)
         except tk.TclError:
             pass
 
@@ -1001,9 +1146,22 @@ class ScrollableComboBox:
                 if self.state == "disabled":
                     self.entry.configure(state="disabled")
                     self._arrow_btn.configure(state="disabled")
+                elif self.state == "readonly":
+                    self.entry.configure(state="readonly")
+                    self._arrow_btn.configure(state="normal")
                 else:
                     self.entry.configure(state="normal")
                     self._arrow_btn.configure(state="normal")
+            else:
+                if self.state == "disabled":
+                    self.entry.config(state="disabled")
+                    self._arrow_btn.config(state="disabled")
+                elif self.state == "readonly":
+                    self.entry.config(state="readonly")
+                    self._arrow_btn.config(state="normal")
+                else:
+                    self.entry.config(state="normal")
+                    self._arrow_btn.config(state="normal")
 
     def cget(self, key: str):
         """Get configuration value."""
