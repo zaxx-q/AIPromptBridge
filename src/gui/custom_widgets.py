@@ -534,10 +534,16 @@ class ScrollableComboBox:
         Ensures the filter is applied immediately when values are refreshed
         or the dropdown is opened while the entry already contains text.
         """
-        search_text = self.entry.get().strip().lower()
-        if search_text and search_text != self._selected_value.lower():
-            self._filtered_values = [v for v in self.values if search_text in v.lower()]
-        else:
+        try:
+            if not hasattr(self, "entry") or not self.entry or not self.entry.winfo_exists():
+                self._filtered_values = list(self.values)
+                return
+            search_text = self.entry.get().strip().lower()
+            if search_text and search_text != self._selected_value.lower():
+                self._filtered_values = [v for v in self.values if search_text in v.lower()]
+            else:
+                self._filtered_values = list(self.values)
+        except (tk.TclError, AttributeError):
             self._filtered_values = list(self.values)
 
     def _on_entry_click(self, event):
@@ -1122,8 +1128,13 @@ class ScrollableComboBox:
 
     def get(self) -> str:
         """Get current value (returns typed text if different from selection)."""
-        typed = self.entry.get().strip()
-        return typed if typed else self._selected_value
+        try:
+            if not hasattr(self, "entry") or not self.entry or not self.entry.winfo_exists():
+                return self._selected_value
+            typed = self.entry.get().strip()
+            return typed if typed else self._selected_value
+        except Exception:
+            return self._selected_value
 
     def set(self, value: str):
         """Set current value."""
@@ -1134,34 +1145,37 @@ class ScrollableComboBox:
 
     def configure(self, **kwargs):
         """Configure widget options."""
-        if "values" in kwargs:
-            self.values = kwargs["values"]
-            self._compute_filtered_values()
-            # Refresh dropdown if it's currently open
-            if self._dropdown_open:
-                self._refresh_dropdown_items()
-        if "state" in kwargs:
-            self.state = kwargs["state"]
-            if HAVE_CTK:
-                if self.state == "disabled":
-                    self.entry.configure(state="disabled")
-                    self._arrow_btn.configure(state="disabled")
-                elif self.state == "readonly":
-                    self.entry.configure(state="readonly")
-                    self._arrow_btn.configure(state="normal")
+        try:
+            if "values" in kwargs:
+                self.values = kwargs["values"]
+                self._compute_filtered_values()
+                # Refresh dropdown if it's currently open
+                if self._dropdown_open:
+                    self._refresh_dropdown_items()
+            if "state" in kwargs:
+                self.state = kwargs["state"]
+                if HAVE_CTK:
+                    if self.state == "disabled":
+                        self.entry.configure(state="disabled")
+                        self._arrow_btn.configure(state="disabled")
+                    elif self.state == "readonly":
+                        self.entry.configure(state="readonly")
+                        self._arrow_btn.configure(state="normal")
+                    else:
+                        self.entry.configure(state="normal")
+                        self._arrow_btn.configure(state="normal")
                 else:
-                    self.entry.configure(state="normal")
-                    self._arrow_btn.configure(state="normal")
-            else:
-                if self.state == "disabled":
-                    self.entry.config(state="disabled")
-                    self._arrow_btn.config(state="disabled")
-                elif self.state == "readonly":
-                    self.entry.config(state="readonly")
-                    self._arrow_btn.config(state="normal")
-                else:
-                    self.entry.config(state="normal")
-                    self._arrow_btn.config(state="normal")
+                    if self.state == "disabled":
+                        self.entry.config(state="disabled")
+                        self._arrow_btn.config(state="disabled")
+                    elif self.state == "readonly":
+                        self.entry.config(state="readonly")
+                        self._arrow_btn.config(state="normal")
+                    else:
+                        self.entry.config(state="normal")
+                        self._arrow_btn.config(state="normal")
+        except Exception:
+            pass
 
     def cget(self, key: str):
         """Get configuration value."""

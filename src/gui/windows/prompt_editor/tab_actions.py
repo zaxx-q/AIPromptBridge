@@ -652,6 +652,9 @@ class ActionsTabMixin:
 
     def _refresh_profile_dropdown(self):
         """Refresh the connection profile dropdown values from profile store."""
+        if getattr(self, "_destroyed", False) or not self.root or not self.root.winfo_exists():
+            return
+
         from ....connection_profiles import ProfileStore
 
         profile_names = ProfileStore.get_instance().get_profile_names()
@@ -659,11 +662,18 @@ class ActionsTabMixin:
 
         if "profile_combo" in self.editor_widgets:
             combo = self.editor_widgets["profile_combo"]
-            combo.configure(values=values)
+            if hasattr(combo, "frame") and combo.frame.winfo_exists():
+                try:
+                    combo.configure(values=values)
+                except Exception:
+                    pass
 
         # Also sync to the playground tab if it exists
         if hasattr(self, "_refresh_playground_profiles"):
-            self._refresh_playground_profiles()
+            try:
+                self._refresh_playground_profiles()
+            except Exception:
+                pass
 
     def _open_profile_manager(self):
         """Open the Manage Profiles dialog."""
