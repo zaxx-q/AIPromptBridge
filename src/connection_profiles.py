@@ -211,6 +211,8 @@ class ProfileStore:
         if name not in self._profiles:
             logging.warning(f"[ProfileStore] Profile '{name}' not found")
             return False
+        if self._active_profile_name == name:
+            return True
         self._active_profile_name = name
         self._save()
         logging.info(f"[ProfileStore] Active profile set to '{name}'")
