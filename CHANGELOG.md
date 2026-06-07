@@ -14,6 +14,16 @@
 - **Inline Thinking Extraction**: Models served via OpenRouter or custom endpoints that emit reasoning text in XML-style tags (e.g., `<think>`, `<thinking>`) are now automatically parsed, separating thinking content from the final response for collapsible display.
 - **Fallback Model Lists**: All model dropdowns (Chat Window, Audio Analyzer, Connection Manager, Onboarding) now display curated fallback model lists when live API fetching fails or is unavailable.
 - **Gemma 4 System Instructions**: Gemma 4+ models now use native `systemInstruction` support instead of prepending system prompts to user messages (legacy Gemma 1–3 behavior is preserved).
+- **Per-Session Manual Override**: Added manual mode support to the chat window, allowing users to toggle between profile selection and manual provider/model selection directly from the toolbar, with overrides persisted independently per-session.
+- **Connection Profiles in Playground**: Integrated connection profile support into the Prompt Editor's playground tab, enabling testing prompts with saved profiles or manual settings, with auto-updated tooltips.
+- **Gemini 3.1 TTS Support**: Added support for the `gemini-3.1-flash-tts-preview` model and set it as the default choice for the Text-to-Speech tool.
+- **ScrollableComboBox Tooltips**: Dropdown list items in the custom `ScrollableComboBox` now display detailed contextual tooltips on hover (such as showing provider, model, and base URL for connection profiles).
+- **Unsaved Changes Tracking**: Implemented robust dirty-state tracking with title-bar indicators and save prompts when attempting to close the Settings window or Prompt Editor with unsaved changes.
+- **Active Environment Keys**: Updated `KeyStore` to unconditionally scan for API keys in environment variables on every startup, automatically importing and persisting newly discovered keys to local storage key pools.
+- **Enable/Disable Connection Profiles**: Added support for enabling or disabling individual connection profiles, allowing users to temporarily hide profiles from dropdown selectors without deleting them.
+- **Standardized Test Suite**: Consolidated the testing workflow into a unified `run_tests.py` script that automates Ruff linting/fixes, formatting checks, and Pytest unit tests in a single command.
+- **New UI Themes**: Introduced three new color themes ("Rose", "Coffee", and "Violet") in both light and dark variants across all application interfaces.
+- **Gemini Response Parts**: Added support for capturing and propagating raw Gemini response parts (like deep reasoning thought signatures) through the API pipeline and persisting them in chat session histories.
 
 ### Improvements
 
@@ -30,6 +40,14 @@
 - **ScrollableComboBox**: Fixed focus-out race conditions that could overwrite explicit dropdown selections, and improved filtering logic to correctly reflect entry text when the dropdown is opened or values are refreshed.
 - **Tooltip Readability**: Increased font size in the Tooltip component for improved readability across all UI elements.
 - **API Key Logging**: Named API keys are now shown by name in request logs instead of generic index numbers. Key rotation is automatically disabled when a specific named key is selected via a profile override.
+- **Terminal Profile Table**: Enhanced the connection profile switching command in the terminal dashboard (`P` key) to show a beautiful, detailed table of profile configurations including API key pool/name, streaming/thinking toggles, temperature, max tokens, and custom endpoints.
+- **Connection Profile Manager Performance**: Optimized summary updates in the Connection Profile Manager by caching widget rows, replacing heavy dynamic rebuilding with static update-only panels.
+- **Earlier Tray Initialization**: Re-architected application startup to initialize the system tray earlier, preventing thread blockages during heavy module load times and ensuring proper OS dark mode synchronization.
+- **Earlier Port Conflict Resolution**: Moved local server port detection and conflict resolution to the very beginning of the startup sequence, preventing race conditions with tray launch and false port warnings.
+- **Thinking Configuration**: Added a `medium` option to thinking level configuration inputs for Gemini 3.x models in the Connection Profiles UI.
+- **Unsafe Code Refactoring**: Performed a major Ruff-driven cleanup of codebase quality, resolving unsafe try-except blocks, import conventions, static typings, and Windows subprocess window flags.
+- **Default Theme Change**: Updated the default application theme from "Dracula" to "Minimal" and refined its dark mode palette for better styling.
+- **Startup Descriptions**: Refined CLI help menus and descriptions to use modern desktop terminology instead of terminal-focused legacy descriptions.
 
 ### Removed
 
@@ -50,6 +68,8 @@
 - **Preset Manager**: Fixed model fetching not reflecting custom Gemini endpoints, and added proper API key pool/name override support for preset testing.
 - **Settings Save**: Fixed an error when saving settings if the Keys tab had never been loaded during the current session.
 - **Profile Method Indentation**: Fixed `_get_profile_names` being incorrectly nested inside another method's return statement in both Audio Analyzer and Chat Base classes.
+- **ScrollableComboBox Robustness**: Added defensive checks and error-handling blocks to the custom `ScrollableComboBox` to prevent asynchronous UI crashes or post-destruction lifecycle errors.
+- **Test Connection Pipeline**: Restructured the test connection logic in the Connection Profile Manager and the Playground to route through `RequestPipeline` instead of deprecated API methods, and updated the test result window to report token usage statistics.
 
 ## [6.4.1] - 2026-04-30
 

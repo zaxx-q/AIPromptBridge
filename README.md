@@ -134,9 +134,11 @@ The **TTS Processor** tool enables batch text-to-speech generation:
 
 1. Download `AIPromptBridge.zip` from [GitHub Releases](https://github.com/zaxx-q/AIPromptBridge/releases)
 2. Extract and run `AIPromptBridge.exe` (use `AIPromptBridge-NoConsole.exe` to hide console)
-3. On first launch, it automatically opens the Settings window in **API Keys** tab. Enter your API keys (see [Getting API Keys](#getting-api-keys)), enter key name (Optional), and click **Add**
-4. Optionally configure selected provider, endpoint URL, or models in **Provider** tab and click **Save**
-5. The app starts minimized to system tray
+3. On first launch, a setup wizard will automatically run to guide you step-by-step to quickly get started
+4. If you skip setup wizard or need to make changes later:
+   - Access **Profiles** to edit and test your connection profiles.
+   - Access **Settings** to customize theme modes, general behavior, and tool configurations.
+5. The app runs minimized to the Windows system tray. Double-click tray icon to hide/unhide the console.
 
 ### From Source (Alternative)
 
@@ -225,8 +227,8 @@ AIPromptBridge features a comprehensive GUI for all configuration needs, making 
 
 Access via **System Tray > Settings**. This window manages the core application configuration (`config.ini`):
 
-- **API Keys**: Manage keys for Google Gemini, OpenRouter, and Custom providers.
-- **Providers**: Select active connection profile
+- **API Keys**: Manage named API keys and custom key pools for rotation.
+- **Connection**: Set your active global profile, assign key pools, and adjust global request timeout / retry parameters.
 - **Tools**: Configure hotkeys and behavior for TextEditTool, SnipTool, and AudioTool.
 - **Theme**: Switch between 9 themes and toggle Dark/Light modes.
 - **System**: Configure server host/port, startup options, and auto-update checks.
