@@ -368,28 +368,28 @@ GRUVBOX_LIGHT = ThemeColors(
 
 # Minimal Dark
 MINIMAL_DARK = ThemeColors(
-    bg="#1a1a1a",
+    bg="#282a36",
     fg="#e0e0e0",
-    text_bg="#222222",
-    input_bg="#2a2a2a",
-    border="#404040",
+    text_bg="#21222c",
+    input_bg="#44475a",
+    border="#6272a4",
     accent="#5a8ff0",
     accent_green="#43a047",
     accent_yellow="#ffb74d",
     accent_red="#f44336",
-    user_bg="#252530",
+    user_bg="#2d3548",
     user_accent="#5a8ff0",
-    assistant_bg="#253025",
+    assistant_bg="#283e2f",
     assistant_accent="#43a047",
-    code_bg="#161616",
+    code_bg="#1e1f29",
     header1="#ffb74d",
     header2="#5a8ff0",
     header3="#4dd0e1",
     bullet="#ba68c8",
     blockquote="#b3b3b3",  # Improved readability (was #808080)
-    surface0="#252525",
-    surface1="#303030",
-    surface2="#404040",
+    surface0="#44475a",
+    surface1="#4d5066",
+    surface2="#6272a4",
     overlay0="#b3b3b3",  # Improved readability (was #808080)
     lavender="#9575cd",
     peach="#ff8a65",
@@ -692,7 +692,7 @@ class ThemeRegistry:
     }
 
     # Default theme
-    DEFAULT_THEME = "dracula"
+    DEFAULT_THEME = "minimal"
     DEFAULT_MODE = "auto"
 
     @classmethod
