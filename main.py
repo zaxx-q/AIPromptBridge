@@ -461,12 +461,12 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py                  Start with tray (console hidden by default)
-  python main.py --show-console   Start with tray and console visible
+  python main.py                  Start application (console hidden by default)
+  python main.py --show-console   Start application with console visible
   python main.py --no-wt          Skip Windows Terminal auto-detection
         """,
     )
-    parser.add_argument("--show-console", action="store_true", help="Start with console visible (when using tray mode)")
+    parser.add_argument("--show-console", action="store_true", help="Start with console visible")
     parser.add_argument("--dummy", action="store_true", help="Dummy argument (does nothing)")
     parser.add_argument(
         "--launched-mode",
@@ -732,7 +732,7 @@ def main():
             else:
                 print("❌ ERROR: Another instance of AIPromptBridge is already running!")
 
-            # If we are in tray mode (hidden console), just exit silently
+            # If console is hidden, just exit silently
             # User probably just double clicked the icon again
             if not args.show_console:
                 sys.exit(0)
@@ -763,7 +763,7 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # Create example config if needed (don't use tray mode for first-run config creation)
+    # Create example config if needed
     if not Path(CONFIG_FILE).exists():
         if HAVE_RICH:
             print_warning(f"Config file '{CONFIG_FILE}' not found.")
@@ -968,7 +968,7 @@ def main():
     else:
         print()
 
-    # ─── Tray Mode vs Terminal Mode ───────────────────────────────────────
+    # ─── Execution Loop ───────────────────────────────────────────────────
     use_tray = HAVE_TRAY and sys.platform == "win32"
 
     if use_tray:
@@ -985,13 +985,13 @@ def main():
         os._exit(0)
 
     else:
-        # Terminal mode: normal behavior
+        # Fallback terminal behavior
         if not HAVE_TRAY:
             if HAVE_RICH:
-                console.print("[dim]📟 Running in terminal mode (tray not available)[/dim]")
+                console.print("[dim]📟 Running in terminal-only fallback (tray not available)[/dim]")
                 console.print("   Install with: [cyan]pip install infi.systray[/cyan]")
             else:
-                print("📟 Running in terminal mode (tray not available)")
+                print("📟 Running in terminal-only fallback (tray not available)")
                 print("   Install with: pip install infi.systray")
         print()
 
