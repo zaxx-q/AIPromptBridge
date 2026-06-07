@@ -752,15 +752,7 @@ def main():
     # - Console mode: Has console (WT check, toggle enabled)
     # - No launched-mode + compiled (Internal.exe): No console (attach mode, skip WT)
     # - No launched-mode + source (python main.py): Has console (WT check, toggle enabled)
-    is_compiled = _is_compiled()
-
-    if args.launched_mode == "gui":
-        has_real_console = False
-    elif args.launched_mode == "console":
-        has_real_console = True
-    else:
-        # No launcher: compiled (direct Internal.exe) has no console, source does
-        has_real_console = not is_compiled
+    # Note: computed earlier for early-tray launch.
 
     # Suppress Flask startup banner
     import flask.cli
@@ -801,8 +793,40 @@ def main():
         else:
             print(f"✅ Created '{PROMPTS_FILE}'")
 
+    # ─── Onboarding & Initialization ───────────────────────────────────────────
     # Initialize (new compact output)
     config, ai_params = initialize()
+
+    # Determine if we have a real console (for WT relaunch and console toggle)
+    is_compiled = _is_compiled()
+    if args.launched_mode == "gui":
+        has_real_console = False
+    elif args.launched_mode == "console":
+        has_real_console = True
+    else:
+        has_real_console = not is_compiled
+
+    # Pre-launch system tray
+    # Launching it early prevents race conditions and ensures it respects OS dark mode
+    # before heavy UI modules block or alter global app/thread state.
+    use_tray = HAVE_TRAY and sys.platform == "win32"
+    tray = None
+    if use_tray:
+        # Start terminal session manager
+        terminal_thread = threading.Thread(target=lambda: terminal_session_manager(), daemon=True)
+        terminal_thread.start()
+
+        # Start Flask server in background thread
+        server_thread = threading.Thread(target=lambda: run_server(config, ai_params), daemon=True)
+        server_thread.start()
+
+        allow_console_toggle = has_real_console
+        tray = TrayApp(
+            on_exit_callback=cleanup, allow_console_toggle=allow_console_toggle, show_edit_file_items=args.show_console
+        )
+        hide_on_start = not args.show_console
+
+        threading.Thread(target=lambda: tray.start(hide_console_on_start=hide_on_start), daemon=True).start()
 
     # Check if onboarding completed
     onboarding_completed = config.get("onboarding_completed", False)
@@ -948,39 +972,17 @@ def main():
     use_tray = HAVE_TRAY and sys.platform == "win32"
 
     if use_tray:
-        # Tray mode: hide console by default, run server in background
-        if HAVE_RICH:
-            console.print("[bold blue]🔲 Starting in tray mode...[/bold blue]")
-            console.print("   Right-click tray icon for menu")
-            if args.launched_mode != "gui":
-                console.print("   Double-click tray icon to show console")
-            console.print()
-        else:
-            print("🔲 Starting in tray mode...")
-            print("   Right-click tray icon for menu")
-            if args.launched_mode != "gui":
-                print("   Double-click tray icon to show console")
-            print()
+        # Keep the main thread alive since the tray is already running in a daemon thread.
+        # Wait until the main thread gets a keyboard interrupt or shutdown signal.
+        import time
 
-        # Start terminal session manager
-        terminal_thread = threading.Thread(target=lambda: terminal_session_manager(), daemon=True)
-        terminal_thread.start()
-
-        # Start Flask server in background thread
-        server_thread = threading.Thread(target=lambda: run_server(config, ai_params), daemon=True)
-        server_thread.start()
-
-        # Determine if console toggling is allowed
-        # Uses has_real_console computed earlier (handles source vs compiled)
-        allow_console_toggle = has_real_console
-
-        # Start tray (this blocks until exit)
-        # Edit file items only show when --show-console is used
-        tray = TrayApp(
-            on_exit_callback=cleanup, allow_console_toggle=allow_console_toggle, show_edit_file_items=args.show_console
-        )
-        hide_on_start = not args.show_console
-        tray.start(hide_console_on_start=hide_on_start)
+        try:
+            while True:
+                time.sleep(1)
+        except (KeyboardInterrupt, SystemExit):
+            pass
+        cleanup()
+        os._exit(0)
 
     else:
         # Terminal mode: normal behavior
