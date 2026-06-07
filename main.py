@@ -842,10 +842,6 @@ def main():
     use_tray = HAVE_TRAY and sys.platform == "win32"
     tray = None
     if use_tray:
-        # Start terminal session manager
-        terminal_thread = threading.Thread(target=lambda: terminal_session_manager(), daemon=True)
-        terminal_thread.start()
-
         # Start Flask server in background thread
         server_thread = threading.Thread(target=lambda: run_server(config, ai_params), daemon=True)
         server_thread.start()
@@ -935,12 +931,8 @@ def main():
         console.print(
             f"[bold green]🚀 Server Running[/bold green]: [link=http://{host}:{port}]http://{host}:{port}[/link]"
         )
-        if HAVE_GUI:
-            console.print(" 🖥️ GUI available (on-demand)")
     else:
         print(f"🚀 Server Running: http://{host}:{port}")
-        if HAVE_GUI:
-            print(" 🖥️ GUI available (on-demand)")
 
     # TextEditTool
     text_tool_result = initialize_text_edit_tool(config, ai_params)
@@ -971,6 +963,10 @@ def main():
     use_tray = HAVE_TRAY and sys.platform == "win32"
 
     if use_tray:
+        # Start terminal session manager at the very end so commands box displays after all startup logs
+        terminal_thread = threading.Thread(target=lambda: terminal_session_manager(), daemon=True)
+        terminal_thread.start()
+
         # Keep the main thread alive since the tray is already running in a daemon thread.
         # Wait until the main thread gets a keyboard interrupt or shutdown signal.
         import time
