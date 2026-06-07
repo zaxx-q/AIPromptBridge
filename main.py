@@ -806,6 +806,36 @@ def main():
     else:
         has_real_console = not is_compiled
 
+    # Resolve port early before starting the server thread to prevent false port-occupied warnings
+    host = web_server.CONFIG.get("host", "127.0.0.1")
+    configured_port = int(web_server.CONFIG.get("port", 5000))
+    try:
+        actual_port = find_available_port(host, configured_port)
+    except RuntimeError as e:
+        if HAVE_RICH:
+            console.print()
+            print_error(f"Could not find an available port: {e}")
+            console.print()
+            console.print("[dim]Press Enter to exit...[/dim]")
+        else:
+            print()
+            print(f"❌ ERROR: Could not find an available port: {e}")
+            print()
+            print("Press Enter to exit...")
+        import contextlib
+
+        with contextlib.suppress(EOFError):
+            input()
+        sys.exit(1)
+
+    if actual_port != configured_port:
+        if HAVE_RICH:
+            print_warning(f"Port {configured_port} occupied, using {actual_port} instead")
+        else:
+            print(f"⚠️ Port {configured_port} occupied, using {actual_port} instead")
+        # Update config in memory (so run_server picks it up)
+        web_server.CONFIG["port"] = actual_port
+
     # Pre-launch system tray
     # Launching it early prevents race conditions and ensures it respects OS dark mode
     # before heavy UI modules block or alter global app/thread state.
@@ -899,38 +929,7 @@ def main():
 
     # ─── Server Info ──────────────────────────────────────────────────────
     host = web_server.CONFIG.get("host", "127.0.0.1")
-    configured_port = int(web_server.CONFIG.get("port", 5000))
-
-    # Auto-switch port if occupied
-    try:
-        actual_port = find_available_port(host, configured_port)
-    except RuntimeError as e:
-        if HAVE_RICH:
-            console.print()
-            print_error(f"Could not find an available port: {e}")
-            console.print()
-            console.print("[dim]Press Enter to exit...[/dim]")
-        else:
-            print()
-            print(f"❌ ERROR: Could not find an available port: {e}")
-            print()
-            print("Press Enter to exit...")
-        import contextlib
-
-        with contextlib.suppress(EOFError):
-            input()
-        sys.exit(1)
-
-    if actual_port != configured_port:
-        if HAVE_RICH:
-            print_warning(f"Port {configured_port} occupied, using {actual_port} instead")
-        else:
-            print(f"⚠️ Port {configured_port} occupied, using {actual_port} instead")
-
-        # Update config in memory (so run_server picks it up)
-        web_server.CONFIG["port"] = actual_port
-
-    port = actual_port
+    port = int(web_server.CONFIG.get("port", 5000))
 
     if HAVE_RICH:
         console.print(
