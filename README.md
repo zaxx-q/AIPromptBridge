@@ -2,6 +2,13 @@
 
 **AIPromptBridge** is a Windows system-wide app that brings AI assistance to your fingertips. Use global hotkeys to edit text using AI, capture and analyze audio or screen content, and chat with models, all from a lightweight system tray app.
 
+<details>
+  <summary>🎬 Click to expand video demo</summary>
+  
+https://github.com/user-attachments/assets/3f3620fd-eae5-4b4d-80d9-2f7826da61b8
+
+</details>
+
 ## ✨ Features
 
 ### 🎯 TextEditTool
@@ -280,6 +287,12 @@ For advanced users, configuration files are stored in the application root:
 - Edit the actions/prompts to your needs in Prompt Editor
 - Add (more) context when selecting text or asking questions.
 - Set the right temperature for the task (e.g., low temperature for OCR tasks, high temp for more creativity)
+
+### For Better GUI Performance
+
+I decided to avoid Qt to minimize app size and bloat so you may sometimes experince lag when resizing AIPromptBridge windows. Underlying Tkinter/CustomTkinter is already a low-performant library, there's nothing I can do about that (see [CustomTkinter Issue #1461](https://github.com/TomSchimansky/CustomTkinter/issues/1461)).
+but if you want to improve performance:
+- Enable **Force Standard Tkinter** (`ui_force_standard_tk`) under the **Theme** tab in Settings. This sacrifices the modern looks and colored emojis for snappier UI.
 
 ### Getting API Keys
 
