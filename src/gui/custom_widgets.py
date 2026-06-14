@@ -36,6 +36,7 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
         self.buttons: Dict[str, Any] = {}  # id -> button
         self.selected_id: Optional[str] = None
         self.items: List[str] = []  # ordered list of IDs
+        self.dimmed: Dict[str, bool] = {}
 
         # Determine strict inner frame for buttons
         if HAVE_CTK:
@@ -68,12 +69,15 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
         if not HAVE_CTK:
             self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
-    def add_item(self, item_id: str, text: str, icon: str | None = None, font_weight: str = "normal"):
+    def add_item(
+        self, item_id: str, text: str, icon: str | None = None, font_weight: str = "normal", dimmed: bool = False
+    ):
         """Add an item to the list."""
         if item_id in self.buttons:
             return
 
         self.items.append(item_id)
+        self.dimmed[item_id] = dimmed
 
         # Determine image
         img = None
@@ -93,6 +97,8 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
         is_selected = item_id == self.selected_id
         variant = "primary" if is_selected else "secondary"
         color_kwargs = get_ctk_button_colors(self.colors, variant)
+        if dimmed and not is_selected:
+            color_kwargs["text_color"] = self.colors.blockquote
 
         if HAVE_CTK:
             btn_kwargs = {
@@ -118,7 +124,7 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
                 anchor="w",
                 command=lambda id=item_id: self.select(id),
                 bg=self.colors.accent if is_selected else self.colors.surface0,
-                fg=self.colors.accent_fg if is_selected else self.colors.fg,
+                fg=self.colors.accent_fg if is_selected else (self.colors.blockquote if dimmed else self.colors.fg),
                 relief="flat",
                 padx=10,
                 pady=5,
@@ -153,17 +159,20 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
         btn = self.buttons[item_id]
         is_selected = item_id == self.selected_id
         variant = "primary" if is_selected else "secondary"
+        dimmed = self.dimmed.get(item_id, False)
 
         if HAVE_CTK:
             # Configure colors - exclude border_width as it causes flicker sometimes
             colors = get_ctk_button_colors(self.colors, variant)
-            btn.configure(
-                fg_color=colors["fg_color"], text_color=colors["text_color"], hover_color=colors["hover_color"]
-            )
+            text_color = colors["text_color"]
+            if dimmed and not is_selected:
+                text_color = self.colors.blockquote
+            btn.configure(fg_color=colors["fg_color"], text_color=text_color, hover_color=colors["hover_color"])
         else:
+            fg_color = self.colors.accent_fg if is_selected else (self.colors.blockquote if dimmed else self.colors.fg)
             btn.configure(
                 bg=self.colors.accent if is_selected else self.colors.surface0,
-                fg=self.colors.accent_fg if is_selected else self.colors.fg,
+                fg=fg_color,
             )
 
     def clear(self):
@@ -172,6 +181,7 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
             btn.destroy()
         self.buttons.clear()
         self.items.clear()
+        self.dimmed.clear()
         self.selected_id = None
 
     def get_selected(self) -> Optional[str]:

@@ -27,6 +27,14 @@ from ...themes import (
     get_ctk_textbox_colors,
 )
 
+try:
+    from ...emoji_renderer import HAVE_PIL, prepare_emoji_content
+
+    HAVE_EMOJI = HAVE_PIL and HAVE_CTK
+except ImportError:
+    HAVE_EMOJI = False
+    prepare_emoji_content = None
+
 
 class ActionsTabMixin:
     """Mixin providing the Actions tab for PromptEditorWindow."""
@@ -46,7 +54,57 @@ class ActionsTabMixin:
         left_panel.pack(side="left", fill="y", padx=(0, 15))
         left_panel.pack_propagate(False)
 
-        create_section_header(left_panel, "Actions", self.colors, "⚡")
+        # Header frame for Actions
+        header_frame = (
+            ctk.CTkFrame(left_panel, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(left_panel, bg=self.colors.bg)
+        )
+        header_frame.pack(fill="x", pady=(0, 10))
+
+        if self.use_ctk and HAVE_EMOJI and prepare_emoji_content:
+            kwargs = prepare_emoji_content("⚡ Actions", size=18)
+            lbl = ctk.CTkLabel(header_frame, font=get_ctk_font(14, "bold"), text_color=self.colors.accent, **kwargs)
+            lbl.pack(side="left", anchor="w")
+        else:
+            if self.use_ctk:
+                lbl = ctk.CTkLabel(
+                    header_frame, text="⚡ Actions", font=get_ctk_font(14, "bold"), text_color=self.colors.accent
+                )
+            else:
+                lbl = tk.Label(
+                    header_frame,
+                    text="⚡ Actions",
+                    font=("Segoe UI", 11, "bold"),
+                    bg=self.colors.bg,
+                    fg=self.colors.accent,
+                )
+            lbl.pack(side="left", anchor="w")
+
+        self.show_hidden_var = tk.BooleanVar(value=False)
+        if self.use_ctk:
+            self.show_hidden_switch = ctk.CTkSwitch(
+                header_frame,
+                text="Show Hidden",
+                variable=self.show_hidden_var,
+                font=get_ctk_font(11),
+                text_color=self.colors.fg,
+                width=46,
+                command=self._refresh_action_list,
+            )
+            self.show_hidden_switch.pack(side="right", anchor="e", padx=(10, 0))
+        else:
+            self.show_hidden_checkbox = tk.Checkbutton(
+                header_frame,
+                text="Show Hidden",
+                variable=self.show_hidden_var,
+                font=("Segoe UI", 9),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+                selectcolor=self.colors.input_bg,
+                command=self._refresh_action_list,
+            )
+            self.show_hidden_checkbox.pack(side="right", anchor="e", padx=(10, 0))
 
         # Tool Switcher
         if self.use_ctk:
@@ -108,7 +166,45 @@ class ActionsTabMixin:
         )
         right_panel.pack(side="left", fill="both", expand=True)
 
-        create_section_header(right_panel, "Edit Action", self.colors, "✏️")
+        # Create a container frame for header + visibility button next to it
+        header_frame = (
+            ctk.CTkFrame(right_panel, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(right_panel, bg=self.colors.bg)
+        )
+        header_frame.pack(fill="x", pady=(0, 0))
+
+        lbl = create_section_header(header_frame, "Edit Action", self.colors, "✏️")
+        lbl.pack_forget()
+        lbl.pack(side="left", pady=(0, 12))
+
+        # Action visibility toggle button
+        self.editor_widgets["visibility_var"] = tk.BooleanVar(value=True)
+        if self.use_ctk:
+            self.editor_widgets["visibility_btn"] = ctk.CTkButton(
+                header_frame,
+                text="",
+                width=34,
+                height=34,
+                command=self._toggle_action_visibility,
+                **get_ctk_button_colors(self.colors, "secondary"),
+            )
+            self.editor_widgets["visibility_btn"].pack(side="left", padx=(10, 0), pady=(0, 12))
+        else:
+            self.editor_widgets["visibility_btn"] = tk.Button(
+                header_frame,
+                text="",
+                font=("Arial", 11),
+                bg=self.colors.surface1,
+                fg=self.colors.fg,
+                activebackground=self.colors.surface2,
+                relief="flat",
+                bd=0,
+                padx=5,
+                pady=2,
+                command=self._toggle_action_visibility,
+            )
+            self.editor_widgets["visibility_btn"].pack(side="left", padx=(10, 0), pady=(0, 12))
 
         # Editor form in scrollable frame
         if self.use_ctk:
@@ -157,34 +253,6 @@ class ActionsTabMixin:
                 fg=self.colors.fg,
             )
         self.editor_widgets["name"].pack(side="left", padx=(10, 0))
-
-        # Action visibility toggle button
-        self.editor_widgets["visibility_var"] = tk.BooleanVar(value=True)
-        if self.use_ctk:
-            self.editor_widgets["visibility_btn"] = ctk.CTkButton(
-                row_frame,
-                text="👁",
-                width=34,
-                height=34,
-                command=self._toggle_action_visibility,
-                **get_ctk_button_colors(self.colors, "secondary"),
-            )
-            self.editor_widgets["visibility_btn"].pack(side="right", padx=(10, 0))
-        else:
-            self.editor_widgets["visibility_btn"] = tk.Button(
-                row_frame,
-                text="👁",
-                font=("Arial", 11),
-                bg=self.colors.surface1,
-                fg=self.colors.fg,
-                activebackground=self.colors.surface2,
-                relief="flat",
-                bd=0,
-                padx=5,
-                pady=2,
-                command=self._toggle_action_visibility,
-            )
-            self.editor_widgets["visibility_btn"].pack(side="right", padx=(10, 0))
 
         # Icon field
         row_frame = (
@@ -546,6 +614,7 @@ class ActionsTabMixin:
         self.action_listbox.clear()
 
         tool_data = self.options_data.get(self.current_tool, {})
+        show_hidden = self.show_hidden_var.get() if hasattr(self, "show_hidden_var") else False
 
         for name in tool_data.keys():
             if name == "_settings":
@@ -553,11 +622,18 @@ class ActionsTabMixin:
             action = tool_data[name]
             icon = action.get("icon", "")
             is_hidden = action.get("_hidden", False)
+            if is_hidden and not show_hidden:
+                continue
             display_name = f"⊘ {name}" if is_hidden else name
-            self.action_listbox.add_item(name, display_name, icon)
+            self.action_listbox.add_item(name, display_name, icon, dimmed=is_hidden)
 
         if selected and selected in tool_data:
-            self.action_listbox.select(selected)
+            is_visible = not (tool_data[selected].get("_hidden", False) and not show_hidden)
+            if is_visible:
+                self.action_listbox.select(selected)
+            else:
+                self.editor_widgets["name"].configure(text="(select an action)")
+                self._clear_editor()
         else:
             self.editor_widgets["name"].configure(text="(select an action)")
             self._clear_editor()
@@ -584,16 +660,28 @@ class ActionsTabMixin:
         if "visibility_btn" not in self.editor_widgets:
             return
         btn = self.editor_widgets["visibility_btn"]
-        if is_hidden:
-            if self.use_ctk:
-                btn.configure(text="🚫", fg_color=self.colors.accent_red)
-            else:
-                btn.configure(text="🚫", bg=self.colors.accent_red)
+
+        icon = "🚫" if is_hidden else "👁"
+
+        if self.use_ctk:
+            try:
+                from ...emoji_renderer import prepare_emoji_content
+
+                kwargs = prepare_emoji_content(icon, size=18)
+                btn.configure(
+                    **kwargs,
+                    **get_ctk_button_colors(self.colors, "danger" if is_hidden else "secondary"),
+                )
+            except Exception:
+                btn.configure(
+                    image=None,
+                    text=icon,
+                    **get_ctk_button_colors(self.colors, "danger" if is_hidden else "secondary"),
+                )
         else:
-            if self.use_ctk:
-                btn.configure(text="👁", **get_ctk_button_colors(self.colors, "secondary"))
-            else:
-                btn.configure(text="👁", bg=self.colors.surface1)
+            bg_color = self.colors.accent_red if is_hidden else self.colors.surface1
+            fg_color = self.colors.accent_fg if is_hidden else self.colors.fg
+            btn.configure(text=icon, bg=bg_color, fg=fg_color)
 
     def _clear_editor(self):
         """Clear the editor fields."""

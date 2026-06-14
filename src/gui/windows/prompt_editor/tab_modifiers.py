@@ -194,7 +194,7 @@ class ModifiersTabMixin:
 
             ctk.CTkCheckBox(
                 row,
-                text="Hidden from toolbar",
+                text="Hidden from toolbar (Disable)",
                 variable=self.modifier_widgets["hidden_var"],
                 font=get_ctk_font(13),
                 text_color=self.colors.fg,
@@ -213,7 +213,7 @@ class ModifiersTabMixin:
 
             tk.Checkbutton(
                 row,
-                text="Hidden from toolbar",
+                text="Hidden from toolbar (Disable)",
                 variable=self.modifier_widgets["hidden_var"],
                 font=("Segoe UI", 10),
                 bg=self.colors.bg,
