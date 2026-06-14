@@ -753,11 +753,13 @@ class PromptsConfig:
             self._save()
 
     def _compare_action(self, user_action: dict, default_action: dict) -> bool:
-        """Compare two actions ignoring _is_default."""
+        """Compare two actions ignoring _is_default and _hidden."""
         u_copy = user_action.copy()
         d_copy = default_action.copy()
         u_copy.pop("_is_default", None)
         d_copy.pop("_is_default", None)
+        u_copy.pop("_hidden", None)
+        d_copy.pop("_hidden", None)
         return u_copy == d_copy
 
     def _tag_defaults(self, section_data: dict, default_actions: dict) -> bool:
@@ -799,6 +801,10 @@ class PromptsConfig:
                 # Update existing default if it changed in code
                 d_action_tagged = d_action.copy()
                 d_action_tagged["_is_default"] = True
+                # Preserve user's _hidden setting when updating defaults
+                existing_hidden = section_data[name].get("_hidden")
+                if existing_hidden is not None:
+                    d_action_tagged["_hidden"] = existing_hidden
                 if section_data[name] != d_action_tagged:
                     section_data[name] = d_action_tagged
                     changed = True
@@ -1000,10 +1006,17 @@ class PromptsConfig:
         settings = tet.get("_settings", {})
         return settings.get(key, DEFAULT_TEXT_EDIT_SETTINGS.get(key, default))
 
-    def get_text_edit_actions(self) -> dict:
+    def get_text_edit_actions(self, include_hidden: bool = False) -> dict:
         """Get text edit tool actions (excluding _settings)."""
         tet = self.get_text_edit_tool()
-        return {k: v for k, v in tet.items() if k != "_settings"}
+        result = {}
+        for k, v in tet.items():
+            if k == "_settings":
+                continue
+            if not include_hidden and isinstance(v, dict) and v.get("_hidden", False):
+                continue
+            result[k] = v
+        return result
 
     # =========================================================================
     # Snip Tool Accessors
@@ -1019,10 +1032,17 @@ class PromptsConfig:
         settings = snip.get("_settings", {})
         return settings.get(key, DEFAULT_SNIP_SETTINGS.get(key, default))
 
-    def get_snip_actions(self) -> dict:
+    def get_snip_actions(self, include_hidden: bool = False) -> dict:
         """Get snip tool actions (excluding _settings)."""
         snip = self.get_snip_tool()
-        return {k: v for k, v in snip.items() if k != "_settings"}
+        result = {}
+        for k, v in snip.items():
+            if k == "_settings":
+                continue
+            if not include_hidden and isinstance(v, dict) and v.get("_hidden", False):
+                continue
+            result[k] = v
+        return result
 
     def can_use_text_edit_actions(self) -> bool:
         """Check if snip tool can borrow text edit tool actions."""
@@ -1042,10 +1062,17 @@ class PromptsConfig:
         settings = audio.get("_settings", {})
         return settings.get(key, DEFAULT_AUDIO_SETTINGS.get(key, default))
 
-    def get_audio_actions(self) -> dict:
+    def get_audio_actions(self, include_hidden: bool = False) -> dict:
         """Get audio tool actions (excluding _settings)."""
         audio = self.get_audio_tool()
-        return {k: v for k, v in audio.items() if k != "_settings"}
+        result = {}
+        for k, v in audio.items():
+            if k == "_settings":
+                continue
+            if not include_hidden and isinstance(v, dict) and v.get("_hidden", False):
+                continue
+            result[k] = v
+        return result
 
     # =========================================================================
     # TTS Tool Accessors
@@ -1078,9 +1105,33 @@ class PromptsConfig:
         global_settings = self._config.get("_global_settings", {})
         return global_settings.get(key, DEFAULT_GLOBAL_SETTINGS.get(key, default))
 
-    def get_modifiers(self) -> List[dict]:
+    def get_modifiers(self, include_hidden: bool = False) -> List[dict]:
         """Get global modifier definitions."""
-        return self.get_global_setting("modifiers", [])
+        all_mods = self.get_global_setting("modifiers", [])
+        if include_hidden:
+            return all_mods
+        return [m for m in all_mods if isinstance(m, dict) and not m.get("_hidden", False)]
+
+    def set_action_hidden(self, tool: str, action_name: str, hidden: bool):
+        """Set the _hidden flag on an action."""
+        tool_data = self._config.get(tool, {})
+        action = tool_data.get(action_name)
+        if isinstance(action, dict):
+            if hidden:
+                action["_hidden"] = True
+            else:
+                action.pop("_hidden", None)
+
+    def set_modifier_hidden(self, modifier_key: str, hidden: bool):
+        """Set the _hidden flag on a modifier by key."""
+        modifiers = self._config.get("_global_settings", {}).get("modifiers", [])
+        for mod in modifiers:
+            if isinstance(mod, dict) and mod.get("key") == modifier_key:
+                if hidden:
+                    mod["_hidden"] = True
+                else:
+                    mod.pop("_hidden", None)
+                break
 
     def get_default_modifier_keys_for_tool(self, tool_name: str) -> List[str]:
         """Get modifier keys that should be pre-active for a given tool.

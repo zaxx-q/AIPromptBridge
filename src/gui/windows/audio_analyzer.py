@@ -741,7 +741,7 @@ class AudioAnalyzerWindow:
                 group_items = []
                 for key in item_keys:
                     action = actions.get(key)
-                    if action:
+                    if action and not action.get("_hidden", False):
                         icon = action.get("icon", "")
                         tooltip = action.get("task", "")
                         group_items.append((key, key, icon, tooltip))
@@ -758,7 +758,7 @@ class AudioAnalyzerWindow:
             actions = self.prompts.get_audio_actions()
             items = []
             for key, action in actions.items():
-                if key.startswith("_"):
+                if key.startswith("_") or action.get("_hidden", False):
                     continue
                 icon = action.get("icon", "")
                 tooltip = action.get("task", "")

@@ -800,7 +800,7 @@ class AttachedSnipPopup:
                 items = []
                 for key in item_keys:
                     action = config.get(key)
-                    if action and not key.startswith("_"):
+                    if action and not key.startswith("_") and not action.get("_hidden", False):
                         icon = action.get("icon", "")
                         tooltip = action.get("task", "")
                         items.append((key, key, icon, tooltip))
@@ -826,6 +826,8 @@ class AttachedSnipPopup:
             if key.startswith("_"):
                 continue
             if not isinstance(action, dict):
+                continue
+            if action.get("_hidden", False):
                 continue
 
             icon = action.get("icon", "")

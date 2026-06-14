@@ -1805,7 +1805,7 @@ class PromptSelectionPopup(BasePopup):
         buttons_frame.pack(fill="both", expand=True)
 
         for key, option in self.options.items():
-            if key == "Custom" or key.startswith("_"):
+            if key == "Custom" or key.startswith("_") or (isinstance(option, dict) and option.get("_hidden", False)):
                 continue
 
             icon = option.get("icon", "")
@@ -1868,7 +1868,7 @@ class PromptSelectionPopup(BasePopup):
         col = 0
 
         for key, option in self.options.items():
-            if key == "Custom" or key.startswith("_"):
+            if key == "Custom" or key.startswith("_") or (isinstance(option, dict) and option.get("_hidden", False)):
                 continue
 
             btn = tk.Button(
@@ -2835,7 +2835,7 @@ class AttachedPromptPopup:
                     items = []
                     for key in item_keys:
                         option = self.options.get(key)
-                        if option and key != "Custom" and not key.startswith("_"):
+                        if option and key != "Custom" and not key.startswith("_") and not option.get("_hidden", False):
                             icon = option.get("icon", None)
                             tooltip = option.get("task", None)
                             items.append((key, key, icon, tooltip))
@@ -2854,7 +2854,7 @@ class AttachedPromptPopup:
         items_per_page = settings.get("popup_items_per_page", CarouselButtonList.DEFAULT_ITEMS_PER_PAGE)
         items = []
         for key, option in self.options.items():
-            if key == "Custom" or key.startswith("_"):
+            if key == "Custom" or key.startswith("_") or (isinstance(option, dict) and option.get("_hidden", False)):
                 continue
             icon = option.get("icon", None)
             tooltip = option.get("task", None)
@@ -2884,7 +2884,7 @@ class AttachedPromptPopup:
                     items = []
                     for key in item_keys:
                         option = self.options.get(key)
-                        if option and key != "Custom" and not key.startswith("_"):
+                        if option and key != "Custom" and not key.startswith("_") and not option.get("_hidden", False):
                             icon = option.get("icon", None)
                             tooltip = option.get("task", None)
                             items.append((key, key, icon, tooltip))
@@ -2903,7 +2903,7 @@ class AttachedPromptPopup:
         items_per_page = settings.get("popup_items_per_page", CarouselButtonList.DEFAULT_ITEMS_PER_PAGE)
         items = []
         for key, option in self.options.items():
-            if key == "Custom" or key.startswith("_"):
+            if key == "Custom" or key.startswith("_") or (isinstance(option, dict) and option.get("_hidden", False)):
                 continue
             icon = option.get("icon", None)
             tooltip = option.get("task", None)

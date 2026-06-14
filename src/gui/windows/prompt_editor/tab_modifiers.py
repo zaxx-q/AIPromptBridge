@@ -63,12 +63,7 @@ class ModifiersTabMixin:
         self.modifier_listbox.pack(fill="both", expand=True)
 
         # Populate modifiers
-        settings = self.options_data.get("_global_settings", {})
-        modifiers = settings.get("modifiers", [])
-        for i, mod in enumerate(modifiers):
-            icon = mod.get("icon", "")
-            label = mod.get("label", mod.get("key", ""))
-            self.modifier_listbox.add_item(str(i), label, icon)
+        self._refresh_modifier_list()
 
         # Buttons
         btn_frame = (
@@ -177,7 +172,7 @@ class ModifiersTabMixin:
             )
         self.modifier_widgets["injection"].pack(fill="x", pady=(2, 0))
 
-        # Forces chat window toggle
+        # Forces chat window & Hidden toggles
         row = (
             ctk.CTkFrame(right_panel, fg_color="transparent")
             if self.use_ctk
@@ -186,6 +181,7 @@ class ModifiersTabMixin:
         row.pack(fill="x", pady=8)
 
         self.modifier_widgets["forces_chat_var"] = tk.BooleanVar()
+        self.modifier_widgets["hidden_var"] = tk.BooleanVar()
         if self.use_ctk:
             ctk.CTkCheckBox(
                 row,
@@ -194,7 +190,16 @@ class ModifiersTabMixin:
                 font=get_ctk_font(13),
                 text_color=self.colors.fg,
                 fg_color=self.colors.accent,
-            ).pack(anchor="w")
+            ).pack(side="left", padx=(0, 20))
+
+            ctk.CTkCheckBox(
+                row,
+                text="Hidden from toolbar",
+                variable=self.modifier_widgets["hidden_var"],
+                font=get_ctk_font(13),
+                text_color=self.colors.fg,
+                fg_color=self.colors.accent,
+            ).pack(side="left")
         else:
             tk.Checkbutton(
                 row,
@@ -204,7 +209,17 @@ class ModifiersTabMixin:
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 selectcolor=self.colors.input_bg,
-            ).pack(anchor="w")
+            ).pack(side="left", padx=(0, 20))
+
+            tk.Checkbutton(
+                row,
+                text="Hidden from toolbar",
+                variable=self.modifier_widgets["hidden_var"],
+                font=("Segoe UI", 10),
+                bg=self.colors.bg,
+                fg=self.colors.fg,
+                selectcolor=self.colors.input_bg,
+            ).pack(side="left")
 
         # Default for Tools section
         row = (
@@ -284,6 +299,26 @@ class ModifiersTabMixin:
             right_panel, "Save Modifier", "💾", self.colors, "success", 160, 40, self._save_current_modifier
         ).pack(anchor="w", pady=(18, 0))
 
+    def _refresh_modifier_list(self):
+        """Refresh the modifiers listbox."""
+        selected = self.modifier_listbox.get_selected()
+        self.modifier_listbox.clear()
+        settings = self.options_data.get("_global_settings", {})
+        modifiers = settings.get("modifiers", [])
+        for i, mod in enumerate(modifiers):
+            icon = mod.get("icon", "")
+            label = mod.get("label", mod.get("key", ""))
+            if mod.get("_hidden", False):
+                label = f"⊘ {label}"
+            self.modifier_listbox.add_item(str(i), label, icon)
+        if selected:
+            try:
+                idx = int(selected)
+                if 0 <= idx < len(modifiers):
+                    self.modifier_listbox.select(selected)
+            except ValueError:
+                pass
+
     def _on_modifier_select(self, mod_id_str):
         """Handle modifier selection."""
         try:
@@ -309,6 +344,7 @@ class ModifiersTabMixin:
                 self.modifier_widgets["injection"].insert("1.0", mod.get("injection", ""))
 
             self.modifier_widgets["forces_chat_var"].set(mod.get("forces_chat_window", False))
+            self.modifier_widgets["hidden_var"].set(mod.get("_hidden", False))
 
             # Load default_tools checkboxes
             default_tools = mod.get("default_tools", [])
@@ -333,7 +369,8 @@ class ModifiersTabMixin:
                 }
             )
             idx = len(modifiers) - 1
-            self.modifier_listbox.add_item(str(idx), key.title(), "🔧")
+            self._refresh_modifier_list()
+            self.modifier_listbox.select(str(idx))
             self._update_title()
 
     def _delete_modifier(self):
@@ -366,10 +403,7 @@ class ModifiersTabMixin:
                         deleted_modifiers.append(mod_key)
 
                 del modifiers[index]
-                # Rebuild list because indices shifted
-                self.modifier_listbox.clear()
-                for i, mod in enumerate(modifiers):
-                    self.modifier_listbox.add_item(str(i), mod.get("label", mod.get("key", "")), mod.get("icon", ""))
+                self._refresh_modifier_list()
                 self._update_title()
 
     def _move_modifier_up(self):
@@ -388,13 +422,7 @@ class ModifiersTabMixin:
 
         if 0 < index < len(modifiers):
             modifiers[index], modifiers[index - 1] = modifiers[index - 1], modifiers[index]
-
-            # Refresh list
-            self.modifier_listbox.clear()
-            for i, mod in enumerate(modifiers):
-                self.modifier_listbox.add_item(str(i), mod.get("label", mod.get("key", "")), mod.get("icon", ""))
-
-            # Restore selection (now at index-1)
+            self._refresh_modifier_list()
             self.modifier_listbox.select(str(index - 1))
             self._update_title()
 
@@ -414,13 +442,7 @@ class ModifiersTabMixin:
 
         if 0 <= index < len(modifiers) - 1:
             modifiers[index], modifiers[index + 1] = modifiers[index + 1], modifiers[index]
-
-            # Refresh list
-            self.modifier_listbox.clear()
-            for i, mod in enumerate(modifiers):
-                self.modifier_listbox.add_item(str(i), mod.get("label", mod.get("key", "")), mod.get("icon", ""))
-
-            # Restore selection (now at index+1)
+            self._refresh_modifier_list()
             self.modifier_listbox.select(str(index + 1))
             self._update_title()
 
@@ -461,11 +483,10 @@ class ModifiersTabMixin:
                 "injection": injection,
                 "forces_chat_window": self.modifier_widgets["forces_chat_var"].get(),
                 "default_tools": default_tools,
+                "_hidden": self.modifier_widgets["hidden_var"].get(),
             }
 
             # Rebuild list to update display
-            self.modifier_listbox.clear()
-            for i, mod in enumerate(modifiers):
-                self.modifier_listbox.add_item(str(i), mod.get("label", mod.get("key", "")), mod.get("icon", ""))
+            self._refresh_modifier_list()
             self.modifier_listbox.select(str(index))
             self._update_title()

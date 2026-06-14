@@ -158,6 +158,34 @@ class ActionsTabMixin:
             )
         self.editor_widgets["name"].pack(side="left", padx=(10, 0))
 
+        # Action visibility toggle button
+        self.editor_widgets["visibility_var"] = tk.BooleanVar(value=True)
+        if self.use_ctk:
+            self.editor_widgets["visibility_btn"] = ctk.CTkButton(
+                row_frame,
+                text="👁",
+                width=34,
+                height=34,
+                command=self._toggle_action_visibility,
+                **get_ctk_button_colors(self.colors, "secondary"),
+            )
+            self.editor_widgets["visibility_btn"].pack(side="right", padx=(10, 0))
+        else:
+            self.editor_widgets["visibility_btn"] = tk.Button(
+                row_frame,
+                text="👁",
+                font=("Arial", 11),
+                bg=self.colors.surface1,
+                fg=self.colors.fg,
+                activebackground=self.colors.surface2,
+                relief="flat",
+                bd=0,
+                padx=5,
+                pady=2,
+                command=self._toggle_action_visibility,
+            )
+            self.editor_widgets["visibility_btn"].pack(side="right", padx=(10, 0))
+
         # Icon field
         row_frame = (
             ctk.CTkFrame(editor_scroll, fg_color="transparent")
@@ -522,14 +550,50 @@ class ActionsTabMixin:
         for name in tool_data.keys():
             if name == "_settings":
                 continue
-            icon = tool_data[name].get("icon", "")
-            self.action_listbox.add_item(name, name, icon)
+            action = tool_data[name]
+            icon = action.get("icon", "")
+            is_hidden = action.get("_hidden", False)
+            display_name = f"⊘ {name}" if is_hidden else name
+            self.action_listbox.add_item(name, display_name, icon)
 
         if selected and selected in tool_data:
             self.action_listbox.select(selected)
         else:
             self.editor_widgets["name"].configure(text="(select an action)")
             self._clear_editor()
+
+    def _toggle_action_visibility(self):
+        """Toggle the visibility of the current action."""
+        if not self.current_action:
+            return
+        tool_data = self.options_data.get(self.current_tool, {})
+        action = tool_data.get(self.current_action)
+        if not isinstance(action, dict):
+            return
+
+        current_hidden = action.get("_hidden", False)
+        action["_hidden"] = not current_hidden
+
+        # Update button appearance
+        self._update_visibility_button(not current_hidden)
+        self._refresh_action_list()
+        self._update_title()
+
+    def _update_visibility_button(self, is_hidden: bool):
+        """Update the visibility toggle button appearance."""
+        if "visibility_btn" not in self.editor_widgets:
+            return
+        btn = self.editor_widgets["visibility_btn"]
+        if is_hidden:
+            if self.use_ctk:
+                btn.configure(text="🚫", fg_color=self.colors.accent_red)
+            else:
+                btn.configure(text="🚫", bg=self.colors.accent_red)
+        else:
+            if self.use_ctk:
+                btn.configure(text="👁", **get_ctk_button_colors(self.colors, "secondary"))
+            else:
+                btn.configure(text="👁", bg=self.colors.surface1)
 
     def _clear_editor(self):
         """Clear the editor fields."""
@@ -547,6 +611,8 @@ class ActionsTabMixin:
             self.editor_widgets["system_prompt"].delete("0.0", "end")
         else:
             self.editor_widgets["system_prompt"].delete("1.0", "end")
+
+        self._update_visibility_button(False)
 
     def _update_editor_visibility(self):
         """Show/hide editor fields based on current tool."""
@@ -623,6 +689,10 @@ class ActionsTabMixin:
             self.editor_widgets["system_prompt"].insert("1.0", action_data.get("system_prompt", ""))
 
         self.editor_widgets["task_var"].set(action_data.get("task", ""))
+
+        # Load visibility state
+        is_hidden = action_data.get("_hidden", False)
+        self._update_visibility_button(is_hidden)
 
         # Handle different field names per tool
         if self.current_tool == "text_edit_tool":
@@ -724,6 +794,7 @@ class ActionsTabMixin:
 
         tool_data[new_name] = copy.deepcopy(tool_data[self.current_action])
         tool_data[new_name]["_is_default"] = False
+        tool_data[new_name].pop("_hidden", None)  # New copy is visible
 
         icon = tool_data[new_name].get("icon", "")
         self.action_listbox.add_item(new_name, new_name, icon)
@@ -859,6 +930,10 @@ class ActionsTabMixin:
                 action_dict["connection_profile"] = profile_val
 
         tool_data = self.options_data.setdefault(self.current_tool, {})
+        existing_action = tool_data.get(self.current_action, {})
+        if isinstance(existing_action, dict) and existing_action.get("_hidden"):
+            action_dict["_hidden"] = True
+
         tool_data[self.current_action] = action_dict
 
         # Refresh UI list to update icons

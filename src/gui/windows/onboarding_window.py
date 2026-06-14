@@ -10,10 +10,11 @@ import sys
 import threading
 import time
 import tkinter as tk
+from pathlib import Path
 from tkinter import messagebox, ttk
 from typing import Callable, Dict, List, Optional
 
-from ...config import save_config_value
+from ...config import load_config, save_config_value
 from ...connection_profiles import ConnectionProfile, ProfileStore
 from ...key_store import KeyStore
 from ...providers.registry import get_provider_definitions
@@ -29,6 +30,7 @@ from ..themes import (
     get_ctk_font,
     get_ctk_frame_colors,
     get_ctk_label_colors,
+    get_ctk_segmented_colors,
 )
 from .utils import set_dark_titlebar, set_window_icon
 
@@ -92,7 +94,7 @@ class OnboardingWizard:
                 self.root = tk.Tk()
 
         self.root.title("Welcome to AIPromptBridge")
-        self.root.geometry("700x650")
+        self.root.geometry("750x700")
         self.root.resizable(False, False)
 
         if self.use_ctk:
@@ -116,8 +118,8 @@ class OnboardingWizard:
 
         # Center the window on the screen
         self.root.update_idletasks()
-        w = 700
-        h = 650
+        w = 750
+        h = 700
         x = (self.root.winfo_screenwidth() - w) // 2
         y = (self.root.winfo_screenheight() - h) // 2
         self.root.geometry(f"{w}x{h}+{x}+{y}")
@@ -196,7 +198,7 @@ class OnboardingWizard:
         dots_sub.pack(expand=True, pady=10)
 
         self.step_dots = []
-        for i in range(5):
+        for i in range(6):
             if self.use_ctk:
                 dot = ctk.CTkLabel(dots_sub, text="○", font=get_ctk_font(16, "bold"), text_color=c.overlay0)
             else:
@@ -219,8 +221,10 @@ class OnboardingWizard:
         elif index == 2:
             self._create_profile_page(self.content_frame)
         elif index == 3:
-            self._create_tour_page(self.content_frame)
+            self._create_tools_page(self.content_frame)
         elif index == 4:
+            self._create_actions_page(self.content_frame)
+        elif index == 5:
             self._create_complete_page(self.content_frame)
 
         self._update_step_indicator()
@@ -301,6 +305,14 @@ class OnboardingWizard:
         # Save profile on Default Profile page
         elif self.current_page == 2:
             self._save_profile()
+
+        # Save tool toggles on Tools page
+        elif self.current_page == 3:
+            self._save_tool_toggles()
+
+        # Save action/modifier visibility on Actions page
+        elif self.current_page == 4:
+            self._save_action_visibility()
 
         if self.current_page < len(self.step_dots) - 1:
             self._show_page(self.current_page + 1)
@@ -1157,35 +1169,33 @@ class OnboardingWizard:
         except Exception:
             pass
 
-    def _create_tour_page(self, parent):
+    def _create_tools_page(self, parent):
+        """Create Step 3: Tool Toggles page."""
         c = self.colors
 
         if self.use_ctk:
             title = ctk.CTkLabel(
-                parent, text="Step 3: Quick Tour & Hotkeys", font=get_ctk_font(18, "bold"), **get_ctk_label_colors(c)
+                parent, text="Step 3: Enable/Disable Tools", font=get_ctk_font(18, "bold"), **get_ctk_label_colors(c)
             )
             title.pack(anchor="w", pady=(10, 5))
 
             subtitle = ctk.CTkLabel(
                 parent,
-                text="AIPromptBridge runs in the system tray. Use these global hotkeys anywhere in Windows:",
+                text="Choose which tools to activate. Disabled tools won't register hotkeys or appear in menus.\nYou can change these anytime in Settings.",
                 font=get_ctk_font(12),
                 justify="left",
                 **get_ctk_label_colors(c, muted=True),
             )
             subtitle.pack(anchor="w", pady=(0, 15))
-
-            grid = ctk.CTkFrame(parent, fg_color="transparent")
-            grid.pack(fill="both", expand=True, padx=5, pady=5)
         else:
             title = tk.Label(
-                parent, text="Step 3: Quick Tour & Hotkeys", font=("Segoe UI", 14, "bold"), bg=c.bg, fg=c.fg
+                parent, text="Step 3: Enable/Disable Tools", font=("Segoe UI", 14, "bold"), bg=c.bg, fg=c.fg
             )
             title.pack(anchor="w", pady=(10, 5))
 
             subtitle = tk.Label(
                 parent,
-                text="AIPromptBridge runs in the system tray. Use these global hotkeys anywhere in Windows:",
+                text="Choose which tools to activate. Disabled tools won't register hotkeys or appear in menus.\nYou can change these anytime in Settings.",
                 font=("Segoe UI", 9),
                 justify="left",
                 bg=c.bg,
@@ -1193,149 +1203,521 @@ class OnboardingWizard:
             )
             subtitle.pack(anchor="w", pady=(0, 15))
 
-            grid = tk.Frame(parent, bg=c.bg)
-            grid.pack(fill="both", expand=True, padx=5, pady=5)
+        # Load current config values
+        config = load_config()
 
-        grid.columnconfigure(0, weight=1)
-        grid.columnconfigure(1, weight=1)
-        grid.rowconfigure(0, weight=1)
-        grid.rowconfigure(1, weight=1)
+        # Initialize toggle vars
+        self._tool_vars = {}
 
         tools = [
             (
-                "📝 Text Edit Tool",
+                "text_edit_tool_enabled",
+                "✏️ Text Edit Tool",
                 "ctrl+space",
-                "Select text and press hotkey to edit, translate, or rewrite it in-place using AI prompts.",
-                0,
-                0,
+                "Select text anywhere and transform it with AI — edit, rewrite, translate, or ask questions about it.",
+                config.get("text_edit_tool_enabled", True),
             ),
             (
+                "screen_snip_enabled",
                 "📸 Screen Snip Tool",
                 "ctrl+alt+x",
-                "Capture any part of your screen to extract text, solve math/homework, or ask AI about the image.",
-                0,
-                1,
+                "Capture any screen area to extract text, analyze images, solve problems, or ask questions.",
+                config.get("screen_snip_enabled", True),
             ),
             (
+                "audio_tool_enabled",
                 "🎙️ Audio Tool",
                 "ctrl+alt+a",
-                "Record voice dictations or system audio and let AI transcribe and type them directly into the active application.",
-                1,
-                0,
+                "Record microphone or system audio for transcription, analysis, and AI processing.",
+                config.get("audio_tool_enabled", True),
             ),
             (
+                "tts_enabled",
                 "🔊 Text-to-Speech",
                 "ctrl+alt+t",
-                "Select text and hear the AI read it aloud using natural-sounding voices.",
-                1,
-                1,
+                "Select text and hear AI read it aloud with expressive, natural-sounding voices.",
+                config.get("tts_enabled", False),
             ),
         ]
 
-        for name, hotkey, desc, r, col in tools:
-            if self.use_ctk:
-                card = ctk.CTkFrame(grid, fg_color=c.surface0, corner_radius=8)
-                card.grid(row=r, column=col, padx=8, pady=8, sticky="nsew")
+        for config_key, name, hotkey, desc, default_on in tools:
+            self._tool_vars[config_key] = tk.BooleanVar(value=default_on)
 
-                header_row = ctk.CTkFrame(card, fg_color="transparent")
-                header_row.pack(fill="x", padx=12, pady=(10, 4))
+            if self.use_ctk:
+                card = ctk.CTkFrame(parent, fg_color=c.surface0, corner_radius=8)
+                card.pack(fill="x", pady=5, ipady=6)
+
+                # Left: Toggle switch
+                switch = ctk.CTkSwitch(
+                    card,
+                    text="",
+                    variable=self._tool_vars[config_key],
+                    fg_color=c.surface2,
+                    progress_color=c.accent_green,
+                    width=46,
+                )
+                switch.pack(side="left", padx=(15, 10), pady=8)
+
+                # Center: Info
+                info = ctk.CTkFrame(card, fg_color="transparent")
+                info.pack(side="left", fill="both", expand=True, pady=8)
+
+                header_row = ctk.CTkFrame(info, fg_color="transparent")
+                header_row.pack(fill="x")
 
                 if HAVE_EMOJI and prepare_emoji_content:
-                    kwargs = prepare_emoji_content(name, size=22)
-                    ctk.CTkLabel(header_row, font=get_ctk_font(12, "bold"), **kwargs, **get_ctk_label_colors(c)).pack(
+                    kwargs = prepare_emoji_content(name, size=18)
+                    ctk.CTkLabel(header_row, font=get_ctk_font(13, "bold"), **kwargs, **get_ctk_label_colors(c)).pack(
                         side="left"
                     )
                 else:
-                    ctk.CTkLabel(header_row, text=name, font=get_ctk_font(12, "bold"), **get_ctk_label_colors(c)).pack(
+                    ctk.CTkLabel(header_row, text=name, font=get_ctk_font(13, "bold"), **get_ctk_label_colors(c)).pack(
                         side="left"
                     )
 
+                # Hotkey badge
                 tag = ctk.CTkFrame(header_row, fg_color=c.accent, corner_radius=4)
-                tag.pack(side="right")
+                tag.pack(side="left", padx=(10, 0))
                 ctk.CTkLabel(tag, text=hotkey.upper(), font=get_ctk_font(10, "bold"), text_color=c.accent_fg).pack(
                     padx=6, pady=2
                 )
 
-                body = ctk.CTkLabel(
-                    card,
+                ctk.CTkLabel(
+                    info,
                     text=desc,
                     font=get_ctk_font(11),
                     justify="left",
-                    wraplength=270,
+                    wraplength=550,
                     **get_ctk_label_colors(c, muted=True),
-                )
-                body.pack(anchor="w", padx=12, pady=(0, 10), fill="both", expand=True)
+                ).pack(anchor="w")
             else:
-                card = tk.Frame(grid, bg=c.surface0, bd=1, relief="solid")
-                card.grid(row=r, column=col, padx=8, pady=8, sticky="nsew")
-
-                header_row = tk.Frame(card, bg=c.surface0)
-                header_row.pack(fill="x", padx=10, pady=(8, 4))
-
-                tk.Label(header_row, text=name, font=("Segoe UI", 9, "bold"), bg=c.surface0, fg=c.fg).pack(side="left")
-
-                tag = tk.Label(
-                    header_row,
-                    text=hotkey.upper(),
-                    font=("Segoe UI", 8, "bold"),
-                    bg=c.accent,
-                    fg=c.accent_fg,
-                    bd=2,
-                    relief="flat",
-                )
-                tag.pack(side="right")
-
-                body = tk.Label(
+                # Tk fallback with Checkbutton
+                card = tk.Frame(parent, bg=c.surface0, bd=1, relief="solid")
+                card.pack(fill="x", pady=4, ipady=4)
+                tk.Checkbutton(
+                    card,
+                    text=name,
+                    variable=self._tool_vars[config_key],
+                    font=("Segoe UI", 10, "bold"),
+                    bg=c.surface0,
+                    fg=c.fg,
+                    selectcolor=c.input_bg,
+                ).pack(anchor="w", padx=10, pady=(5, 0))
+                tk.Label(
                     card,
                     text=desc,
                     font=("Segoe UI", 8),
-                    justify="left",
-                    wraplength=270,
                     bg=c.surface0,
                     fg=c.blockquote,
-                )
-                body.pack(anchor="w", padx=10, pady=(0, 8), fill="both", expand=True)
+                    wraplength=600,
+                    justify="left",
+                ).pack(anchor="w", padx=30)
 
-        # Additional features note — rendered once, outside the for loop
-        extra_text = "Also available: Chat windows for conversations, 6 themes in Settings, console commands (press H for help), and a Prompt Editor to customize actions."
+        # Note about restart
+        note_text = "⚠️ Tool changes require a restart to take effect."
         if self.use_ctk:
-            extra_frame = ctk.CTkFrame(parent, fg_color="transparent")
-            extra_frame.pack(fill="x", padx=15, pady=(8, 0))
-
-            if HAVE_EMOJI and prepare_emoji_content:
-                icon_kwargs = prepare_emoji_content("💡", size=18)
-                ctk.CTkLabel(
-                    extra_frame, font=get_ctk_font(18), width=30, **icon_kwargs, **get_ctk_label_colors(c, muted=True)
-                ).pack(side="left", padx=(0, 5))
-            else:
-                ctk.CTkLabel(
-                    extra_frame, text="💡", font=get_ctk_font(18), width=30, **get_ctk_label_colors(c, muted=True)
-                ).pack(side="left", padx=(0, 5))
-
-            ctk.CTkLabel(
-                extra_frame,
-                text=extra_text,
-                font=get_ctk_font(11),
-                justify="left",
-                wraplength=600,
-                anchor="w",
-                **get_ctk_label_colors(c, muted=True),
-            ).pack(side="left", fill="x", expand=True)
+            ctk.CTkLabel(parent, text=note_text, font=get_ctk_font(11), **get_ctk_label_colors(c, muted=True)).pack(
+                anchor="w", pady=(15, 0)
+            )
         else:
-            extra_frame = tk.Frame(parent, bg=c.bg)
-            extra_frame.pack(fill="x", padx=15, pady=(8, 0))
+            tk.Label(parent, text=note_text, font=("Segoe UI", 9), bg=c.bg, fg=c.blockquote).pack(
+                anchor="w", pady=(10, 0)
+            )
 
-            tk.Label(extra_frame, text="💡", font=("Segoe UI", 12), bg=c.bg, fg=c.fg).pack(side="left", padx=(0, 5))
-            tk.Label(
-                extra_frame,
-                text=extra_text,
-                font=("Segoe UI", 9),
+    def _save_tool_toggles(self):
+        """Save tool enable/disable states to config.ini."""
+        if not hasattr(self, "_tool_vars"):
+            return
+        for config_key, var in self._tool_vars.items():
+            try:
+                save_config_value(config_key, var.get())
+            except Exception as e:
+                print(f"[Onboarding] Error saving {config_key}: {e}")
+
+    def _create_actions_page(self, parent):
+        """Create Step 4: Actions & Modifiers selection page."""
+        c = self.colors
+
+        if self.use_ctk:
+            title = ctk.CTkLabel(
+                parent, text="Step 4: Choose Default Actions", font=get_ctk_font(18, "bold"), **get_ctk_label_colors(c)
+            )
+            title.pack(anchor="w", pady=(10, 3))
+
+            subtitle = ctk.CTkLabel(
+                parent,
+                text="Select which actions appear in tool popups. Start minimal — you can enable more anytime in the Prompt Editor.",
+                font=get_ctk_font(12),
                 justify="left",
-                wraplength=600,
-                anchor="w",
+                wraplength=680,
+                **get_ctk_label_colors(c, muted=True),
+            )
+            subtitle.pack(anchor="w", pady=(0, 10))
+
+            # Sub-tabs
+            self._actions_subtab = ctk.CTkSegmentedButton(
+                parent,
+                values=["Text Edit", "Snip Tool", "Audio Tool", "Modifiers"],
+                command=self._on_actions_subtab_change,
+                font=get_ctk_font(12, "bold"),
+                **get_ctk_segmented_colors(c),
+            )
+            self._actions_subtab.set("Text Edit")
+            self._actions_subtab.pack(fill="x", pady=(0, 8))
+
+            # Container for list content
+            self._actions_content_frame = ctk.CTkFrame(parent, fg_color="transparent")
+            self._actions_content_frame.pack(fill="both", expand=True)
+        else:
+            # tk fallback - simple notebook or manual tabs
+            title = tk.Label(
+                parent, text="Step 4: Choose Default Actions", font=("Segoe UI", 14, "bold"), bg=c.bg, fg=c.fg
+            )
+            title.pack(anchor="w", pady=(10, 3))
+
+            subtitle = tk.Label(
+                parent,
+                text="Select which actions appear in tool popups.",
+                font=("Segoe UI", 9),
                 bg=c.bg,
                 fg=c.blockquote,
-            ).pack(side="left", fill="x", expand=True)
+                justify="left",
+            )
+            subtitle.pack(anchor="w", pady=(0, 10))
+
+            self._actions_content_frame = tk.Frame(parent, bg=c.bg)
+            self._actions_content_frame.pack(fill="both", expand=True)
+
+        # Initialize toggle vars for all default actions
+        self._init_action_toggles()
+
+        # Show first sub-tab
+        self._show_actions_subtab("Text Edit")
+
+    def _init_action_toggles(self):
+        """Initialize toggle variables for all default actions and modifiers."""
+        from ..prompts import (
+            DEFAULT_AUDIO_ACTIONS,
+            DEFAULT_GLOBAL_SETTINGS,
+            DEFAULT_SNIP_ACTIONS,
+            DEFAULT_TEXT_EDIT_ACTIONS,
+            PromptsConfig,
+        )
+
+        WIZARD_MINIMAL_TEXT_EDIT = {"Explain", "Proofread", "Refine", "Translate to English", "Answer"}
+        WIZARD_MINIMAL_SNIP = {
+            "Quick Extract",
+            "Smart Extract",
+            "Explain",
+            "Answer",
+            "Describe",
+            "Translate to English",
+        }
+        WIZARD_MINIMAL_AUDIO = {"Transcribe", "Summarize", "Translate to English"}
+        WIZARD_MINIMAL_MODIFIERS = {"direct", "shorter", "longer", "language"}
+
+        # Check if prompts.json already exists (re-run wizard scenario)
+        prompts_config = PromptsConfig.get_instance()
+        is_rerun = Path("prompts.json").exists()
+
+        # Action toggles: {tool: {action_name: BooleanVar}}
+        self._action_toggle_vars = {}
+
+        # Text Edit Tool
+        self._action_toggle_vars["text_edit_tool"] = {}
+        for name in DEFAULT_TEXT_EDIT_ACTIONS:
+            if name.startswith("_"):
+                continue  # Skip _Custom, _Ask
+            if is_rerun:
+                # On re-run, use current visibility state
+                existing = prompts_config.get_text_edit_tool().get(name, {})
+                default_visible = not existing.get("_hidden", False)
+            else:
+                # First time: use minimal selection
+                default_visible = name in WIZARD_MINIMAL_TEXT_EDIT
+            self._action_toggle_vars["text_edit_tool"][name] = tk.BooleanVar(value=default_visible)
+
+        # Snip Tool
+        self._action_toggle_vars["snip_tool"] = {}
+        for name in DEFAULT_SNIP_ACTIONS:
+            if name.startswith("_"):
+                continue
+            if is_rerun:
+                existing = prompts_config.get_snip_tool().get(name, {})
+                default_visible = not existing.get("_hidden", False)
+            else:
+                default_visible = name in WIZARD_MINIMAL_SNIP
+            self._action_toggle_vars["snip_tool"][name] = tk.BooleanVar(value=default_visible)
+
+        # Audio Tool
+        self._action_toggle_vars["audio_tool"] = {}
+        for name in DEFAULT_AUDIO_ACTIONS:
+            if name.startswith("_"):
+                continue
+            if is_rerun:
+                existing = prompts_config.get_audio_tool().get(name, {})
+                default_visible = not existing.get("_hidden", False)
+            else:
+                default_visible = name in WIZARD_MINIMAL_AUDIO
+            self._action_toggle_vars["audio_tool"][name] = tk.BooleanVar(value=default_visible)
+
+        # Modifiers
+        self._modifier_toggle_vars = {}
+        default_modifiers = DEFAULT_GLOBAL_SETTINGS.get("modifiers", [])
+        for mod in default_modifiers:
+            key = mod.get("key", "")
+            if not key:
+                continue
+            if is_rerun:
+                # Check current state
+                current_mods = prompts_config.get_modifiers(include_hidden=True)
+                existing_mod = next((m for m in current_mods if m.get("key") == key), None)
+                default_visible = not (existing_mod.get("_hidden", False) if existing_mod else False)
+            else:
+                default_visible = key in WIZARD_MINIMAL_MODIFIERS
+            self._modifier_toggle_vars[key] = tk.BooleanVar(value=default_visible)
+
+    def _on_actions_subtab_change(self, value):
+        self._show_actions_subtab(value)
+
+    def _show_actions_subtab(self, tab_name):
+        """Render the action toggle list for the selected sub-tab."""
+        c = self.colors
+
+        # Clear current content
+        for child in self._actions_content_frame.winfo_children():
+            child.destroy()
+
+        if tab_name == "Modifiers":
+            self._render_modifier_toggles(self._actions_content_frame)
+            return
+
+        # Map tab name to tool key and action defaults
+        from ..prompts import DEFAULT_AUDIO_ACTIONS, DEFAULT_SNIP_ACTIONS, DEFAULT_TEXT_EDIT_ACTIONS
+
+        tool_map = {
+            "Text Edit": ("text_edit_tool", DEFAULT_TEXT_EDIT_ACTIONS),
+            "Snip Tool": ("snip_tool", DEFAULT_SNIP_ACTIONS),
+            "Audio Tool": ("audio_tool", DEFAULT_AUDIO_ACTIONS),
+        }
+
+        tool_key, defaults = tool_map[tab_name]
+        toggles = self._action_toggle_vars.get(tool_key, {})
+
+        # Select All / Deselect All buttons
+        btn_row = (
+            ctk.CTkFrame(self._actions_content_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self._actions_content_frame, bg=c.bg)
+        )
+        btn_row.pack(fill="x", pady=(0, 5))
+
+        def select_all():
+            for var in toggles.values():
+                var.set(True)
+
+        def deselect_all():
+            for var in toggles.values():
+                var.set(False)
+
+        create_emoji_button(btn_row, "All On", "✅", c, "success", 80, 28, select_all).pack(side="left", padx=3)
+        create_emoji_button(btn_row, "All Off", "❌", c, "danger", 80, 28, deselect_all).pack(side="left", padx=3)
+
+        # Scrollable list of toggles
+        if self.use_ctk:
+            scroll = ctk.CTkScrollableFrame(self._actions_content_frame, fg_color="transparent")
+        else:
+            scroll = TkScrollableFrame(self._actions_content_frame, bg_color=c.bg)
+        scroll.pack(fill="both", expand=True)
+
+        inner = scroll if self.use_ctk else scroll.scrollable_frame
+
+        for name in defaults:
+            if name.startswith("_"):
+                continue
+            if name not in toggles:
+                continue
+
+            action = defaults[name]
+            icon = action.get("icon", "")
+            task = action.get("task", "")
+
+            row = (
+                ctk.CTkFrame(inner, fg_color=c.surface0, corner_radius=6)
+                if self.use_ctk
+                else tk.Frame(inner, bg=c.surface0)
+            )
+            row.pack(fill="x", pady=2, padx=2, ipady=3)
+
+            if self.use_ctk:
+                switch = ctk.CTkSwitch(
+                    row,
+                    text="",
+                    variable=toggles[name],
+                    fg_color=c.surface2,
+                    progress_color=c.accent_green,
+                    width=40,
+                    height=20,
+                    switch_width=36,
+                    switch_height=18,
+                )
+                switch.pack(side="left", padx=(10, 5), pady=4)
+
+                # Icon + name
+                if HAVE_EMOJI and prepare_emoji_content and icon:
+                    icon_kwargs = prepare_emoji_content(icon, size=16)
+                    ctk.CTkLabel(row, font=get_ctk_font(12), width=24, **icon_kwargs, **get_ctk_label_colors(c)).pack(
+                        side="left", padx=(0, 4)
+                    )
+                elif icon:
+                    ctk.CTkLabel(row, text=icon, font=get_ctk_font(14), width=24, **get_ctk_label_colors(c)).pack(
+                        side="left", padx=(0, 4)
+                    )
+
+                ctk.CTkLabel(row, text=name, font=get_ctk_font(12, "bold"), anchor="w", **get_ctk_label_colors(c)).pack(
+                    side="left", padx=(0, 8)
+                )
+
+                # Task as tooltip-like description
+                if task:
+                    truncated = task[:80] + "..." if len(task) > 80 else task
+                    ctk.CTkLabel(
+                        row, text=truncated, font=get_ctk_font(10), anchor="w", **get_ctk_label_colors(c, muted=True)
+                    ).pack(side="left", fill="x", expand=True, padx=(0, 10))
+            else:
+                tk.Checkbutton(
+                    row,
+                    text=f"{icon} {name}",
+                    variable=toggles[name],
+                    font=("Segoe UI", 9),
+                    bg=c.surface0,
+                    fg=c.fg,
+                    selectcolor=c.input_bg,
+                    anchor="w",
+                ).pack(side="left", padx=8)
+
+    def _render_modifier_toggles(self, parent):
+        """Render modifier toggle list."""
+        c = self.colors
+        from ..prompts import DEFAULT_GLOBAL_SETTINGS
+
+        # Select All / Deselect All
+        btn_row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=c.bg)
+        btn_row.pack(fill="x", pady=(0, 5))
+
+        def select_all():
+            for var in self._modifier_toggle_vars.values():
+                var.set(True)
+
+        def deselect_all():
+            for var in self._modifier_toggle_vars.values():
+                var.set(False)
+
+        create_emoji_button(btn_row, "All On", "✅", c, "success", 80, 28, select_all).pack(side="left", padx=3)
+        create_emoji_button(btn_row, "All Off", "❌", c, "danger", 80, 28, deselect_all).pack(side="left", padx=3)
+
+        if self.use_ctk:
+            scroll = ctk.CTkScrollableFrame(parent, fg_color="transparent")
+        else:
+            scroll = TkScrollableFrame(parent, bg_color=c.bg)
+        scroll.pack(fill="both", expand=True)
+
+        inner = scroll if self.use_ctk else scroll.scrollable_frame
+
+        default_modifiers = DEFAULT_GLOBAL_SETTINGS.get("modifiers", [])
+        for mod in default_modifiers:
+            key = mod.get("key", "")
+            if not key or key not in self._modifier_toggle_vars:
+                continue
+
+            icon = mod.get("icon", "")
+            label = mod.get("label", key)
+            tooltip = mod.get("tooltip", "")
+
+            row = (
+                ctk.CTkFrame(inner, fg_color=c.surface0, corner_radius=6)
+                if self.use_ctk
+                else tk.Frame(inner, bg=c.surface0)
+            )
+            row.pack(fill="x", pady=2, padx=2, ipady=3)
+
+            if self.use_ctk:
+                switch = ctk.CTkSwitch(
+                    row,
+                    text="",
+                    variable=self._modifier_toggle_vars[key],
+                    fg_color=c.surface2,
+                    progress_color=c.accent_green,
+                    width=40,
+                    height=20,
+                    switch_width=36,
+                    switch_height=18,
+                )
+                switch.pack(side="left", padx=(10, 5), pady=4)
+
+                if HAVE_EMOJI and prepare_emoji_content and icon:
+                    icon_kwargs = prepare_emoji_content(icon, size=16)
+                    ctk.CTkLabel(row, font=get_ctk_font(12), width=24, **icon_kwargs, **get_ctk_label_colors(c)).pack(
+                        side="left", padx=(0, 4)
+                    )
+                elif icon:
+                    ctk.CTkLabel(row, text=icon, font=get_ctk_font(14), width=24, **get_ctk_label_colors(c)).pack(
+                        side="left", padx=(0, 4)
+                    )
+
+                ctk.CTkLabel(
+                    row, text=label, font=get_ctk_font(12, "bold"), anchor="w", **get_ctk_label_colors(c)
+                ).pack(side="left", padx=(0, 8))
+
+                if tooltip:
+                    ctk.CTkLabel(
+                        row, text=tooltip, font=get_ctk_font(10), anchor="w", **get_ctk_label_colors(c, muted=True)
+                    ).pack(side="left", fill="x", expand=True, padx=(0, 10))
+            else:
+                tk.Checkbutton(
+                    row,
+                    text=f"{icon} {label}",
+                    variable=self._modifier_toggle_vars[key],
+                    font=("Segoe UI", 9),
+                    bg=c.surface0,
+                    fg=c.fg,
+                    selectcolor=c.input_bg,
+                    anchor="w",
+                ).pack(side="left", padx=8)
+
+    def _save_action_visibility(self):
+        """Apply action/modifier visibility selections to prompts.json."""
+        from ..prompts import PromptsConfig
+
+        prompts_config = PromptsConfig.get_instance()
+        config = prompts_config._config  # Direct access for bulk mutation
+
+        # Apply action toggles
+        for tool_key, toggles in self._action_toggle_vars.items():
+            tool_data = config.setdefault(tool_key, {})
+            for action_name, var in toggles.items():
+                action = tool_data.get(action_name)
+                if isinstance(action, dict):
+                    if var.get():
+                        # Visible — remove _hidden if present
+                        action.pop("_hidden", None)
+                    else:
+                        # Hidden
+                        action["_hidden"] = True
+
+        # Apply modifier toggles
+        modifiers = config.get("_global_settings", {}).get("modifiers", [])
+        for mod in modifiers:
+            key = mod.get("key", "")
+            if key in self._modifier_toggle_vars:
+                if self._modifier_toggle_vars[key].get():
+                    mod.pop("_hidden", None)
+                else:
+                    mod["_hidden"] = True
+
+        # Save to file
+        prompts_config._save()
+        print("[Onboarding] Action/modifier visibility preferences saved")
 
     def _create_complete_page(self, parent):
         c = self.colors
@@ -1403,6 +1785,22 @@ class OnboardingWizard:
         base_url = self._base_url_var.get().strip() if hasattr(self, "_base_url_var") else ""
         if self._provider_var.get() == "custom" and base_url:
             summary_details.append(("🌐", "Base URL:", base_url))
+
+        # Show enabled tools in summary
+        enabled_tools = []
+        if hasattr(self, "_tool_vars"):
+            tool_names = {
+                "text_edit_tool_enabled": "TextEdit",
+                "screen_snip_enabled": "ScreenSnip",
+                "audio_tool_enabled": "AudioTool",
+                "tts_enabled": "TTS",
+            }
+            for key, var in self._tool_vars.items():
+                if var.get():
+                    enabled_tools.append(tool_names.get(key, key))
+
+        tools_text = ", ".join(enabled_tools) if enabled_tools else "None"
+        summary_details.append(("🔧", "Enabled Tools:", tools_text))
 
         summary_box.columnconfigure(0, weight=0, minsize=35)  # emoji column
         summary_box.columnconfigure(1, weight=1)  # label column
