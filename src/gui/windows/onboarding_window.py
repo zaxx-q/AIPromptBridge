@@ -1206,6 +1206,11 @@ class OnboardingWizard:
         # Load current config values
         config = load_config()
 
+        onboarding_completed = config.get("onboarding_completed", False)
+        if isinstance(onboarding_completed, str):
+            onboarding_completed = onboarding_completed.strip().lower() in ("true", "1")
+        is_first_run = not onboarding_completed
+
         # Initialize toggle vars
         self._tool_vars = {}
 
@@ -1215,28 +1220,28 @@ class OnboardingWizard:
                 "✏️ Text Edit Tool",
                 "ctrl+space",
                 "Select text anywhere and transform it with AI — edit, rewrite, translate, or ask questions about it.",
-                config.get("text_edit_tool_enabled", True),
+                True if is_first_run else config.get("text_edit_tool_enabled", True),
             ),
             (
                 "screen_snip_enabled",
                 "📸 Screen Snip Tool",
                 "ctrl+alt+x",
                 "Capture any screen area to extract text, analyze images, solve problems, or ask questions.",
-                config.get("screen_snip_enabled", True),
+                True if is_first_run else config.get("screen_snip_enabled", True),
             ),
             (
                 "audio_tool_enabled",
                 "🎙️ Audio Tool",
                 "ctrl+alt+a",
                 "Record microphone or system audio for transcription, analysis, and AI processing.",
-                config.get("audio_tool_enabled", True),
+                True if is_first_run else config.get("audio_tool_enabled", True),
             ),
             (
                 "tts_enabled",
                 "🔊 Text-to-Speech",
                 "ctrl+alt+t",
                 "Select text and hear AI read it aloud with expressive, natural-sounding voices.",
-                config.get("tts_enabled", False),
+                False if is_first_run else config.get("tts_enabled", False),
             ),
         ]
 
@@ -1314,7 +1319,11 @@ class OnboardingWizard:
                 ).pack(anchor="w", padx=30)
 
         # Note about restart
-        note_text = "⚠️ Tool changes require a restart to take effect."
+        if is_first_run:
+            note_text = "💡 These choices will take effect immediately upon completing the setup."
+        else:
+            note_text = "⚠️ Note: Tool changes made during a re-run require a restart to take effect."
+
         if self.use_ctk:
             ctk.CTkLabel(parent, text=note_text, font=get_ctk_font(11), **get_ctk_label_colors(c, muted=True)).pack(
                 anchor="w", pady=(15, 0)
@@ -1416,9 +1425,13 @@ class OnboardingWizard:
         WIZARD_MINIMAL_AUDIO = {"Transcribe", "Summarize", "Translate to English"}
         WIZARD_MINIMAL_MODIFIERS = {"direct", "shorter", "longer", "language"}
 
-        # Check if prompts.json already exists (re-run wizard scenario)
+        # Check if onboarding completed already (re-run wizard scenario)
         prompts_config = PromptsConfig.get_instance()
-        is_rerun = Path("prompts.json").exists()
+        config_data = load_config()
+        onboarding_completed = config_data.get("onboarding_completed", False)
+        if isinstance(onboarding_completed, str):
+            onboarding_completed = onboarding_completed.strip().lower() in ("true", "1")
+        is_rerun = onboarding_completed
 
         # Action toggles: {tool: {action_name: BooleanVar}}
         self._action_toggle_vars = {}

@@ -181,6 +181,11 @@ DEFAULT_TEXT_EDIT_SETTINGS = {
     "popup_use_groups": True,
     "popup_groups": [
         {
+            "name": "Text Edit",
+            "enabled": True,
+            "items": ["Proofread", "Refine", "Rewrite", "Paraphrase", "Professional", "Friendly", "Casual", "Concise"],
+        },
+        {
             "name": "Understanding",
             "enabled": True,
             "items": [
@@ -194,11 +199,6 @@ DEFAULT_TEXT_EDIT_SETTINGS = {
                 "Translate to English",
                 "Translate to Indonesian",
             ],
-        },
-        {
-            "name": "Text Edit",
-            "enabled": True,
-            "items": ["Proofread", "Refine", "Rewrite", "Paraphrase", "Professional", "Friendly", "Casual", "Concise"],
         },
         {"name": "Code", "enabled": True, "items": ["Explain Code", "Code Review", "Debug", "Refactor", "Document"]},
         {
