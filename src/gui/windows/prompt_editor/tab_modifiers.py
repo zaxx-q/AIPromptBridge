@@ -308,9 +308,10 @@ class ModifiersTabMixin:
         for i, mod in enumerate(modifiers):
             icon = mod.get("icon", "")
             label = mod.get("label", mod.get("key", ""))
-            if mod.get("_hidden", False):
+            is_hidden = mod.get("_hidden", False)
+            if is_hidden:
                 label = f"⊘ {label}"
-            self.modifier_listbox.add_item(str(i), label, icon)
+            self.modifier_listbox.add_item(str(i), label, icon, dimmed=is_hidden)
         if selected:
             try:
                 idx = int(selected)
