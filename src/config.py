@@ -21,7 +21,7 @@ DEFAULT_CONFIG = {
     "retry_delay": 5,
     "request_timeout": 120,
     "max_sessions": 200,
-    # Show AI response in chat window: yes or no
+    # Show AI response in chat window
     # This controls whether responses appear in a GUI window or are typed directly.
     # For TextEditTool: overridden by show_chat_window_instead_of_replace per-action setting,
     # which is further overridden by popup radio button selection
@@ -362,7 +362,7 @@ port = 5000
 # ============================================================
 # RESPONSE DISPLAY SETTINGS
 # ============================================================
-# Show AI response in a chat window (yes) or type directly (no)
+# Show AI response in a chat window or type directly
 #
 # Override hierarchy (highest to lowest priority):
 # 1. ?show=yes/no URL parameter (API endpoints only)

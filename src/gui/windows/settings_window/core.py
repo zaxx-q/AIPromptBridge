@@ -486,7 +486,7 @@ class SettingsWindow(
 
         # Collect values from widgets
         for key, var in self.vars.items():
-            if key in ["run_at_startup", "unlock_server_settings"]:
+            if key in ["run_at_startup", "unlock_server_settings", "key_obfuscation_disabled"]:
                 continue
 
             try:
@@ -522,9 +522,25 @@ class SettingsWindow(
         if hasattr(self, "_save_keys_to_store"):
             self._save_keys_to_store()
 
+        # Apply obfuscation toggle if changed
+        if "key_obfuscation_disabled" in self.vars:
+            try:
+                from src.key_store import KeyStore
+
+                key_store = KeyStore.get_instance()
+                new_value = self.vars["key_obfuscation_disabled"].get()
+                if new_value != key_store.obfuscation_disabled:
+                    key_store.set_obfuscation_disabled(new_value)
+                    key_store.save()
+                    mode = "plaintext (portable)" if new_value else "obfuscated"
+                    print(f"[Settings] Key storage mode changed to {mode}")
+            except Exception as e:
+                print(f"[Settings] Error updating obfuscation setting: {e}")
+
         # Cleanup transient keys
         self.config_data.config.pop("run_at_startup", None)
         self.config_data.config.pop("unlock_server_settings", None)
+        self.config_data.config.pop("key_obfuscation_disabled", None)
 
         # Save to file
         if save_config_full(self.config_data):
@@ -598,6 +614,10 @@ class SettingsWindow(
                             var.set(str(default_value))
                         else:
                             var.set(str(default_value) if default_value is not None else "")
+
+            # Reset obfuscation toggle to default (enabled, i.e., not disabled)
+            if "key_obfuscation_disabled" in self.vars:
+                self.vars["key_obfuscation_disabled"].set(False)
 
             # Update theme preview if available
             if self.preview_frame:

@@ -116,6 +116,26 @@ class GeneralTabMixin:
         # Welcome Guide
         self._create_welcome_guide_row(content)
 
+        # --- Security ---
+        create_section_header(content, "🔐 Security", self.colors, top_padding=20)
+
+        # Read current value from KeyStore (not from config.ini)
+        from src.key_store import KeyStore
+
+        key_store = KeyStore.get_instance()
+        current_obf_disabled = key_store.obfuscation_disabled
+
+        self._add_toggle_field(
+            content,
+            "key_obfuscation_disabled",
+            "Disable API key obfuscation (portable mode)",
+            current_obf_disabled,
+            hint="When enabled, keys.json stores plaintext keys instead of machine-specific obfuscated values. "
+            "This allows keys.json to be copied between machines. "
+            "⚠️ Keys will be visible in plaintext in the file.",
+            command=self._on_obfuscation_toggle,
+        )
+
         # --- Updates ---
         create_section_header(content, "⬆️ Updates", self.colors, top_padding=20)
 
@@ -385,6 +405,10 @@ class GeneralTabMixin:
                 self.status_label.configure(text=f"❌ Error: {e}", text_color=self.colors.accent_red)
             else:
                 self.status_label.configure(text=f"❌ Error: {e}", fg=self.colors.accent_red)
+
+    def _on_obfuscation_toggle(self):
+        """Handle obfuscation toggle — actual change applied on save."""
+        pass  # Applied in _save via _save_obfuscation_setting in core.py
 
     def _add_startup_info_label(self, parent):
         """Add an info label showing current startup target."""

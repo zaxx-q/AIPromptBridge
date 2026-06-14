@@ -124,6 +124,7 @@ class KeyStore:
 
         # Pub/sub listeners for key store change notifications
         self._listeners: List[Any] = []
+        self._obfuscation_disabled: bool = False
 
     # -- Singleton -----------------------------------------------------------
 
@@ -154,6 +155,45 @@ class KeyStore:
                 cb()
             except Exception as e:
                 logging.error(f"[KeyStore] Error notifying listener: {e}")
+
+    @property
+    def obfuscation_disabled(self) -> bool:
+        """Whether key obfuscation is disabled (plaintext storage)."""
+        with self._data_lock:
+            return self._obfuscation_disabled
+
+    def set_obfuscation_disabled(self, disabled: bool) -> None:
+        """Enable or disable key obfuscation.
+
+        When toggling, re-encodes all keys in memory to match the new mode.
+        Call save() afterward to persist.
+        """
+        with self._data_lock:
+            if disabled == self._obfuscation_disabled:
+                return
+
+            old_disabled = self._obfuscation_disabled
+            self._obfuscation_disabled = disabled
+
+            # Re-encode all keys in all pools
+            for pool_id, pool in self._pools.items():
+                new_keys = []
+                for kd in pool.get("keys", []):
+                    raw = kd.get("key", "")
+                    # First deobfuscate using the OLD mode
+                    if old_disabled:
+                        plaintext = raw  # Was stored as plaintext
+                    else:
+                        plaintext = deobfuscate(raw)  # Was stored obfuscated
+
+                    # Re-encode using the NEW mode
+                    if disabled:
+                        encoded = plaintext  # Store as plaintext
+                    else:
+                        encoded = obfuscate(plaintext)  # Store obfuscated
+
+                    new_keys.append({"key": encoded, "name": kd.get("name", "")})
+                pool["keys"] = new_keys
 
     # -- Load / Save ---------------------------------------------------------
 
@@ -188,6 +228,7 @@ class KeyStore:
         with self._data_lock:
             self._pools = data.get("pools", {})
             self._provider_pool_map = data.get("provider_pool_map", {})
+            self._obfuscation_disabled = data.get("obfuscation_disabled", False)
             self._ensure_builtin_pools()
 
         if self._append_env_keys():
@@ -203,6 +244,8 @@ class KeyStore:
                     "pools": self._pools,
                     "provider_pool_map": self._provider_pool_map,
                 }
+                if self._obfuscation_disabled:
+                    data["obfuscation_disabled"] = True
             with open(target, "w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2, ensure_ascii=False)
             self._notify_listeners()
@@ -212,6 +255,99 @@ class KeyStore:
 
             print_error(f"Failed to save {target}: {exc}")
             return False
+
+    def export_keys(self) -> Dict[str, Any]:
+        """Export all pools with deobfuscated (plaintext) keys.
+
+        Returns a dict suitable for JSON serialization:
+        {
+            "pools": {
+                "google": {"display_name": "Google", "keys": [{"key": "AIza...", "name": "main"}]},
+                ...
+            },
+            "provider_pool_map": {"google": "google", ...}
+        }
+        """
+        with self._data_lock:
+            exported_pools = {}
+            for pool_id, pool in self._pools.items():
+                keys_list = []
+                for kd in pool.get("keys", []):
+                    raw = kd.get("key", "")
+                    if self._obfuscation_disabled:
+                        plaintext = raw
+                    else:
+                        plaintext = deobfuscate(raw)
+                    if plaintext:
+                        keys_list.append({"key": plaintext, "name": kd.get("name", "")})
+                exported_pools[pool_id] = {
+                    "display_name": pool.get("display_name", pool_id),
+                    "keys": keys_list,
+                }
+            return {
+                "pools": exported_pools,
+                "provider_pool_map": dict(self._provider_pool_map),
+            }
+
+    def import_keys(self, data: Dict[str, Any]) -> Dict[str, int]:
+        """Import keys from an export dict, appending to existing pools.
+
+        Skips duplicate keys (same plaintext value already in pool).
+        Creates new pools if they don't exist.
+
+        Args:
+            data: Dict with "pools" and optionally "provider_pool_map".
+
+        Returns:
+            Dict of pool_id -> number of keys added.
+        """
+        imported_pools = data.get("pools", {})
+        result = {}
+
+        with self._data_lock:
+            for pool_id, pool_data in imported_pools.items():
+                if pool_id not in self._pools:
+                    # Create pool
+                    self._pools[pool_id] = {
+                        "display_name": pool_data.get("display_name", pool_id),
+                        "keys": [],
+                    }
+
+                pool = self._pools[pool_id]
+
+                # Get existing plaintext keys for duplicate detection
+                existing_plaintexts = set()
+                for kd in pool.get("keys", []):
+                    raw = kd.get("key", "")
+                    if self._obfuscation_disabled:
+                        pt = raw
+                    else:
+                        pt = deobfuscate(raw)
+                    if pt:
+                        existing_plaintexts.add(pt)
+
+                added = 0
+                for kd in pool_data.get("keys", []):
+                    plaintext = kd.get("key", "").strip()
+                    if not plaintext:
+                        continue
+                    if plaintext in existing_plaintexts:
+                        continue  # Skip duplicate
+
+                    encoded = plaintext if self._obfuscation_disabled else obfuscate(plaintext)
+                    pool["keys"].append({"key": encoded, "name": kd.get("name", "")})
+                    existing_plaintexts.add(plaintext)
+                    added += 1
+
+                result[pool_id] = added
+
+            # Import provider_pool_map entries for new pools only
+            imported_map = data.get("provider_pool_map", {})
+            for provider, pool_id in imported_map.items():
+                if provider not in self._provider_pool_map and pool_id in self._pools:
+                    self._provider_pool_map[provider] = pool_id
+
+        return result
 
     # -- Migration -----------------------------------------------------------
 
@@ -280,9 +416,10 @@ class KeyStore:
                 for idx, raw_key in enumerate(raw_keys):
                     if raw_key:
                         name = names[idx] if idx < len(names) else ""
+                        encoded = raw_key if self._obfuscation_disabled else obfuscate(raw_key)
                         keys_list.append(
                             {
-                                "key": obfuscate(raw_key),
+                                "key": encoded,
                                 "name": name,
                             }
                         )
@@ -351,7 +488,7 @@ class KeyStore:
                 pool = self._pools[pool_id]
                 existing_plaintext_keys = []
                 for kd in pool.get("keys", []):
-                    k = deobfuscate(kd.get("key", ""))
+                    k = kd.get("key", "") if self._obfuscation_disabled else deobfuscate(kd.get("key", ""))
                     if k:
                         existing_plaintext_keys.append(k.strip())
 
@@ -359,9 +496,10 @@ class KeyStore:
                     val = os.environ.get(env_name, "").strip()
                     if val:
                         if val not in existing_plaintext_keys:
+                            encoded = val if self._obfuscation_disabled else obfuscate(val)
                             pool["keys"].append(
                                 {
-                                    "key": obfuscate(val),
+                                    "key": encoded,
                                     "name": f"env:{env_name}",
                                 }
                             )
@@ -437,6 +575,8 @@ class KeyStore:
             pool = self._pools.get(pool_id)
             if not pool:
                 return []
+            if self._obfuscation_disabled:
+                return [{"key": kd.get("key", ""), "name": kd.get("name", "")} for kd in pool.get("keys", [])]
             return [{"key": deobfuscate(kd.get("key", "")), "name": kd.get("name", "")} for kd in pool.get("keys", [])]
 
     def get_pool_for_provider(self, provider: str) -> List[Dict[str, str]]:
@@ -446,12 +586,13 @@ class KeyStore:
         return self.get_pool(pool_id)
 
     def add_key(self, pool_id: str, key: str, name: str = "") -> bool:
-        """Add a key to a pool (obfuscates automatically)."""
+        """Add a key to a pool (obfuscates automatically unless disabled)."""
         with self._data_lock:
             pool = self._pools.get(pool_id)
             if pool is None:
                 return False
-            pool["keys"].append({"key": obfuscate(key), "name": name})
+            encoded = key if self._obfuscation_disabled else obfuscate(key)
+            pool["keys"].append({"key": encoded, "name": name})
             return True
 
     def remove_key(self, pool_id: str, index: int) -> bool:
@@ -489,7 +630,12 @@ class KeyStore:
             if pool is None:
                 return False
             pool["keys"] = [
-                {"key": obfuscate(kd.get("key", "")), "name": kd.get("name", "")} for kd in keys_data if kd.get("key")
+                {
+                    "key": (kd.get("key", "") if self._obfuscation_disabled else obfuscate(kd.get("key", ""))),
+                    "name": kd.get("name", ""),
+                }
+                for kd in keys_data
+                if kd.get("key")
             ]
             return True
 
@@ -529,7 +675,10 @@ class KeyStore:
                 raw_keys: List[str] = []
                 key_names: List[str] = []
                 for kd in pool.get("keys", []):
-                    k = deobfuscate(kd.get("key", ""))
+                    if self._obfuscation_disabled:
+                        k = kd.get("key", "")
+                    else:
+                        k = deobfuscate(kd.get("key", ""))
                     if k:
                         raw_keys.append(k)
                         key_names.append(kd.get("name", ""))

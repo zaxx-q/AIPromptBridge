@@ -171,7 +171,7 @@ Right-click the tray icon for:
 - **Audio Analyzer** - Open audio tool (Ctrl+Alt+A)
 - **TTS** - Open Text-to-Speech window (Ctrl+Alt+T)
 - **Settings** - Open GUI settings editor
-- **Prompt Editor** - Edit TextEditTool prompts
+- **Prompt Editor** - Customize prompts sent to AI, preview prompts in Playground
 - **Profiles** - Open Connection Profile Manager
 - **Edit config.ini** - Open configuration file (only visible with `--show-console` arg)
 - **Edit prompts.json** - Open prompts file (only visible with `--show-console` arg)
@@ -292,6 +292,7 @@ For advanced users, configuration files are stored in the application root:
 
 I decided to avoid Qt to minimize app size and bloat so you may sometimes experince lag when resizing AIPromptBridge windows. Underlying Tkinter/CustomTkinter is already a low-performant library, there's nothing I can do about that (see [CustomTkinter Issue #1461](https://github.com/TomSchimansky/CustomTkinter/issues/1461)).
 but if you want to improve performance:
+
 - Enable **Force Standard Tkinter** (`ui_force_standard_tk`) under the **Theme** tab in Settings. This sacrifices the modern looks and colored emojis for snappier UI.
 
 ### Getting API Keys
@@ -310,6 +311,7 @@ but if you want to improve performance:
 - If one key hits rate limits, the next one is used automatically
 - The system tracks exhausted keys and skips them
 - Keys rotate on: 429 (rate limit), 401/402/403 (auth errors), empty responses
+- **Export & Import**: Export plaintext JSON backups and import/merge keys directly via the API Keys settings tab (handles duplicate detection automatically).
 - **Security**: You can also provide keys via Environment Variables (auto-migrated to `keys.json` on first run if it doesn't exist):
   - `GEMINI_API_KEY`
   - `ANTHROPIC_API_KEY`

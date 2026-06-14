@@ -91,23 +91,46 @@ class KeysTabMixin:
         )
         right_frame.grid(row=0, column=1, sticky="nsew")
 
+        # Header row with title and Import/Export buttons
+        header_row = (
+            ctk.CTkFrame(right_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(right_frame, bg=self.colors.bg)
+        )
+        header_row.pack(fill="x", pady=(0, 2))
+
         self._keys_header_var = tk.StringVar(master=self.root, value="🔑 Keys")
         if self.use_ctk:
             self._keys_header_label = ctk.CTkLabel(
-                right_frame,
+                header_row,
                 textvariable=self._keys_header_var,
                 font=get_ctk_font(14, "bold"),
                 **get_ctk_label_colors(self.colors),
             )
         else:
             self._keys_header_label = tk.Label(
-                right_frame,
+                header_row,
                 textvariable=self._keys_header_var,
                 font=("Segoe UI", 11, "bold"),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
             )
-        self._keys_header_label.pack(anchor="w")
+        self._keys_header_label.pack(side="left")
+
+        # Import/Export buttons
+        io_btn_frame = (
+            ctk.CTkFrame(header_row, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(header_row, bg=self.colors.bg)
+        )
+        io_btn_frame.pack(side="right")
+
+        create_emoji_button(io_btn_frame, "Export", "📤", self.colors, "secondary", 90, 28, self._export_keys).pack(
+            side="left", padx=2
+        )
+        create_emoji_button(io_btn_frame, "Import", "📥", self.colors, "secondary", 90, 28, self._import_keys).pack(
+            side="left", padx=2
+        )
 
         if self.use_ctk:
             key_list = ScrollableButtonList(
@@ -415,3 +438,88 @@ class KeysTabMixin:
         if name:
             return f"{masked}  ({name})"
         return masked
+
+    def _export_keys(self):
+        """Export all keys to a JSON file (plaintext, deobfuscated)."""
+        import json
+        from tkinter import filedialog, messagebox
+
+        filepath = filedialog.asksaveasfilename(
+            title="Export API Keys",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            initialfile="api_keys_export.json",
+            parent=self.root,
+        )
+        if not filepath:
+            return
+
+        try:
+            export_data = self._key_store.export_keys()
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(export_data, f, indent=2, ensure_ascii=False)
+
+            total_keys = sum(len(p.get("keys", [])) for p in export_data["pools"].values())
+            messagebox.showinfo(
+                "Export Complete",
+                f"Exported {total_keys} key(s) across {len(export_data['pools'])} pool(s).\n\n"
+                "⚠️ Keys are stored in PLAINTEXT in the exported file.\n"
+                "Keep this file secure!",
+                parent=self.root,
+            )
+        except Exception as e:
+            messagebox.showerror("Export Failed", f"Error exporting keys: {e}", parent=self.root)
+
+    def _import_keys(self):
+        """Import keys from a JSON file (appends, skips duplicates)."""
+        import json
+        from tkinter import filedialog, messagebox
+
+        filepath = filedialog.askopenfilename(
+            title="Import API Keys",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            parent=self.root,
+        )
+        if not filepath:
+            return
+
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                import_data = json.load(f)
+
+            if "pools" not in import_data:
+                messagebox.showerror(
+                    "Invalid File",
+                    "The selected file does not contain valid key pool data.\n"
+                    "Expected a file created by the Export function.",
+                    parent=self.root,
+                )
+                return
+
+            result = self._key_store.import_keys(import_data)
+            self._key_store.save()
+
+            # Refresh UI
+            self._refresh_pool_list()
+            self._refresh_key_list()
+
+            # Build summary
+            total_added = sum(result.values())
+            pool_details = ", ".join(f"{pid}: +{count}" for pid, count in result.items() if count > 0)
+
+            if total_added > 0:
+                messagebox.showinfo(
+                    "Import Complete",
+                    f"Added {total_added} new key(s).\n\n{pool_details}",
+                    parent=self.root,
+                )
+            else:
+                messagebox.showinfo(
+                    "Import Complete",
+                    "No new keys were added (all keys already exist).",
+                    parent=self.root,
+                )
+        except json.JSONDecodeError:
+            messagebox.showerror("Import Failed", "The selected file is not valid JSON.", parent=self.root)
+        except Exception as e:
+            messagebox.showerror("Import Failed", f"Error importing keys: {e}", parent=self.root)
