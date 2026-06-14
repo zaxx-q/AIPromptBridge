@@ -89,6 +89,10 @@ class ActionsTabMixin:
                 variable=self.show_hidden_var,
                 font=get_ctk_font(11),
                 text_color=self.colors.fg,
+                fg_color=self.colors.surface2,
+                progress_color=self.colors.accent,
+                button_color="#ffffff",
+                button_hover_color="#f0f0f0",
                 width=46,
                 command=self._refresh_action_list,
             )
