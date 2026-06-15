@@ -593,6 +593,12 @@ class TrayApp:
         """Open TTS Window"""
         try:
             from . import web_server
+
+            # Check if TTS is enabled in config
+            if not web_server.CONFIG.get("tts_enabled", True):
+                print("[Warning] TTS not enabled")
+                return
+
             from .gui.core import HAVE_GUI, GUICoordinator
 
             if HAVE_GUI:
@@ -750,6 +756,19 @@ class TrayApp:
 
         SEP = ("---", _separator)
 
+        # Read tool enable states from config for conditional menu items
+        try:
+            from . import web_server
+
+            _cfg = web_server.CONFIG or {}
+        except Exception:
+            _cfg = {}
+
+        _text_edit_enabled = _cfg.get("text_edit_tool_enabled", True)
+        _snip_enabled = _cfg.get("screen_snip_enabled", True)
+        _audio_enabled = _cfg.get("audio_tool_enabled", True)
+        _tts_enabled = _cfg.get("tts_enabled", True)
+
         # Define menu options with dynamic emoji icon support
         raw_options = []
 
@@ -757,14 +776,22 @@ class TrayApp:
             raw_options.append(("💻 Toggle Console", self._on_toggle_console))
             raw_options.append(SEP)
 
+        # Always show Session Browser (not a tool)
+        raw_options.append(("🔍 Session Browser", self._on_session_browser))
+
+        # Only show tool items if the tool is enabled
+        if _text_edit_enabled:
+            raw_options.append(("💬 Direct Chat", self._on_direct_chat))
+        if _snip_enabled:
+            raw_options.append(("📸 Screen Snip", self._on_snip_tool))
+        if _audio_enabled:
+            raw_options.append(("🎤 Audio Analyzer", self._on_audio_analyzer))
+        if _tts_enabled:
+            raw_options.append(("🔊 TTS", self._on_tts_window))
+
+        raw_options.append(SEP)
         raw_options.extend(
             [
-                ("🔍 Session Browser", self._on_session_browser),
-                ("💬 Direct Chat", self._on_direct_chat),
-                ("📸 Screen Snip", self._on_snip_tool),
-                ("🎤 Audio Analyzer", self._on_audio_analyzer),
-                ("🔊 TTS", self._on_tts_window),
-                SEP,
                 ("⚙️ Settings", self._on_settings),
                 ("✏️ Prompt Editor", self._on_prompt_editor),
                 ("🔌 Profiles", self._on_connection_profiles),

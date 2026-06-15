@@ -155,6 +155,9 @@ class TextEditToolApp:
         else:
             selected_text = self.text_handler.get_selected_text()
 
+        # Only offer TTS button in popups if TTS is enabled
+        on_tts = self._on_tts_requested if self.config.get("tts_enabled", True) else None
+
         if selected_text:
             logging.debug(f'Selected text: "{selected_text[:50]}..."')
             # Text selected - show prompt selection popup via coordinator
@@ -164,14 +167,14 @@ class TextEditToolApp:
                 on_option_selected=self._on_option_selected,
                 on_close=self._on_popup_closed,
                 selected_text=selected_text,
-                on_tts=self._on_tts_requested,
+                on_tts=on_tts,
                 on_request_compare_text=self._on_request_compare_text,
             )
         else:
             # No text selected - show simple input popup via coordinator
             logging.debug("No text selected, showing input popup")
             GUICoordinator.get_instance().request_input_popup(
-                on_submit=self._on_direct_chat, on_close=self._on_popup_closed, on_tts=self._on_tts_requested
+                on_submit=self._on_direct_chat, on_close=self._on_popup_closed, on_tts=on_tts
             )
 
     def _on_popup_closed(self):
