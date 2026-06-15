@@ -150,7 +150,7 @@ class TextEditToolApp:
 
         # Get selected text (captured locally to avoid race conditions
         # when multiple hotkey presses trigger concurrent popups)
-        selected_text = self.text_handler.get_selected_text()
+        selected_text = self.text_handler.get_selected_text_with_retry()
 
         if selected_text:
             logging.debug(f'Selected text: "{selected_text[:50]}..."')
@@ -591,7 +591,6 @@ class TextEditToolApp:
         import time
 
         import pyperclip
-        from pynput import keyboard as pykeyboard
 
         if not text:
             return False
@@ -610,12 +609,9 @@ class TextEditToolApp:
             # Small delay to ensure clipboard is updated
             time.sleep(0.05)
 
-            # Paste using Ctrl+V
-            keyboard = pykeyboard.Controller()
-            keyboard.press(pykeyboard.Key.ctrl)
-            keyboard.press("v")
-            keyboard.release("v")
-            keyboard.release(pykeyboard.Key.ctrl)
+            # Paste using SendInput with VK codes
+            # (avoids Caps Lock / keyboard layout issues with pynput)
+            self.text_handler._send_paste_keystroke()
 
             # Wait for paste to complete
             time.sleep(0.1)

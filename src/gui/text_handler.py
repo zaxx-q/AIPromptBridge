@@ -16,6 +16,7 @@ _INPUT_KEYBOARD = 1
 _KEYEVENTF_KEYUP = 0x0002
 _VK_CONTROL = 0x11
 _VK_C = 0x43
+_VK_V = 0x56
 _WM_COPY = 0x0301
 
 _PUL = ctypes.POINTER(ctypes.c_ulong)
@@ -153,6 +154,44 @@ class TextHandler:
 
         logging.debug(f"SendInput copy: ctrl_held={ctrl_held}, {sent}/{n} events sent")
 
+    @staticmethod
+    def _send_paste_keystroke():
+        """
+        Send a Ctrl+V paste command using Win32 SendInput with virtual key codes.
+
+        Uses VK codes instead of character-based presses to avoid issues with
+        Caps Lock being on or non-English keyboard layouts (which can cause
+        pynput's keyboard.press('v') to send the wrong character).
+        """
+        user32 = ctypes.windll.user32
+
+        # Check if Ctrl is already physically held
+        ctrl_held = bool(user32.GetAsyncKeyState(_VK_CONTROL) & 0x8000)
+
+        if ctrl_held:
+            # Ctrl already held → just press/release V
+            events = [
+                _make_key_event(_VK_V),
+                _make_key_event(_VK_V, up=True),
+            ]
+        else:
+            # No Ctrl held → send full Ctrl+V sequence
+            events = [
+                _make_key_event(_VK_CONTROL),
+                _make_key_event(_VK_V),
+                _make_key_event(_VK_V, up=True),
+                _make_key_event(_VK_CONTROL, up=True),
+            ]
+
+        n = len(events)
+        arr = (_INPUT * n)(*events)
+        sent = user32.SendInput(n, arr, ctypes.sizeof(_INPUT))
+
+        if sent != n:
+            logging.warning(f"SendInput paste: only {sent}/{n} events were injected")
+
+        logging.debug(f"SendInput paste: ctrl_held={ctrl_held}, {sent}/{n} events sent")
+
     def get_selected_text(self, sleep_duration: float = 0.01, max_wait: float = 0.4) -> str:
         """
         Get the currently selected text from any application using polling.
@@ -229,19 +268,105 @@ class TextHandler:
 
     def get_selected_text_with_retry(self) -> str:
         """
-        Get selected text with a retry using longer wait time.
+        Get selected text with a smart retry for slow applications.
+
+        Fast path (attempt 1): default timing — works for most apps, returns in <100ms
+        typically (exits as soon as clipboard changes). Max wait 0.4s.
+
+        Slow-app path (attempt 2): if the first attempt captured nothing, retries with
+        a longer timeout (1.2s) and re-sends the copy keystroke after 0.4s. This
+        handles Electron apps (Obsidian), JavaFX apps (XMind), and similar programs
+        that process Ctrl+C asynchronously.
 
         Returns:
             The selected text, or empty string if none
         """
-        # First attempt with default settings (0.5s max wait)
+        # Fast path — works for most apps
         selected_text = self.get_selected_text()
+        if selected_text:
+            return selected_text
 
-        # Retry with longer wait if no text captured
-        if not selected_text:
-            logging.debug("No text captured, retrying with longer wait")
-            # Increase stability delay and max wait
-            selected_text = self.get_selected_text(sleep_duration=0.1, max_wait=0.8)
+        # Slow-app retry
+        logging.debug("No text captured on first attempt, retrying with slow-app strategy")
+        return self._get_selected_text_slow_app()
+
+    def _get_selected_text_slow_app(self) -> str:
+        """
+        Retry strategy for slow applications (Electron/JavaFX).
+
+        - Waits 80ms before sending (gives Electron's event loop time to settle)
+        - Polls for up to 1.2s with 20ms intervals
+        - Re-sends the copy keystroke once after 0.4s if clipboard hasn't changed
+        - Total added latency for normal apps: 0 (this only runs if fast path failed)
+
+        Returns:
+            The selected text, or empty string if none
+        """
+        user32 = ctypes.windll.user32
+
+        try:
+            clipboard_backup = pyperclip.paste()
+        except Exception:
+            clipboard_backup = ""
+
+        try:
+            start_sequence = user32.GetClipboardSequenceNumber()
+        except Exception:
+            return ""
+
+        # Longer pre-send delay — Electron needs time after focus change
+        time.sleep(0.08)
+
+        # Send copy keystroke
+        try:
+            self.is_copying = True
+            self.last_copy_time = time.time()
+            self._send_copy_keystroke()
+        except Exception as e:
+            logging.error(f"Slow-app copy failed: {e}")
+            self.is_copying = False
+            return ""
+
+        # Poll for clipboard change with longer timeout and mid-wait re-send
+        start_time = time.time()
+        selected_text = ""
+        clipboard_changed = False
+        resent = False
+
+        while (time.time() - start_time) < 1.2:
+            try:
+                current_sequence = user32.GetClipboardSequenceNumber()
+                if current_sequence != start_sequence:
+                    selected_text = pyperclip.paste()
+                    clipboard_changed = True
+                    break
+            except Exception:
+                pass
+
+            # After 0.4s with no result, re-send the copy keystroke once
+            # This handles apps that may have missed or delayed the first send
+            if not resent and (time.time() - start_time) > 0.4:
+                resent = True
+                logging.debug("Re-sending copy keystroke for slow app")
+                try:
+                    self._send_copy_keystroke()
+                except Exception:
+                    pass
+
+            time.sleep(0.02)  # 20ms polling interval
+
+        self.is_copying = False
+
+        # Restore clipboard if we captured text (we overwrote user's clipboard)
+        if clipboard_changed:
+            try:
+                time.sleep(0.05)
+                pyperclip.copy(clipboard_backup)
+            except Exception as e:
+                logging.error(f"Failed to restore clipboard after slow-app capture: {e}")
+
+        if selected_text:
+            logging.debug(f"Slow-app strategy captured {len(selected_text)} chars (resent={resent})")
 
         return selected_text
 
@@ -269,12 +394,10 @@ class TextHandler:
             cleaned_text = new_text.rstrip("\n")
             pyperclip.copy(cleaned_text)
 
-            # Simulate Ctrl+V
+            # Paste using SendInput with VK codes
+            # (avoids Caps Lock / keyboard layout issues with pynput)
             time.sleep(0.1)
-            self.keyboard.press(pykeyboard.Key.ctrl)
-            self.keyboard.press("v")
-            self.keyboard.release("v")
-            self.keyboard.release(pykeyboard.Key.ctrl)
+            self._send_paste_keystroke()
 
             time.sleep(0.2)
 
