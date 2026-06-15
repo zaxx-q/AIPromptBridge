@@ -343,6 +343,15 @@ def save_config_value(key: str, value, filepath=CONFIG_FILE):
         with open(filepath, "w", encoding="utf-8") as f:
             f.writelines(new_lines)
 
+        # Update in-memory web_server.CONFIG if available
+        try:
+            from . import web_server
+
+            if web_server.CONFIG is not None:
+                web_server.CONFIG[key] = value
+        except Exception:
+            pass
+
         notify_config_change(key, value)
         return True
     except Exception as e:

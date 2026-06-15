@@ -671,6 +671,10 @@ class GUICoordinator:
             except ImportError:
                 pass
 
+        if config is not None and not config.get("tts_enabled", True):
+            print("[Warning] TTS not enabled")
+            return
+
         self._request_queue.put(
             {
                 "type": "tts_window",

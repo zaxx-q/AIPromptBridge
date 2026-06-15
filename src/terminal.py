@@ -333,6 +333,14 @@ def terminal_session_manager():
                     from . import web_server
                     from .gui.core import GUICoordinator
 
+                    # Check if TTS is enabled in config
+                    if not web_server.CONFIG.get("tts_enabled", True):
+                        if HAVE_RICH:
+                            console.print("\n[red]✗ TTS is disabled in configuration[/red]\n")
+                        else:
+                            print("\n✗ TTS is disabled in configuration\n")
+                        continue
+
                     if HAVE_RICH:
                         console.print("\n[bold]🔊  Opening TTS Window...[/bold]\n")
                     else:

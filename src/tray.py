@@ -51,6 +51,22 @@ try:
                     item = PackMENUITEMINFO(text=option_text, hbmpItem=option_icon, hSubMenu=submenu)
                     InsertMenuItem(menu, 0, 1, ctypes.byref(item))
 
+        def update_menu_options(self, menu_options):
+            """Dynamically update menu options of the running tray icon"""
+            if self._menu:
+                try:
+                    ctypes.windll.user32.DestroyMenu(self._menu)
+                except Exception as e:
+                    print(f"[Warning] Failed to destroy menu: {e}")
+                self._menu = None
+
+            self._next_action_id = SysTrayIcon.FIRST_ID
+            self._menu_actions_by_id = set()
+
+            full_options = [*menu_options, ("Quit", None, SysTrayIcon.QUIT)]
+            self._menu_options = self._add_ids_to_menu_options(full_options)
+            self._menu_actions_by_id = dict(self._menu_actions_by_id)
+
     # Use our custom class instead
     SysTrayIcon = CustomSysTrayIcon
     HAVE_SYSTRAY = True
@@ -750,6 +766,106 @@ class TrayApp:
         # Enable dark mode for menus if applicable
         self._enable_dark_mode()
 
+        # Subscribe to config changes to rebuild menu dynamically
+        try:
+            from .config import subscribe_config_change
+
+            subscribe_config_change(self._on_config_changed)
+        except Exception as e:
+            print(f"[Warning] Could not subscribe to config changes in tray: {e}")
+
+        menu_options = self.build_menu_options()
+
+        # Create the system tray icon
+        try:
+            # Standard initialization: Let library handle the Quit button
+            # We removed "Quit" from raw_options to ensure only one button appears
+            self.systray = SysTrayIcon(
+                self.icon_path,
+                "AIPromptBridge",
+                tuple(menu_options),
+                on_quit=self._on_exit,
+                default_menu_index=0,  # "Show Console" is default action on double-click
+            )
+
+            # Hide console if requested
+            if hide_console_on_start:
+                # Use a short delay and retry to ensure WT window is ready
+                import time
+
+                for attempt in range(3):
+                    if hide_console():
+                        # Verify it actually hid
+                        time.sleep(0.1)
+                        if not is_console_visible():
+                            self.console_visible = False
+                            break
+                    time.sleep(0.3)  # Wait before retry
+                else:
+                    # Final attempt
+                    hide_console()
+                    self.console_visible = not is_console_visible()
+
+            # Start the tray (this blocks until shutdown is called)
+            self.systray.start()
+            return True
+
+        except Exception as e:
+            print(f"[Error] Failed to start system tray: {e}")
+            return False
+
+    def _enable_dark_mode(self):
+        """
+        Attempt to enable dark mode for the application menus.
+        Uses undocumented Windows APIs.
+        """
+        if sys.platform != "win32":
+            return
+
+        try:
+            # Check if we should use dark mode
+            try:
+                from .gui.themes import is_dark_mode
+
+                should_be_dark = is_dark_mode()
+            except ImportError:
+                should_be_dark = True  # Default to dark if can't check
+
+            if not should_be_dark:
+                return
+
+            # uxtheme.dll ordinal 135 is SetPreferredAppMode (Windows 10 1903+)
+            # 0 = Default, 1 = AllowDark, 2 = ForceDark, 3 = ForceLight, 4 = Max
+            try:
+                uxtheme = ctypes.windll.uxtheme
+                # Try to load the function by ordinal
+                if hasattr(uxtheme, "SetPreferredAppMode"):
+                    uxtheme.SetPreferredAppMode(2)  # Force Dark
+                else:
+                    # Try by ordinal for older versions or if not exposed by name
+                    try:
+                        SetPreferredAppMode = uxtheme[135]
+                        SetPreferredAppMode(2)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        except Exception as e:
+            print(f"[Warning] Failed to enable dark mode for tray: {e}")
+
+    def stop(self):
+        """Stop the system tray icon"""
+        try:
+            from .config import unsubscribe_config_change
+
+            unsubscribe_config_change(self._on_config_changed)
+        except Exception:
+            pass
+        if self.systray:
+            self.systray.shutdown()
+
+    def build_menu_options(self):
         # Helper for separators
         def _separator(systray):
             pass
@@ -848,88 +964,26 @@ class TrayApp:
             for text, callback in raw_options:
                 menu_options.append((text, None, callback))
 
-        # Create the system tray icon
-        try:
-            # Standard initialization: Let library handle the Quit button
-            # We removed "Quit" from raw_options to ensure only one button appears
-            self.systray = SysTrayIcon(
-                self.icon_path,
-                "AIPromptBridge",
-                tuple(menu_options),
-                on_quit=self._on_exit,
-                default_menu_index=0,  # "Show Console" is default action on double-click
-            )
+        return menu_options
 
-            # Hide console if requested
-            if hide_console_on_start:
-                # Use a short delay and retry to ensure WT window is ready
-                import time
-
-                for attempt in range(3):
-                    if hide_console():
-                        # Verify it actually hid
-                        time.sleep(0.1)
-                        if not is_console_visible():
-                            self.console_visible = False
-                            break
-                    time.sleep(0.3)  # Wait before retry
-                else:
-                    # Final attempt
-                    hide_console()
-                    self.console_visible = not is_console_visible()
-
-            # Start the tray (this blocks until shutdown is called)
-            self.systray.start()
-            return True
-
-        except Exception as e:
-            print(f"[Error] Failed to start system tray: {e}")
-            return False
-
-    def _enable_dark_mode(self):
-        """
-        Attempt to enable dark mode for the application menus.
-        Uses undocumented Windows APIs.
-        """
-        if sys.platform != "win32":
+    def update_tray_menu(self):
+        """Rebuild and update the tray menu options dynamically based on config changes."""
+        if not self.systray:
             return
+        menu_options = self.build_menu_options()
+        self.systray.update_menu_options(menu_options)
 
-        try:
-            # Check if we should use dark mode
-            try:
-                from .gui.themes import is_dark_mode
-
-                should_be_dark = is_dark_mode()
-            except ImportError:
-                should_be_dark = True  # Default to dark if can't check
-
-            if not should_be_dark:
-                return
-
-            # uxtheme.dll ordinal 135 is SetPreferredAppMode (Windows 10 1903+)
-            # 0 = Default, 1 = AllowDark, 2 = ForceDark, 3 = ForceLight, 4 = Max
-            try:
-                uxtheme = ctypes.windll.uxtheme
-                # Try to load the function by ordinal
-                if hasattr(uxtheme, "SetPreferredAppMode"):
-                    uxtheme.SetPreferredAppMode(2)  # Force Dark
-                else:
-                    # Try by ordinal for older versions or if not exposed by name
-                    try:
-                        SetPreferredAppMode = uxtheme[135]
-                        SetPreferredAppMode(2)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-
-        except Exception as e:
-            print(f"[Warning] Failed to enable dark mode for tray: {e}")
-
-    def stop(self):
-        """Stop the system tray icon"""
-        if self.systray:
-            self.systray.shutdown()
+    def _on_config_changed(self, key, value):
+        # Rebuild tray menu if any tool toggle or bulk update occurs
+        if key in (
+            "text_edit_tool_enabled",
+            "screen_snip_enabled",
+            "audio_tool_enabled",
+            "tts_enabled",
+            "_bulk_update",
+            "onboarding_completed",
+        ):
+            self.update_tray_menu()
 
 
 def run_with_tray(main_func, icon_path=None, hide_console=True):
