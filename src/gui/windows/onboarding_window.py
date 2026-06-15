@@ -12,7 +12,7 @@ import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox, ttk
-from typing import Callable, Dict, List, Optional
+from typing import Callable, ClassVar, Dict, List, Optional
 
 from ...config import load_config, save_config_value
 from ...connection_profiles import ConnectionProfile, ProfileStore
@@ -69,6 +69,24 @@ class OnboardingWizard:
     """
     Onboarding wizard guiding first-time users through configuration.
     """
+
+    WIZARD_MINIMAL_TEXT_EDIT: ClassVar[set[str]] = {
+        "Explain",
+        "Proofread",
+        "Refine",
+        "Translate to English",
+        "Answer",
+    }
+    WIZARD_MINIMAL_SNIP: ClassVar[set[str]] = {
+        "Quick Extract",
+        "Smart Extract",
+        "Explain",
+        "Answer",
+        "Describe",
+        "Translate to English",
+    }
+    WIZARD_MINIMAL_AUDIO: ClassVar[set[str]] = {"Transcribe", "Summarize", "Translate to English"}
+    WIZARD_MINIMAL_MODIFIERS: ClassVar[set[str]] = {"direct", "shorter", "longer", "language"}
 
     def __init__(self, master=None, on_close=None):
         self.master = master
@@ -1356,7 +1374,7 @@ class OnboardingWizard:
 
             subtitle = ctk.CTkLabel(
                 parent,
-                text="Select which actions appear in tool popups. Start minimal — you can enable more anytime in the Prompt Editor.",
+                text="Select which actions appear in tool popups. Start minimal, you can enable more anytime in the Prompt Editor.",
                 font=get_ctk_font(12),
                 justify="left",
                 wraplength=680,
@@ -1387,7 +1405,7 @@ class OnboardingWizard:
 
             subtitle = tk.Label(
                 parent,
-                text="Select which actions appear in tool popups.",
+                text="Select which actions appear in tool popups. Start minimal, you can enable more anytime in the Prompt Editor.",
                 font=("Segoe UI", 9),
                 bg=c.bg,
                 fg=c.blockquote,
@@ -1417,18 +1435,6 @@ class OnboardingWizard:
             PromptsConfig,
         )
 
-        WIZARD_MINIMAL_TEXT_EDIT = {"Explain", "Proofread", "Refine", "Translate to English", "Answer"}
-        WIZARD_MINIMAL_SNIP = {
-            "Quick Extract",
-            "Smart Extract",
-            "Explain",
-            "Answer",
-            "Describe",
-            "Translate to English",
-        }
-        WIZARD_MINIMAL_AUDIO = {"Transcribe", "Summarize", "Translate to English"}
-        WIZARD_MINIMAL_MODIFIERS = {"direct", "shorter", "longer", "language"}
-
         # Check if onboarding completed already (re-run wizard scenario)
         prompts_config = PromptsConfig.get_instance()
         config_data = load_config()
@@ -1451,7 +1457,7 @@ class OnboardingWizard:
                 default_visible = not existing.get("_hidden", False)
             else:
                 # First time: use minimal selection
-                default_visible = name in WIZARD_MINIMAL_TEXT_EDIT
+                default_visible = name in self.WIZARD_MINIMAL_TEXT_EDIT
             self._action_toggle_vars["text_edit_tool"][name] = tk.BooleanVar(value=default_visible)
 
         # Snip Tool
@@ -1463,7 +1469,7 @@ class OnboardingWizard:
                 existing = prompts_config.get_snip_tool().get(name, {})
                 default_visible = not existing.get("_hidden", False)
             else:
-                default_visible = name in WIZARD_MINIMAL_SNIP
+                default_visible = name in self.WIZARD_MINIMAL_SNIP
             self._action_toggle_vars["snip_tool"][name] = tk.BooleanVar(value=default_visible)
 
         # Audio Tool
@@ -1475,7 +1481,7 @@ class OnboardingWizard:
                 existing = prompts_config.get_audio_tool().get(name, {})
                 default_visible = not existing.get("_hidden", False)
             else:
-                default_visible = name in WIZARD_MINIMAL_AUDIO
+                default_visible = name in self.WIZARD_MINIMAL_AUDIO
             self._action_toggle_vars["audio_tool"][name] = tk.BooleanVar(value=default_visible)
 
         # Modifiers
@@ -1491,7 +1497,7 @@ class OnboardingWizard:
                 existing_mod = next((m for m in current_mods if m.get("key") == key), None)
                 default_visible = not (existing_mod.get("_hidden", False) if existing_mod else False)
             else:
-                default_visible = key in WIZARD_MINIMAL_MODIFIERS
+                default_visible = key in self.WIZARD_MINIMAL_MODIFIERS
             self._modifier_toggle_vars[key] = tk.BooleanVar(value=default_visible)
 
     def _on_actions_subtab_change(self, value):
@@ -1551,8 +1557,21 @@ class OnboardingWizard:
             for var in toggles.values():
                 var.set(False)
 
+        def select_minimal():
+            minimal_set = set()
+            if tool_key == "text_edit_tool":
+                minimal_set = self.WIZARD_MINIMAL_TEXT_EDIT
+            elif tool_key == "snip_tool":
+                minimal_set = self.WIZARD_MINIMAL_SNIP
+            elif tool_key == "audio_tool":
+                minimal_set = self.WIZARD_MINIMAL_AUDIO
+
+            for k, var in toggles.items():
+                var.set(k in minimal_set)
+
         create_emoji_button(btn_row, "All On", "✅", c, "success", 80, 28, select_all).pack(side="left", padx=3)
         create_emoji_button(btn_row, "All Off", "❌", c, "danger", 80, 28, deselect_all).pack(side="left", padx=3)
+        create_emoji_button(btn_row, "Minimal", "✨", c, "secondary", 80, 28, select_minimal).pack(side="left", padx=3)
 
         # Lightweight scrollable list using Canvas + tk.Checkbuttons (much faster than CTkScrollableFrame + CTk widgets)
         canvas_frame = tk.Frame(tab_frame, bg=c.bg)
@@ -1678,8 +1697,13 @@ class OnboardingWizard:
             for var in self._modifier_toggle_vars.values():
                 var.set(False)
 
+        def select_minimal():
+            for k, var in self._modifier_toggle_vars.items():
+                var.set(k in self.WIZARD_MINIMAL_MODIFIERS)
+
         create_emoji_button(btn_row, "All On", "✅", c, "success", 80, 28, select_all).pack(side="left", padx=3)
         create_emoji_button(btn_row, "All Off", "❌", c, "danger", 80, 28, deselect_all).pack(side="left", padx=3)
+        create_emoji_button(btn_row, "Minimal", "✨", c, "secondary", 80, 28, select_minimal).pack(side="left", padx=3)
 
         # Lightweight scrollable list using Canvas + tk.Checkbuttons
         canvas_frame = tk.Frame(parent, bg=c.bg)
