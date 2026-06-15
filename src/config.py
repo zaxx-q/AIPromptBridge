@@ -38,12 +38,10 @@ DEFAULT_CONFIG = {
     "text_edit_tool_hotkey": "ctrl+space",
     # Hotkey to abort streaming typing (default: escape)
     "text_edit_tool_abort_hotkey": "escape",
-    # Delay between characters when streaming to text field (ms)
-    # Lower = faster typing. Default: 5
-    "streaming_typing_delay": 5,
-    # Uncap typing speed - type at maximum speed from server stream
-    # WARNING: May cause issues with some applications (input lag, missed characters)
-    "streaming_typing_uncapped": False,
+    # Typing speed cap when streaming to text field (milliseconds per character)
+    # 0 = no limit (as fast as the server streams). Default: 0
+    # Increase if target apps get overwhelmed (lag, missed characters)
+    "streaming_typing_delay": 0,
     # Enable slow application retry strategy for text capture (Obsidian, XMind, Anki, etc.)
     "text_edit_slow_app_retry": False,
     # Screen Snipping Tool settings
@@ -412,14 +410,10 @@ text_edit_tool_hotkey = ctrl+space
 # Press this key to stop mid-stream typing
 text_edit_tool_abort_hotkey = escape
 
-# Delay between characters when streaming to text field (milliseconds)
-# Lower = faster typing. Default: 5
-streaming_typing_delay = 5
-
-# Uncap typing speed - type at maximum speed from server stream
-# WARNING: Setting to true may cause issues with some applications
-# (input lag, missed characters, application freezing). Use with caution!
-streaming_typing_uncapped = false
+# Typing speed cap when streaming to text field (milliseconds per character)
+# 0 = no limit (as fast as the server streams). Default: 0
+# Increase if target apps get overwhelmed (lag, missed characters)
+streaming_typing_delay = 0
 
 # Slow application retry strategy for text capture
 # Enable this if you use slow Electron/JavaFX apps (Obsidian, XMind, Anki)

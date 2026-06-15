@@ -36,7 +36,7 @@ AIPromptBridge/
     ├── key_manager.py          # API key rotation with exhaustion tracking and named key lookup
     ├── messages.py             # Multimodal message construction factory
     ├── connection_profiles.py  # Connection profile store (profiles.json CRUD, ProfileStore singleton)
-    ├── profile_resolver.py      # Connection profile resolution (per-action AI config overrides)
+    ├── profile_resolver.py     # Connection profile resolution (per-action AI config overrides)
     ├── request_pipeline.py     # Unified request processing with logging
     ├── session_manager.py      # Session persistence with sequential IDs and per-session model override
     ├── terminal.py             # Interactive terminal commands (includes Tools menu)
@@ -44,7 +44,7 @@ AIPromptBridge/
     ├── updater.py              # Self-update: GitHub Releases check, download, staging, trigger
     ├── utils.py                # Utility functions and build state detection (is_compiled)
     ├── version.py              # Application version source of truth
-    ├── web_server.py # Flask server for internal API
+    ├── web_server.py           # Flask server for internal API
     │
     ├── audio/                  # Audio Subsystem
     │   ├── __init__.py
@@ -100,20 +100,20 @@ AIPromptBridge/
     │       │   ├── tab_generation.py   # Generation tab mixin (typing speed settings)
     │       │   ├── tab_tools.py        # Tools tab mixin (TextEdit, ScreenSnip, Audio)
     │       │   ├── tab_tts.py          # TTS tab mixin (voice, director, export)
-    │   │ ├── tab_keys.py # API Keys tab mixin
-    │   │ └── tab_theme.py # Theme tab mixin (theme, chat colors, preview)
+    │       │   ├── tab_keys.py         # API Keys tab mixin
+    │       │   └── tab_theme.py        # Theme tab mixin (theme, chat colors, preview)
     │       ├── connection_manager.py   # Connection Profile Manager window
     │       ├── tts_window.py       # TTS UI (voice selection, AI Director, playback)
     │       └── utils.py            # Window management utilities
     │
-    ├── providers/              # AI Provider Implementations
-    │   ├── __init__.py         # Provider exports and factory
-    │   ├── base.py             # Abstract BaseProvider with centralized retry/abort
-    │   ├── registry.py         # Provider registry, definitions, and create_provider factory
-    │   ├── anthropic.py        # Anthropic Claude Messages API provider
-    │   ├── inline_thinking.py  # Regex-based extraction of <think> blocks
-    │   ├── gemini_native.py    # Native Gemini API provider (generation pipeline)
-    │   ├── gemini_services.py  # Gemini-specific services (Files API, Batch, TTS)
+    ├── providers/               # AI Provider Implementations
+    │   ├── __init__.py          # Provider exports and factory
+    │   ├── base.py              # Abstract BaseProvider with centralized retry/abort
+    │   ├── registry.py          # Provider registry, definitions, and create_provider factory
+    │   ├── anthropic.py         # Anthropic Claude Messages API provider
+    │   ├── inline_thinking.py   # Regex-based extraction of <think> blocks
+    │   ├── gemini_native.py     # Native Gemini API provider (generation pipeline)
+    │   ├── gemini_services.py   # Gemini-specific services (Files API, Batch, TTS)
     │   └── openai_compatible.py # OpenAI, OpenRouter, xAI, Mistral, Cohere, Custom providers
     │
     └── tools/                  # Tools Package - Batch file processing

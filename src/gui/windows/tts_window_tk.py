@@ -415,9 +415,9 @@ def _create_director_section_tk(window, parent):
     controls.pack(fill="x", padx=12, pady=(0, 5))
 
     # Director Profile Override (optional)
-    tk.Label(controls, text="Director Connection Profile:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0).pack(
-        side="left", padx=(0, 5)
-    )
+    tk.Label(
+        controls, text="Director Connection Profile:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0
+    ).pack(side="left", padx=(0, 5))
 
     from ...connection_profiles import ProfileStore
 

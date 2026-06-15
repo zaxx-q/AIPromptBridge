@@ -579,7 +579,29 @@ class SnipToolApp:
                 print(f"\n✅ Response streamed ({len(response) if response else 0} chars)")
         else:
             # Non-streaming: get full response then paste instantly
-            response, error = text_edit._call_api(messages, origin_override=origin, action_config=action_config)
+            print(f"[AI Response] Processing... [{text_edit.abort_hotkey.title()} to abort]")
+
+            import threading
+
+            abort_event = threading.Event()
+            text_edit._start_abort_listener(abort_event)
+            from .core import dismiss_typing_indicator, show_typing_indicator
+
+            show_typing_indicator(text_edit.abort_hotkey)
+
+            try:
+                response, error = text_edit._call_api(
+                    messages,
+                    origin_override=origin,
+                    action_config=action_config,
+                    abort_event=abort_event,
+                )
+            finally:
+                text_edit._stop_abort_listener()
+                dismiss_typing_indicator()
+
+            if text_edit.streaming_aborted:
+                return
 
             if error:
                 logging.error(f"Type mode request failed: {error}")

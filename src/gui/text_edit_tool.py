@@ -49,8 +49,7 @@ class TextEditToolApp:
         self.abort_hotkey = config.get("text_edit_tool_abort_hotkey", "escape")
 
         # Typing speed settings
-        self.typing_delay_ms = config.get("streaming_typing_delay", 5)
-        self.typing_uncapped = config.get("streaming_typing_uncapped", False)
+        self.typing_delay_ms = config.get("streaming_typing_delay", 0)
 
         # Initialize components
         self.hotkey_listener: Optional[HotkeyListener] = None
@@ -367,7 +366,16 @@ class TextEditToolApp:
             daemon=True,
         ).start()
 
-    def _call_api(self, messages, provider=None, model=None, on_chunk=None, origin_override=None, action_config=None):
+    def _call_api(
+        self,
+        messages,
+        provider=None,
+        model=None,
+        on_chunk=None,
+        origin_override=None,
+        action_config=None,
+        abort_event=None,
+    ):
         """
         Call the AI API with streaming support when enabled.
 
@@ -378,6 +386,7 @@ class TextEditToolApp:
             on_chunk: Optional callback for each text chunk (for real-time typing)
             origin_override: Optional RequestOrigin override
             action_config: Optional action config dict (may contain connection_profile)
+            abort_event: Optional threading.Event to abort the request
         """
         from ..profile_resolver import resolve_profile
         from ..request_pipeline import RequestContext, RequestOrigin, RequestPipeline, StreamCallback
@@ -425,7 +434,13 @@ class TextEditToolApp:
             callbacks = StreamCallback(on_text=on_text, on_done=on_done)
 
             ctx = RequestPipeline.execute_streaming(
-                ctx, session, resolved.config, resolved.ai_params, resolved.key_managers, callbacks
+                ctx,
+                session,
+                resolved.config,
+                resolved.ai_params,
+                resolved.key_managers,
+                callbacks,
+                abort_event=abort_event,
             )
 
             if self.cancel_requested:
@@ -435,7 +450,7 @@ class TextEditToolApp:
         else:
             # Non-streaming
             ctx = RequestPipeline.execute_simple(
-                ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers
+                ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers, abort_event=abort_event
             )
 
             if self.cancel_requested:
@@ -443,15 +458,19 @@ class TextEditToolApp:
 
             return ctx.response_text, ctx.error
 
-    def _start_abort_listener(self):
+    def _start_abort_listener(self, abort_event=None):
         """
         Start listening for abort hotkey (e.g., Escape).
         When pressed, sets streaming_aborted flag and provides immediate feedback.
         Also unlocks the hotkey so new triggers can work immediately.
+
+        Args:
+            abort_event: Optional threading.Event to set on abort (for cancelling API calls)
         """
         from pynput import keyboard as pykeyboard
 
         self.streaming_aborted = False
+        self._current_abort_event = abort_event
 
         # Parse abort hotkey to pynput key
         abort_key = self._parse_hotkey(self.abort_hotkey)
@@ -460,6 +479,8 @@ class TextEditToolApp:
             if self._key_matches(key, abort_key):
                 self.streaming_aborted = True
                 self.cancel_requested = True
+                if self._current_abort_event:
+                    self._current_abort_event.set()
                 logging.debug("Abort hotkey pressed - stopping stream")
 
                 # Provide immediate visual feedback
@@ -481,6 +502,7 @@ class TextEditToolApp:
             except Exception:
                 pass
             self._abort_listener = None
+        self._current_abort_event = None
 
     def _parse_hotkey(self, hotkey_str: str):
         """Parse hotkey string to pynput key."""
@@ -539,14 +561,8 @@ class TextEditToolApp:
         try:
             keyboard = pykeyboard.Controller()
 
-            # Determine delay per character
-            if self.typing_uncapped:
-                # WARNING: Uncapped mode - no delay
-                # May cause issues with some applications
-                char_delay = 0
-            else:
-                # Configurable delay (default 5ms)
-                char_delay = self.typing_delay_ms / 1000.0
+            # Delay per character (0 = no limit)
+            char_delay = self.typing_delay_ms / 1000.0
 
             # Type each character with configured delay
             for char in text:
@@ -571,7 +587,7 @@ class TextEditToolApp:
                     time.sleep(char_delay)
 
             # Small delay after chunk for application responsiveness
-            if not self.typing_uncapped:
+            if self.typing_delay_ms > 0:
                 time.sleep(0.01)
 
             return True
@@ -747,6 +763,11 @@ class TextEditToolApp:
             # Store action config for profile resolution in streaming paths
             self._current_action_config = action_config
 
+            # Resolve profile early for streaming decision (respects profile override)
+            from ..profile_resolver import resolve_profile
+
+            resolved = resolve_profile(action_config, self.config, self.ai_params, self.key_managers)
+
             # Session origin for direct chat (no text selected)
             session_origin = "directchat"
 
@@ -777,9 +798,7 @@ class TextEditToolApp:
                 print(f"{'\u2500' * 60}\n")
             elif show_gui:
                 # Stream directly into chat window for real-time display
-                from .. import web_server as _ws
-
-                streaming_enabled = _ws.get_active_setting("streaming", True)
+                streaming_enabled = resolved.config.get("streaming_enabled", True)
 
                 print(f"\n{'─' * 60}")
                 print(f"[AI Response] Opening chat window{'...' if streaming_enabled else ' (non-streaming)...'}")
@@ -826,9 +845,7 @@ class TextEditToolApp:
                 print(f"{'─' * 60}\n")
             else:
                 # Replace mode: type response to active field
-                from .. import web_server as _ws
-
-                streaming_enabled = _ws.get_active_setting("streaming", True)
+                streaming_enabled = resolved.config.get("streaming_enabled", True)
 
                 if streaming_enabled:
                     print(f"[AI Response] Streaming to active field... [{self.abort_hotkey.title()} to abort]")
@@ -888,9 +905,27 @@ class TextEditToolApp:
                     # Non-streaming: get full response then paste instantly
                     from ..request_pipeline import RequestOrigin
 
-                    response, error = self._call_api(
-                        messages, origin_override=RequestOrigin.POPUP_INPUT, action_config=action_config
-                    )
+                    print(f"[AI Response] Processing... [{self.abort_hotkey.title()} to abort]")
+
+                    abort_event = threading.Event()
+                    self._start_abort_listener(abort_event)
+                    from .core import dismiss_typing_indicator, show_typing_indicator
+
+                    show_typing_indicator(self.abort_hotkey)
+
+                    try:
+                        response, error = self._call_api(
+                            messages,
+                            origin_override=RequestOrigin.POPUP_INPUT,
+                            action_config=action_config,
+                            abort_event=abort_event,
+                        )
+                    finally:
+                        self._stop_abort_listener()
+                        dismiss_typing_indicator()
+
+                    if self.streaming_aborted:
+                        return
 
                     # Paste the full response instantly using clipboard
                     if response and not error:
@@ -1201,12 +1236,29 @@ class TextEditToolApp:
                     # so we don't need to show it again here
                 else:
                     # Non-streaming: get full response then paste instantly
-                    response, error = self._call_api(
-                        messages, origin_override=RequestOrigin.POPUP_PROMPT, action_config=option
-                    )
+                    print(f"[AI Response] Processing... [{self.abort_hotkey.title()} to abort]")
 
-                    # Paste the full response instantly using clipboard
-                    if response and not error:
+                    abort_event = threading.Event()
+                    self._start_abort_listener(abort_event)
+                    from .core import dismiss_typing_indicator, show_typing_indicator
+
+                    show_typing_indicator(self.abort_hotkey)
+
+                    try:
+                        response, error = self._call_api(
+                            messages,
+                            origin_override=RequestOrigin.POPUP_PROMPT,
+                            action_config=option,
+                            abort_event=abort_event,
+                        )
+                    finally:
+                        self._stop_abort_listener()
+                        dismiss_typing_indicator()
+
+                    if self.streaming_aborted:
+                        # Skip paste, update status message below
+                        pass
+                    elif response and not error:
                         print("[Pasting to active field...]")
                         self._paste_text_instant(response)
 

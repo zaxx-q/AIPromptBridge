@@ -133,7 +133,7 @@ class ToolsTabMixin:
         if self.use_ctk:
             ctk.CTkLabel(
                 content,
-                text="Controls typing speed when streaming text into other applications via replace mode.",
+                text="Controls typing speed when streaming AI responses into other applications via replace mode.\n0 = no limit (as fast as the server streams). Increase if apps get overwhelmed.",
                 font=get_ctk_font(11),
                 justify="left",
                 **get_ctk_label_colors(self.colors, muted=True),
@@ -141,7 +141,7 @@ class ToolsTabMixin:
         else:
             tk.Label(
                 content,
-                text="Controls typing speed when streaming text into other applications via replace mode.",
+                text="Controls typing speed when streaming AI responses into other applications via replace mode.\n0 = no limit (as fast as the server streams). Increase if apps get overwhelmed.",
                 font=("Segoe UI", 9),
                 justify="left",
                 bg=self.colors.bg,
@@ -151,17 +151,9 @@ class ToolsTabMixin:
         self._add_spinbox_field(
             content,
             "streaming_typing_delay",
-            "Typing delay (ms):",
-            self.config_data.config.get("streaming_typing_delay", 5),
-            1,
+            "Typing speed cap (ms):",
+            self.config_data.config.get("streaming_typing_delay", 0),
+            0,
             100,
-            hint="Delay per character in replace mode",
-        )
-
-        self._add_toggle_field(
-            content,
-            "streaming_typing_uncapped",
-            "Uncapped typing speed",
-            self.config_data.config.get("streaming_typing_uncapped", False),
-            hint="⚠️ No delay between chars. May overwhelm some apps.",
+            hint="Delay per character. 0 = no limit. Useful if apps get overwhelmed by fast input.",
         )
