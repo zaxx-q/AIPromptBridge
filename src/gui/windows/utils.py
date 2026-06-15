@@ -104,19 +104,36 @@ def set_dark_titlebar(window):
 def get_profile_tooltip_text(profile_name: str) -> str:
     """Build tooltip text for a connection profile name.
 
-    Returns empty string for sentinel values like '(Use Global)', '(None)', etc.
+    For sentinel values representing the global default (e.g., '(Default)',
+    '(Use Global)', '(None)'), shows the active profile's details.
     """
-    if not profile_name or profile_name.startswith("("):
+    target_name = profile_name
+    is_sentinel = False
+
+    if profile_name in ("(Default)", "(Use Global)", "(None)") or (
+        profile_name and (profile_name.startswith("(Use Global") or profile_name.startswith("(Default"))
+    ):
+        try:
+            from ...connection_profiles import ProfileStore
+
+            target_name = ProfileStore.get_instance().get_active_profile_name()
+            is_sentinel = True
+        except Exception:
+            return ""
+
+    if not target_name or target_name.startswith("("):
         return ""
 
     try:
         from ...connection_profiles import ProfileStore
 
-        profile = ProfileStore.get_instance().get_profile(profile_name)
+        profile = ProfileStore.get_instance().get_profile(target_name)
         if not profile:
             return ""
 
         lines = []
+        if is_sentinel:
+            lines.append(f"Active Profile: {target_name}")
         lines.append(f"Provider: {profile.provider}")
         lines.append(f"Model: {profile.model}")
         if profile.base_url:

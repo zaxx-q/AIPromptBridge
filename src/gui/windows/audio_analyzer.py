@@ -201,9 +201,6 @@ class AudioAnalyzerWindow:
 
     def _get_profile_tooltip(self, profile_name: str) -> str:
         """Build tooltip text for a profile dropdown item."""
-        # Handle default sentinel
-        if profile_name == "(Default)":
-            return ""
         from .utils import get_profile_tooltip_text
 
         return get_profile_tooltip_text(profile_name)

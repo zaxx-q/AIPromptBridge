@@ -1274,8 +1274,6 @@ def create_profile_dropdown_ctk(parent, colors):
     profile_var = tk.StringVar(value="(Default)")
 
     def _tooltip_callback(name: str) -> str:
-        if name == "(Default)":
-            return ""
         return get_profile_tooltip_text(name)
 
     dropdown = ScrollableComboBox(
@@ -1310,8 +1308,6 @@ def create_profile_dropdown_tk(parent, root, colors):
     profile_var = tk.StringVar(master=root, value="(Default)")
 
     def _tooltip_callback(name: str) -> str:
-        if name == "(Default)":
-            return ""
         return get_profile_tooltip_text(name)
 
     dropdown = ScrollableComboBox(
