@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Any, Callable, Optional
 
+from ..custom_widgets import ScrollableComboBox
 from ..popups import Tooltip
 from ..themes import get_colors
 
@@ -413,22 +414,27 @@ def _create_director_section_tk(window, parent):
     controls = tk.Frame(frame, bg=colors.surface0)
     controls.pack(fill="x", padx=12, pady=(0, 5))
 
-    tk.Label(controls, text="Director Model:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0).pack(
+    # Director Profile Override (optional)
+    tk.Label(controls, text="Director Connection Profile:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0).pack(
         side="left", padx=(0, 5)
     )
 
-    window.director_model_entry = tk.Entry(
+    from ...connection_profiles import ProfileStore
+
+    profile_names = ProfileStore.get_instance().get_profile_names()
+
+    window.director_profile_dropdown = ScrollableComboBox(
         controls,
-        font=("Segoe UI", 9),
-        width=20,
-        bg=colors.surface1,
-        fg=colors.text,
-        relief="flat",
-        insertbackground=colors.text,
+        colors=colors,
+        values=["(Use Active)", *profile_names],
+        width=160,
+        height=28,
+        font_size=9,
+        item_tooltip_callback=window._get_profile_tooltip,
     )
-    if window.director_model:
-        window.director_model_entry.insert(0, window.director_model)
-    window.director_model_entry.pack(side="left", padx=(0, 8))
+    current_profile_display = window.director_profile if window.director_profile in profile_names else "(Use Active)"
+    window.director_profile_dropdown.set(current_profile_display)
+    window.director_profile_dropdown.pack(side="left", padx=(0, 8))
 
     # Generate Style button
     window.generate_style_btn = tk.Button(

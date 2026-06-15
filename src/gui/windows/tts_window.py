@@ -108,7 +108,7 @@ class TTSWindow:
         # AI Director state
         self.director_enabled = config.get("tts_director_enabled", True)
         self.director_auto_mode = config.get("tts_director_auto_mode", False)
-        self.director_model = config.get("tts_director_model", "")
+        self.director_profile = config.get("tts_director_profile", "")
 
         # Audio state
         self.pcm_audio: Optional[bytes] = None
@@ -146,7 +146,7 @@ class TTSWindow:
         self.speaker2_voice_dropdown = None
         self.style_textbox = None
         self.director_toggle = None
-        self.director_model_dropdown = None
+        self.director_profile_dropdown = None
         self.generate_style_btn = None
         self.generate_audio_btn = None
         self.play_pause_btn = None
@@ -154,6 +154,12 @@ class TTSWindow:
         self.position_label = None
         self.save_btn = None
         self.status_label = None
+
+    def _get_profile_tooltip(self, profile_name: str) -> str:
+        """Build tooltip text for a profile dropdown item."""
+        from .utils import get_profile_tooltip_text
+
+        return get_profile_tooltip_text(profile_name)
 
     def _get_window_tag(self) -> str:
         """Return unique window tag."""
@@ -613,22 +619,27 @@ class TTSWindow:
         controls = ctk.CTkFrame(frame, fg_color="transparent")
         controls.pack(fill="x", padx=12, pady=(0, 5))
 
-        # Director model override (optional)
+        # Director Profile Override (optional)
         ctk.CTkLabel(
-            controls, text="Director Model:", font=get_ctk_font(size=10), text_color=self.colors.overlay0
+            controls, text="Director Connection Profile:", font=get_ctk_font(size=10), text_color=self.colors.overlay0
         ).pack(side="left", padx=(0, 5))
 
-        self.director_model_entry = ctk.CTkEntry(
+        from ...connection_profiles import ProfileStore
+
+        profile_names = ProfileStore.get_instance().get_profile_names()
+
+        self.director_profile_dropdown = ScrollableComboBox(
             controls,
-            placeholder_text="(uses default provider)",
+            colors=self.colors,
+            values=["(Use Active)", *profile_names],
             width=160,
             height=28,
-            font=get_ctk_font(size=10),
-            border_color=self.colors.surface2,
+            font_size=10,
+            item_tooltip_callback=self._get_profile_tooltip,
         )
-        if self.director_model:
-            self.director_model_entry.insert(0, self.director_model)
-        self.director_model_entry.pack(side="left", padx=(0, 8))
+        current_profile_display = self.director_profile if self.director_profile in profile_names else "(Use Active)"
+        self.director_profile_dropdown.set(current_profile_display)
+        self.director_profile_dropdown.pack(side="left", padx=(0, 8))
 
         # Generate Style button
         style_content = prepare_emoji_content("🎬 Generate Style", size=12)
@@ -769,8 +780,9 @@ class TTSWindow:
             self._update_status("No input text to analyze", self.colors.red)
             return
 
-        # Get director model override and voice info while on UI thread
-        director_model_override = self.director_model_entry.get().strip() if self.director_model_entry else ""
+        # Get director profile override and voice info while on UI thread
+        director_profile_val = self.director_profile_dropdown.get().strip() if self.director_profile_dropdown else ""
+        director_profile_override = "" if director_profile_val == "(Use Active)" else director_profile_val
         voice_info = self._get_voice_info()
 
         self.is_directing = True
@@ -778,10 +790,10 @@ class TTSWindow:
         self._update_status("Generating style instructions...", self.colors.accent)
 
         threading.Thread(
-            target=self._run_director, args=(input_text, director_model_override, voice_info), daemon=True
+            target=self._run_director, args=(input_text, director_profile_override, voice_info), daemon=True
         ).start()
 
-    def _run_director(self, input_text: str, director_model_override: str, voice_info: dict | None = None):
+    def _run_director(self, input_text: str, director_profile_override: str, voice_info: dict | None = None):
         """Run the AI Director in a background thread."""
         from ...gui.tts_tool import get_instance as get_tts_tool
 
@@ -817,7 +829,7 @@ class TTSWindow:
 
             GUICoordinator.get_instance().run_on_gui_thread(update)
 
-        tool.run_director(input_text, director_model_override, voice_info, on_success, on_error)
+        tool.run_director(input_text, director_profile_override, voice_info, on_success, on_error)
 
     # =========================================================================
     # TTS Generation
@@ -842,7 +854,8 @@ class TTSWindow:
             return
 
         # Capture UI states on main thread
-        director_model = self.director_model_entry.get().strip() if self.director_model_entry else ""
+        director_profile_val = self.director_profile_dropdown.get().strip() if self.director_profile_dropdown else ""
+        director_profile_override = "" if director_profile_val == "(Use Active)" else director_profile_val
         multi_config = self._get_multi_speaker_config()
         voice_info = self._get_voice_info()
 
@@ -855,7 +868,7 @@ class TTSWindow:
                 self._update_status("Auto-directing then generating...", self.colors.accent)
                 threading.Thread(
                     target=self._auto_direct_then_generate,
-                    args=(input_text, director_model, multi_config, voice_info),
+                    args=(input_text, director_profile_override, multi_config, voice_info),
                     daemon=True,
                 ).start()
                 return
@@ -880,7 +893,7 @@ class TTSWindow:
     def _auto_direct_then_generate(
         self,
         input_text: str,
-        director_model_override: str,
+        director_profile_override: str,
         multi_config: Optional[List[Dict]],
         voice_info: dict | None = None,
     ):
@@ -926,7 +939,7 @@ class TTSWindow:
             lambda: self._update_status("Step 1/2: Generating style...", self.colors.accent)
         )
 
-        tool.run_director(input_text, director_model_override, voice_info, on_director_success, on_director_error)
+        tool.run_director(input_text, director_profile_override, voice_info, on_director_success, on_director_error)
 
     def _run_tts_generation(self, full_prompt: str, multi_config: Optional[List[Dict]] = None):
         """Run TTS generation in a background thread."""

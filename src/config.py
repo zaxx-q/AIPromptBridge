@@ -81,8 +81,8 @@ DEFAULT_CONFIG = {
     "tts_default_model": "gemini-2.5-flash-preview-tts",
     "tts_director_enabled": True,
     "tts_director_auto_mode": False,
-    # Model override for AI Director (empty = use default provider model)
-    "tts_director_model": "",
+    # Profile override for AI Director (empty or "(Default)" = use default active profile)
+    "tts_director_profile": "(Default)",
     # Directory for saved TTS audio files
     "tts_save_directory": "audio_output",
     # Automatically play generated audio
@@ -490,8 +490,8 @@ tts_director_enabled = true
 # true = auto (Generate Audio runs director automatically)
 tts_director_auto_mode = false
 
-# Model override for AI Director (leave empty to use default provider model)
-tts_director_model =
+# Profile override for AI Director (use (Default) to follow active profile)
+tts_director_profile = (Default)
 
 # Directory for saved TTS audio files (relative to app root)
 tts_save_directory = audio_output

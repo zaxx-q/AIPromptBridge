@@ -1,5 +1,30 @@
 # Changelog
 
+## [7.1.0] - 2026-06-15
+
+### New Features
+
+- **API Key Export & Import**: Export plaintext JSON backups and import/merge API keys directly from the API Keys settings tab, with automatic duplicate key detection when importing.
+- **Portable Key Storage Mode**: Added a "Disable API key obfuscation" toggle in General settings, allowing plaintext key storage in `keys.json` for easy portability across machines. Keys are automatically re-encoded when toggling the mode.
+- **Action & Modifier Visibility**: Individual actions and modifiers can now be hidden from tool popups without deleting them. Toggle visibility directly in the Prompt Editor using the visibility button, with a "Show Hidden" switch to reveal dimmed disabled items in the action list.
+- **Expanded Onboarding Wizard**: The first-time setup wizard now includes 6 steps with new pages for toggling individual tools on/off and selecting which default actions and modifiers to enable, including a "Minimal" quick-preset for a clean starting point.
+- **Slow App Text Capture**: Added an optional retry strategy for capturing selected text in slow applications like Obsidian, XMind, and Anki. Enable via Settings > Tools > "Slow app text capture retry".
+- **Draggable Popups**: Borderless popup windows (input popup, prompt popup, snip popup, typing indicator, error popup) can now be repositioned by clicking and dragging any non-interactive area.
+- **Dynamic Tray Menu**: The system tray menu now automatically updates when tools are enabled or disabled, hiding entries for inactive tools without requiring a restart.
+- **TTS AI Director Connection Profile**: The TTS AI Director now uses a connection profile dropdown instead of a manual model text field, allowing full provider/model/key configuration for style generation requests.
+- **Active Profile Tooltips**: Hovering over default/sentinel values (like "(Default)" or "(Use Active)") in connection profile dropdowns now displays the currently active profile's details including provider, model, and endpoint.
+
+### Improvements
+
+- **Tool Visibility in Menus & Popups**: Disabled tools are automatically hidden from the system tray menu, and the TTS button is removed from Text Edit popups when TTS is disabled in configuration.
+- **Onboarding Performance**: Improved tab switching speed in the onboarding wizard's action/modifier selection step by caching tab frames instead of rebuilding them on each switch.
+- **Default Popup Group Order**: The "Text Edit" action category is now displayed first in the default popup group list for quicker access to common actions.
+
+### Fixes
+
+- **Text Pasting on Non-English Keyboards**: Fixed text paste operations failing when Caps Lock is active or a non-English keyboard layout is in use, by replacing character-based key presses with Win32 virtual key code injection.
+- **Text Capture in Slow Applications**: Fixed the Text Edit Tool failing to capture selected text in Electron-based apps (Obsidian), JavaFX apps (XMind), and similar programs that process copy commands asynchronously.
+
 ## [7.0.0] - 2026-05-21
 
 ### New Features

@@ -189,7 +189,7 @@ class TTSToolApp:
     def run_director(
         self,
         input_text: str,
-        model_override: str = "",
+        profile_override: str = "",
         voice_info: Optional[Dict[str, Any]] = None,
         callback_success: Optional[Callable[[str, int], None]] = None,
         callback_error: Optional[Callable[[str], None]] = None,
@@ -199,7 +199,7 @@ class TTSToolApp:
 
         Args:
             input_text: The text to analyze and style.
-            model_override: Optional model name to override default provider.
+            profile_override: Optional profile name override for the AI request.
             voice_info: Optional dict with voice info for gender injection.
                 Single-speaker: {"voice": "Kore"}
                 Multi-speaker: {"multi": True, "speakers": [{"name": "S1", "voice": "Kore"}, ...]}
@@ -220,14 +220,17 @@ class TTSToolApp:
                 messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": task}]
 
                 from .. import web_server as _ws
-                from ..profile_resolver import resolve_profile
+                from ..profile_resolver import resolve_profile, resolve_profile_by_name
 
-                provider = _ws.get_active_setting("provider", "google")
-                model = model_override or _ws.get_active_setting("model", "")
-                thinking_enabled = _ws.get_active_setting("thinking", False)
+                # Resolve profile (either by name or using global defaults)
+                if profile_override:
+                    resolved = resolve_profile_by_name(profile_override, self.config, self.ai_params, self.key_managers)
+                else:
+                    resolved = resolve_profile(None, self.config, self.ai_params, self.key_managers)
 
-                # Resolve profile to get merged config with connection keys
-                resolved = resolve_profile(None, self.config, self.ai_params, self.key_managers)
+                provider = resolved.provider
+                model = resolved.model
+                thinking_enabled = resolved.thinking_enabled
 
                 ctx = RequestContext(
                     origin=RequestOrigin.TTS_TOOL,

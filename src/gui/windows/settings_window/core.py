@@ -516,6 +516,10 @@ class SettingsWindow(
             if key == "tts_default_voice" and isinstance(value, str) and " — " in value:
                 value = value.split(" — ")[0]
 
+            # Handle TTS director profile
+            if key == "tts_director_profile" and value == "(Use Active)":
+                value = ""
+
             self.config_data.config[key] = value
 
         # Save API keys via KeyStore (pool-based)

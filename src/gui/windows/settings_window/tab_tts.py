@@ -91,13 +91,21 @@ class TTSTabMixin:
             hint="Automatically run director before generating audio",
         )
 
-        self._add_entry_field(
+        # AI Director Profile
+        from ....connection_profiles import ProfileStore
+
+        profile_names = ProfileStore.get_instance().get_profile_names()
+        current_profile = self.config_data.config.get("tts_director_profile", "")
+        current_profile_display = current_profile if current_profile in profile_names else "(Use Active)"
+
+        self._add_scrollable_dropdown_field(
             content,
-            "tts_director_model",
-            "Director Model:",
-            self.config_data.config.get("tts_director_model", ""),
+            "tts_director_profile",
+            "Director Connection Profile:",
+            current_profile_display,
+            options=["(Use Active)", *profile_names],
             size="lg",
-            hint="Override model (empty = use default provider)",
+            hint="Override Connection for TTS instructions generation",
         )
 
         # --- Export & Playback ---

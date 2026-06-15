@@ -110,8 +110,13 @@ def get_profile_tooltip_text(profile_name: str) -> str:
     target_name = profile_name
     is_sentinel = False
 
-    if profile_name in ("(Default)", "(Use Global)", "(None)") or (
-        profile_name and (profile_name.startswith("(Use Global") or profile_name.startswith("(Default"))
+    if profile_name in ("(Default)", "(Use Global)", "(None)", "(Use Active)") or (
+        profile_name
+        and (
+            profile_name.startswith("(Use Global")
+            or profile_name.startswith("(Default")
+            or profile_name.startswith("(Use Active")
+        )
     ):
         try:
             from ...connection_profiles import ProfileStore
