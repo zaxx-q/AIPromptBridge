@@ -150,7 +150,10 @@ class TextEditToolApp:
 
         # Get selected text (captured locally to avoid race conditions
         # when multiple hotkey presses trigger concurrent popups)
-        selected_text = self.text_handler.get_selected_text_with_retry()
+        if self.config.get("text_edit_slow_app_retry", False):
+            selected_text = self.text_handler.get_selected_text_with_retry()
+        else:
+            selected_text = self.text_handler.get_selected_text()
 
         if selected_text:
             logging.debug(f'Selected text: "{selected_text[:50]}..."')

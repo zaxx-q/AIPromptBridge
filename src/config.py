@@ -44,6 +44,8 @@ DEFAULT_CONFIG = {
     # Uncap typing speed - type at maximum speed from server stream
     # WARNING: May cause issues with some applications (input lag, missed characters)
     "streaming_typing_uncapped": False,
+    # Enable slow application retry strategy for text capture (Obsidian, XMind, Anki, etc.)
+    "text_edit_slow_app_retry": False,
     # Screen Snipping Tool settings
     "screen_snip_enabled": True,
     "screen_snip_hotkey": "ctrl+alt+x",
@@ -409,6 +411,11 @@ streaming_typing_delay = 5
 # WARNING: Setting to true may cause issues with some applications
 # (input lag, missed characters, application freezing). Use with caution!
 streaming_typing_uncapped = false
+
+# Slow application retry strategy for text capture
+# Enable this if you use slow Electron/JavaFX apps (Obsidian, XMind, Anki)
+# where capturing selected text fails. Adds latency when no text is selected.
+text_edit_slow_app_retry = false
 
 # ============================================================
 # SCREEN SNIPPING TOOL - Capture screen regions for AI analysis

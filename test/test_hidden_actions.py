@@ -15,6 +15,7 @@ class TestHiddenActions:
         self._backup = False
         if os.path.exists("prompts.json"):
             shutil.copy("prompts.json", "prompts_backup_test.json")
+            os.remove("prompts.json")
             self._backup = True
 
     def teardown_method(self):

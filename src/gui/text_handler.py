@@ -287,7 +287,7 @@ class TextHandler:
             return selected_text
 
         # Slow-app retry
-        logging.debug("No text captured on first attempt, retrying with slow-app strategy")
+        logging.warning("No text captured on first attempt, retrying with slow-app strategy")
         return self._get_selected_text_slow_app()
 
     def _get_selected_text_slow_app(self) -> str:

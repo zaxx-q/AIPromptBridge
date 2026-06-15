@@ -52,6 +52,14 @@ class ToolsTabMixin:
             hint="⚠️ Restart required",
         )
 
+        self._add_toggle_field(
+            content,
+            "text_edit_slow_app_retry",
+            "Slow app text capture retry",
+            self.config_data.config.get("text_edit_slow_app_retry", False),
+            hint="Enable for Obsidian/Anki/XMind if text capture fails. Adds delay when no text is selected.",
+        )
+
         # --- ScreenSnip ---
         create_section_header(content, "📸 ScreenSnip", self.colors, top_padding=20)
 

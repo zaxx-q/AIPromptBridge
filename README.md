@@ -281,6 +281,16 @@ For advanced users, configuration files are stored in the application root:
 - Disable thinking parameter: Press `T` in console or set `thinking_enabled = false`
 - Keep streaming enabled for perceived faster responses
 
+### For Slow Applications (Obsidian, Anki, XMind)
+
+Some applications (like Obsidian/Electron, XMind/JavaFX, or Anki) process keyboard copy commands asynchronously or slowly. If you notice TextEditTool fails to capture selected text in these applications:
+
+- Go to **Settings > Tools** tab.
+- Enable **Slow app text capture retry**.
+- Click **Save**.
+
+_Note: This option is disabled by default to keep popup invocation instant for normal applications when no text is selected._
+
 ### For Better Results
 
 - Enable thinking mode for complex tasks
