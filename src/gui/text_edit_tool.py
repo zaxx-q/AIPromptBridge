@@ -5,7 +5,7 @@ Main TextEditTool application controller
 Settings Override Hierarchy (for display mode):
 1. Radio button in popup (if not "Default") - highest priority
 2. show_chat_window_instead_of_replace per-action option - per-action default
-3. show_ai_response_in_chat_window in config - global default (InputPopup only)
+3. show_ai_response_in_chat_window in config - global default (AttachedInputPopup only)
 
 For API endpoints, the ?show= URL parameter takes highest priority.
 """

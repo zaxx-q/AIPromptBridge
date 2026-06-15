@@ -17,7 +17,7 @@ Global Settings (_global_settings):
   - modifiers: List of modifier toggle definitions (used by both SnipTool and TextEditTool)
 
 Text Edit Tool _settings:
-  - chat_system_instruction: System prompt for direct AI chat (InputPopup)
+  - chat_system_instruction: System prompt for direct AI chat (AttachedInputPopup)
   - base_output_rules_edit: Common output constraints for "edit" type prompts
   - base_output_rules_general: Output rules for "general" type prompts
   - text_delimiter: Delimiter placed before the target text (opening tag)

@@ -33,6 +33,7 @@ from .popups import (
     ModifierBar,
     SegmentedToggle,
     Tooltip,
+    _make_draggable,
     create_profile_dropdown_ctk,
     create_profile_dropdown_tk,
     get_profile_override_value,
@@ -191,6 +192,9 @@ class AttachedSnipPopup:
             self._build_ctk_ui()
         else:
             self._build_tk_ui()
+
+        # Enable drag-to-move on non-interactive areas
+        _make_draggable(self.root, self._main_frame)
 
         # Position and show
         self._position_window()
@@ -409,6 +413,7 @@ class AttachedSnipPopup:
         self.actions_frame.pack(fill="both", expand=True)
 
         self._create_action_buttons()
+        self._main_frame = main_frame
 
     def _build_tk_ui(self):
         """Build standard Tkinter UI (fallback)."""
@@ -592,6 +597,7 @@ class AttachedSnipPopup:
         self.actions_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
 
         self._create_action_buttons()
+        self._main_frame = main_frame
 
     def _create_thumbnail(self, parent):
         """Create clickable thumbnail preview (CTk version)."""

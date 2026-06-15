@@ -115,6 +115,89 @@ def setup_transparent_popup(window, colors: ThemeColors):
             window.configure(bg=colors.base)
 
 
+def _make_draggable(root, frame):
+    """
+    Make an overrideredirect popup draggable by clicking and dragging
+    any non-interactive part of the window.
+
+    Recursively binds mouse press/drag events to the frame and all its
+    non-interactive descendants (skips buttons, entries, textboxes, etc.).
+
+    Args:
+        root: The Toplevel/CTkToplevel window to reposition
+        frame: The main container frame whose children to bind
+    """
+    _drag_data = {"x": 0, "y": 0}
+
+    def _on_press(event):
+        _drag_data["x"] = event.x_root
+        _drag_data["y"] = event.y_root
+
+    def _on_drag(event):
+        dx = event.x_root - _drag_data["x"]
+        dy = event.y_root - _drag_data["y"]
+        try:
+            new_x = root.winfo_x() + dx
+            new_y = root.winfo_y() + dy
+            root.geometry(f"+{new_x}+{new_y}")
+        except tk.TclError:
+            pass
+        _drag_data["x"] = event.x_root
+        _drag_data["y"] = event.y_root
+
+    # Widget class names that should NOT get drag bindings.
+    # Using class name strings so this works regardless of CTk availability.
+    _INTERACTIVE_CLASS_NAMES = frozenset(
+        {
+            # CTk widgets
+            "CTkButton",
+            "CTkEntry",
+            "CTkTextbox",
+            "CTkSegmentedButton",
+            "CTkCheckBox",
+            "CTkOptionMenu",
+            "CTkScrollableFrame",
+            "CTkSwitch",
+            "CTkSlider",
+            "CTkComboBox",
+            "CTkScrollbar",
+            # Standard Tk widgets
+            "Button",
+            "Entry",
+            "Text",
+            "Checkbutton",
+            "Listbox",
+            "Scale",
+            "Spinbox",
+            "OptionMenu",
+            "Scrollbar",
+            # Custom widgets
+            "ScrollableComboBox",
+        }
+    )
+
+    def _is_interactive(widget):
+        """Check if widget type is interactive (should keep normal click behavior)."""
+        cls_name = type(widget).__name__
+        return cls_name in _INTERACTIVE_CLASS_NAMES
+
+    def _bind_recursive(widget):
+        """Bind drag events to widget and non-interactive descendants."""
+        if _is_interactive(widget):
+            return
+
+        widget.bind("<ButtonPress-1>", _on_press, add="+")
+        widget.bind("<B1-Motion>", _on_drag, add="+")
+
+        try:
+            for child in widget.winfo_children():
+                _bind_recursive(child)
+        except Exception:
+            pass
+
+    _bind_recursive(frame)
+
+
 # =============================================================================
 # Custom UI Components (CustomTkinter-based)
 # =============================================================================
@@ -1259,673 +1342,6 @@ def get_profile_override_value(profile_var):
 
 
 # =============================================================================
-# Base Popup Class
-# =============================================================================
-
-
-class BasePopup:
-    """Base class for popup windows"""
-
-    def __init__(self):
-        self.root = None
-        self.dark_mode = is_dark_mode()
-        self.colors = get_colors()
-        self._setup_colors()
-
-    def _setup_colors(self):
-        """Setup color scheme (legacy compatibility)."""
-        c = self.colors
-        self.bg_color = c.base
-        self.fg_color = c.text
-        self.button_bg = c.surface0
-        self.button_hover = c.surface1
-        self.input_bg = c.surface0
-        self.border_color = c.surface2
-        self.accent_color = c.blue
-
-    def _close(self):
-        """Close the popup window."""
-        if self.root:
-            self.root.destroy()
-            self.root = None
-
-    def is_open(self) -> bool:
-        """Check if the popup is currently open."""
-        return self.root is not None and self.root.winfo_exists()
-
-
-class InputPopup(BasePopup):
-    """
-    Simple input popup for when no text is selected.
-    Uses CTk for modern look when available.
-    """
-
-    def __init__(self, on_submit: Callable[[str, str], None], on_close: Optional[Callable[[], None]] = None):
-        super().__init__()
-        self.on_submit = on_submit
-        self.on_close_callback = on_close
-        self.input_var = None
-        self.response_toggle = None
-
-    def show(self, x: Optional[int] = None, y: Optional[int] = None):
-        """Show the input popup."""
-        if HAVE_CTK:
-            sync_ctk_appearance()
-            self.root = ctk.CTk()
-        else:
-            self.root = tk.Tk()
-
-        self.root.withdraw()
-        self.root.title("AI Chat")
-        self.root.overrideredirect(True)
-        self.root.attributes("-topmost", True)
-
-        # Set up transparent corners on Windows
-        setup_transparent_popup(self.root, self.colors)
-
-        # Hide from taskbar
-        hide_from_taskbar(self.root)
-
-        if HAVE_CTK:
-            main_frame = ctk.CTkFrame(
-                self.root,
-                corner_radius=10,
-                fg_color=self.colors.base,
-                border_color=self.colors.surface2,
-                border_width=1,
-            )
-            main_frame.pack(fill="both", expand=True, padx=1, pady=1)
-
-            content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-            content_frame.pack(fill="both", expand=True, padx=8, pady=8)
-
-            # Close button
-            top_bar = ctk.CTkFrame(content_frame, fg_color="transparent")
-            top_bar.pack(fill="x", pady=(0, 8))
-
-            close_btn = ctk.CTkButton(
-                top_bar,
-                text="×",
-                width=24,
-                height=24,
-                corner_radius=6,
-                fg_color="transparent",
-                hover_color=self.colors.red,
-                text_color=self.colors.overlay0,
-                font=get_ctk_font(size=14, weight="bold"),
-                command=self._close,
-            )
-            close_btn.pack(side="right")
-
-            # Response toggle
-            toggle_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-            toggle_frame.pack(fill="x", pady=(0, 8))
-
-            self.response_toggle = SegmentedToggle(
-                toggle_frame,
-                options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
-                default_value="default",
-                tooltips={
-                    "Default": "Use the action's configured response mode",
-                    "Copy": "Copy the response to clipboard",
-                    "Replace": "Replace the selected text with the response",
-                    "Show": "Show the response in a chat window",
-                },
-            )
-            self.response_toggle.pack(anchor="center")
-
-            # Input area
-            input_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-            input_frame.pack(fill="x")
-
-            self.input_entry = ctk.CTkEntry(
-                input_frame,
-                placeholder_text="Ask your AI...",
-                font=get_ctk_font(size=12),
-                height=40,
-                corner_radius=8,
-                fg_color=self.colors.surface0,
-                border_color=self.colors.surface2,
-                text_color=self.colors.text,
-                placeholder_text_color=self.colors.overlay0,
-                width=280,
-            )
-            self.input_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            self.input_entry.bind("<Return>", lambda e: self._submit())
-
-            send_btn = ctk.CTkButton(
-                input_frame,
-                text="➤",
-                width=44,
-                height=40,
-                corner_radius=8,
-                fg_color=self.colors.blue,
-                hover_color=self.colors.lavender,
-                text_color=self.colors.accent_fg,
-                font=get_ctk_font(size=14),
-                command=self._submit,
-            )
-            send_btn.pack(side="right")
-        else:
-            # Fallback to tk
-            self.root.configure(bg=self.bg_color)
-            main_frame = tk.Frame(
-                self.root, bg=self.bg_color, highlightbackground=self.border_color, highlightthickness=1
-            )
-            main_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
-
-            content_frame = tk.Frame(main_frame, bg=self.bg_color)
-            content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-            # Close button
-            top_bar = tk.Frame(content_frame, bg=self.bg_color)
-            top_bar.pack(fill=tk.X, pady=(0, 5))
-
-            close_btn = tk.Button(
-                top_bar,
-                text="×",
-                font=("Arial", 14, "bold"),
-                bg=self.bg_color,
-                fg=self.fg_color,
-                activebackground=self.button_hover,
-                relief=tk.FLAT,
-                bd=0,
-                command=self._close,
-            )
-            close_btn.pack(side=tk.RIGHT)
-
-            # Response mode toggle
-            toggle_frame = tk.Frame(content_frame, bg=self.bg_color)
-            toggle_frame.pack(fill=tk.X, pady=(0, 8))
-
-            self.response_toggle = SegmentedToggle(
-                toggle_frame,
-                options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
-                default_value="default",
-                tooltips={
-                    "Default": "Use the action's configured response mode",
-                    "Copy": "Copy the response to clipboard",
-                    "Replace": "Replace the selected text with the response",
-                    "Show": "Show the response in a chat window",
-                },
-            )
-            self.response_toggle.pack(anchor=tk.CENTER)
-
-            # Input area
-            input_frame = tk.Frame(content_frame, bg=self.bg_color)
-            input_frame.pack(fill=tk.X)
-
-            self.input_var = tk.StringVar()
-            placeholder = "Ask your AI..."
-
-            self.input_entry = tk.Entry(
-                input_frame,
-                textvariable=self.input_var,
-                font=("Arial", 11),
-                bg=self.input_bg,
-                fg=self.fg_color,
-                insertbackground=self.fg_color,
-                relief=tk.FLAT,
-                highlightbackground=self.border_color,
-                highlightthickness=1,
-                width=40,
-            )
-            self.input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5), ipady=8)
-            self.input_entry.insert(0, placeholder)
-            self.input_entry.config(fg="gray")
-
-            def on_focus_in(event):
-                if self.input_entry.get() == placeholder:
-                    self.input_entry.delete(0, tk.END)
-                    self.input_entry.config(fg=self.fg_color)
-
-            def on_focus_out(event):
-                if not self.input_entry.get():
-                    self.input_entry.insert(0, placeholder)
-                    self.input_entry.config(fg="gray")
-
-            self.input_entry.bind("<FocusIn>", on_focus_in)
-            self.input_entry.bind("<FocusOut>", on_focus_out)
-            self.input_entry.bind("<Return>", lambda e: self._submit())
-
-            # Send button
-            send_btn = tk.Button(
-                input_frame,
-                text="➤",
-                font=("Arial", 12),
-                bg=self.accent_color,
-                fg=self.colors.accent_fg,
-                activebackground="#1976D2",
-                relief=tk.FLAT,
-                bd=0,
-                padx=10,
-                pady=5,
-                command=self._submit,
-            )
-            send_btn.pack(side=tk.RIGHT)
-
-        # Position window and force rendering before showing
-        self._position_window(x, y)
-        self.root.update_idletasks()
-        self.root.deiconify()
-        self.root.bind("<Escape>", lambda e: self._close())
-        self.root.lift()
-        self.root.focus_force()
-        self.input_entry.focus_set()
-
-        self._run_event_loop()
-
-    def _position_window(self, x, y):
-        """Position the window."""
-        self.root.update_idletasks()
-
-        if x is None or y is None:
-            x = self.root.winfo_pointerx()
-            y = self.root.winfo_pointery() + 20
-
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-        window_width = self.root.winfo_reqwidth()
-        window_height = self.root.winfo_reqheight()
-
-        if x + window_width > screen_width:
-            x = screen_width - window_width - 10
-        if y + window_height > screen_height:
-            y = y - window_height - 30
-
-        self.root.geometry(f"+{x}+{y}")
-
-    def _run_event_loop(self):
-        """Run event loop without blocking."""
-        try:
-            while self.root is not None:
-                try:
-                    if not self.root.winfo_exists():
-                        break
-                    self.root.update()
-                    time.sleep(0.01)
-                except tk.TclError:
-                    break
-        except Exception:
-            pass
-
-    def _submit(self):
-        """Handle submit."""
-        if HAVE_CTK:
-            text = self.input_entry.get().strip()
-        else:
-            text = self.input_var.get().strip() if self.input_var else ""
-
-        if text and text != "Ask your AI...":
-            response_mode = self.response_toggle.get() if self.response_toggle else "default"
-            self._close()
-            self.on_submit(text, response_mode)
-
-    def _close(self):
-        super()._close()
-        if self.on_close_callback:
-            self.on_close_callback()
-
-
-class PromptSelectionPopup(BasePopup):
-    """
-    Popup with prompt selection buttons for when text is selected.
-    """
-
-    def __init__(
-        self,
-        options: Dict,
-        on_option_selected: Callable[[str, str, Optional[str]], None],
-        on_close: Optional[Callable[[], None]] = None,
-    ):
-        super().__init__()
-        self.options = options
-        self.on_option_selected = on_option_selected
-        self.on_close_callback = on_close
-        self.selected_text = ""
-        self.response_toggle = None
-
-    def show(self, selected_text: str, x: Optional[int] = None, y: Optional[int] = None):
-        """Show the popup window."""
-        self.selected_text = selected_text
-
-        if HAVE_CTK:
-            sync_ctk_appearance()
-            self.root = ctk.CTk()
-        else:
-            self.root = tk.Tk()
-
-        self.root.withdraw()
-        self.root.title("Text Edit Tool")
-        self.root.overrideredirect(True)
-        self.root.attributes("-topmost", True)
-
-        # Set up transparent corners on Windows
-        setup_transparent_popup(self.root, self.colors)
-
-        # Hide from taskbar
-        hide_from_taskbar(self.root)
-
-        if HAVE_CTK:
-            main_frame = ctk.CTkFrame(
-                self.root,
-                corner_radius=10,
-                fg_color=self.colors.base,
-                border_color=self.colors.surface2,
-                border_width=1,
-            )
-            main_frame.pack(fill="both", expand=True, padx=1, pady=1)
-
-            content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-            content_frame.pack(fill="both", expand=True, padx=8, pady=8)
-
-            # Close button
-            top_bar = ctk.CTkFrame(content_frame, fg_color="transparent")
-            top_bar.pack(fill="x", pady=(0, 8))
-
-            close_btn = ctk.CTkButton(
-                top_bar,
-                text="×",
-                width=24,
-                height=24,
-                corner_radius=6,
-                fg_color="transparent",
-                hover_color=self.colors.red,
-                text_color=self.colors.overlay0,
-                font=get_ctk_font(size=14, weight="bold"),
-                command=self._close,
-            )
-            close_btn.pack(side="right")
-
-            # Response toggle
-            toggle_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-            toggle_frame.pack(fill="x", pady=(0, 8))
-
-            self.response_toggle = SegmentedToggle(
-                toggle_frame,
-                options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
-                default_value="default",
-                tooltips={
-                    "Default": "Use the action's configured response mode",
-                    "Copy": "Copy the response to clipboard",
-                    "Replace": "Replace the selected text with the response",
-                    "Show": "Show the response in a chat window",
-                },
-            )
-            self.response_toggle.pack(anchor="center")
-
-            # Input area
-            input_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-            input_frame.pack(fill="x", pady=(0, 8))
-
-            self.input_entry = ctk.CTkEntry(
-                input_frame,
-                placeholder_text="Explain your changes...",
-                font=get_ctk_font(size=12),
-                height=40,
-                corner_radius=8,
-                fg_color=self.colors.surface0,
-                border_color=self.colors.surface2,
-                text_color=self.colors.text,
-                placeholder_text_color=self.colors.overlay0,
-            )
-            self.input_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            self.input_entry.bind("<Return>", lambda e: self._on_custom_submit())
-
-            send_btn = ctk.CTkButton(
-                input_frame,
-                text="➤",
-                width=44,
-                height=40,
-                corner_radius=8,
-                fg_color=self.colors.blue,
-                hover_color=self.colors.lavender,
-                text_color=self.colors.accent_fg,
-                font=get_ctk_font(size=14),
-                command=self._on_custom_submit,
-            )
-            send_btn.pack(side="right")
-
-            # Option buttons
-            self._create_option_buttons_ctk(content_frame)
-        else:
-            # Fallback to tk
-            self.root.configure(bg=self.bg_color)
-            main_frame = tk.Frame(
-                self.root, bg=self.bg_color, highlightbackground=self.border_color, highlightthickness=1
-            )
-            main_frame.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
-
-            content_frame = tk.Frame(main_frame, bg=self.bg_color)
-            content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-            # Close button
-            top_bar = tk.Frame(content_frame, bg=self.bg_color)
-            top_bar.pack(fill=tk.X, pady=(0, 5))
-
-            close_btn = tk.Button(
-                top_bar,
-                text="×",
-                font=("Arial", 14, "bold"),
-                bg=self.bg_color,
-                fg=self.fg_color,
-                activebackground=self.button_hover,
-                relief=tk.FLAT,
-                bd=0,
-                command=self._close,
-            )
-            close_btn.pack(side=tk.RIGHT)
-
-            # Response mode toggle
-            toggle_frame = tk.Frame(content_frame, bg=self.bg_color)
-            toggle_frame.pack(fill=tk.X, pady=(0, 8))
-
-            self.response_toggle = SegmentedToggle(
-                toggle_frame,
-                options=[("Default", "default"), ("Copy", "copy"), ("Replace", "replace"), ("Show", "show")],
-                default_value="default",
-                tooltips={
-                    "Default": "Use the action's configured response mode",
-                    "Copy": "Copy the response to clipboard",
-                    "Replace": "Replace the selected text with the response",
-                    "Show": "Show the response in a chat window",
-                },
-            )
-            self.response_toggle.pack(anchor=tk.CENTER)
-
-            # Input area
-            input_frame = tk.Frame(content_frame, bg=self.bg_color)
-            input_frame.pack(fill=tk.X, pady=(0, 10))
-
-            self.input_var = tk.StringVar()
-            placeholder = "Explain your changes.."
-
-            self.input_entry = tk.Entry(
-                input_frame,
-                textvariable=self.input_var,
-                font=("Arial", 11),
-                bg=self.input_bg,
-                fg=self.fg_color,
-                insertbackground=self.fg_color,
-                relief=tk.FLAT,
-                highlightbackground=self.border_color,
-                highlightthickness=1,
-            )
-            self.input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5), ipady=8)
-            self.input_entry.insert(0, placeholder)
-            self.input_entry.config(fg="gray")
-
-            def on_focus_in(event):
-                if self.input_entry.get() == placeholder:
-                    self.input_entry.delete(0, tk.END)
-                    self.input_entry.config(fg=self.fg_color)
-
-            def on_focus_out(event):
-                if not self.input_entry.get():
-                    self.input_entry.insert(0, placeholder)
-                    self.input_entry.config(fg="gray")
-
-            self.input_entry.bind("<FocusIn>", on_focus_in)
-            self.input_entry.bind("<FocusOut>", on_focus_out)
-            self.input_entry.bind("<Return>", lambda e: self._on_custom_submit())
-
-            # Send button
-            send_btn = tk.Button(
-                input_frame,
-                text="➤",
-                font=("Arial", 12),
-                bg=self.accent_color,
-                fg=self.colors.accent_fg,
-                activebackground="#1976D2",
-                relief=tk.FLAT,
-                bd=0,
-                padx=10,
-                pady=5,
-                command=self._on_custom_submit,
-            )
-            send_btn.pack(side=tk.RIGHT)
-
-            # Option buttons
-            self._create_option_buttons_tk(content_frame)
-
-        # Position window and force rendering before showing
-        self._position_window(x, y)
-        self.root.update_idletasks()
-        self.root.deiconify()
-        self.root.bind("<Escape>", lambda e: self._close())
-        self.root.lift()
-        self.root.focus_force()
-        self.input_entry.focus_set()
-
-        self._run_event_loop()
-
-    def _create_option_buttons_ctk(self, parent):
-        """Create option buttons with CTk."""
-        buttons_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        buttons_frame.pack(fill="both", expand=True)
-
-        for key, option in self.options.items():
-            if key == "Custom" or key.startswith("_") or (isinstance(option, dict) and option.get("_hidden", False)):
-                continue
-
-            icon = option.get("icon", "")
-
-            btn = create_emoji_button(
-                buttons_frame,
-                text=key,
-                icon=icon,
-                colors=self.colors,
-                variant="secondary",
-                height=36,
-                font_size=11,
-                anchor="w",
-                command=lambda k=key: self._on_option_click(k),
-            )
-            # Override colors to match design
-            btn.configure(fg_color=self.colors.surface0, text_color=self.colors.text)
-            btn.pack(fill="x", pady=1)
-
-    def _position_window(self, x, y):
-        """Position the window."""
-        self.root.update_idletasks()
-
-        if x is None or y is None:
-            x = self.root.winfo_pointerx()
-            y = self.root.winfo_pointery() + 20
-
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-        window_width = self.root.winfo_reqwidth()
-        window_height = self.root.winfo_reqheight()
-
-        if x + window_width > screen_width:
-            x = screen_width - window_width - 10
-        if y + window_height > screen_height:
-            y = y - window_height - 30
-
-        self.root.geometry(f"+{x}+{y}")
-
-    def _run_event_loop(self):
-        """Run event loop."""
-        try:
-            while self.root is not None:
-                try:
-                    if not self.root.winfo_exists():
-                        break
-                    self.root.update()
-                    time.sleep(0.01)
-                except tk.TclError:
-                    break
-        except Exception:
-            pass
-
-    def _create_option_buttons_tk(self, parent):
-        """Create option buttons for tk fallback."""
-        buttons_frame = tk.Frame(parent, bg=self.bg_color)
-        buttons_frame.pack(fill=tk.BOTH, expand=True)
-
-        row = 0
-        col = 0
-
-        for key, option in self.options.items():
-            if key == "Custom" or key.startswith("_") or (isinstance(option, dict) and option.get("_hidden", False)):
-                continue
-
-            btn = tk.Button(
-                buttons_frame,
-                text=key,
-                font=("Arial", 10),
-                bg=self.button_bg,
-                fg=self.fg_color,
-                activebackground=self.button_hover,
-                relief=tk.FLAT,
-                bd=0,
-                padx=15,
-                pady=8,
-                width=12,
-                anchor=tk.W,
-                command=lambda k=key: self._on_option_click(k),
-            )
-            btn.grid(row=row, column=col, padx=3, pady=3, sticky=tk.EW)
-
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=self.button_hover))
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=self.button_bg))
-
-            col += 1
-            if col > 1:
-                col = 0
-                row += 1
-
-        buttons_frame.columnconfigure(0, weight=1)
-        buttons_frame.columnconfigure(1, weight=1)
-
-    def _on_option_click(self, option_key: str):
-        """Handle option button click."""
-        response_mode = self.response_toggle.get() if self.response_toggle else "default"
-        self._close()
-        self.on_option_selected(option_key, self.selected_text, None, response_mode)
-
-    def _on_custom_submit(self):
-        """Handle custom input submission."""
-        if HAVE_CTK:
-            custom_text = self.input_entry.get().strip()
-        else:
-            custom_text = self.input_var.get().strip() if self.input_var else ""
-
-        if not custom_text or custom_text == "Explain your changes..":
-            return
-
-        response_mode = self.response_toggle.get() if self.response_toggle else "default"
-        self._close()
-        self.on_option_selected("_Custom", self.selected_text, custom_text, response_mode)
-
-    def _close(self):
-        super()._close()
-        if self.on_close_callback:
-            self.on_close_callback()
-
-
-# =============================================================================
 # Attached Popups for GUICoordinator (CTkToplevel versions)
 # =============================================================================
 
@@ -2194,6 +1610,9 @@ class AttachedInputPopup:
             send_btn.bind("<Button-1>", lambda e: self._submit())
             send_btn.bind("<Enter>", lambda e: send_btn.config(bg=self.colors.lavender))
             send_btn.bind("<Leave>", lambda e: send_btn.config(bg=self.colors.blue))
+
+        # Enable drag-to-move on non-interactive areas
+        _make_draggable(self.root, main_frame)
 
         # Force Tk to process all pending drawing commands before showing
         self._position_window()
@@ -2797,6 +2216,9 @@ class AttachedPromptPopup:
             # Action buttons carousel
             self._create_carousel_tk(content_frame)
 
+        # Enable drag-to-move on non-interactive areas
+        _make_draggable(self.root, main_frame)
+
         # Force Tk to process all pending drawing commands before showing
         self._position_window()
         self.root.update_idletasks()
@@ -3321,6 +2743,9 @@ class TypingIndicator:
                 fg=self.colors.overlay0,
             ).pack(side=tk.LEFT)
 
+        # Enable drag-to-move on non-interactive areas
+        _make_draggable(self.root, main_frame)
+
         # Force Tk to process all pending drawing commands before showing
         self.root.update_idletasks()
         # Use delayed deiconify for smoother appearance
@@ -3693,6 +3118,9 @@ class ErrorPopup:
             )
             ok_btn.pack(side=tk.RIGHT)
             ok_btn.bind("<Button-1>", lambda e: self._close())
+
+        # Enable drag-to-move on non-interactive areas
+        _make_draggable(self.root, main_frame)
 
         self._position_window()
         self.root.update_idletasks()
