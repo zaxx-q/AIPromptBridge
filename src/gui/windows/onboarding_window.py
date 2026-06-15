@@ -35,12 +35,13 @@ from ..themes import (
 from .utils import set_dark_titlebar, set_window_icon
 
 try:
-    from ..emoji_renderer import HAVE_PIL, prepare_emoji_content
+    from ..emoji_renderer import HAVE_PIL, get_emoji_renderer, prepare_emoji_content
 
     HAVE_EMOJI = HAVE_PIL and HAVE_CTK
 except ImportError:
     HAVE_EMOJI = False
     prepare_emoji_content = None
+    get_emoji_renderer = None
 
 from ...model_defaults import get_fallback_models
 
@@ -1397,6 +1398,9 @@ class OnboardingWizard:
             self._actions_content_frame = tk.Frame(parent, bg=c.bg)
             self._actions_content_frame.pack(fill="both", expand=True)
 
+        # Initialize tab frames cache
+        self._tab_frames = {}
+
         # Initialize toggle vars for all default actions
         self._init_action_toggles()
 
@@ -1497,12 +1501,30 @@ class OnboardingWizard:
         """Render the action toggle list for the selected sub-tab."""
         c = self.colors
 
-        # Clear current content
-        for child in self._actions_content_frame.winfo_children():
-            child.destroy()
+        # Initialize tab frames cache if not present
+        if not hasattr(self, "_tab_frames"):
+            self._tab_frames = {}
+
+        # Hide all tab frames
+        for name, frame in self._tab_frames.items():
+            frame.pack_forget()
+
+        # If already created, just show it
+        if tab_name in self._tab_frames:
+            self._tab_frames[tab_name].pack(fill="both", expand=True)
+            return
+
+        # Otherwise, create the frame and populate it
+        tab_frame = (
+            ctk.CTkFrame(self._actions_content_frame, fg_color="transparent")
+            if self.use_ctk
+            else tk.Frame(self._actions_content_frame, bg=c.bg)
+        )
+        self._tab_frames[tab_name] = tab_frame
+        tab_frame.pack(fill="both", expand=True)
 
         if tab_name == "Modifiers":
-            self._render_modifier_toggles(self._actions_content_frame)
+            self._render_modifier_toggles(tab_frame)
             return
 
         # Map tab name to tool key and action defaults
@@ -1518,11 +1540,7 @@ class OnboardingWizard:
         toggles = self._action_toggle_vars.get(tool_key, {})
 
         # Select All / Deselect All buttons
-        btn_row = (
-            ctk.CTkFrame(self._actions_content_frame, fg_color="transparent")
-            if self.use_ctk
-            else tk.Frame(self._actions_content_frame, bg=c.bg)
-        )
+        btn_row = ctk.CTkFrame(tab_frame, fg_color="transparent") if self.use_ctk else tk.Frame(tab_frame, bg=c.bg)
         btn_row.pack(fill="x", pady=(0, 5))
 
         def select_all():
@@ -1536,14 +1554,28 @@ class OnboardingWizard:
         create_emoji_button(btn_row, "All On", "✅", c, "success", 80, 28, select_all).pack(side="left", padx=3)
         create_emoji_button(btn_row, "All Off", "❌", c, "danger", 80, 28, deselect_all).pack(side="left", padx=3)
 
-        # Scrollable list of toggles
-        if self.use_ctk:
-            scroll = ctk.CTkScrollableFrame(self._actions_content_frame, fg_color="transparent")
-        else:
-            scroll = TkScrollableFrame(self._actions_content_frame, bg_color=c.bg)
-        scroll.pack(fill="both", expand=True)
+        # Lightweight scrollable list using Canvas + tk.Checkbuttons (much faster than CTkScrollableFrame + CTk widgets)
+        canvas_frame = tk.Frame(tab_frame, bg=c.bg)
+        canvas_frame.pack(fill="both", expand=True)
 
-        inner = scroll if self.use_ctk else scroll.scrollable_frame
+        canvas = tk.Canvas(canvas_frame, bg=c.bg, highlightthickness=0, bd=0)
+        scrollbar = tk.Scrollbar(canvas_frame, orient="vertical", command=canvas.yview)
+        inner = tk.Frame(canvas, bg=c.bg)
+
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        win_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(win_id, width=e.width))
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Mousewheel binding
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas.bind("<MouseWheel>", _on_mousewheel)
+        inner.bind("<MouseWheel>", _on_mousewheel)
 
         for name in defaults:
             if name.startswith("_"):
@@ -1555,59 +1587,79 @@ class OnboardingWizard:
             icon = action.get("icon", "")
             task = action.get("task", "")
 
-            row = (
-                ctk.CTkFrame(inner, fg_color=c.surface0, corner_radius=6)
-                if self.use_ctk
-                else tk.Frame(inner, bg=c.surface0)
+            row = tk.Frame(inner, bg=c.surface0, padx=6, pady=4)
+            row.pack(fill="x", pady=1, padx=2)
+            row.bind("<MouseWheel>", _on_mousewheel)
+
+            initial_select_color = c.accent_green if toggles[name].get() else c.surface0
+            cb = tk.Checkbutton(
+                row,
+                variable=toggles[name],
+                bg=c.surface0,
+                activebackground=c.surface0,
+                selectcolor=initial_select_color,
+                relief="flat",
+                bd=0,
             )
-            row.pack(fill="x", pady=2, padx=2, ipady=3)
+            cb.pack(side="left", padx=(4, 6))
+            cb.bind("<MouseWheel>", _on_mousewheel)
 
-            if self.use_ctk:
-                switch = ctk.CTkSwitch(
+            def on_var_change(*args, n=name, cb_w=cb):
+                try:
+                    if cb_w.winfo_exists():
+                        cb_w.configure(selectcolor=c.accent_green if toggles[n].get() else c.surface0)
+                except Exception:
+                    pass
+
+            toggles[name].trace_add("write", on_var_change)
+
+            # Icon
+            if HAVE_EMOJI and get_emoji_renderer and icon:
+                renderer = get_emoji_renderer()
+                img = renderer.get_emoji_image(icon, size=16)
+                if img:
+                    icon_lbl = tk.Label(row, image=img, bg=c.surface0)
+                    icon_lbl.image = img  # Keep reference to prevent GC
+                    icon_lbl.pack(side="left", padx=(0, 4))
+                    icon_lbl.bind("<Button-1>", lambda e, v=toggles[name]: v.set(not v.get()))
+                    icon_lbl.bind("<MouseWheel>", _on_mousewheel)
+                else:
+                    icon_lbl = tk.Label(row, text=icon, font=("Segoe UI", 10), bg=c.surface0, fg=c.fg)
+                    icon_lbl.pack(side="left", padx=(0, 4))
+                    icon_lbl.bind("<Button-1>", lambda e, v=toggles[name]: v.set(not v.get()))
+                    icon_lbl.bind("<MouseWheel>", _on_mousewheel)
+            elif icon:
+                icon_lbl = tk.Label(row, text=icon, font=("Segoe UI", 10), bg=c.surface0, fg=c.fg)
+                icon_lbl.pack(side="left", padx=(0, 4))
+                icon_lbl.bind("<Button-1>", lambda e, v=toggles[name]: v.set(not v.get()))
+                icon_lbl.bind("<MouseWheel>", _on_mousewheel)
+
+            # Name label
+            name_lbl = tk.Label(
+                row,
+                text=name,
+                font=("Segoe UI", 10, "bold"),
+                bg=c.surface0,
+                fg=c.fg,
+                anchor="w",
+            )
+            name_lbl.pack(side="left", padx=(0, 8))
+            name_lbl.bind("<Button-1>", lambda e, v=toggles[name]: v.set(not v.get()))
+            name_lbl.bind("<MouseWheel>", _on_mousewheel)
+
+            if task:
+                truncated = task[:80] + "..." if len(task) > 80 else task
+                desc_lbl = tk.Label(
                     row,
-                    text="",
-                    variable=toggles[name],
-                    fg_color=c.surface2,
-                    progress_color=c.accent_green,
-                    width=40,
-                    height=20,
-                    switch_width=36,
-                    switch_height=18,
-                )
-                switch.pack(side="left", padx=(10, 5), pady=4)
-
-                # Icon + name
-                if HAVE_EMOJI and prepare_emoji_content and icon:
-                    icon_kwargs = prepare_emoji_content(icon, size=16)
-                    ctk.CTkLabel(row, font=get_ctk_font(12), width=24, **icon_kwargs, **get_ctk_label_colors(c)).pack(
-                        side="left", padx=(0, 4)
-                    )
-                elif icon:
-                    ctk.CTkLabel(row, text=icon, font=get_ctk_font(14), width=24, **get_ctk_label_colors(c)).pack(
-                        side="left", padx=(0, 4)
-                    )
-
-                ctk.CTkLabel(row, text=name, font=get_ctk_font(12, "bold"), anchor="w", **get_ctk_label_colors(c)).pack(
-                    side="left", padx=(0, 8)
-                )
-
-                # Task as tooltip-like description
-                if task:
-                    truncated = task[:80] + "..." if len(task) > 80 else task
-                    ctk.CTkLabel(
-                        row, text=truncated, font=get_ctk_font(10), anchor="w", **get_ctk_label_colors(c, muted=True)
-                    ).pack(side="left", fill="x", expand=True, padx=(0, 10))
-            else:
-                tk.Checkbutton(
-                    row,
-                    text=f"{icon} {name}",
-                    variable=toggles[name],
-                    font=("Segoe UI", 9),
+                    text=truncated,
+                    font=("Segoe UI", 8),
                     bg=c.surface0,
-                    fg=c.fg,
-                    selectcolor=c.input_bg,
+                    fg=c.blockquote,
                     anchor="w",
-                ).pack(side="left", padx=8)
+                )
+                desc_lbl.pack(side="left", fill="x", expand=True, padx=(0, 6))
+                desc_lbl.bind("<Button-1>", lambda e, v=toggles[name]: v.set(not v.get()))
+                desc_lbl.bind("<MouseWheel>", _on_mousewheel)
 
     def _render_modifier_toggles(self, parent):
         """Render modifier toggle list."""
@@ -1629,13 +1681,27 @@ class OnboardingWizard:
         create_emoji_button(btn_row, "All On", "✅", c, "success", 80, 28, select_all).pack(side="left", padx=3)
         create_emoji_button(btn_row, "All Off", "❌", c, "danger", 80, 28, deselect_all).pack(side="left", padx=3)
 
-        if self.use_ctk:
-            scroll = ctk.CTkScrollableFrame(parent, fg_color="transparent")
-        else:
-            scroll = TkScrollableFrame(parent, bg_color=c.bg)
-        scroll.pack(fill="both", expand=True)
+        # Lightweight scrollable list using Canvas + tk.Checkbuttons
+        canvas_frame = tk.Frame(parent, bg=c.bg)
+        canvas_frame.pack(fill="both", expand=True)
 
-        inner = scroll if self.use_ctk else scroll.scrollable_frame
+        canvas = tk.Canvas(canvas_frame, bg=c.bg, highlightthickness=0, bd=0)
+        scrollbar = tk.Scrollbar(canvas_frame, orient="vertical", command=canvas.yview)
+        inner = tk.Frame(canvas, bg=c.bg)
+
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        win_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(win_id, width=e.width))
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas.bind("<MouseWheel>", _on_mousewheel)
+        inner.bind("<MouseWheel>", _on_mousewheel)
 
         default_modifiers = DEFAULT_GLOBAL_SETTINGS.get("modifiers", [])
         for mod in default_modifiers:
@@ -1647,56 +1713,79 @@ class OnboardingWizard:
             label = mod.get("label", key)
             tooltip = mod.get("tooltip", "")
 
-            row = (
-                ctk.CTkFrame(inner, fg_color=c.surface0, corner_radius=6)
-                if self.use_ctk
-                else tk.Frame(inner, bg=c.surface0)
+            row = tk.Frame(inner, bg=c.surface0, padx=6, pady=4)
+            row.pack(fill="x", pady=1, padx=2)
+            row.bind("<MouseWheel>", _on_mousewheel)
+
+            initial_select_color = c.accent_green if self._modifier_toggle_vars[key].get() else c.surface0
+            cb = tk.Checkbutton(
+                row,
+                variable=self._modifier_toggle_vars[key],
+                bg=c.surface0,
+                activebackground=c.surface0,
+                selectcolor=initial_select_color,
+                relief="flat",
+                bd=0,
             )
-            row.pack(fill="x", pady=2, padx=2, ipady=3)
+            cb.pack(side="left", padx=(4, 6))
+            cb.bind("<MouseWheel>", _on_mousewheel)
 
-            if self.use_ctk:
-                switch = ctk.CTkSwitch(
+            def on_mod_change(*args, k=key, cb_w=cb):
+                try:
+                    if cb_w.winfo_exists():
+                        cb_w.configure(
+                            selectcolor=c.accent_green if self._modifier_toggle_vars[k].get() else c.surface0
+                        )
+                except Exception:
+                    pass
+
+            self._modifier_toggle_vars[key].trace_add("write", on_mod_change)
+
+            # Icon
+            if HAVE_EMOJI and get_emoji_renderer and icon:
+                renderer = get_emoji_renderer()
+                img = renderer.get_emoji_image(icon, size=16)
+                if img:
+                    icon_lbl = tk.Label(row, image=img, bg=c.surface0)
+                    icon_lbl.image = img  # Keep reference to prevent GC
+                    icon_lbl.pack(side="left", padx=(0, 4))
+                    icon_lbl.bind("<Button-1>", lambda e, v=self._modifier_toggle_vars[key]: v.set(not v.get()))
+                    icon_lbl.bind("<MouseWheel>", _on_mousewheel)
+                else:
+                    icon_lbl = tk.Label(row, text=icon, font=("Segoe UI", 10), bg=c.surface0, fg=c.fg)
+                    icon_lbl.pack(side="left", padx=(0, 4))
+                    icon_lbl.bind("<Button-1>", lambda e, v=self._modifier_toggle_vars[key]: v.set(not v.get()))
+                    icon_lbl.bind("<MouseWheel>", _on_mousewheel)
+            elif icon:
+                icon_lbl = tk.Label(row, text=icon, font=("Segoe UI", 10), bg=c.surface0, fg=c.fg)
+                icon_lbl.pack(side="left", padx=(0, 4))
+                icon_lbl.bind("<Button-1>", lambda e, v=self._modifier_toggle_vars[key]: v.set(not v.get()))
+                icon_lbl.bind("<MouseWheel>", _on_mousewheel)
+
+            name_lbl = tk.Label(
+                row,
+                text=label,
+                font=("Segoe UI", 10, "bold"),
+                bg=c.surface0,
+                fg=c.fg,
+                anchor="w",
+            )
+            name_lbl.pack(side="left", padx=(0, 8))
+            name_lbl.bind("<Button-1>", lambda e, v=self._modifier_toggle_vars[key]: v.set(not v.get()))
+            name_lbl.bind("<MouseWheel>", _on_mousewheel)
+
+            if tooltip:
+                desc_lbl = tk.Label(
                     row,
-                    text="",
-                    variable=self._modifier_toggle_vars[key],
-                    fg_color=c.surface2,
-                    progress_color=c.accent_green,
-                    width=40,
-                    height=20,
-                    switch_width=36,
-                    switch_height=18,
-                )
-                switch.pack(side="left", padx=(10, 5), pady=4)
-
-                if HAVE_EMOJI and prepare_emoji_content and icon:
-                    icon_kwargs = prepare_emoji_content(icon, size=16)
-                    ctk.CTkLabel(row, font=get_ctk_font(12), width=24, **icon_kwargs, **get_ctk_label_colors(c)).pack(
-                        side="left", padx=(0, 4)
-                    )
-                elif icon:
-                    ctk.CTkLabel(row, text=icon, font=get_ctk_font(14), width=24, **get_ctk_label_colors(c)).pack(
-                        side="left", padx=(0, 4)
-                    )
-
-                ctk.CTkLabel(
-                    row, text=label, font=get_ctk_font(12, "bold"), anchor="w", **get_ctk_label_colors(c)
-                ).pack(side="left", padx=(0, 8))
-
-                if tooltip:
-                    ctk.CTkLabel(
-                        row, text=tooltip, font=get_ctk_font(10), anchor="w", **get_ctk_label_colors(c, muted=True)
-                    ).pack(side="left", fill="x", expand=True, padx=(0, 10))
-            else:
-                tk.Checkbutton(
-                    row,
-                    text=f"{icon} {label}",
-                    variable=self._modifier_toggle_vars[key],
-                    font=("Segoe UI", 9),
+                    text=tooltip,
+                    font=("Segoe UI", 8),
                     bg=c.surface0,
-                    fg=c.fg,
-                    selectcolor=c.input_bg,
+                    fg=c.blockquote,
                     anchor="w",
-                ).pack(side="left", padx=8)
+                )
+                desc_lbl.pack(side="left", fill="x", expand=True, padx=(0, 6))
+                desc_lbl.bind("<Button-1>", lambda e, v=self._modifier_toggle_vars[key]: v.set(not v.get()))
+                desc_lbl.bind("<MouseWheel>", _on_mousewheel)
 
     def _save_action_visibility(self):
         """Apply action/modifier visibility selections to prompts.json."""
