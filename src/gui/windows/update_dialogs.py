@@ -4,11 +4,12 @@ Contains CTkToplevel logic to prevent bloating the tray module.
 """
 
 import threading
+import webbrowser
 
 from ...updater import is_compiled, perform_update
 from ..core import GUICoordinator
 from ..platform import ctk
-from ..themes import get_colors, get_ctk_button_colors, get_ctk_font, get_ctk_label_colors
+from ..themes import get_colors, get_ctk_button_colors, get_ctk_font, get_ctk_label_colors, get_ctk_textbox_colors
 from .utils import set_dark_titlebar, set_window_icon
 
 
@@ -62,17 +63,6 @@ def show_update_available_dialog(info, current_version: str):
         size_mb = info.asset_size / (1024 * 1024)
         size_str = f" ({size_mb:.1f} MB)"
 
-    notes_preview = ""
-    if info.release_notes:
-        lines = info.release_notes.strip().split("\n")[:5]
-        notes_preview = "\n".join(l.strip() for l in lines)
-        if len(info.release_notes.strip().split("\n")) > 5:
-            notes_preview += "\n..."
-
-    message = f"A new version is available!\n\nCurrent: v{current_version}\nNew: v{info.version}{size_str}\n"
-    if notes_preview:
-        message += f"\nRelease Notes:\n{notes_preview}\n"
-
     dialog = ctk.CTkToplevel()
     dialog.withdraw()
     dialog.title("AIPromptBridge Update Available")
@@ -83,32 +73,67 @@ def show_update_available_dialog(info, current_version: str):
     set_dark_titlebar(dialog)
     set_window_icon(dialog)
 
+    # Header label at the top
+    header_text = f"A new version is available!\nCurrent: v{current_version}  |  New: v{info.version}{size_str}"
     lbl = ctk.CTkLabel(
-        dialog, text=message, font=get_ctk_font(13), justify="left", wraplength=450, **get_ctk_label_colors(colors)
+        dialog, text=header_text, font=get_ctk_font(13, "bold"), justify="left", **get_ctk_label_colors(colors)
     )
-    lbl.pack(padx=30, pady=20, fill="both", expand=True)
+    lbl.pack(padx=30, pady=(20, 10), fill="x")
+
+    # Scrollable Textbox for release notes
+    lbl_notes = None
+    txt_changelog = None
+    if info.release_notes:
+        lbl_notes = ctk.CTkLabel(
+            dialog,
+            text="Release Notes / Changelog:",
+            font=get_ctk_font(11, "bold"),
+            justify="left",
+            **get_ctk_label_colors(colors),
+        )
+        lbl_notes.pack(padx=30, pady=(0, 2), anchor="w")
+
+        txt_changelog = ctk.CTkTextbox(dialog, font=get_ctk_font(12), height=140, **get_ctk_textbox_colors(colors))
+        txt_changelog.pack(padx=30, pady=(0, 10), fill="both", expand=True)
+        txt_changelog.insert("1.0", info.release_notes.strip())
+        txt_changelog.configure(state="disabled")
+
+    # Prompt label at the bottom of the content area
+    prompt_text = (
+        "Download and install now?"
+        if is_compiled()
+        else "You are running from source. Please update manually via git or downloading from GitHub."
+    )
+    lbl_prompt = ctk.CTkLabel(
+        dialog, text=prompt_text, font=get_ctk_font(12), justify="left", wraplength=450, **get_ctk_label_colors(colors)
+    )
+    lbl_prompt.pack(padx=30, pady=(0, 15), fill="x")
 
     btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
     btn_frame.pack(fill="x", padx=30, pady=(0, 20))
 
     if is_compiled():
-        lbl.configure(text=message + "\nDownload and install now?")
 
         def on_yes():
-            # Hide old buttons
+            # Hide old buttons, notes label, textbox, and prompt label
             btn_frame.pack_forget()
+            if lbl_notes:
+                lbl_notes.pack_forget()
+            if txt_changelog:
+                txt_changelog.pack_forget()
+            lbl_prompt.pack_forget()
 
             # Transition to Progress UI
             dialog.title("AIPromptBridge Updating...")
             lbl.configure(text=f"Downloading update v{info.version}...", justify="center")
 
             progress_bar = ctk.CTkProgressBar(dialog, width=300, fg_color=colors.surface1, progress_color=colors.accent)
-            progress_bar.pack(padx=30, pady=(0, 20))
+            progress_bar.pack(padx=30, pady=(40, 20))
             progress_bar.set(0)
 
             dialog.update_idletasks()
-            w = max(400, dialog.winfo_reqwidth())
-            h = max(200, dialog.winfo_reqheight())
+            w = 400
+            h = 200
             x = (dialog.winfo_screenwidth() - w) // 2
             y = (dialog.winfo_screenheight() - h) // 2
             dialog.geometry(f"{w}x{h}+{x}+{y}")
@@ -174,18 +199,25 @@ def show_update_available_dialog(info, current_version: str):
         )
         btn_no.pack(side="right")
     else:
-        lbl.configure(
-            text=message + "\n\nYou are running from source. Please update manually via git or downloading from GitHub."
-        )
         btn_ok = ctk.CTkButton(
             btn_frame, text="OK", width=120, command=dialog.destroy, **get_ctk_button_colors(colors, variant="primary")
         )
         btn_ok.pack(side="right")
         print(f"📦 Running from source. Download: {info.release_url}\n")
 
+    # Add button to open latest GitHub releases
+    btn_gh = ctk.CTkButton(
+        btn_frame,
+        text="GitHub Releases",
+        width=140,
+        command=lambda: webbrowser.open("https://github.com/zaxx-q/AIPromptBridge/releases/latest"),
+        **get_ctk_button_colors(colors, variant="secondary"),
+    )
+    btn_gh.pack(side="left")
+
     dialog.update_idletasks()
-    w = max(500, dialog.winfo_reqwidth())
-    h = max(250, dialog.winfo_reqheight())
+    w = max(550, dialog.winfo_reqwidth())
+    h = max(380, dialog.winfo_reqheight())
     x = (dialog.winfo_screenwidth() - w) // 2
     y = (dialog.winfo_screenheight() - h) // 2
     dialog.geometry(f"{w}x{h}+{x}+{y}")

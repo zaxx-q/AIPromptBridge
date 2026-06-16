@@ -104,7 +104,7 @@ Customizable appearance with:
 ### 🔄 Robust Backend
 
 - **Multi-provider support** - Google Gemini, Anthropic Claude, OpenAI, OpenRouter, xAI (Grok), Mistral, Cohere, and Custom OpenAI-compatible endpoints
-- **Connection Profiles** - Dedicated connection profiles (`profiles.json`) for provider, model, thinking, streaming, and advanced params — assignable per-action or globally
+- **Connection Profiles** - Dedicated connection profiles (`profiles.json`) for provider, model, thinking, streaming, API key override, and custom endpoint URL. Assignable per-action or globally
 - **Automatic key rotation** - Switch API keys on rate limits (429, 401, 403)
 - **Smart retry logic** - Handles errors gracefully with configurable delays
 - **Empty response detection** - Automatically retries with next key
@@ -281,7 +281,7 @@ For advanced users, configuration files are stored in the application root:
 - Disable thinking parameter: Press `T` in console or set `thinking_enabled = false`
 - Keep streaming enabled for perceived faster responses
 
-### For Slow Applications (Obsidian, Anki, XMind)
+### If selected text not detected
 
 Some applications (like Obsidian/Electron, XMind/JavaFX, or Anki) process keyboard copy commands asynchronously or slowly. If you notice TextEditTool fails to capture selected text in these applications:
 
@@ -290,6 +290,8 @@ Some applications (like Obsidian/Electron, XMind/JavaFX, or Anki) process keyboa
 - Click **Save**.
 
 _Note: This option is disabled by default to keep popup invocation instant for normal applications when no text is selected._
+
+> 💡 **Avoid 'Alt' in Hotkeys**: Some applications (like Anki) intercept the `Alt` key if your trigger hotkey includes it (e.g., `Alt+Space` or a custom shortcut with `Alt`). This can cause them to receive `Ctrl+Alt+C` instead of a clean `Ctrl+C` copy instruction, resulting in copy failures or overwriting your selection with a literal `c` or `C`. If you experience this issue, avoid using `Alt` in your global hotkeys (use `Ctrl+Space` or similar instead).
 
 ### For Better Results
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## [7.1.1] - 2026-06-16
+
+### Improvements
+- **Non-Streaming Abort Support**: Added support for the escape hotkey and typing indicator to cancel non-streaming replace/typing operations in both the Text Edit Tool and Screen Snipping Tool (Type mode).
+- **Typing Delay Defaults**: Default streaming typing delay is now set to 0ms (no limit) for maximum speed, and the separate "uncapped" speed toggle has been deprecated. The settings spinbox range is simplified to [0, 100] ms.
+- **Update Dialog**: Replaced the static, truncated 5-line changelog in the Update Available dialog with a themed, scrollable text box showing the full release notes. Also updated the layout and added Github button.
+
+### Fixes
+
+- **Profile Override Streaming**: Fixed an issue where streaming settings of a selected connection profile override were not being respected during the API request.
+
 ## [7.1.0] - 2026-06-15
 
 ### New Features
@@ -99,9 +110,11 @@
 ## [6.4.1] - 2026-04-30
 
 ### Improvements
+
 - **Popup UI**: Simplified layout in popup menus by removing redundant "Preset:" and "Actions:" text labels from dropdown frames, giving the dropdowns more room to expand responsively.
 
 ### Fixes
+
 - **Chat Window**: Fixed an issue where the "Copy Last" button wouldn't work immediately when reopening an existing session. The last response is now properly initialized from the session history payload on load.
 - **Provider Reliability**: Enhanced empty response detection during API streaming to ignore incomplete responses that only contain "thinking" blocks without any actual text or tool outputs, ensuring these upstream API glitches trigger an automatic retry.
 
@@ -352,6 +365,7 @@
 ### New Features
 
 #### 🔊 Text-to-Speech (TTS)
+
 - **Gemini TTS Integration**: Full support for Google's Gemini TTS models with streaming audio generation.
 - **Voice Selection**: Access to 30 prebuilt voices with style and gender descriptors.
 - **AI Director**: Intelligent style generation that analyzes text to provide expressive performance instructions (tone, pace, emotion) before synthesis.
@@ -361,10 +375,12 @@
 - **Tkinter Support**: Full functional fallback UI for standard Tkinter environments.
 
 #### 🎤 Audio Tool Enhancements
+
 - **File Upload**: Added support for uploading existing audio files for analysis, alongside live recording.
 - **Unified Controls**: Consolidated Record/Stop and Play/Pause buttons into dynamic toggle controls for a cleaner UI.
 
 #### ⚙️ Configuration & Playground
+
 - **Live Preview**: Prompt Editor playground now updates in real-time as settings are modified.
 - **Playground Audio**: Added ability to upload audio files directly in the Prompt Editor playground for testing.
 - **TTS Settings**: Dedicated "TTS" tab in Settings Window and configuration section in Prompt Editor.
@@ -482,6 +498,7 @@
 ### New Features
 
 #### Audio Tool
+
 - **Audio Analyzer**: New tool for recording and analyzing audio from microphone or system loopback.
 - **Unified Stream Architecture**: Robust audio handling for simultaneous recording and level monitoring.
 - **Visualization**: Real-time audio level meter with gradient visualization and resizable UI.
@@ -490,16 +507,19 @@
 - **Tkinter Fallback**: Full support for standard Tkinter environments.
 
 #### System Tray & Navigation
+
 - Added direct access to **Direct Chat**, **Screen Snip**, and **Audio Analyzer** from the tray menu.
 - Implemented custom tray menu with separators for better organization.
 - Restricted file editing options to console mode.
 
 #### Settings & Configuration
+
 - **Auto-Save**: New `auto_save_session` setting to control when sessions are persisted ("on_followup", "always_window", "on_attachment").
 - **Reset Defaults**: Added button to reset configuration to default values.
 - **Logging**: Centralized logging configuration with Rich formatting support.
 
 #### Prompts & Actions
+
 - **New Actions**: Added "Extract Data", "Code Review", "Smart Cleanup", "OCR to Markdown", and more.
 - **Groups**: Support for enabling/disabling action groups in popup menus.
 - **Overhaul**: Comprehensive update to Screen Snip prompts for better results.
