@@ -30,6 +30,8 @@ from ..themes import (
     get_ctk_frame_colors,
     get_ctk_scrollbar_colors,
     get_ctk_textbox_colors,
+    get_tk_font,
+    scaled_tk_size,
     sync_ctk_appearance,
 )
 from ..utils import copy_to_clipboard, get_color_scheme, render_markdown, setup_text_tags
@@ -681,7 +683,7 @@ class ChatWindowBase(ABC):
             self.chat_text = tk.Text(
                 chat_frame,
                 wrap=tk.WORD,
-                font=("Segoe UI", 11),
+                font=get_tk_font(11),
                 bg=self.theme.text_bg,
                 fg=self.theme.fg,
                 insertbackground=self.theme.fg,
@@ -726,7 +728,7 @@ class ChatWindowBase(ABC):
             self.chat_text = tk.Text(
                 chat_frame,
                 wrap=tk.WORD,
-                font=("Segoe UI", 11),
+                font=get_tk_font(11),
                 bg=self.colors["text_bg"],
                 fg=self.colors["fg"],
                 insertbackground=self.colors["fg"],
@@ -1164,7 +1166,7 @@ class ChatWindowBase(ABC):
                 thinking_tag = f"thinking_header_{i}"
                 self.chat_text.tag_configure(
                     thinking_tag,
-                    font=("Segoe UI", 10, "bold"),
+                    font=get_tk_font(10, "bold"),
                     foreground=self.theme.accent_yellow,
                     spacing1=2,
                     spacing3=2,

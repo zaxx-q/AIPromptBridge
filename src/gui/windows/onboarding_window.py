@@ -31,6 +31,7 @@ from ..themes import (
     get_ctk_frame_colors,
     get_ctk_label_colors,
     get_ctk_segmented_colors,
+    get_tk_font,
 )
 from .utils import set_dark_titlebar, set_window_icon
 
@@ -1643,12 +1644,12 @@ class OnboardingWizard:
                     icon_lbl.bind("<Button-1>", lambda e, v=toggles[name]: v.set(not v.get()))
                     icon_lbl.bind("<MouseWheel>", _on_mousewheel)
                 else:
-                    icon_lbl = tk.Label(row, text=icon, font=("Segoe UI", 10), bg=c.surface0, fg=c.fg)
+                    icon_lbl = tk.Label(row, text=icon, font=get_tk_font(10), bg=c.surface0, fg=c.fg)
                     icon_lbl.pack(side="left", padx=(0, 4))
                     icon_lbl.bind("<Button-1>", lambda e, v=toggles[name]: v.set(not v.get()))
                     icon_lbl.bind("<MouseWheel>", _on_mousewheel)
             elif icon:
-                icon_lbl = tk.Label(row, text=icon, font=("Segoe UI", 10), bg=c.surface0, fg=c.fg)
+                icon_lbl = tk.Label(row, text=icon, font=get_tk_font(10), bg=c.surface0, fg=c.fg)
                 icon_lbl.pack(side="left", padx=(0, 4))
                 icon_lbl.bind("<Button-1>", lambda e, v=toggles[name]: v.set(not v.get()))
                 icon_lbl.bind("<MouseWheel>", _on_mousewheel)
@@ -1657,7 +1658,7 @@ class OnboardingWizard:
             name_lbl = tk.Label(
                 row,
                 text=name,
-                font=("Segoe UI", 10, "bold"),
+                font=get_tk_font(10, "bold"),
                 bg=c.surface0,
                 fg=c.fg,
                 anchor="w",
@@ -1671,7 +1672,7 @@ class OnboardingWizard:
                 desc_lbl = tk.Label(
                     row,
                     text=truncated,
-                    font=("Segoe UI", 8),
+                    font=get_tk_font(8),
                     bg=c.surface0,
                     fg=c.blockquote,
                     anchor="w",
@@ -1776,12 +1777,12 @@ class OnboardingWizard:
                     icon_lbl.bind("<Button-1>", lambda e, v=self._modifier_toggle_vars[key]: v.set(not v.get()))
                     icon_lbl.bind("<MouseWheel>", _on_mousewheel)
                 else:
-                    icon_lbl = tk.Label(row, text=icon, font=("Segoe UI", 10), bg=c.surface0, fg=c.fg)
+                    icon_lbl = tk.Label(row, text=icon, font=get_tk_font(10), bg=c.surface0, fg=c.fg)
                     icon_lbl.pack(side="left", padx=(0, 4))
                     icon_lbl.bind("<Button-1>", lambda e, v=self._modifier_toggle_vars[key]: v.set(not v.get()))
                     icon_lbl.bind("<MouseWheel>", _on_mousewheel)
             elif icon:
-                icon_lbl = tk.Label(row, text=icon, font=("Segoe UI", 10), bg=c.surface0, fg=c.fg)
+                icon_lbl = tk.Label(row, text=icon, font=get_tk_font(10), bg=c.surface0, fg=c.fg)
                 icon_lbl.pack(side="left", padx=(0, 4))
                 icon_lbl.bind("<Button-1>", lambda e, v=self._modifier_toggle_vars[key]: v.set(not v.get()))
                 icon_lbl.bind("<MouseWheel>", _on_mousewheel)
@@ -1789,7 +1790,7 @@ class OnboardingWizard:
             name_lbl = tk.Label(
                 row,
                 text=label,
-                font=("Segoe UI", 10, "bold"),
+                font=get_tk_font(10, "bold"),
                 bg=c.surface0,
                 fg=c.fg,
                 anchor="w",
@@ -1802,7 +1803,7 @@ class OnboardingWizard:
                 desc_lbl = tk.Label(
                     row,
                     text=tooltip,
-                    font=("Segoe UI", 8),
+                    font=get_tk_font(8),
                     bg=c.surface0,
                     fg=c.blockquote,
                     anchor="w",

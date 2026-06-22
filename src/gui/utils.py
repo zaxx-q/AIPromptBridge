@@ -37,7 +37,7 @@ if sys.platform == "win32":
 from .platform import HAVE_CTK, ctk
 
 # Import theme system
-from .themes import ThemeColors, ThemeRegistry, get_ctk_font
+from .themes import ThemeColors, ThemeRegistry, get_ctk_font, scaled_tk_size
 from .themes import get_color_scheme as _get_color_scheme
 from .themes import is_dark_mode as _is_dark_mode
 
@@ -220,44 +220,56 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
         mono_font = "TkFixedFont"
         base_font = "TkDefaultFont"
 
+    # DPI-scale font sizes for raw tk.Text tag configuration.
+    # CTk handles its own scaling; raw tk widgets need manual adjustment.
+    _s = scaled_tk_size
+
     # Headers
-    text_widget.tag_configure("h1", font=(base_font, 16, "bold"), foreground=colors["header1"], spacing1=6, spacing3=4)
+    text_widget.tag_configure(
+        "h1", font=(base_font, _s(16), "bold"), foreground=colors["header1"], spacing1=6, spacing3=4
+    )
 
-    text_widget.tag_configure("h2", font=(base_font, 14, "bold"), foreground=colors["header2"], spacing1=5, spacing3=3)
+    text_widget.tag_configure(
+        "h2", font=(base_font, _s(14), "bold"), foreground=colors["header2"], spacing1=5, spacing3=3
+    )
 
-    text_widget.tag_configure("h3", font=(base_font, 12, "bold"), foreground=colors["header3"], spacing1=4, spacing3=2)
+    text_widget.tag_configure(
+        "h3", font=(base_font, _s(12), "bold"), foreground=colors["header3"], spacing1=4, spacing3=2
+    )
 
-    text_widget.tag_configure("h4", font=(base_font, 11, "bold"), foreground=colors["fg"], spacing1=3, spacing3=2)
+    text_widget.tag_configure("h4", font=(base_font, _s(11), "bold"), foreground=colors["fg"], spacing1=3, spacing3=2)
 
     # Header + italic combinations
     text_widget.tag_configure(
-        "h1_italic", font=(base_font, 16, "bold italic"), foreground=colors["header1"], spacing1=6, spacing3=4
+        "h1_italic", font=(base_font, _s(16), "bold italic"), foreground=colors["header1"], spacing1=6, spacing3=4
     )
 
     text_widget.tag_configure(
-        "h2_italic", font=(base_font, 14, "bold italic"), foreground=colors["header2"], spacing1=5, spacing3=3
+        "h2_italic", font=(base_font, _s(14), "bold italic"), foreground=colors["header2"], spacing1=5, spacing3=3
     )
 
     text_widget.tag_configure(
-        "h3_italic", font=(base_font, 12, "bold italic"), foreground=colors["header3"], spacing1=4, spacing3=2
+        "h3_italic", font=(base_font, _s(12), "bold italic"), foreground=colors["header3"], spacing1=4, spacing3=2
     )
 
     text_widget.tag_configure(
-        "h4_italic", font=(base_font, 11, "bold italic"), foreground=colors["fg"], spacing1=3, spacing3=2
+        "h4_italic", font=(base_font, _s(11), "bold italic"), foreground=colors["fg"], spacing1=3, spacing3=2
     )
 
     # Inline formatting
-    text_widget.tag_configure("bold", font=(base_font, 11, "bold"))
-    text_widget.tag_configure("italic", font=(base_font, 11, "italic"))
-    text_widget.tag_configure("bold_italic", font=(base_font, 11, "bold italic"))
-    text_widget.tag_configure("strikethrough", font=(base_font, 11), overstrike=True)
+    text_widget.tag_configure("bold", font=(base_font, _s(11), "bold"))
+    text_widget.tag_configure("italic", font=(base_font, _s(11), "italic"))
+    text_widget.tag_configure("bold_italic", font=(base_font, _s(11), "bold italic"))
+    text_widget.tag_configure("strikethrough", font=(base_font, _s(11)), overstrike=True)
 
     # Code
-    text_widget.tag_configure("code", font=(mono_font, 10), background=colors["code_bg"], foreground=colors["accent"])
+    text_widget.tag_configure(
+        "code", font=(mono_font, _s(10)), background=colors["code_bg"], foreground=colors["accent"]
+    )
 
     text_widget.tag_configure(
         "codeblock",
-        font=(mono_font, 10),
+        font=(mono_font, _s(10)),
         background=colors["code_bg"],
         lmargin1=12,
         lmargin2=12,
@@ -281,7 +293,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
 
     # Blockquote
     text_widget.tag_configure(
-        "blockquote", lmargin1=16, lmargin2=20, foreground=colors["blockquote"], font=(base_font, 11, "italic")
+        "blockquote", lmargin1=16, lmargin2=20, foreground=colors["blockquote"], font=(base_font, _s(11), "italic")
     )
 
     # =================================================================
@@ -289,11 +301,11 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     # =================================================================
 
     # User message card - left accent bar color
-    text_widget.tag_configure("user_accent_bar", foreground=colors["user_accent"], font=(base_font, 11))
+    text_widget.tag_configure("user_accent_bar", foreground=colors["user_accent"], font=(base_font, _s(11)))
 
     # User message label
     text_widget.tag_configure(
-        "user_label", font=(base_font, 11, "bold"), foreground=colors["user_accent"], spacing1=0, spacing3=2
+        "user_label", font=(base_font, _s(11), "bold"), foreground=colors["user_accent"], spacing1=0, spacing3=2
     )
 
     # User message content (colored background)
@@ -302,11 +314,15 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     )
 
     # Assistant message card - left accent bar color
-    text_widget.tag_configure("assistant_accent_bar", foreground=colors["assistant_accent"], font=(base_font, 11))
+    text_widget.tag_configure("assistant_accent_bar", foreground=colors["assistant_accent"], font=(base_font, _s(11)))
 
     # Assistant message label
     text_widget.tag_configure(
-        "assistant_label", font=(base_font, 11, "bold"), foreground=colors["assistant_accent"], spacing1=0, spacing3=2
+        "assistant_label",
+        font=(base_font, _s(11), "bold"),
+        foreground=colors["assistant_accent"],
+        spacing1=0,
+        spacing3=2,
     )
 
     # Assistant message content (colored background)
@@ -321,10 +337,12 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     )
 
     # Card gap (transparent space between messages)
-    text_widget.tag_configure("card_gap", spacing1=4, spacing3=4, font=(base_font, 4))  # Small font for minimal height
+    text_widget.tag_configure(
+        "card_gap", spacing1=4, spacing3=4, font=(base_font, _s(4))
+    )  # Small font for minimal height
 
     # Normal text
-    text_widget.tag_configure("normal", font=(base_font, 11), foreground=colors["fg"])
+    text_widget.tag_configure("normal", font=(base_font, _s(11)), foreground=colors["fg"])
 
     # Separator (only used within cards, not between them)
     text_widget.tag_configure("separator", foreground=colors.get("surface1", colors["border"]), spacing1=4, spacing3=4)
@@ -335,7 +353,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
 
     # Thinking header - clickable, yellow accent
     text_widget.tag_configure(
-        "thinking_header", font=(base_font, 10, "bold"), foreground=colors["accent_yellow"], spacing1=4, spacing3=2
+        "thinking_header", font=(base_font, _s(10), "bold"), foreground=colors["accent_yellow"], spacing1=4, spacing3=2
     )
 
     # Add cursor change on hover for thinking header
@@ -345,7 +363,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     # Thinking content - improved contrast (use overlay0 instead of blockquote)
     text_widget.tag_configure(
         "thinking_content",
-        font=(base_font, 10),
+        font=(base_font, _s(10)),
         foreground=colors.get("overlay0", colors["blockquote"]),
         lmargin1=12,
         lmargin2=12,
@@ -366,7 +384,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     text_widget.tag_configure(
         "thinking_end_sep",
         foreground=colors.get("surface2", colors.get("overlay0", "#9399b2")),
-        font=(base_font, 7),
+        font=(base_font, _s(7)),
         spacing1=6,
         spacing3=4,
     )
@@ -377,11 +395,11 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
 
     # Muted by default — accent highlight on hover is handled per-instance
     text_widget.tag_configure(
-        "action_icon", font=(base_font, 10), foreground=colors.get("surface1", colors.get("overlay0", "#585b70"))
+        "action_icon", font=(base_font, _s(10)), foreground=colors.get("surface1", colors.get("overlay0", "#585b70"))
     )
 
     # Hover-highlighted variant
-    text_widget.tag_configure("action_icon_hover", font=(base_font, 10), foreground=colors.get("accent", "#89b4fa"))
+    text_widget.tag_configure("action_icon_hover", font=(base_font, _s(10)), foreground=colors.get("accent", "#89b4fa"))
 
     # =================================================================
     # LaTeX math display
@@ -389,13 +407,13 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
 
     # Inline math ($...$) - italic with accent color
     text_widget.tag_configure(
-        "latex_inline", font=(base_font, 11, "italic"), foreground=colors.get("accent_yellow", colors["accent"])
+        "latex_inline", font=(base_font, _s(11), "italic"), foreground=colors.get("accent_yellow", colors["accent"])
     )
 
     # Display math ($$...$$) - left-aligned block with code font for alignment
     text_widget.tag_configure(
         "latex_block",
-        font=(mono_font, 11),
+        font=(mono_font, _s(11)),
         foreground=colors.get("accent_yellow", colors["accent"]),
         background=colors["code_bg"],
         justify="left",
@@ -410,7 +428,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     # e.g. **$$...$$** → latex_block_bold
     text_widget.tag_configure(
         "latex_block_bold",
-        font=(mono_font, 11, "bold"),
+        font=(mono_font, _s(11), "bold"),
         foreground=colors.get("accent_yellow", colors["accent"]),
         background=colors["code_bg"],
         justify="left",
@@ -423,7 +441,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
 
     text_widget.tag_configure(
         "latex_block_italic",
-        font=(mono_font, 11, "italic"),
+        font=(mono_font, _s(11), "italic"),
         foreground=colors.get("accent_yellow", colors["accent"]),
         background=colors["code_bg"],
         justify="left",
@@ -436,7 +454,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
 
     text_widget.tag_configure(
         "latex_block_bold_italic",
-        font=(mono_font, 11, "bold italic"),
+        font=(mono_font, _s(11), "bold italic"),
         foreground=colors.get("accent_yellow", colors["accent"]),
         background=colors["code_bg"],
         justify="left",
@@ -450,7 +468,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     # Technical symbols font (center pieces) - used for characters
     # that are missing or look poor in monospaced fonts.
     text_widget.tag_configure(
-        "latex_symbols", font=("Segoe UI Symbol", 24), foreground=colors.get("accent_yellow", colors["accent"])
+        "latex_symbols", font=("Segoe UI Symbol", _s(24)), foreground=colors.get("accent_yellow", colors["accent"])
     )
 
     # Raise thinking_block_layout above user_message/assistant_message so its background takes priority
@@ -778,7 +796,7 @@ def render_markdown(
         _font_obj = tkfont.Font(font=widget_font)
     except Exception:
         try:
-            _font_obj = tkfont.Font(family="Segoe UI", size=11)
+            _font_obj = tkfont.Font(family="Segoe UI", size=scaled_tk_size(11))
         except Exception:
             _font_obj = None
 

@@ -28,6 +28,8 @@ from ..themes import (
     get_ctk_button_colors,
     get_ctk_entry_colors,
     get_ctk_font,
+    get_tk_font,
+    scaled_tk_size,
     sync_ctk_appearance,
 )
 from .utils import set_dark_titlebar, set_window_icon
@@ -65,7 +67,7 @@ class SessionListItem(tk.Frame):
         kwargs.pop("fg_color", None)
         kwargs.pop("corner_radius", None)
 
-        super().__init__(parent, bg=colors.surface0, height=36, **kwargs)
+        super().__init__(parent, bg=colors.surface0, height=scaled_tk_size(36), **kwargs)
         self.session_data = session_data
         self.colors = colors
         self.on_click_callback = on_click
@@ -75,11 +77,11 @@ class SessionListItem(tk.Frame):
 
         # Use grid layout for column alignment (pixel-perfect)
         # MUST match SessionListHeader grid config
-        self.grid_columnconfigure(0, minsize=60)  # ID
+        self.grid_columnconfigure(0, minsize=scaled_tk_size(60))  # ID
         self.grid_columnconfigure(1, weight=1)  # Title
-        self.grid_columnconfigure(2, minsize=100)  # Origin
-        self.grid_columnconfigure(3, minsize=70)  # Msgs
-        self.grid_columnconfigure(4, minsize=140)  # Updated
+        self.grid_columnconfigure(2, minsize=scaled_tk_size(100))  # Origin
+        self.grid_columnconfigure(3, minsize=scaled_tk_size(70))  # Msgs
+        self.grid_columnconfigure(4, minsize=scaled_tk_size(140))  # Updated
 
         self.pack_propagate(False)
         self.grid_propagate(False)
@@ -97,7 +99,7 @@ class SessionListItem(tk.Frame):
         if updated:
             updated = updated[:16].replace("T", " ")
 
-        font = ("Segoe UI", 10)
+        font = get_tk_font(10)
         self.cells = []
 
         # Helper to create cells
@@ -111,7 +113,7 @@ class SessionListItem(tk.Frame):
                     renderer = get_emoji_renderer()
                     emoji_char, remaining = renderer.extract_leading_emoji(text)
                     if emoji_char:
-                        emoji_img = renderer.get_emoji_image(emoji_char, size=16)
+                        emoji_img = renderer.get_emoji_image(emoji_char, size=scaled_tk_size(16))
                         if emoji_img:
                             self._emoji_images.append(emoji_img)  # Prevent GC
                             display_text = remaining
@@ -125,15 +127,15 @@ class SessionListItem(tk.Frame):
                 bg=colors.surface0,
                 fg=colors.fg,
                 anchor=anchor,
-                padx=5,
-                pady=8,
+                padx=scaled_tk_size(5),
+                pady=scaled_tk_size(8),
                 cursor="hand2",
             )
 
             if emoji_img:
                 lbl.configure(image=emoji_img, compound="left")
 
-            lbl.grid(row=0, column=col, sticky=sticky, padx=(10 if col == 0 else 0, 0))
+            lbl.grid(row=0, column=col, sticky=sticky, padx=(scaled_tk_size(10) if col == 0 else 0, 0))
             self.cells.append(lbl)
 
             # Event binding
@@ -202,18 +204,18 @@ class SessionListHeader(tk.Frame):
         kwargs.pop("fg_color", None)
         kwargs.pop("corner_radius", None)
 
-        super().__init__(parent, bg=colors.surface1, height=30, **kwargs)
+        super().__init__(parent, bg=colors.surface1, height=scaled_tk_size(30), **kwargs)
         self.colors = colors
         self.on_sort = on_sort
         self.current_sort = current_sort
         self.descending = descending
 
         # Grid config (Must match SessionListItem)
-        self.grid_columnconfigure(0, minsize=60)  # ID
+        self.grid_columnconfigure(0, minsize=scaled_tk_size(60))  # ID
         self.grid_columnconfigure(1, weight=1)  # Title
-        self.grid_columnconfigure(2, minsize=100)  # Origin
-        self.grid_columnconfigure(3, minsize=70)  # Msgs
-        self.grid_columnconfigure(4, minsize=140)  # Updated
+        self.grid_columnconfigure(2, minsize=scaled_tk_size(100))  # Origin
+        self.grid_columnconfigure(3, minsize=scaled_tk_size(70))  # Msgs
+        self.grid_columnconfigure(4, minsize=scaled_tk_size(140))  # Updated
 
         self.pack_propagate(False)
         self.grid_propagate(False)
@@ -222,7 +224,7 @@ class SessionListHeader(tk.Frame):
         self._create_headers()
 
     def _create_headers(self):
-        font = ("Segoe UI", 10, "bold")
+        font = get_tk_font(10, "bold")
 
         def create_header(text, col, sort_key, anchor="w", sticky="w"):
             # Determine indicator
@@ -239,11 +241,11 @@ class SessionListHeader(tk.Frame):
                 bg=self.colors.surface1,
                 fg=self.colors.fg,
                 anchor=anchor,
-                padx=5,
-                pady=6,
+                padx=scaled_tk_size(5),
+                pady=scaled_tk_size(6),
                 cursor="hand2",
             )
-            lbl.grid(row=0, column=col, sticky=sticky, padx=(10 if col == 0 else 0, 0))
+            lbl.grid(row=0, column=col, sticky=sticky, padx=(scaled_tk_size(10) if col == 0 else 0, 0))
 
             lbl.bind("<Button-1>", lambda e: self.on_sort(actual_sort_key) if self.on_sort else None)
             self.cells[actual_sort_key] = lbl

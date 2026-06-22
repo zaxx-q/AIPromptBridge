@@ -21,6 +21,7 @@ CustomTkinter Integration:
 - sync_ctk_appearance(): Sync appearance mode with config
 """
 
+import ctypes
 import sys
 from dataclasses import dataclass, field
 from typing import Dict, Optional
@@ -898,6 +899,95 @@ def get_ctk_font(size: int = 12, weight: str = "normal", family: str | None = No
 
     # Always return tuple - works with both tk and CTk, and is thread-safe
     return (family, size, weight)
+
+
+# =============================================================================
+# DPI Scaling for Raw Tk Widgets
+# =============================================================================
+
+_DPI_SCALING: Optional[float] = None
+
+
+def _detect_dpi_scaling() -> float:
+    """Detect the display DPI scaling factor (e.g., 1.0, 1.25, 1.5, 2.0).
+
+    When CustomTkinter is active, the process is DPI-aware and CTk handles its
+    own widget scaling.  Raw Tk widgets don't receive that scaling, so we need
+    to apply the same factor manually to their font sizes.
+
+    Without CTk, Windows handles DPI via virtualization and no manual scaling
+    is needed.
+    """
+    if sys.platform != "win32" or not HAVE_CTK:
+        return 1.0
+
+    try:
+        # GetScaleFactorForDevice(0) returns the primary display scale as a
+        # percentage: 100, 125, 150, 175, 200, etc.
+        scale_pct = ctypes.windll.shcore.GetScaleFactorForDevice(0)
+        if scale_pct and scale_pct > 0:
+            return scale_pct / 100.0
+    except (AttributeError, OSError, ValueError):
+        pass
+
+    try:
+        # Fallback: query logical DPI via GDI
+        hdc = ctypes.windll.user32.GetDC(0)
+        dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)  # LOGPIXELSX
+        ctypes.windll.user32.ReleaseDC(0, hdc)
+        if dpi and dpi > 0:
+            return dpi / 96.0
+    except (AttributeError, OSError, ValueError):
+        pass
+
+    return 1.0
+
+
+def get_dpi_scaling() -> float:
+    """Get the cached DPI scaling factor for the primary display.
+
+    Returns 1.0 when CTk is not active (Windows virtualizes DPI automatically).
+    """
+    global _DPI_SCALING
+    if _DPI_SCALING is None:
+        _DPI_SCALING = _detect_dpi_scaling()
+    return _DPI_SCALING
+
+
+def scaled_tk_size(size: int) -> int:
+    """Scale a font point size for raw tk widgets to match CTk's DPI scaling.
+
+    Use this when configuring font tuples for standard tk widgets
+    (tk.Label, tk.Text, tk.Checkbutton, etc.) that coexist with CTk widgets.
+    CTk widgets handle scaling internally and do NOT need this.
+    """
+    return round(size * get_dpi_scaling())
+
+
+def get_tk_font(size: int = 12, weight: str = "normal", family: str | None = None):
+    """Get a DPI-scaled font tuple for use with standard tk widgets.
+
+    Unlike ``get_ctk_font()`` (which returns unscaled sizes because CTk applies
+    scaling internally), this function pre-scales font sizes so raw tk widgets
+    match the visual size of CTk widgets on high-DPI displays.
+
+    Use ``get_tk_font()`` for: tk.Label, tk.Text, tk.Button, tk.Checkbutton, etc.
+    Use ``get_ctk_font()`` for: CTkLabel, CTkButton, CTkEntry, CTkTextbox, etc.
+
+    Returns:
+        Tuple font specification ``(family, scaled_size, weight)``
+    """
+    if family is None:
+        if sys.platform == "win32":
+            family = "Segoe UI"
+        elif sys.platform == "darwin":
+            family = "SF Pro Text"
+        else:
+            family = "DejaVu Sans"
+
+    if weight and weight != "normal":
+        return (family, scaled_tk_size(size), weight)
+    return (family, scaled_tk_size(size))
 
 
 def _adjust_hex_color(hex_color: str, factor: float) -> str:
