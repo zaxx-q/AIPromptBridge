@@ -365,6 +365,180 @@ def create_emoji_button(
         return btn
 
 
+class SplitButton:
+    """
+    A split button with a main action and a dropdown arrow for additional options.
+
+    The main button executes the default command. The small arrow button
+    opens a dropdown menu with alternative actions.
+
+    Supports both CustomTkinter and standard Tkinter fallback.
+    """
+
+    def __init__(
+        self,
+        parent,
+        text: str,
+        colors: ThemeColors,
+        command: Callable | None = None,
+        menu_items: list[tuple[str, Callable]] | None = None,
+        variant: str = "secondary",
+        width: int = 85,
+        height: int = 32,
+        font_size: int = 12,
+        corner_radius: int = 8,
+        **kwargs,
+    ):
+        """
+        Args:
+            parent: Parent widget
+            text: Main button text
+            colors: ThemeColors instance
+            command: Default action when main button is clicked
+            menu_items: List of (label, callback) tuples for dropdown menu.
+                        Use None as label for a separator: (None, None).
+            variant: Button color variant ("primary", "secondary", "success", etc.)
+            width: Width of the main button (arrow button is always ~28px)
+            height: Button height
+            font_size: Font size
+            corner_radius: Corner radius (CTk only)
+        """
+        self.colors = colors
+        self.command = command
+        self.menu_items = menu_items or []
+        self._arrow_btn = None
+
+        if HAVE_CTK:
+            self.frame = ctk.CTkFrame(parent, fg_color="transparent")
+            btn_colors = get_ctk_button_colors(colors, variant)
+
+            self.main_btn = ctk.CTkButton(
+                self.frame,
+                text=text,
+                font=get_ctk_font(size=font_size),
+                width=width,
+                height=height,
+                corner_radius=corner_radius,
+                command=self._on_main_click,
+                **btn_colors,
+                **kwargs,
+            )
+            self.main_btn.pack(side="left", padx=(0, 1))
+
+            self._arrow_btn = ctk.CTkButton(
+                self.frame,
+                text="▾",
+                font=get_ctk_font(size=font_size),
+                width=22,
+                height=height,
+                corner_radius=corner_radius,
+                command=self._show_menu,
+                **btn_colors,
+            )
+            self._arrow_btn.pack(side="left", padx=0)
+        else:
+            self.frame = tk.Frame(parent, bg=colors.bg)
+
+            # Map variant to colors for Tk fallback
+            bg_color = colors.surface0
+            fg_color = colors.fg
+            if variant == "primary":
+                bg_color = colors.accent
+                fg_color = colors.accent_fg
+            elif variant == "success":
+                bg_color = colors.accent_green
+                fg_color = colors.accent_fg
+            elif variant == "danger":
+                bg_color = colors.accent_red
+                fg_color = colors.accent_fg
+
+            self.main_btn = tk.Button(
+                self.frame,
+                text=text,
+                font=("Segoe UI", 10),
+                bg=bg_color,
+                fg=fg_color,
+                relief=tk.FLAT,
+                padx=10,
+                pady=6,
+                command=self._on_main_click,
+                cursor="hand2",
+            )
+            self.main_btn.pack(side=tk.LEFT, padx=(0, 0))
+
+            self._arrow_btn = tk.Button(
+                self.frame,
+                text="▾",
+                font=("Segoe UI", 9),
+                bg=bg_color,
+                fg=fg_color,
+                relief=tk.FLAT,
+                padx=2,
+                pady=6,
+                command=self._show_menu,
+                cursor="hand2",
+            )
+            self._arrow_btn.pack(side=tk.LEFT, padx=0)
+
+        # Build tk.Menu for dropdown
+        self._menu = tk.Menu(
+            self.frame,
+            tearoff=0,
+            bg=colors.surface0,
+            fg=colors.fg,
+            activebackground=colors.accent,
+            activeforeground=colors.accent_fg,
+            relief=tk.FLAT,
+            borderwidth=1,
+            font=("Segoe UI", 10),
+        )
+        for item in self.menu_items:
+            label, callback = item
+            if label is None:
+                self._menu.add_separator()
+            else:
+                self._menu.add_command(label=label, command=callback)
+
+    def _on_main_click(self):
+        """Execute the default command."""
+        if self.command:
+            self.command()
+
+    def _show_menu(self):
+        """Show the dropdown menu below the arrow button."""
+        if not self._arrow_btn:
+            return
+        try:
+            x = self._arrow_btn.winfo_rootx()
+            y = self._arrow_btn.winfo_rooty() + self._arrow_btn.winfo_height()
+            self._menu.post(x, y)
+        except tk.TclError:
+            pass
+
+    # Layout proxy methods
+    def pack(self, **kwargs):
+        self.frame.pack(**kwargs)
+
+    def grid(self, **kwargs):
+        self.frame.grid(**kwargs)
+
+    def place(self, **kwargs):
+        self.frame.place(**kwargs)
+
+    def pack_forget(self):
+        self.frame.pack_forget()
+
+    def configure(self, **kwargs):
+        """Forward configure to main button."""
+        if HAVE_CTK:
+            self.main_btn.configure(**kwargs)
+        else:
+            self.main_btn.configure(**kwargs)
+
+    def destroy(self):
+        self.frame.destroy()
+
+
 class ScrollableComboBox:
     """
     A searchable combobox with scrollable dropdown for handling many items.

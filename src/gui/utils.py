@@ -1251,6 +1251,314 @@ def _render_inline(
         _insert_with_latex_segments(text_widget, remaining, tags, enable_emojis)
 
 
+def markdown_to_html(text: str) -> str:
+    """
+    Convert markdown text to basic HTML for clipboard (CF_HTML).
+
+    Handles: headers, bold, italic, code, code blocks, bullet lists,
+    numbered lists, blockquotes, links, horizontal rules, paragraphs.
+    """
+    import html as html_module
+
+    lines = text.split("\n")
+    result = []
+    in_code_block = False
+    code_block_lines = []
+    code_lang = ""
+    in_list = False  # Track if we're inside a <ul> or <ol>
+    list_type = None  # "ul" or "ol"
+
+    def process_inline(line_text: str) -> str:
+        """Process inline markdown formatting."""
+        # Escape HTML entities first
+        t = html_module.escape(line_text)
+        # Bold+italic (***text*** or ___text___)
+        t = re.sub(r"\*\*\*(.+?)\*\*\*", r"<strong><em>\1</em></strong>", t)
+        t = re.sub(r"___(.+?)___", r"<strong><em>\1</em></strong>", t)
+        # Bold (**text** or __text__)
+        t = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
+        t = re.sub(r"__(.+?)__", r"<strong>\1</strong>", t)
+        # Italic (*text* or _text_)
+        t = re.sub(r"\*([^\*]+)\*", r"<em>\1</em>", t)
+        t = re.sub(r"(?<![a-zA-Z])_([^_]+)_(?![a-zA-Z])", r"<em>\1</em>", t)
+        # Strikethrough
+        t = re.sub(r"~~(.+?)~~", r"<s>\1</s>", t)
+        # Inline code
+        t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
+        # Links [text](url)
+        t = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', t)
+        return t
+
+    def close_list():
+        nonlocal in_list, list_type
+        if in_list:
+            result.append(f"</{list_type}>")
+            in_list = False
+            list_type = None
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Code block toggle
+        if stripped.startswith("```"):
+            if in_code_block:
+                # End code block
+                code_text = html_module.escape("\n".join(code_block_lines))
+                result.append(f"<pre><code>{code_text}</code></pre>")
+                code_block_lines = []
+                in_code_block = False
+            else:
+                close_list()
+                in_code_block = True
+                code_lang = stripped[3:].strip()
+            continue
+
+        if in_code_block:
+            code_block_lines.append(line)
+            continue
+
+        # Empty line
+        if not stripped:
+            close_list()
+            continue
+
+        # Headers
+        header_match = re.match(r"^(#{1,6})\s+(.+)$", stripped)
+        if header_match:
+            close_list()
+            level = len(header_match.group(1))
+            content = process_inline(header_match.group(2))
+            result.append(f"<h{level}>{content}</h{level}>")
+            continue
+
+        # Horizontal rule
+        if re.match(r"^[-*_]{3,}$", stripped):
+            close_list()
+            result.append("<hr>")
+            continue
+
+        # Blockquote
+        if stripped.startswith("> "):
+            close_list()
+            content = process_inline(stripped[2:])
+            result.append(f"<blockquote>{content}</blockquote>")
+            continue
+
+        # Bullet list
+        bullet_match = re.match(r"^[-*+]\s+(.+)$", stripped)
+        if bullet_match:
+            if not in_list or list_type != "ul":
+                close_list()
+                result.append("<ul>")
+                in_list = True
+                list_type = "ul"
+            content = process_inline(bullet_match.group(1))
+            result.append(f"<li>{content}</li>")
+            continue
+
+        # Numbered list
+        num_match = re.match(r"^\d+\.\s+(.+)$", stripped)
+        if num_match:
+            if not in_list or list_type != "ol":
+                close_list()
+                result.append("<ol>")
+                in_list = True
+                list_type = "ol"
+            content = process_inline(num_match.group(1))
+            result.append(f"<li>{content}</li>")
+            continue
+
+        # Regular paragraph
+        close_list()
+        content = process_inline(stripped)
+        result.append(f"<p>{content}</p>")
+
+    # Close any remaining open list
+    close_list()
+
+    # Close any unclosed code block
+    if in_code_block and code_block_lines:
+        import html as html_module
+
+        code_text = html_module.escape("\n".join(code_block_lines))
+        result.append(f"<pre><code>{code_text}</code></pre>")
+
+    return "\n".join(result)
+
+
+def copy_as_html_to_clipboard(markdown_text: str, root=None) -> bool:
+    """
+    Convert markdown to HTML and copy to clipboard as CF_HTML format.
+
+    This uses the Windows CF_HTML clipboard format which applications
+    like Microsoft Word recognize for rich text paste.
+
+    Falls back to plain HTML text copy on non-Windows or on failure.
+
+    Args:
+        markdown_text: Raw markdown text to convert and copy
+        root: Optional Tk root for fallback clipboard
+
+    Returns:
+        True if successful
+    """
+    html_body = markdown_to_html(markdown_text)
+
+    if sys.platform != "win32":
+        # Non-Windows: just copy the HTML as text
+        return copy_to_clipboard(html_body, root)
+
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32
+        user32 = ctypes.windll.user32
+
+        # Configure ctypes argtypes and restypes for 64-bit compatibility
+        kernel32.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+        kernel32.GlobalAlloc.restype = ctypes.c_void_p
+
+        kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalLock.restype = ctypes.c_void_p
+
+        kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalUnlock.restype = ctypes.c_bool
+
+        kernel32.GlobalFree.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalFree.restype = ctypes.c_void_p
+
+        user32.RegisterClipboardFormatW.argtypes = [ctypes.c_wchar_p]
+        user32.RegisterClipboardFormatW.restype = ctypes.c_uint
+
+        user32.OpenClipboard.argtypes = [ctypes.c_void_p]
+        user32.OpenClipboard.restype = ctypes.c_bool
+
+        user32.EmptyClipboard.argtypes = []
+        user32.EmptyClipboard.restype = ctypes.c_bool
+
+        user32.CloseClipboard.argtypes = []
+        user32.CloseClipboard.restype = ctypes.c_bool
+
+        user32.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+        user32.SetClipboardData.restype = ctypes.c_void_p
+
+        # Build CF_HTML payload with required header
+        # The header contains byte offsets that must be precise
+        html_template = (
+            "Version:0.9\r\n"
+            "StartHTML:{start_html:010d}\r\n"
+            "EndHTML:{end_html:010d}\r\n"
+            "StartFragment:{start_frag:010d}\r\n"
+            "EndFragment:{end_frag:010d}\r\n"
+            "<html><body>\r\n"
+            "<!--StartFragment-->"
+            "{fragment}"
+            "<!--EndFragment-->\r\n"
+            "</body></html>"
+        )
+
+        # Calculate header length first (with placeholder zeros)
+        dummy = html_template.format(start_html=0, end_html=0, start_frag=0, end_frag=0, fragment="")
+        header_len = len(dummy.split("<!--StartFragment-->")[0].encode("utf-8"))
+        # Actually we need to compute offsets on the final encoded string
+
+        prefix = "<html><body>\r\n<!--StartFragment-->"
+        suffix = "<!--EndFragment-->\r\n</body></html>"
+
+        # Build with placeholder header to measure
+        header_placeholder = (
+            "Version:0.9\r\n"
+            "StartHTML:0000000000\r\n"
+            "EndHTML:0000000000\r\n"
+            "StartFragment:0000000000\r\n"
+            "EndFragment:0000000000\r\n"
+        )
+
+        header_bytes = header_placeholder.encode("utf-8")
+        prefix_bytes = prefix.encode("utf-8")
+        fragment_bytes = html_body.encode("utf-8")
+        suffix_bytes = suffix.encode("utf-8")
+
+        start_html = len(header_bytes)
+        start_frag = start_html + len(prefix_bytes)
+        end_frag = start_frag + len(fragment_bytes)
+        end_html = end_frag + len(suffix_bytes)
+
+        header = (
+            "Version:0.9\r\n"
+            f"StartHTML:{start_html:010d}\r\n"
+            f"EndHTML:{end_html:010d}\r\n"
+            f"StartFragment:{start_frag:010d}\r\n"
+            f"EndFragment:{end_frag:010d}\r\n"
+        )
+
+        cf_html_data = header.encode("utf-8") + prefix_bytes + fragment_bytes + suffix_bytes
+
+        # Use Win32 API to set clipboard
+        CF_HTML = user32.RegisterClipboardFormatW("HTML Format")
+
+        GMEM_MOVEABLE = 0x0002
+
+        if not user32.OpenClipboard(0):
+            print("[CF_HTML Error] Failed to open clipboard.")
+            return copy_to_clipboard(html_body, root)
+
+        try:
+            user32.EmptyClipboard()
+
+            # Allocate global memory
+            size = len(cf_html_data) + 1  # +1 for null terminator
+            h_global = kernel32.GlobalAlloc(GMEM_MOVEABLE, size)
+            if not h_global:
+                print("[CF_HTML Error] GlobalAlloc failed.")
+                return False
+
+            # Lock and copy data
+            p_global = kernel32.GlobalLock(h_global)
+            if not p_global:
+                print("[CF_HTML Error] GlobalLock failed.")
+                kernel32.GlobalFree(h_global)
+                return False
+
+            ctypes.memmove(p_global, cf_html_data, len(cf_html_data))
+            # Null terminate
+            ctypes.memset(p_global + len(cf_html_data), 0, 1)
+            kernel32.GlobalUnlock(h_global)
+
+            # Set clipboard data
+            result = user32.SetClipboardData(CF_HTML, h_global)
+
+            # Also set plain text (CF_UNICODETEXT = 13) so Ctrl+V works everywhere
+            plain_text = markdown_text
+            text_bytes = plain_text.encode("utf-16-le") + b"\x00\x00"
+            h_text = kernel32.GlobalAlloc(GMEM_MOVEABLE, len(text_bytes))
+            if h_text:
+                p_text = kernel32.GlobalLock(h_text)
+                if p_text:
+                    ctypes.memmove(p_text, text_bytes, len(text_bytes))
+                    kernel32.GlobalUnlock(h_text)
+                    user32.SetClipboardData(13, h_text)  # 13 = CF_UNICODETEXT
+
+            return bool(result)
+
+        finally:
+            user32.CloseClipboard()
+
+    except Exception as e:
+        print(f"[CF_HTML Error] {e}")
+        # Fallback: copy HTML as plain text
+        return copy_to_clipboard(html_body, root)
+
+
+def copy_as_plaintext(markdown_text: str, root=None) -> bool:
+    """Copy markdown text as plain text (stripped of formatting) to clipboard."""
+    from ..utils import strip_markdown
+
+    plain = strip_markdown(markdown_text)
+    return copy_to_clipboard(plain, root)
+
+
 def hide_from_taskbar(window):
     """
     Remove the window from the taskbar on Windows.

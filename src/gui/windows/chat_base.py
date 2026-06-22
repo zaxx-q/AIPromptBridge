@@ -17,7 +17,7 @@ from typing import Dict, List, Optional
 from ...model_defaults import get_fallback_models
 from ...session_manager import add_session
 from ..core import get_next_window_id, register_window, unregister_window
-from ..custom_widgets import ScrollableComboBox
+from ..custom_widgets import ScrollableComboBox, SplitButton
 from ..emoji_renderer import prepare_emoji_content
 from ..platform import HAVE_CTK, ctk
 from ..themes import (
@@ -34,7 +34,14 @@ from ..themes import (
     scaled_tk_size,
     sync_ctk_appearance,
 )
-from ..utils import copy_to_clipboard, get_color_scheme, render_markdown, setup_text_tags
+from ..utils import (
+    copy_as_html_to_clipboard,
+    copy_as_plaintext,
+    copy_to_clipboard,
+    get_color_scheme,
+    render_markdown,
+    setup_text_tags,
+)
 from .utils import set_dark_titlebar, set_window_icon
 
 
@@ -966,27 +973,43 @@ class ChatWindowBase(ABC):
 
             sec_colors = get_ctk_button_colors(self.theme, "secondary")
 
-            ctk.CTkButton(
+            # Copy All split button
+            self._copy_all_btn = SplitButton(
                 btn_row,
                 text="Copy All",
-                font=get_ctk_font(size=12),
+                colors=self.theme,
+                command=self._copy_all,
+                menu_items=[
+                    ("Copy All as Markdown", self._copy_all),
+                    ("Copy All as Plaintext", self._copy_all_plaintext),
+                    ("Copy All as Rich Text (HTML)", self._copy_all_html),
+                ],
+                variant="secondary",
                 width=85,
                 height=32,
+                font_size=12,
                 corner_radius=8,
-                command=self._copy_all,
-                **sec_colors,
-            ).pack(side="left", padx=2)
+            )
+            self._copy_all_btn.pack(side="left", padx=2)
 
-            ctk.CTkButton(
+            # Copy Last split button
+            self._copy_last_btn = SplitButton(
                 btn_row,
                 text="Copy Last",
-                font=get_ctk_font(size=12),
+                colors=self.theme,
+                command=self._copy_last,
+                menu_items=[
+                    ("Copy Last as Markdown", self._copy_last),
+                    ("Copy Last as Plaintext", self._copy_last_plaintext),
+                    ("Copy Last as Rich Text (HTML)", self._copy_last_html),
+                ],
+                variant="secondary",
                 width=85,
                 height=32,
+                font_size=12,
                 corner_radius=8,
-                command=self._copy_last,
-                **sec_colors,
-            ).pack(side="left", padx=2)
+            )
+            self._copy_last_btn.pack(side="left", padx=2)
 
             ctk.CTkButton(
                 btn_row,
@@ -1036,20 +1059,50 @@ class ChatWindowBase(ABC):
             )
             self.regen_btn.pack(side=tk.LEFT, padx=2)
 
-            for text, cmd in [("Copy All", self._copy_all), ("Copy Last", self._copy_last), ("Close", self._close)]:
-                btn = tk.Button(
-                    btn_row,
-                    text=text,
-                    font=("Segoe UI", 10),
-                    bg=self.colors["button_bg"],
-                    fg=self.colors["fg"],
-                    relief=tk.FLAT,
-                    padx=10,
-                    pady=6,
-                    command=cmd,
-                    cursor="hand2",
-                )
-                btn.pack(side=tk.LEFT, padx=2)
+            # Copy All split button (Tk fallback)
+            self._copy_all_btn = SplitButton(
+                btn_row,
+                text="Copy All",
+                colors=self.theme,
+                command=self._copy_all,
+                menu_items=[
+                    ("Copy All as Markdown", self._copy_all),
+                    ("Copy All as Plaintext", self._copy_all_plaintext),
+                    ("Copy All as Rich Text (HTML)", self._copy_all_html),
+                ],
+                variant="secondary",
+            )
+            self._copy_all_btn.pack(side=tk.LEFT, padx=2)
+
+            # Copy Last split button (Tk fallback)
+            self._copy_last_btn = SplitButton(
+                btn_row,
+                text="Copy Last",
+                colors=self.theme,
+                command=self._copy_last,
+                menu_items=[
+                    ("Copy Last as Markdown", self._copy_last),
+                    ("Copy Last as Plaintext", self._copy_last_plaintext),
+                    ("Copy Last as Rich Text (HTML)", self._copy_last_html),
+                ],
+                variant="secondary",
+            )
+            self._copy_last_btn.pack(side=tk.LEFT, padx=2)
+
+            # Close button (stays as plain button)
+            btn = tk.Button(
+                btn_row,
+                text="Close",
+                font=("Segoe UI", 10),
+                bg=self.colors["button_bg"],
+                fg=self.colors["fg"],
+                relief=tk.FLAT,
+                padx=10,
+                pady=6,
+                command=self._close,
+                cursor="hand2",
+            )
+            btn.pack(side=tk.LEFT, padx=2)
 
             self.status_label = tk.Label(
                 btn_row, text="", font=("Segoe UI", 9), bg=self.colors["bg"], fg=self.colors["accent"]
@@ -1809,6 +1862,38 @@ class ChatWindowBase(ABC):
         text = self.last_response
         if copy_to_clipboard(text, self.root):
             self._update_status("✅ Copied last response!", self.theme.accent_green)
+        else:
+            self._update_status("✗ Failed to copy", self.theme.accent_red)
+
+    def _copy_all_plaintext(self):
+        """Copy all conversation as plaintext (markdown stripped)."""
+        text = self._get_conversation_text()
+        if copy_as_plaintext(text, self.root):
+            self._update_status("✅ Copied all as plaintext!", self.theme.accent_green)
+        else:
+            self._update_status("✗ Failed to copy", self.theme.accent_red)
+
+    def _copy_all_html(self):
+        """Copy all conversation as CF_HTML (rich text for Word)."""
+        text = self._get_conversation_text()
+        if copy_as_html_to_clipboard(text, self.root):
+            self._update_status("✅ Copied all as rich text!", self.theme.accent_green)
+        else:
+            self._update_status("✗ Failed to copy", self.theme.accent_red)
+
+    def _copy_last_plaintext(self):
+        """Copy last response as plaintext (markdown stripped)."""
+        text = self.last_response
+        if copy_as_plaintext(text, self.root):
+            self._update_status("✅ Copied last as plaintext!", self.theme.accent_green)
+        else:
+            self._update_status("✗ Failed to copy", self.theme.accent_red)
+
+    def _copy_last_html(self):
+        """Copy last response as CF_HTML (rich text for Word)."""
+        text = self.last_response
+        if copy_as_html_to_clipboard(text, self.root):
+            self._update_status("✅ Copied last as rich text!", self.theme.accent_green)
         else:
             self._update_status("✗ Failed to copy", self.theme.accent_red)
 
