@@ -367,10 +367,9 @@ def create_emoji_button(
 
 class SplitButton:
     """
-    A split button with a main action and a dropdown arrow for additional options.
-
-    The main button executes the default command. The small arrow button
-    opens a dropdown menu with alternative actions.
+    A unified split button that displays as a single rounded capsule.
+    Clicking the main text triggers the default command, while clicking the
+    dropdown arrow (on the rightmost 30 pixels) opens the dropdown menu.
 
     Supports both CustomTkinter and standard Tkinter fallback.
     """
@@ -398,7 +397,7 @@ class SplitButton:
             menu_items: List of (label, callback) tuples for dropdown menu.
                         Use None as label for a separator: (None, None).
             variant: Button color variant ("primary", "secondary", "success", etc.)
-            width: Width of the main button (arrow button is always ~28px)
+            width: Width of the main button (default width, expanded for arrow and separator)
             height: Button height
             font_size: Font size
             corner_radius: Corner radius (CTk only)
@@ -406,39 +405,30 @@ class SplitButton:
         self.colors = colors
         self.command = command
         self.menu_items = menu_items or []
-        self._arrow_btn = None
+
+        combined_width = width + 25
 
         if HAVE_CTK:
-            self.frame = ctk.CTkFrame(parent, fg_color="transparent")
             btn_colors = get_ctk_button_colors(colors, variant)
 
             self.main_btn = ctk.CTkButton(
-                self.frame,
-                text=text,
+                parent,
+                text=f"  {text}",
                 font=get_ctk_font(size=font_size),
-                width=width,
+                width=combined_width,
                 height=height,
                 corner_radius=corner_radius,
-                command=self._on_main_click,
+                command=self._on_click_wrapper,
+                anchor="w",
                 **btn_colors,
                 **kwargs,
             )
-            self.main_btn.pack(side="left", padx=(0, 1))
 
-            self._arrow_btn = ctk.CTkButton(
-                self.frame,
-                text="▾",
-                font=get_ctk_font(size=font_size),
-                width=22,
-                height=height,
-                corner_radius=corner_radius,
-                command=self._show_menu,
-                **btn_colors,
-            )
-            self._arrow_btn.pack(side="left", padx=0)
+            # Override the _draw method of CTkButton to render our custom line and arrow on its canvas.
+            self.original_draw = self.main_btn._draw
+            self.main_btn._draw = self._custom_draw
+            self.main_btn._draw()
         else:
-            self.frame = tk.Frame(parent, bg=colors.bg)
-
             # Map variant to colors for Tk fallback
             bg_color = colors.surface0
             fg_color = colors.fg
@@ -453,36 +443,21 @@ class SplitButton:
                 fg_color = colors.accent_fg
 
             self.main_btn = tk.Button(
-                self.frame,
-                text=text,
+                parent,
+                text=f"  {text}  │  ▼",
                 font=("Segoe UI", 10),
                 bg=bg_color,
                 fg=fg_color,
                 relief=tk.FLAT,
                 padx=10,
                 pady=6,
-                command=self._on_main_click,
+                command=self._on_click_wrapper,
                 cursor="hand2",
             )
-            self.main_btn.pack(side=tk.LEFT, padx=(0, 0))
-
-            self._arrow_btn = tk.Button(
-                self.frame,
-                text="▾",
-                font=("Segoe UI", 9),
-                bg=bg_color,
-                fg=fg_color,
-                relief=tk.FLAT,
-                padx=2,
-                pady=6,
-                command=self._show_menu,
-                cursor="hand2",
-            )
-            self._arrow_btn.pack(side=tk.LEFT, padx=0)
 
         # Build tk.Menu for dropdown
         self._menu = tk.Menu(
-            self.frame,
+            self.main_btn,
             tearoff=0,
             bg=colors.surface0,
             fg=colors.fg,
@@ -499,44 +474,96 @@ class SplitButton:
             else:
                 self._menu.add_command(label=label, command=callback)
 
+    def _custom_draw(self, *args, **kwargs):
+        """Draw the default CTkButton elements, then overlay the divider column and arrow."""
+        if not hasattr(self, "main_btn") or not self.main_btn:
+            return
+
+        self.original_draw(*args, **kwargs)
+
+        btn = self.main_btn
+        try:
+            btn._canvas.delete("custom_split")
+
+            scale = btn._get_widget_scaling()
+            w = btn._current_width
+            h = btn._current_height
+            scaled_w = w * scale
+            scaled_h = h * scale
+
+            sep_x = scaled_w - (30 * scale)
+            text_color = btn._apply_appearance_mode(btn._text_color)
+
+            # Draw vertical divider line
+            btn._canvas.create_line(
+                sep_x, 6 * scale, sep_x, (h - 6) * scale, fill=text_color, width=1, tags="custom_split"
+            )
+
+            # Draw prominent arrow ▼
+            btn._canvas.create_text(
+                sep_x + (15 * scale),
+                scaled_h / 2,
+                text="▼",
+                font=("Segoe UI", 10, "bold"),
+                fill=text_color,
+                anchor="center",
+                tags="custom_split",
+            )
+        except Exception:
+            pass
+
+    def _on_click_wrapper(self):
+        """Determine whether click was on the right arrow or the main body."""
+        btn = self.main_btn
+        try:
+            x = btn.winfo_pointerx() - btn.winfo_rootx()
+            y = btn.winfo_pointery() - btn.winfo_rooty()
+            w = btn.winfo_width()
+            h = btn.winfo_height()
+
+            # If click was in the rightmost 30 pixels, trigger dropdown
+            # Check boundaries of the widget to ensure it wasn't a keyboard trigger (e.g. Enter/Space)
+            if 0 <= x <= w and 0 <= y <= h and x > w - 30:
+                self._show_menu()
+            else:
+                self._on_main_click()
+        except Exception:
+            # Fallback to main action in case of any issues with pointer querying
+            self._on_main_click()
+
     def _on_main_click(self):
         """Execute the default command."""
         if self.command:
             self.command()
 
     def _show_menu(self):
-        """Show the dropdown menu below the arrow button."""
-        if not self._arrow_btn:
-            return
+        """Show the dropdown menu below the rightmost portion of the button."""
         try:
-            x = self._arrow_btn.winfo_rootx()
-            y = self._arrow_btn.winfo_rooty() + self._arrow_btn.winfo_height()
+            # Post menu directly under the right-side arrow index
+            x = self.main_btn.winfo_rootx() + self.main_btn.winfo_width() - 110
+            y = self.main_btn.winfo_rooty() + self.main_btn.winfo_height()
             self._menu.post(x, y)
         except tk.TclError:
             pass
 
-    # Layout proxy methods
+    # Layout proxy methods forwarding directly to the main button
     def pack(self, **kwargs):
-        self.frame.pack(**kwargs)
+        self.main_btn.pack(**kwargs)
 
     def grid(self, **kwargs):
-        self.frame.grid(**kwargs)
+        self.main_btn.grid(**kwargs)
 
     def place(self, **kwargs):
-        self.frame.place(**kwargs)
+        self.main_btn.place(**kwargs)
 
     def pack_forget(self):
-        self.frame.pack_forget()
+        self.main_btn.pack_forget()
 
     def configure(self, **kwargs):
-        """Forward configure to main button."""
-        if HAVE_CTK:
-            self.main_btn.configure(**kwargs)
-        else:
-            self.main_btn.configure(**kwargs)
+        self.main_btn.configure(**kwargs)
 
     def destroy(self):
-        self.frame.destroy()
+        self.main_btn.destroy()
 
 
 class ScrollableComboBox:
