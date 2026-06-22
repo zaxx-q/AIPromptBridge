@@ -757,6 +757,8 @@ class ChatWindowBase(ABC):
 
         # Right-click context menu for message editing
         self.chat_text.bind("<Button-3>", self._on_chat_right_click)
+        # Clean up copied text by stripping visual indentation prefix
+        self.chat_text.bind("<<Copy>>", self._on_chat_copy)
 
     def _create_input_area(self):
         """Create the message input area with attachment button."""
@@ -1809,6 +1811,26 @@ class ChatWindowBase(ABC):
             self._update_status("✅ Copied last response!", self.theme.accent_green)
         else:
             self._update_status("✗ Failed to copy", self.theme.accent_red)
+
+    def _on_chat_copy(self, event=None):
+        """Strip visual indentation (line_prefix) from copied chat text.
+
+        The chat display prepends 2-space line_prefix to every content line
+        for visual indentation. This handler removes those spaces so copied
+        text is clean when pasted elsewhere.
+        """
+        try:
+            if not self.chat_text.tag_ranges("sel"):
+                return  # No selection
+            selected = self.chat_text.get("sel.first", "sel.last")
+            # Strip the 2-space line_prefix used for visual indentation
+            lines = selected.split("\n")
+            cleaned = "\n".join(line[2:] if line.startswith("  ") else line for line in lines)
+            if copy_to_clipboard(cleaned, self.root):
+                self._update_status("✅ Copied!", self.theme.accent_green)
+            return "break"  # Prevent default copy
+        except Exception:
+            return None  # Fall through to default
 
     # =========================================================================
     # Regenerate Response
