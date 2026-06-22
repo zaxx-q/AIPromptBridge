@@ -1267,6 +1267,8 @@ def markdown_to_html(text: str) -> str:
     code_lang = ""
     in_list = False  # Track if we're inside a <ul> or <ol>
     list_type = None  # "ul" or "ol"
+    in_table = False
+    table_rows = []
 
     def process_inline(line_text: str) -> str:
         """Process inline markdown formatting."""
@@ -1296,11 +1298,74 @@ def markdown_to_html(text: str) -> str:
             in_list = False
             list_type = None
 
+    def close_table():
+        nonlocal in_table, table_rows
+        if not in_table:
+            return
+
+        html_rows = []
+        has_separator = False
+        header_row_index = -1
+
+        for i, row in enumerate(table_rows):
+            clean_row = row.strip()
+            if re.match(r"^\|(?:\s*:?-+:?\s*\|)+$", clean_row):
+                has_separator = True
+                header_row_index = i - 1
+                break
+
+        html_rows.append(
+            '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; margin: 10px 0;">'
+        )
+
+        thead_written = False
+        tbody_open = False
+
+        for i, row in enumerate(table_rows):
+            clean_row = row.strip()
+            if has_separator and re.match(r"^\|(?:\s*:?-+:?\s*\|)+$", clean_row):
+                continue
+
+            cols = [c.strip() for c in clean_row.split("|")[1:-1]]
+            is_header = has_separator and i == header_row_index
+
+            row_html = []
+            row_html.append("  <tr>")
+            for col in cols:
+                processed_val = process_inline(col)
+                if is_header:
+                    row_html.append(f"    <th>{processed_val}</th>")
+                else:
+                    row_html.append(f"    <td>{processed_val}</td>")
+            row_html.append("  </tr>")
+
+            if is_header:
+                html_rows.append("<thead>")
+                html_rows.extend(row_html)
+                html_rows.append("</thead>")
+                thead_written = True
+            else:
+                if not tbody_open:
+                    if thead_written:
+                        html_rows.append("<tbody>")
+                    tbody_open = True
+                html_rows.extend(row_html)
+
+        if tbody_open:
+            html_rows.append("</tbody>")
+
+        html_rows.append("</table>")
+        result.append("\n".join(html_rows))
+
+        in_table = False
+        table_rows = []
+
     for line in lines:
         stripped = line.strip()
 
         # Code block toggle
         if stripped.startswith("```"):
+            close_table()
             if in_code_block:
                 # End code block
                 code_text = html_module.escape("\n".join(code_block_lines))
@@ -1317,14 +1382,25 @@ def markdown_to_html(text: str) -> str:
             code_block_lines.append(line)
             continue
 
+        # Table row match
+        if stripped.startswith("|") and stripped.endswith("|"):
+            close_list()
+            if not in_table:
+                in_table = True
+                table_rows = []
+            table_rows.append(stripped)
+            continue
+
         # Empty line
         if not stripped:
+            close_table()
             close_list()
             continue
 
         # Headers
         header_match = re.match(r"^(#{1,6})\s+(.+)$", stripped)
         if header_match:
+            close_table()
             close_list()
             level = len(header_match.group(1))
             content = process_inline(header_match.group(2))
@@ -1333,12 +1409,14 @@ def markdown_to_html(text: str) -> str:
 
         # Horizontal rule
         if re.match(r"^[-*_]{3,}$", stripped):
+            close_table()
             close_list()
             result.append("<hr>")
             continue
 
         # Blockquote
         if stripped.startswith("> "):
+            close_table()
             close_list()
             content = process_inline(stripped[2:])
             result.append(f"<blockquote>{content}</blockquote>")
@@ -1347,6 +1425,7 @@ def markdown_to_html(text: str) -> str:
         # Bullet list
         bullet_match = re.match(r"^[-*+]\s+(.+)$", stripped)
         if bullet_match:
+            close_table()
             if not in_list or list_type != "ul":
                 close_list()
                 result.append("<ul>")
@@ -1359,6 +1438,7 @@ def markdown_to_html(text: str) -> str:
         # Numbered list
         num_match = re.match(r"^\d+\.\s+(.+)$", stripped)
         if num_match:
+            close_table()
             if not in_list or list_type != "ol":
                 close_list()
                 result.append("<ol>")
@@ -1369,9 +1449,13 @@ def markdown_to_html(text: str) -> str:
             continue
 
         # Regular paragraph
+        close_table()
         close_list()
         content = process_inline(stripped)
         result.append(f"<p>{content}</p>")
+
+    # Close any remaining open table
+    close_table()
 
     # Close any remaining open list
     close_list()

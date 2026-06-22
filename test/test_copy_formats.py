@@ -34,3 +34,24 @@ def test_strip_markdown():
     text = "# Header\nThis is **bold** text."
     expected = "Header\nThis is bold text."
     assert strip_markdown(text) == expected
+
+
+def test_markdown_to_html_table():
+    text = "| Header 1 | Header 2 |\n|---|---|\n| Cell 1 | Cell 2 |"
+    expected = (
+        '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; margin: 10px 0;">\n'
+        "<thead>\n"
+        "  <tr>\n"
+        "    <th>Header 1</th>\n"
+        "    <th>Header 2</th>\n"
+        "  </tr>\n"
+        "</thead>\n"
+        "<tbody>\n"
+        "  <tr>\n"
+        "    <td>Cell 1</td>\n"
+        "    <td>Cell 2</td>\n"
+        "  </tr>\n"
+        "</tbody>\n"
+        "</table>"
+    )
+    assert markdown_to_html(text) == expected

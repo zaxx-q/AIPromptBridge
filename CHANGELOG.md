@@ -1,8 +1,25 @@
 # Changelog
 
+## [7.2.0] - 2026-06-23
+
+### New Features
+
+- **Split Copy Buttons**: Replaced the standard chat copy buttons with dropdown split buttons, allowing users to copy all conversation history or the last response as Markdown, stripped plaintext, or rich-text HTML.
+- **Markdown Table Clipboard Support**: Added support for converting Markdown tables to HTML format when copying messages as rich text, allowing them to render with correct borders and structure when pasted into external applications like Microsoft Word.
+
+### Improvements
+
+- **Unified Split Button Design**: Enhanced the CustomTkinter split buttons to render as single rounded capsules, drawing the separator and dropdown arrow directly on the button's canvas.
+- **Standard Tkinter DPI Scaling**: Implemented a system to scale standard Tkinter font sizes, row heights, and layout margins on high-DPI displays, resolving misalignment, text overlap, and cropping issues across fallback widgets.
+
+### Fixes
+
+- **Visual Chat Indentation**: Fixed copied text retaining visual layout padding by stripping styling leading spaces from manually copied sections.
+
 ## [7.1.1] - 2026-06-16
 
 ### Improvements
+
 - **Non-Streaming Abort Support**: Added support for the escape hotkey and typing indicator to cancel non-streaming replace/typing operations in both the Text Edit Tool and Screen Snipping Tool (Type mode).
 - **Typing Delay Defaults**: Default streaming typing delay is now set to 0ms (no limit) for maximum speed, and the separate "uncapped" speed toggle has been deprecated. The settings spinbox range is simplified to [0, 100] ms.
 - **Update Dialog**: Replaced the static, truncated 5-line changelog in the Update Available dialog with a themed, scrollable text box showing the full release notes. Also updated the layout and added Github button.
