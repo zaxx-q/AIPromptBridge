@@ -15,6 +15,10 @@ import threading
 import time
 from typing import Dict, Optional
 
+from ..platform import is_linux
+from ..platform.clipboard import copy_text as platform_copy_text
+from ..platform.clipboard import paste_text as platform_paste_text
+from ..platform.input import type_text as platform_type_text
 from .hotkey import HotkeyListener
 from .prompts import get_prompts_config
 from .text_handler import TextHandler
@@ -544,9 +548,13 @@ class TextEditToolApp:
     def _type_text_chunk(self, text: str) -> bool:
         """
         Insert text chunk using keyboard typing with rate limiting.
-        Used for STREAMING mode only - types character by character.
+        Used for STREAMING mode only.
+
+        **Windows:** pynput character-by-character typing.
+        **Linux:** chunked ``wlrctl keyboard type`` (no per-character subprocess spam).
+
         Avoids clipboard to prevent filling clipboard managers.
-        Uses configurable delay between characters for stability.
+        Uses configurable delay (per character on Windows; between chunks on Linux).
 
         Newlines are sent as Shift+Enter to avoid triggering form submissions
         in applications like chat inputs, Discord, etc.
@@ -557,6 +565,19 @@ class TextEditToolApp:
         Returns:
             True if successful, False if aborted
         """
+        if is_linux():
+            try:
+                # delay_ms is approximate on Linux (applied between wlrctl chunks).
+                # Abort is honored between internal type units (chunks / newlines).
+                return platform_type_text(
+                    text,
+                    delay_ms=int(self.typing_delay_ms or 0),
+                    abort_check=lambda: self.streaming_aborted,
+                )
+            except Exception as e:
+                logging.error(f"Error typing text chunk (Linux/wlrctl): {e}")
+                return False
+
         import time
 
         from pynput import keyboard as pykeyboard
@@ -607,18 +628,56 @@ class TextEditToolApp:
         This is faster than character-by-character typing and provides
         a better user experience when streaming is disabled.
 
+        **Windows:** pyperclip + SendInput Ctrl+V.
+        **Linux:** wl-copy + wlrctl Ctrl+V (no Win32 SendInput).
+
         Args:
             text: The text to paste
 
         Returns:
             True if successful, False otherwise
         """
-        import time
-
-        import pyperclip
-
         if not text:
             return False
+
+        if is_linux():
+            try:
+                clipboard_backup = platform_paste_text(primary=False)
+            except Exception:
+                clipboard_backup = ""
+
+            try:
+                cleaned_text = text.rstrip("\n")
+                if not platform_copy_text(cleaned_text):
+                    logging.error("Linux instant paste: failed to set clipboard")
+                    return False
+
+                time.sleep(0.05)
+                if not self.text_handler._send_paste_keystroke():
+                    logging.error("Linux instant paste: wlrctl Ctrl+V failed")
+                    try:
+                        platform_copy_text(clipboard_backup)
+                    except Exception:
+                        pass
+                    return False
+
+                time.sleep(0.1)
+                try:
+                    platform_copy_text(clipboard_backup)
+                except Exception:
+                    pass
+
+                logging.debug(f"Pasted {len(cleaned_text)} chars instantly (Linux)")
+                return True
+            except Exception as e:
+                logging.error(f"Error pasting text (Linux): {e}")
+                try:
+                    platform_copy_text(clipboard_backup)
+                except Exception:
+                    pass
+                return False
+
+        import pyperclip
 
         # Backup current clipboard
         try:

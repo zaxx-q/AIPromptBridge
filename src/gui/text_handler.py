@@ -17,6 +17,11 @@ from pynput import keyboard as pykeyboard
 from ..platform import is_linux, is_windows
 from ..platform.clipboard import copy_text as platform_copy_text
 from ..platform.clipboard import get_selected_text_wayland
+from ..platform.clipboard import paste_text as platform_paste_text
+from ..platform.input import (
+    copy_via_clipboard_shortcut,
+    paste_via_clipboard_shortcut,
+)
 
 # --- Win32 SendInput structures (module-level to avoid repeated class definitions) ---
 # Defined only for type/layout use on Windows; never touch windll on non-Windows.
@@ -105,9 +110,11 @@ class TextHandler:
         logging.debug("TextHandler initialized")
 
     @staticmethod
-    def _send_copy_keystroke():
+    def _send_copy_keystroke() -> bool:
         """
-        Send a copy command using two parallel strategies (no delays):
+        Send a copy command (Ctrl+C / WM_COPY).
+
+        **Windows:** two parallel strategies (no delays):
 
         1. **WM_COPY** window message → tells the focused control to copy
            its selection directly, completely bypassing keyboard state.
@@ -120,11 +127,20 @@ class TextHandler:
         Both fire instantly.  Whichever the target app responds to first
         triggers the clipboard change detected by get_selected_text().
 
-        Windows-only — Linux selection uses primary selection (Phase 2).
+        **Linux:** ``wlrctl`` virtual-keyboard Ctrl+C (optional hybrid capture).
+
+        Returns:
+            True if the platform reported a successful inject (best-effort).
         """
+        if is_linux():
+            ok = copy_via_clipboard_shortcut()
+            if not ok:
+                logging.debug("_send_copy_keystroke: wlrctl Ctrl+C failed or unavailable")
+            return ok
+
         if not is_windows():
-            logging.debug("_send_copy_keystroke skipped (non-Windows)")
-            return
+            logging.debug("_send_copy_keystroke skipped (unsupported platform)")
+            return False
 
         user32 = ctypes.windll.user32
 
@@ -173,21 +189,30 @@ class TextHandler:
             logging.warning(f"SendInput: only {sent}/{n} events were injected")
 
         logging.debug(f"SendInput copy: ctrl_held={ctrl_held}, {sent}/{n} events sent")
+        return sent == n
 
     @staticmethod
-    def _send_paste_keystroke():
+    def _send_paste_keystroke() -> bool:
         """
-        Send a Ctrl+V paste command using Win32 SendInput with virtual key codes.
+        Send a Ctrl+V paste command.
 
-        Uses VK codes instead of character-based presses to avoid issues with
-        Caps Lock being on or non-English keyboard layouts (which can cause
-        pynput's keyboard.press('v') to send the wrong character).
+        **Windows:** Win32 SendInput with virtual key codes (avoids Caps Lock /
+        layout issues that can make pynput send the wrong character).
 
-        Windows-only — Linux paste injection needs Phase 3 (wlrctl).
+        **Linux:** ``wlrctl`` virtual-keyboard Ctrl+V.
+
+        Returns:
+            True if the platform reported a successful inject (best-effort).
         """
+        if is_linux():
+            ok = paste_via_clipboard_shortcut()
+            if not ok:
+                logging.debug("_send_paste_keystroke: wlrctl Ctrl+V failed or unavailable")
+            return ok
+
         if not is_windows():
-            logging.debug("_send_paste_keystroke skipped (non-Windows)")
-            return
+            logging.debug("_send_paste_keystroke skipped (unsupported platform)")
+            return False
 
         user32 = ctypes.windll.user32
 
@@ -217,6 +242,7 @@ class TextHandler:
             logging.warning(f"SendInput paste: only {sent}/{n} events were injected")
 
         logging.debug(f"SendInput paste: ctrl_held={ctrl_held}, {sent}/{n} events sent")
+        return sent == n
 
     def get_selected_text(self, sleep_duration: float = 0.01, max_wait: float = 0.4) -> str:
         """
@@ -224,7 +250,7 @@ class TextHandler:
 
         **Linux/Wayland:** reads primary selection first (mouse highlight), then
         falls back to a read-only clipboard paste. Does **not** inject Ctrl+C
-        (that requires Phase 3 input backend).
+        (hybrid primary→Ctrl+C capture is optional/later; paste inject uses wlrctl).
 
         **Windows:** uses clipboard sequence number + SendInput Ctrl+C, then
         restores the previous clipboard content.
@@ -430,8 +456,8 @@ class TextHandler:
         Replace the currently selected text with new text.
 
         **Windows:** clipboard + SendInput Ctrl+V, then restore clipboard.
-        **Linux:** sets the clipboard only and returns False — paste key
-        injection requires Phase 3 (wlrctl). Explicit failure avoids half-broken replace.
+        **Linux:** platform clipboard (wl-copy) + wlrctl Ctrl+V, then restore
+        clipboard best-effort. Returns True only when paste injection succeeds.
 
         Args:
             new_text: The text to paste
@@ -444,19 +470,54 @@ class TextHandler:
 
         if is_linux():
             cleaned = new_text.rstrip("\n")
-            ok = platform_copy_text(cleaned)
-            if ok:
-                logging.info(
-                    "Linux replace_selected_text: text placed on clipboard, but paste "
-                    "key injection is not implemented yet (needs Phase 3 input backend). "
-                    "Returning False."
-                )
-            else:
-                logging.warning(
-                    "Linux replace_selected_text: failed to set clipboard "
-                    "(wl-clipboard missing or error); paste injection also unavailable (Phase 3)."
-                )
-            return False
+            # Backup current clipboard (best-effort; may be empty)
+            try:
+                clipboard_backup = platform_paste_text(primary=False)
+            except Exception:
+                clipboard_backup = ""
+
+            try:
+                if not platform_copy_text(cleaned):
+                    logging.warning(
+                        "Linux replace_selected_text: failed to set clipboard "
+                        "(wl-clipboard missing or error)"
+                    )
+                    return False
+
+                # Brief settle for compositor clipboard sync
+                time.sleep(0.08)
+                if not self._send_paste_keystroke():
+                    logging.warning(
+                        "Linux replace_selected_text: clipboard set but paste key "
+                        "injection failed (is wlrctl installed and the target focused?)"
+                    )
+                    # Still try to restore clipboard
+                    try:
+                        if clipboard_backup is not None:
+                            platform_copy_text(clipboard_backup)
+                    except Exception:
+                        pass
+                    return False
+
+                time.sleep(0.1)
+
+                # Restore previous clipboard best-effort
+                try:
+                    if clipboard_backup is not None:
+                        platform_copy_text(clipboard_backup)
+                except Exception as e:
+                    logging.debug(f"Linux replace: clipboard restore failed: {e}")
+
+                logging.debug("Linux text replaced successfully via clipboard + wlrctl")
+                return True
+            except Exception as e:
+                logging.error(f"Linux replace_selected_text failed: {e}")
+                try:
+                    if clipboard_backup is not None:
+                        platform_copy_text(clipboard_backup)
+                except Exception:
+                    pass
+                return False
 
         if pyperclip is None:
             logging.error("pyperclip is required for replace_selected_text on Windows")
