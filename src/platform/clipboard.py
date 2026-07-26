@@ -14,6 +14,7 @@ import logging
 import shutil
 import subprocess
 import threading
+import time
 from typing import Optional
 
 from .detect import is_linux
@@ -23,6 +24,12 @@ logger = logging.getLogger(__name__)
 # Subprocess timeouts — never hang forever waiting on a compositor.
 _DEFAULT_TIMEOUT = 3.0
 _LIST_TYPES_TIMEOUT = 2.0
+
+# Hybrid Ctrl+C capture defaults (keyboard selection without primary)
+_HYBRID_DEFAULT_TIMEOUT = 0.4
+_HYBRID_POLL_INTERVAL = 0.01
+_HYBRID_SLOW_TIMEOUT = 1.2
+_HYBRID_RESEND_AFTER = 0.4
 
 # MIME defaults
 _TEXT_MIME = "text/plain;charset=utf-8"
@@ -34,6 +41,8 @@ _wl_paste_path: Optional[str] = None
 _availability_checked = False
 _availability_lock = threading.Lock()
 _missing_warned = False
+_hybrid_wlrctl_missing_warned = False
+_hybrid_fail_warned = False
 
 
 def _refresh_binary_cache() -> None:
@@ -274,6 +283,142 @@ def get_selected_text_wayland() -> str:
         return clipboard
 
     return ""
+
+
+def _capture_via_ctrl_c(
+    *,
+    timeout: float = _HYBRID_DEFAULT_TIMEOUT,
+    poll_interval: float = _HYBRID_POLL_INTERVAL,
+    resend_after: Optional[float] = None,
+) -> str:
+    """
+    Inject Ctrl+C, poll clipboard for new text, restore previous clipboard.
+
+    Always restores the pre-capture clipboard best-effort in ``finally``.
+    Returns captured text or empty string. Does not re-check primary.
+    """
+    # Local import avoids any risk of circular imports at module load.
+    from .input import copy_via_clipboard_shortcut, is_wlrctl_available
+
+    global _hybrid_wlrctl_missing_warned, _hybrid_fail_warned
+
+    if not is_wlrctl_available():
+        if not _hybrid_wlrctl_missing_warned:
+            _hybrid_wlrctl_missing_warned = True
+            logger.info(
+                "No primary selection; Ctrl+C inject unavailable — install wlrctl "
+                "for keyboard-selection capture (wlroots compositors such as niri)."
+            )
+        return ""
+
+    # Snapshot current clipboard so we can restore after hijacking it for capture.
+    try:
+        backup = paste_text(primary=False)
+    except Exception:
+        backup = ""
+
+    # Baseline used to detect whether Ctrl+C actually changed the clipboard.
+    # Empty backup: any non-empty paste is a success. Non-empty backup: require
+    # content different from backup (and non-empty after strip).
+    captured = ""
+    try:
+        if not copy_via_clipboard_shortcut():
+            if not _hybrid_fail_warned:
+                _hybrid_fail_warned = True
+                logger.info(
+                    "No primary selection; Ctrl+C inject failed — install wlrctl "
+                    "and focus the target app for keyboard-selection capture."
+                )
+            return ""
+
+        start = time.time()
+        resent = False
+        while (time.time() - start) < timeout:
+            try:
+                current = paste_text(primary=False)
+            except Exception:
+                current = ""
+
+            if current and current.strip():
+                # Accept if clipboard was empty before, or content changed.
+                if not backup or current != backup:
+                    captured = current
+                    break
+
+            if (
+                resend_after is not None
+                and not resent
+                and (time.time() - start) >= resend_after
+            ):
+                resent = True
+                logger.debug("Hybrid capture: re-sending Ctrl+C for slow app")
+                try:
+                    copy_via_clipboard_shortcut()
+                except Exception:
+                    pass
+
+            time.sleep(max(0.001, poll_interval))
+
+        if not captured and not _hybrid_fail_warned:
+            _hybrid_fail_warned = True
+            logger.info(
+                "No primary selection; Ctrl+C inject produced no clipboard text — "
+                "focus the target app, or select text with the mouse (primary)."
+            )
+        return captured
+    except Exception as e:
+        logger.debug("Hybrid Ctrl+C capture failed: %s", e)
+        return ""
+    finally:
+        # Always restore best-effort so we do not leave the user's clipboard polluted.
+        try:
+            copy_text(backup if backup is not None else "")
+        except Exception as e:
+            logger.debug("Hybrid capture: clipboard restore failed: %s", e)
+
+
+def capture_selection_hybrid(
+    *,
+    timeout: float = _HYBRID_DEFAULT_TIMEOUT,
+    poll_interval: float = _HYBRID_POLL_INTERVAL,
+    allow_ctrl_c: bool = True,
+    resend_after: Optional[float] = None,
+) -> str:
+    """
+    Capture selected text on Wayland with optional Ctrl+C hybrid fallback.
+
+    Order:
+      1. Primary selection (mouse highlight — no clipboard pollution).
+      2. Read-only clipboard (user may already have copied).
+      3. If still empty and ``allow_ctrl_c``: backup clipboard → wlrctl Ctrl+C →
+         poll clipboard until change/timeout → restore backup → return text.
+
+    Args:
+        timeout: Max seconds to wait for clipboard after Ctrl+C.
+        poll_interval: Sleep between clipboard polls.
+        allow_ctrl_c: When False, only steps 1–2 (same as get_selected_text_wayland).
+        resend_after: If set, re-send Ctrl+C once after this many seconds of polling
+            (slow-app retry). Only applies to the Ctrl+C path.
+
+    Returns:
+        Captured text, or empty string.
+    """
+    if not is_linux():
+        return ""
+
+    # Prefer primary / existing clipboard — never inject when already have text.
+    existing = get_selected_text_wayland()
+    if existing and existing.strip():
+        return existing
+
+    if not allow_ctrl_c:
+        return ""
+
+    return _capture_via_ctrl_c(
+        timeout=timeout,
+        poll_interval=poll_interval,
+        resend_after=resend_after,
+    )
 
 
 def paste_image_png(*, primary: bool = False) -> bytes:

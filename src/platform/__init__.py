@@ -5,6 +5,7 @@ Intentionally free of GUI / audio / provider imports.
 """
 
 from .clipboard import (
+    capture_selection_hybrid,
     copy_bytes,
     copy_text,
     get_selected_text_wayland,
@@ -51,6 +52,7 @@ __all__ = [
     "capture_full_screen",
     "capture_output",
     "capture_region_interactive",
+    "capture_selection_hybrid",
     "copy_bytes",
     "copy_text",
     "copy_via_clipboard_shortcut",

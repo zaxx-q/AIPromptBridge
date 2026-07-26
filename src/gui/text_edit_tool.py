@@ -118,7 +118,27 @@ class TextEditToolApp:
         if self.hotkey_listener.is_running():
             print(f"  ✅ TextEditTool: Hotkey '{self.hotkey}' registered")
         else:
-            print("  ✅ TextEditTool: Ready (trigger via: --trigger textedit)")
+            # Linux IPC path — surface capture capabilities once at start
+            caps = "trigger via: --trigger textedit"
+            if is_linux():
+                try:
+                    from ..platform.clipboard import is_wl_clipboard_available
+                    from ..platform.input import is_wlrctl_available
+
+                    parts = []
+                    if is_wl_clipboard_available():
+                        parts.append("primary/clipboard")
+                    else:
+                        parts.append("wl-clipboard missing")
+                    if is_wlrctl_available():
+                        parts.append("hybrid Ctrl+C")
+                    else:
+                        parts.append("wlrctl missing (keyboard select limited)")
+                    if parts:
+                        caps = f"{'; '.join(parts)}; {caps}"
+                except Exception:
+                    pass
+            print(f"  ✅ TextEditTool: Ready ({caps})")
 
     def stop(self):
         """Stop the TextEditTool application."""

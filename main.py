@@ -505,16 +505,23 @@ Examples:
   python main.py --no-wt          Skip Windows Terminal auto-detection
   python main.py --trigger snip   Linux: invoke tool on the running instance
 
-Linux (experimental):
-  Global hotkeys are not registered. Bind window-manager keys to:
-    uv run main.py --trigger snip
-    uv run main.py --trigger textedit
-    uv run main.py --trigger audio
-    uv run main.py --trigger tts
-    uv run main.py --trigger chat
-    uv run main.py --trigger browser
-  Requires a running instance (does not auto-start the full app).
-  Clipboard/selection uses wl-copy/wl-paste (install wl-clipboard).
+Linux Wayland (niri / wlroots) supported:
+  Global hotkeys are not registered. Bind window-manager keys to a running
+  instance (does not auto-start the full app), e.g. niri:
+    bind "Mod+Shift+T" { spawn "uv" "run" "main.py" "--trigger" "textedit"; }
+    bind "Mod+Shift+S" { spawn "uv" "run" "main.py" "--trigger" "snip"; }
+    bind "Mod+Shift+A" { spawn "uv" "run" "main.py" "--trigger" "audio"; }
+  Other triggers: tts, chat, browser.
+
+  System packages (install as needed):
+    wl-clipboard  — clipboard + primary selection (required for TextEdit/Snip paste)
+    wlrctl        — type/paste + hybrid Ctrl+C for keyboard-only selection
+    grim, slurp   — region screenshot (SnipTool)
+    portaudio     — PyAudio devices / monitor sources
+    paplay (or pw-play / ffplay) — optional feedback sounds
+
+  Selection capture: prefers primary (mouse highlight, no clipboard pollution);
+  if empty, falls back to hybrid wlrctl Ctrl+C + restore.
         """,
     )
     parser.add_argument("--show-console", action="store_true", help="Start with console visible")

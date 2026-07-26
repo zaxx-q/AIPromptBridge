@@ -95,8 +95,11 @@ class SnipToolApp:
                 from ..platform.detect import is_linux
                 from ..platform.screenshot import is_grim_slurp_available
 
-                if is_linux() and is_grim_slurp_available():
-                    capture_backend = "grim+slurp; "
+                if is_linux():
+                    if is_grim_slurp_available():
+                        capture_backend = "grim+slurp; "
+                    else:
+                        capture_backend = "grim/slurp missing — install both for capture; "
             except Exception:
                 pass
             print(f"  ✅ SnipTool: Ready ({capture_backend}trigger via: --trigger snip)")

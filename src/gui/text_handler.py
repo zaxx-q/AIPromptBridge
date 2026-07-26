@@ -15,8 +15,8 @@ except ImportError:  # pragma: no cover - optional on minimal Linux envs
 from pynput import keyboard as pykeyboard
 
 from ..platform import is_linux, is_windows
+from ..platform.clipboard import capture_selection_hybrid
 from ..platform.clipboard import copy_text as platform_copy_text
-from ..platform.clipboard import get_selected_text_wayland
 from ..platform.clipboard import paste_text as platform_paste_text
 from ..platform.input import (
     copy_via_clipboard_shortcut,
@@ -248,25 +248,23 @@ class TextHandler:
         """
         Get the currently selected text from any application.
 
-        **Linux/Wayland:** reads primary selection first (mouse highlight), then
-        falls back to a read-only clipboard paste. Does **not** inject Ctrl+C
-        (hybrid primary→Ctrl+C capture is optional/later; paste inject uses wlrctl).
+        **Linux/Wayland:** hybrid capture — primary selection first (mouse
+        highlight, no clipboard pollution), then read-only clipboard, then
+        optional wlrctl Ctrl+C + clipboard poll with restore when still empty.
 
         **Windows:** uses clipboard sequence number + SendInput Ctrl+C, then
         restores the previous clipboard content.
 
         Args:
             sleep_duration: Short delay before Ctrl+C for stability (Windows; default: 0.01s)
-            max_wait: Maximum time to wait for clipboard content (Windows; default: 0.4s)
+            max_wait: Maximum time to wait for clipboard content (default: 0.4s)
 
         Returns:
             The selected text, or empty string if none
         """
         if is_linux():
-            # Prefer primary selection; optional read-only clipboard fallback.
-            # No SendInput / clipboard pollution.
             try:
-                return get_selected_text_wayland()
+                return capture_selection_hybrid(timeout=max_wait, allow_ctrl_c=True)
             except Exception as e:
                 logging.error(f"Linux selection capture failed: {e}")
                 return ""
@@ -342,7 +340,8 @@ class TextHandler:
         """
         Get selected text with a smart retry for slow applications.
 
-        **Linux:** single primary-selection read (no Ctrl+C retry needed).
+        **Linux:** hybrid capture once (primary → clipboard → Ctrl+C). If empty,
+        retries the Ctrl+C path with a longer poll (1.2s) and one mid-wait re-send.
 
         **Windows:**
         Fast path (attempt 1): default timing — works for most apps, returns in <100ms
@@ -357,7 +356,14 @@ class TextHandler:
             The selected text, or empty string if none
         """
         if is_linux():
-            return self.get_selected_text()
+            # Fast hybrid path (primary preferred; Ctrl+C only if needed)
+            selected_text = self.get_selected_text(max_wait=0.4)
+            if selected_text:
+                return selected_text
+            logging.warning(
+                "No text captured on first attempt, retrying with slow-app hybrid strategy"
+            )
+            return self._get_selected_text_slow_app()
 
         # Fast path — works for most apps
         selected_text = self.get_selected_text()
@@ -370,8 +376,12 @@ class TextHandler:
 
     def _get_selected_text_slow_app(self) -> str:
         """
-        Retry strategy for slow applications (Electron/JavaFX). Windows-only.
+        Retry strategy for slow applications (Electron/JavaFX).
 
+        **Linux:** longer hybrid Ctrl+C poll (1.2s) with one re-send after 0.4s.
+        Primary is still preferred first (no clipboard pollution when it has text).
+
+        **Windows:**
         - Waits 80ms before sending (gives Electron's event loop time to settle)
         - Polls for up to 1.2s with 20ms intervals
         - Re-sends the copy keystroke once after 0.4s if clipboard hasn't changed
@@ -380,6 +390,18 @@ class TextHandler:
         Returns:
             The selected text, or empty string if none
         """
+        if is_linux():
+            try:
+                return capture_selection_hybrid(
+                    timeout=1.2,
+                    poll_interval=0.02,
+                    allow_ctrl_c=True,
+                    resend_after=0.4,
+                )
+            except Exception as e:
+                logging.error(f"Linux slow-app selection capture failed: {e}")
+                return ""
+
         if not is_windows() or pyperclip is None:
             return ""
 
