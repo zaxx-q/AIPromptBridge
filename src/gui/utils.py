@@ -87,8 +87,34 @@ def copy_to_clipboard(text: str, root=None) -> bool:
     """
     Cross-platform clipboard copy.
 
-    Works with both tk.Tk and ctk.CTk root windows.
+    **Linux/Wayland:** prefers ``wl-copy`` via the platform clipboard service
+    (works without X11). Optional Tk clipboard is tried only as a last resort.
+
+    **Windows/macOS:** Tk root clipboard when available, else OS clipboard tools.
     """
+    # Linux: prefer wl-copy so Wayland sessions work without X11/xclip.
+    if sys.platform.startswith("linux"):
+        try:
+            from ..platform.clipboard import copy_text as platform_copy_text
+            from ..platform.clipboard import is_wl_clipboard_available
+
+            if is_wl_clipboard_available() and platform_copy_text(text if text is not None else ""):
+                return True
+        except Exception as e:
+            print(f"[Clipboard Error] wl-copy path failed: {e}")
+
+        # Optional Tk fallback (may be empty/X11-only on pure Wayland)
+        if root:
+            try:
+                root.clipboard_clear()
+                root.clipboard_append(text)
+                root.update()
+                return True
+            except Exception as e:
+                print(f"[Clipboard Error] Tk fallback failed: {e}")
+                return False
+        return False
+
     try:
         if root:
             # Both tk.Tk and ctk.CTk have clipboard methods
@@ -1489,7 +1515,13 @@ def copy_as_html_to_clipboard(markdown_text: str, root=None) -> bool:
     html_body = markdown_to_html(markdown_text)
 
     if sys.platform != "win32":
-        # Non-Windows: just copy the HTML as text
+        # Non-Windows: plain text only.
+        # Linux/Wayland: no multi-MIME HTML+text stack this phase — plain
+        # markdown (or HTML body as text) via wl-copy is enough for Phase 2.
+        # Rich paste into LibreOffice/etc. remains incomplete until multi-MIME.
+        if sys.platform.startswith("linux"):
+            # Prefer original markdown as plain text for general paste targets.
+            return copy_to_clipboard(markdown_text, root)
         return copy_to_clipboard(html_body, root)
 
     try:

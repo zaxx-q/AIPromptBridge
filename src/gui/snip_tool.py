@@ -444,10 +444,9 @@ class SnipToolApp:
 
     def _copy_to_clipboard_with_notification(self, messages, action_key, action_config=None):
         """Execute non-streaming request, copy to clipboard, show notification."""
-        import pyperclip
-
         from ..profile_resolver import resolve_profile
         from ..request_pipeline import RequestContext, RequestOrigin, RequestPipeline
+        from .text_handler import TextHandler
 
         resolved = resolve_profile(action_config, self.config, self.ai_params, self.key_managers)
 
@@ -470,9 +469,10 @@ class SnipToolApp:
             return
 
         if ctx.response_text:
-            # Copy to clipboard
+            # Copy to clipboard (platform service on Linux / pyperclip on Windows)
             try:
-                pyperclip.copy(ctx.response_text)
+                if not TextHandler.copy_to_clipboard(ctx.response_text):
+                    raise RuntimeError("copy_to_clipboard returned False")
 
                 # Play sound
                 from ..utils import play_sound

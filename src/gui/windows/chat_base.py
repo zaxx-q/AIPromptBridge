@@ -2152,6 +2152,37 @@ class ChatWindowBase(ABC):
     def _on_paste(self, event):
         """Handle Ctrl+V: attach clipboard image if present, otherwise allow normal text paste."""
         try:
+            import os
+            import sys
+            import tempfile
+
+            # Linux/Wayland: PIL ImageGrab often cannot see the Wayland clipboard.
+            # Prefer wl-paste image/png via the platform clipboard service.
+            if sys.platform.startswith("linux"):
+                from ...platform.clipboard import paste_image_png
+
+                png_data = paste_image_png(primary=False)
+                if png_data:
+                    fd, tmp_path = tempfile.mkstemp(suffix=".png", prefix="clipboard_")
+                    os.close(fd)
+                    with open(tmp_path, "wb") as f:
+                        f.write(png_data)
+                    self._clipboard_temp_files.append(tmp_path)
+                    self._add_pending_attachment(tmp_path)
+
+                    if self._has_placeholder:
+                        if HAVE_CTK:
+                            self.input_text.delete("0.0", "end")
+                            self.input_text.configure(text_color=self.theme.fg)
+                        else:
+                            self.input_text.delete("1.0", tk.END)
+                            self.input_text.configure(fg=self.colors["fg"])
+                        self._has_placeholder = False
+
+                    return "break"  # Consume the event — don't paste image as text
+                # No image — fall through to default text paste
+                return None
+
             from PIL import ImageGrab
 
             clip = ImageGrab.grabclipboard()
@@ -2162,9 +2193,6 @@ class ChatWindowBase(ABC):
 
             # Case 1: PIL Image (bitmap from clipboard — screenshot, snip, etc.)
             if hasattr(clip, "save"):
-                import os
-                import tempfile
-
                 # Save clipboard image to a temp .png file
                 fd, tmp_path = tempfile.mkstemp(suffix=".png", prefix="clipboard_")
                 os.close(fd)

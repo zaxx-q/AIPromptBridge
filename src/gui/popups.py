@@ -3150,13 +3150,13 @@ class ErrorPopup:
 
     def _copy_to_clipboard(self):
         """Copy error details to clipboard."""
-        import pyperclip
+        from .utils import copy_to_clipboard
 
         text = f"{self.title}\n\n{self.message}"
         if self.details:
             text += f"\n\nDetails:\n{self.details}"
         try:
-            pyperclip.copy(text)
+            copy_to_clipboard(text, getattr(self, "root", None))
         except Exception:
             pass
 

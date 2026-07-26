@@ -514,6 +514,7 @@ Linux (experimental):
     uv run main.py --trigger chat
     uv run main.py --trigger browser
   Requires a running instance (does not auto-start the full app).
+  Clipboard/selection uses wl-copy/wl-paste (install wl-clipboard).
         """,
     )
     parser.add_argument("--show-console", action="store_true", help="Start with console visible")

@@ -687,8 +687,6 @@ class TextEditToolApp:
             action_key: Label for logging and notification
             action_config: Optional action config dict (may contain connection_profile)
         """
-        import pyperclip
-
         from ..profile_resolver import resolve_profile
         from ..request_pipeline import RequestContext, RequestOrigin, RequestPipeline
 
@@ -715,9 +713,10 @@ class TextEditToolApp:
             return
 
         if ctx.response_text:
-            # Copy to clipboard
+            # Copy to clipboard (platform service on Linux / pyperclip on Windows)
             try:
-                pyperclip.copy(ctx.response_text)
+                if not self.text_handler.copy_to_clipboard(ctx.response_text):
+                    raise RuntimeError("copy_to_clipboard returned False")
 
                 # Play sound
                 from ..utils import play_sound
