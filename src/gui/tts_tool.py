@@ -66,7 +66,10 @@ class TTSToolApp:
         self.hotkey_listener = HotkeyListener(shortcut=self.hotkey, callback=self._on_hotkey_pressed)
         self.hotkey_listener.start()
 
-        print(f"  ✅ TTSTool: Hotkey '{self.hotkey}' registered")
+        if self.hotkey_listener.is_running():
+            print(f"  ✅ TTSTool: Hotkey '{self.hotkey}' registered")
+        else:
+            print("  ✅ TTSTool: Ready (trigger via: --trigger tts)")
 
     def stop(self):
         """Stop the TTS tool."""

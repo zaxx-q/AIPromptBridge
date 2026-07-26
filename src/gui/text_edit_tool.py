@@ -107,11 +107,14 @@ class TextEditToolApp:
 
         logging.info(f"Starting TextEditTool with hotkey: {self.hotkey}")
 
-        # Create and start hotkey listener
+        # Create and start hotkey listener (no-op on Linux — use --trigger textedit / chat)
         self.hotkey_listener = HotkeyListener(shortcut=self.hotkey, callback=self._on_hotkey_pressed)
         self.hotkey_listener.start()
 
-        print(f"  ✅ TextEditTool: Hotkey '{self.hotkey}' registered")
+        if self.hotkey_listener.is_running():
+            print(f"  ✅ TextEditTool: Hotkey '{self.hotkey}' registered")
+        else:
+            print("  ✅ TextEditTool: Ready (trigger via: --trigger textedit)")
 
     def stop(self):
         """Stop the TextEditTool application."""

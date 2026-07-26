@@ -1,14 +1,30 @@
 #!/usr/bin/env python3
 """
 Global hotkey listener using pynput
+
+Phase 1 Linux: global hotkeys are not registered on Linux/Wayland.
+Use ``python main.py --trigger <name>`` (Unix socket IPC) instead.
 """
 
 import logging
+import sys
 import threading
 import time
 from typing import Callable, Optional
 
-from pynput import keyboard as pykeyboard
+# pynput is Windows-primary in this project; optional on Linux (IPC replaces it).
+try:
+    from pynput import keyboard as pykeyboard
+
+    HAVE_PYNPUT = True
+except ImportError:
+    pykeyboard = None  # type: ignore[assignment]
+    HAVE_PYNPUT = False
+
+
+def _global_hotkeys_supported() -> bool:
+    """Phase 1: only register OS-level hotkeys on Windows."""
+    return sys.platform == "win32" and HAVE_PYNPUT
 
 
 class HotkeyListener:
@@ -26,7 +42,7 @@ class HotkeyListener:
         """
         self.shortcut = shortcut
         self.callback = callback
-        self.listener: Optional[pykeyboard.Listener] = None
+        self.listener: Optional[object] = None
         self.paused = False
         self.running = False
 
@@ -91,6 +107,15 @@ class HotkeyListener:
         """Start listening for the hotkey."""
         if self.running:
             logging.debug("Hotkey listener already running")
+            return
+
+        # Phase 1 Linux: no pynput global hotkeys (Wayland/niri — use --trigger IPC).
+        if not _global_hotkeys_supported():
+            logging.info(
+                "Global hotkey '%s' not registered on this platform (use: uv run main.py --trigger <name>)",
+                self.shortcut,
+            )
+            self.running = False
             return
 
         try:

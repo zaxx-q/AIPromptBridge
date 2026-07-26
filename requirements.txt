@@ -16,11 +16,11 @@ Pillow
 # Rich console output (colors, tables, etc.)
 rich
 
-# System tray (Windows)
-infi.systray
+# System tray (Windows-only — Linux uses pystray later / terminal+IPC for now)
+infi.systray; sys_platform == "win32"
 
-# Audio Tool dependencies
-PyAudioWPatch
+# Audio loopback (Windows WASAPI via PyAudioWPatch; Linux uses stock PyAudio later)
+PyAudioWPatch; sys_platform == "win32"
 
 # PDF Tool dependencies
 pypdf>=4.0.0

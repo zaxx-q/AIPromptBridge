@@ -90,7 +90,10 @@ class AudioToolApp:
         self.hotkey_listener = HotkeyListener(shortcut=self.hotkey, callback=self._on_hotkey_pressed)
         self.hotkey_listener.start()
 
-        print(f"  ✅ AudioTool: Hotkey '{self.hotkey}' registered")
+        if self.hotkey_listener.is_running():
+            print(f"  ✅ AudioTool: Hotkey '{self.hotkey}' registered")
+        else:
+            print("  ✅ AudioTool: Ready (trigger via: --trigger audio)")
 
     def stop(self):
         """Stop the audio tool."""

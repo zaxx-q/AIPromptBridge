@@ -9,6 +9,8 @@ Provides:
 - FFmpeg-based compression to Opus/OGG format
 """
 
+from __future__ import annotations
+
 import io
 import logging
 import math

@@ -1,7 +1,9 @@
 [project]
 name = "AIPromptBridge"
 version = "7.0.0"
-requires-python = ">=3.12"
+# Stick to 3.13.x for Nuitka stability (3.14 not fully stable yet).
+# Exact interpreter for this repo is pinned in .python-version (3.13.14).
+requires-python = ">=3.13,<3.14"
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
@@ -13,8 +15,9 @@ markers = [
 ]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py313"
 line-length = 120
+exclude = ["references"]
 
 [tool.ruff.lint]
 select = [

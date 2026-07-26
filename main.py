@@ -7,12 +7,14 @@ Usage:
     python main.py              # Start with tray (console hidden)
     python main.py --show-console   # Start with tray + console visible
     python main.py --no-wt      # Skip Windows Terminal auto-detection
+    python main.py --trigger snip   # Linux: trigger tool on running instance
 
 Nuitka Configuration:
 (Moved to .github/workflows/manual_release.yml)
 """
 
 import argparse
+import contextlib
 import ctypes
 import logging
 import os
@@ -27,13 +29,28 @@ from src import web_server
 from src.attachment_manager import AttachmentManager
 from src.config import CONFIG_FILE, OPENROUTER_URL, generate_example_config, load_config
 from src.console import HAVE_RICH, Panel, Table, console, print_error, print_panel, print_success, print_warning
-from src.gui.core import HAVE_GUI, show_settings_window_blocking
 from src.key_store import KeyStore
+from src.platform import (
+    KNOWN_TRIGGERS,
+    InstanceLock,
+    TriggerServer,
+    acquire_single_instance,
+    is_linux,
+    is_windows,
+    send_trigger,
+)
 from src.session_manager import list_sessions, load_sessions
 from src.terminal import print_commands_box, terminal_session_manager
 from src.version import __version__
 
-# System tray support
+# GUI core is optional (e.g. Linux hosts without tkinter) — soft import
+try:
+    from src.gui.core import HAVE_GUI, show_settings_window_blocking
+except ImportError:
+    HAVE_GUI = False
+    show_settings_window_blocking = None  # type: ignore[assignment]
+
+# System tray support (Windows / infi.systray)
 HAVE_TRAY = False
 try:
     from src.tray import HAVE_SYSTRAY, TrayApp, hide_console, show_console
@@ -45,10 +62,11 @@ except ImportError:
 # TextEditTool - now part of gui module
 TEXT_EDIT_TOOL_APP = None
 try:
-    from src.gui import TextEditToolApp
+    from src.gui.text_edit_tool import TextEditToolApp
 
     HAVE_TEXT_EDIT_TOOL = True
-except ImportError as e:
+except ImportError:
+    TextEditToolApp = None  # type: ignore[assignment,misc]
     HAVE_TEXT_EDIT_TOOL = False
     # Silent - will show in startup
 
@@ -58,7 +76,8 @@ try:
     from src.gui.snip_tool import SnipToolApp
 
     HAVE_SNIP_TOOL = True
-except ImportError as e:
+except ImportError:
+    SnipToolApp = None  # type: ignore[assignment,misc]
     HAVE_SNIP_TOOL = False
     # Silent - will show in startup
 
@@ -68,7 +87,8 @@ try:
     from src.gui.audio_tool import AudioToolApp
 
     HAVE_AUDIO_TOOL = True
-except ImportError as e:
+except ImportError:
+    AudioToolApp = None  # type: ignore[assignment,misc]
     HAVE_AUDIO_TOOL = False
     # Silent - will show in startup
 
@@ -78,9 +98,15 @@ try:
     from src.gui.tts_tool import TTSToolApp
 
     HAVE_TTS_TOOL = True
-except ImportError as e:
+except ImportError:
+    TTSToolApp = None  # type: ignore[assignment,misc]
     HAVE_TTS_TOOL = False
     # Silent - will show in startup
+
+# IPC trigger server (Linux) + readiness gate for early-started socket
+_INSTANCE_LOCK = None  # Optional[InstanceLock]
+_TRIGGER_SERVER = None  # Optional[TriggerServer]
+_TOOLS_READY = False
 
 
 def get_base_url(config, provider, profile=None):
@@ -403,6 +429,19 @@ def initialize_tts_tool(config, ai_params):
 def cleanup():
     """Cleanup on shutdown"""
     global TEXT_EDIT_TOOL_APP, SNIP_TOOL_APP, AUDIO_TOOL_APP, TTS_TOOL_APP
+    global _TRIGGER_SERVER, _INSTANCE_LOCK, _TOOLS_READY
+
+    _TOOLS_READY = False
+
+    if _TRIGGER_SERVER is not None:
+        with contextlib.suppress(Exception):
+            _TRIGGER_SERVER.stop()
+        _TRIGGER_SERVER = None
+
+    if _INSTANCE_LOCK is not None:
+        with contextlib.suppress(Exception):
+            _INSTANCE_LOCK.release()
+        _INSTANCE_LOCK = None
 
     if TEXT_EDIT_TOOL_APP:
         if HAVE_RICH:
@@ -464,15 +503,161 @@ Examples:
   python main.py                  Start application (console hidden by default)
   python main.py --show-console   Start application with console visible
   python main.py --no-wt          Skip Windows Terminal auto-detection
+  python main.py --trigger snip   Linux: invoke tool on the running instance
+
+Linux (experimental):
+  Global hotkeys are not registered. Bind window-manager keys to:
+    uv run main.py --trigger snip
+    uv run main.py --trigger textedit
+    uv run main.py --trigger audio
+    uv run main.py --trigger tts
+    uv run main.py --trigger chat
+    uv run main.py --trigger browser
+  Requires a running instance (does not auto-start the full app).
         """,
     )
     parser.add_argument("--show-console", action="store_true", help="Start with console visible")
     parser.add_argument("--dummy", action="store_true", help="Dummy argument (does nothing)")
     parser.add_argument(
+        "--trigger",
+        choices=list(KNOWN_TRIGGERS),
+        metavar="NAME",
+        help=(
+            f"Linux IPC client: send a trigger to the running instance and exit (one of: {', '.join(KNOWN_TRIGGERS)})"
+        ),
+    )
+    parser.add_argument(
         "--launched-mode",
         help=argparse.SUPPRESS,  # Hidden argument used by launchers
     )
     return parser.parse_args()
+
+
+def dispatch_trigger(name: str) -> tuple:
+    """
+    Server-side trigger dispatch — same entry points as tray/hotkeys.
+
+    Returns:
+        (ok: bool, detail: str)  detail empty on success; error body on failure.
+    """
+    global _TOOLS_READY
+
+    name = (name or "").strip().lower()
+    if not name:
+        return False, "missing trigger name"
+
+    if not _TOOLS_READY:
+        return False, "not ready"
+
+    try:
+        if name in ("textedit", "chat"):
+            from src.gui.text_edit_tool import get_instance
+
+            app = get_instance()
+            if app is None or not hasattr(app, "_on_hotkey_pressed"):
+                return False, "tool unavailable"
+            app._on_hotkey_pressed()
+            return True, ""
+
+        if name == "snip":
+            from src.gui.snip_tool import get_instance
+
+            app = get_instance()
+            if app is None or not hasattr(app, "_on_hotkey_pressed"):
+                return False, "tool unavailable"
+            app._on_hotkey_pressed()
+            return True, ""
+
+        if name == "audio":
+            from src.gui.audio_tool import get_instance
+
+            app = get_instance()
+            if app is None or not hasattr(app, "_on_hotkey_pressed"):
+                return False, "tool unavailable"
+            app._on_hotkey_pressed()
+            return True, ""
+
+        if name == "tts":
+            # Prefer tool instance (same as hotkey); fall back to tray-style path
+            try:
+                from src.gui.tts_tool import get_instance
+
+                app = get_instance()
+                if app is not None and hasattr(app, "_on_hotkey_pressed"):
+                    app._on_hotkey_pressed()
+                    return True, ""
+            except ImportError:
+                pass
+
+            if not web_server.CONFIG or not web_server.CONFIG.get("tts_enabled", True):
+                return False, "tool unavailable"
+            if not HAVE_GUI:
+                return False, "tool unavailable"
+            from src.gui.core import GUICoordinator
+
+            GUICoordinator.get_instance().request_tts_window(
+                web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS, initial_text=""
+            )
+            return True, ""
+
+        if name == "browser":
+            if not HAVE_GUI:
+                return False, "tool unavailable"
+            from src.gui.core import show_session_browser
+
+            show_session_browser()
+            return True, ""
+
+        if name == "settings":
+            if not HAVE_GUI:
+                return False, "tool unavailable"
+            from src.gui.core import show_settings_window
+
+            show_settings_window()
+            return True, ""
+
+        if name == "prompts":
+            if not HAVE_GUI:
+                return False, "tool unavailable"
+            from src.gui.core import show_prompt_editor
+
+            show_prompt_editor()
+            return True, ""
+
+        return False, f"unknown trigger: {name}"
+    except Exception as e:
+        logging.exception("Trigger dispatch failed for %s", name)
+        return False, f"handler failed: {e}"
+
+
+def run_trigger_client(trigger_name: str) -> int:
+    """
+    Client mode for ``--trigger``: contact running instance over Unix socket.
+
+    Does not start the full app. Exit 0 on ok, non-zero on error.
+    """
+    if is_windows():
+        # Phase 1: IPC triggers are Linux-only (Windows keeps tray/hotkeys).
+        msg = "IPC --trigger is only available on Linux. On Windows use the system tray or global hotkeys."
+        if HAVE_RICH:
+            print_error(msg)
+        else:
+            print(f"❌ {msg}")
+        return 1
+
+    ok, message = send_trigger(trigger_name)
+    if ok:
+        if HAVE_RICH:
+            print_success(f"trigger {trigger_name}: {message}")
+        else:
+            print(f"✅ trigger {trigger_name}: {message}")
+        return 0
+
+    if HAVE_RICH:
+        print_error(f"trigger {trigger_name}: {message}")
+    else:
+        print(f"❌ trigger {trigger_name}: {message}")
+    return 1
 
 
 from src.utils import is_compiled as _is_compiled
@@ -604,30 +789,14 @@ def find_available_port(host: str, port: int, max_attempts: int = 20) -> int:
 
 def acquire_single_instance_mutex():
     """
-    Acquire a named mutex to ensure single instance.
+    Legacy wrapper — prefer src.platform.acquire_single_instance().
 
-    Returns:
-        mutex_handle if acquired successfully (first instance)
-        None if another instance is already running
+    Windows: named mutex handle or None.
+    Non-Windows: \"NotWindows\" (historical; Linux now uses socket ownership).
     """
-    if sys.platform != "win32":
-        return "NotWindows"
+    from src.platform.single_instance import acquire_single_instance_mutex as _acquire
 
-    kernel32 = ctypes.windll.kernel32
-    mutex_name = "AIPromptBridge_SingleInstance"
-
-    # CreateMutexW(security_attributes, initial_owner, name)
-    mutex = kernel32.CreateMutexW(None, False, mutex_name)
-
-    # ERROR_ALREADY_EXISTS = 183
-    if kernel32.GetLastError() == 183:
-        # Another instance owns the mutex
-        if mutex:
-            kernel32.CloseHandle(mutex)
-        return None
-
-    # We own the mutex - keep the handle alive for process lifetime
-    return mutex
+    return _acquire()
 
 
 def run_server(config, ai_params):
@@ -701,8 +870,15 @@ def configure_logging(debug_mode: bool = False):
 
 def main():
     """Main entry point"""
+    global _INSTANCE_LOCK, _TRIGGER_SERVER, _TOOLS_READY
+
     # Parse command line arguments first (doesn't depend on CWD)
     args = parse_args()
+
+    # ─── IPC client mode (--trigger) ───────────────────────────────────────
+    # Contact the running instance and exit. No workspace / full app init.
+    if args.trigger:
+        sys.exit(run_trigger_client(args.trigger))
 
     # Set up workspace (CWD resolution for compiled mode)
     if not setup_workspace(args.launched_mode):
@@ -717,32 +893,53 @@ def main():
     except Exception:
         pass  # Non-critical, don't block startup
 
-    # Single instance check via named mutex (Windows only)
-    # We do this early to prevent multiple instances
-    mutex_handle = None
-    if sys.platform == "win32":
-        mutex_handle = acquire_single_instance_mutex()
-        if mutex_handle is None:
-            if args.show_console:
-                # If console is visible, we might want to alert
-                pass
+    # Single instance check (Windows: named mutex; Linux: Unix socket bind)
+    # Done early to prevent multiple instances. On Linux the bound socket is
+    # reused by the IPC trigger server.
+    _INSTANCE_LOCK = acquire_single_instance()
+    if _INSTANCE_LOCK is None:
+        if args.show_console:
+            # If console is visible, we might want to alert
+            pass
 
+        if HAVE_RICH:
+            print_error("Another instance of AIPromptBridge is already running!")
+        else:
+            print("❌ ERROR: Another instance of AIPromptBridge is already running!")
+
+        # If console is hidden, just exit silently
+        # User probably just double clicked the icon again
+        if not args.show_console:
+            sys.exit(0)
+
+        import contextlib
+
+        print("Press Enter to exit...")
+        with contextlib.suppress(EOFError):
+            input()
+        sys.exit(1)
+
+    # Linux: start IPC server early so --trigger clients get "not ready"
+    # instead of "no instance" while tools initialize.
+    if is_linux() and _INSTANCE_LOCK.listen_socket is not None:
+        _TRIGGER_SERVER = TriggerServer(
+            handler=dispatch_trigger,
+            socket_path=_INSTANCE_LOCK.socket_path,
+            listen_sock=_INSTANCE_LOCK.listen_socket,
+            unlink_on_stop=True,
+        )
+        # Transfer listen socket ownership to the IPC server (avoid double-close
+        # / double-unlink in InstanceLock.release()).
+        _INSTANCE_LOCK._listen_sock = None
+        _INSTANCE_LOCK._socket_path = None
+        try:
+            _TRIGGER_SERVER.start()
+        except Exception as e:
             if HAVE_RICH:
-                print_error("Another instance of AIPromptBridge is already running!")
+                print_warning(f"IPC trigger server failed to start: {e}")
             else:
-                print("❌ ERROR: Another instance of AIPromptBridge is already running!")
-
-            # If console is hidden, just exit silently
-            # User probably just double clicked the icon again
-            if not args.show_console:
-                sys.exit(0)
-
-            import contextlib
-
-            print("Press Enter to exit...")
-            with contextlib.suppress(EOFError):
-                input()
-            sys.exit(1)
+                print(f"⚠️  IPC trigger server failed to start: {e}")
+            _TRIGGER_SERVER = None
 
     # Configure global logging (DEBUG if --show-console, otherwise INFO)
     configure_logging(debug_mode=args.show_console)
@@ -839,7 +1036,8 @@ def main():
     # Pre-launch system tray
     # Launching it early prevents race conditions and ensures it respects OS dark mode
     # before heavy UI modules block or alter global app/thread state.
-    use_tray = HAVE_TRAY and sys.platform == "win32"
+    # Phase 1 Linux: no tray — terminal + IPC only.
+    use_tray = HAVE_TRAY and is_windows()
     tray = None
     if use_tray:
         # Start Flask server in background thread
@@ -908,7 +1106,13 @@ def main():
 
             # Open Settings Window directly (blocking)
             # Use GUICoordinator to keep the root alive and avoid re-init delays
-            show_settings_window_blocking(initial_tab="API Keys")
+            if show_settings_window_blocking is not None:
+                show_settings_window_blocking(initial_tab="API Keys")
+            else:
+                if HAVE_RICH:
+                    print_warning("GUI not available — configure API keys in keys.json / Settings later.")
+                else:
+                    print("⚠️  GUI not available — configure API keys in keys.json / Settings later.")
 
             # Reload keys after settings window closes
             has_any_keys = any(km.has_keys() for km in web_server.KEY_MANAGERS.values())
@@ -954,13 +1158,28 @@ def main():
     if tts_tool_result:
         tts_hotkey = config.get("tts_hotkey", "ctrl+alt+t")
 
+    # Tools finished initializing — IPC triggers may dispatch for real
+    _TOOLS_READY = True
+    if _TRIGGER_SERVER is not None:
+        _TRIGGER_SERVER.mark_ready()
+        if is_linux():
+            from src.platform.ipc import get_socket_path
+
+            if HAVE_RICH:
+                console.print(
+                    f"[dim]🔌 IPC triggers: [cyan]uv run main.py --trigger <name>[/cyan] "
+                    f"(socket: {get_socket_path()})[/dim]"
+                )
+            else:
+                print(f"🔌 IPC triggers: uv run main.py --trigger <name> (socket: {get_socket_path()})")
+
     if HAVE_RICH:
         console.print()
     else:
         print()
 
     # ─── Execution Loop ───────────────────────────────────────────────────
-    use_tray = HAVE_TRAY and sys.platform == "win32"
+    use_tray = HAVE_TRAY and is_windows()
 
     if use_tray:
         # Start terminal session manager at the very end so commands box displays after all startup logs
@@ -980,14 +1199,25 @@ def main():
         os._exit(0)
 
     else:
-        # Fallback terminal behavior
+        # Fallback terminal behavior (expected on Linux Phase 1)
         if not HAVE_TRAY:
-            if HAVE_RICH:
-                console.print("[dim]📟 Running in terminal-only fallback (tray not available)[/dim]")
-                console.print("   Install with: [cyan]pip install infi.systray[/cyan]")
+            if is_linux():
+                if HAVE_RICH:
+                    console.print("[dim]📟 Running in terminal mode (Linux Phase 1 — tray/hotkeys via IPC)[/dim]")
+                    console.print(
+                        "   Window-manager binds: [cyan]uv run main.py --trigger snip[/cyan] "
+                        "(also: textedit, audio, tts, chat, browser)"
+                    )
+                else:
+                    print("📟 Running in terminal mode (Linux Phase 1 — tray/hotkeys via IPC)")
+                    print("   Window-manager binds: uv run main.py --trigger snip")
             else:
-                print("📟 Running in terminal-only fallback (tray not available)")
-                print("   Install with: pip install infi.systray")
+                if HAVE_RICH:
+                    console.print("[dim]📟 Running in terminal-only fallback (tray not available)[/dim]")
+                    console.print("   Install with: [cyan]pip install infi.systray[/cyan]")
+                else:
+                    print("📟 Running in terminal-only fallback (tray not available)")
+                    print("   Install with: pip install infi.systray")
         print()
 
         # Start terminal session manager

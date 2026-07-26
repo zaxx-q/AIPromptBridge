@@ -22,7 +22,19 @@ from .console import (
     print_success,
     print_warning,
 )
-from .gui.core import HAVE_GUI, get_gui_status, show_session_browser
+
+try:
+    from .gui.core import HAVE_GUI, get_gui_status, show_session_browser
+except ImportError:
+    HAVE_GUI = False
+
+    def get_gui_status():
+        return {"available": False, "running": False, "error": "GUI dependencies not available"}
+
+    def show_session_browser(*_args, **_kwargs):
+        raise RuntimeError("GUI not available")
+
+
 from .session_manager import (
     CHAT_SESSIONS,
     SESSION_LOCK,

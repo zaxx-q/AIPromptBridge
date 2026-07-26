@@ -86,7 +86,10 @@ class SnipToolApp:
         self.hotkey_listener = HotkeyListener(shortcut=self.hotkey, callback=self._on_hotkey_pressed)
         self.hotkey_listener.start()
 
-        print(f"  ✅ SnipTool: Hotkey '{self.hotkey}' registered")
+        if self.hotkey_listener.is_running():
+            print(f"  ✅ SnipTool: Hotkey '{self.hotkey}' registered")
+        else:
+            print("  ✅ SnipTool: Ready (trigger via: --trigger snip)")
 
     def stop(self):
         """Stop the snip tool."""

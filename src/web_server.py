@@ -9,8 +9,23 @@ from flask import Flask, jsonify, request
 
 from .api_client import call_api_chat, call_api_simple, fetch_models
 from .config import CONFIG_FILE
-from .gui.core import HAVE_GUI, get_gui_status, show_chat_gui, show_session_browser
 from .session_manager import ChatSession, add_session, get_session, list_sessions
+
+# GUI is optional (e.g. Linux hosts without tkinter) — soft import
+try:
+    from .gui.core import HAVE_GUI, get_gui_status, show_chat_gui, show_session_browser
+except ImportError:
+    HAVE_GUI = False
+
+    def get_gui_status():
+        return {"available": False, "running": False, "error": "GUI dependencies not available"}
+
+    def show_chat_gui(*_args, **_kwargs):
+        raise RuntimeError("GUI not available")
+
+    def show_session_browser(*_args, **_kwargs):
+        raise RuntimeError("GUI not available")
+
 
 # Global state - will be initialized by main.py
 CONFIG = {}
