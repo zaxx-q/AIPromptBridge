@@ -442,7 +442,7 @@ class GUICoordinator:
             callbacks.ready.set()
 
     def _create_snip_overlay(self, request):
-        """Create a screen snip overlay on the GUI thread"""
+        """Create a screen snip overlay on the GUI thread (Windows ImageGrab path)."""
         from .screen_snip import ScreenSnipOverlay
 
         on_capture = request.get("on_capture")
@@ -450,6 +450,56 @@ class GUICoordinator:
 
         if on_capture and on_cancel:
             ScreenSnipOverlay(self._root, on_capture, on_cancel)
+
+    def _start_linux_region_capture(self, on_capture, on_cancel):
+        """
+        Interactive region capture via grim/slurp (Linux/Wayland).
+
+        Runs slurp+grim on a background thread so the GUI loop is not frozen,
+        then marshals on_capture / on_cancel back to the GUI thread.
+        """
+        import logging
+
+        from ..platform.screenshot import capture_region_interactive, is_grim_slurp_available
+        from .screen_snip import png_bytes_to_capture_result
+
+        if not is_grim_slurp_available():
+            logging.error(
+                "[ScreenSnip] grim/slurp not available — install packages 'grim' and 'slurp' "
+                "for Wayland region capture. Snip cancelled."
+            )
+            try:
+                from ..console import print_error
+
+                print_error(
+                    "Snip capture requires grim and slurp. "
+                    "Install both system packages, then try again."
+                )
+            except Exception:
+                pass
+            if on_cancel:
+                self.run_on_gui_thread(on_cancel)
+            return
+
+        def worker():
+            try:
+                png = capture_region_interactive()
+            except Exception as e:
+                logging.error(f"[ScreenSnip] Linux region capture failed: {e}")
+                png = None
+
+            if png:
+                result = png_bytes_to_capture_result(png)
+                if result and on_capture:
+                    # Capture result in default arg so the lambda is not late-bound
+                    self.run_on_gui_thread(lambda r=result: on_capture(r))
+                    return
+                logging.error("[ScreenSnip] Failed to build CaptureResult from grim PNG")
+
+            if on_cancel:
+                self.run_on_gui_thread(on_cancel)
+
+        threading.Thread(target=worker, name="LinuxSnipCapture", daemon=True).start()
 
     def _create_snip_popup(self, request):
         """Create a snip popup on the GUI thread"""
@@ -607,8 +657,21 @@ class GUICoordinator:
         self._request_queue.put({"type": "connection_manager", "on_close": on_close})
 
     def request_snip_overlay(self, on_capture, on_cancel):
-        """Request creation of a screen snip overlay (thread-safe)"""
+        """
+        Request interactive region capture (thread-safe).
+
+        - Linux/Wayland: ``slurp`` + ``grim`` background capture (no Tk overlay).
+        - Windows (and other): frozen ImageGrab + Tk ``ScreenSnipOverlay``.
+        """
         self.ensure_running()
+
+        from ..platform.detect import is_linux
+
+        if is_linux():
+            # All snip callers (hotkey, compare-mode, playground) share this path.
+            self._start_linux_region_capture(on_capture, on_cancel)
+            return
+
         self._request_queue.put({"type": "snip_overlay", "on_capture": on_capture, "on_cancel": on_cancel})
 
     def request_snip_popup(

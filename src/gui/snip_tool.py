@@ -89,7 +89,17 @@ class SnipToolApp:
         if self.hotkey_listener.is_running():
             print(f"  ✅ SnipTool: Hotkey '{self.hotkey}' registered")
         else:
-            print("  ✅ SnipTool: Ready (trigger via: --trigger snip)")
+            # Linux IPC path (no global pynput hotkeys)
+            capture_backend = ""
+            try:
+                from ..platform.detect import is_linux
+                from ..platform.screenshot import is_grim_slurp_available
+
+                if is_linux() and is_grim_slurp_available():
+                    capture_backend = "grim+slurp; "
+            except Exception:
+                pass
+            print(f"  ✅ SnipTool: Ready ({capture_backend}trigger via: --trigger snip)")
 
     def stop(self):
         """Stop the snip tool."""

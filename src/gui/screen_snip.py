@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """
-Screen snipping overlay for region capture.
+Screen snipping overlay and capture result helpers.
 
-Uses PIL.ImageGrab for screen capture and Tkinter Canvas for selection overlay.
-Provides a fullscreen overlay where users can drag to select a region to capture.
+Platform capture backends:
+    - Windows: PIL.ImageGrab + Tk fullscreen overlay (``ScreenSnipOverlay``).
+    - Linux/Wayland: ``grim`` + ``slurp`` via ``src.platform.screenshot``
+      (interactive region selection; no frozen Tk dim overlay).
+
+``CaptureResult`` is the stable contract for the snip popup / AI pipeline —
+callers must not care which backend produced the PNG.
 
 Threading Note:
-    This must be created on the GUI thread via GUICoordinator.
-    Uses Tk Canvas for cross-platform overlay with stipple pattern for semi-transparency.
+    ``ScreenSnipOverlay`` must be created on the GUI thread via GUICoordinator.
+    Linux grim/slurp capture runs on a background thread; callbacks are
+    marshaled back to the GUI thread by the coordinator.
 """
 
 import base64
@@ -31,6 +37,32 @@ class CaptureResult:
     width: int = 0
     height: int = 0
     pil_image: Optional[Image.Image] = None  # For thumbnail preview
+
+
+def png_bytes_to_capture_result(png: bytes) -> Optional[CaptureResult]:
+    """
+    Decode PNG bytes into a ``CaptureResult`` (base64 + size + PIL image).
+
+    Used by the Linux grim/slurp path so ``src.platform.screenshot`` can stay
+    free of GUI types (Option A: platform returns raw PNG only).
+    Base64 encoding matches ImageGrab paths: raw PNG bytes → b64 UTF-8 string.
+    """
+    if not png:
+        return None
+    try:
+        img = Image.open(io.BytesIO(png))
+        img.load()
+        image_base64 = base64.b64encode(png).decode("utf-8")
+        return CaptureResult(
+            image_base64=image_base64,
+            mime_type="image/png",
+            width=img.width,
+            height=img.height,
+            pil_image=img,
+        )
+    except Exception as e:
+        logging.error(f"[ScreenSnip] Failed to decode PNG capture: {e}")
+        return None
 
 
 class ScreenSnipOverlay:

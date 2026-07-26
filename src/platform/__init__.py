@@ -1,5 +1,5 @@
 """
-OS platform helpers (detection, single-instance, IPC, clipboard, input).
+OS platform helpers (detection, single-instance, IPC, clipboard, input, screenshot).
 
 Intentionally free of GUI / audio / provider imports.
 """
@@ -34,6 +34,12 @@ from .ipc import (
     parse_reply,
     send_trigger,
 )
+from .screenshot import (
+    capture_full_screen,
+    capture_output,
+    capture_region_interactive,
+    is_grim_slurp_available,
+)
 from .single_instance import InstanceLock, acquire_single_instance, acquire_single_instance_mutex
 
 __all__ = [
@@ -42,6 +48,9 @@ __all__ = [
     "TriggerServer",
     "acquire_single_instance",
     "acquire_single_instance_mutex",
+    "capture_full_screen",
+    "capture_output",
+    "capture_region_interactive",
     "copy_bytes",
     "copy_text",
     "copy_via_clipboard_shortcut",
@@ -52,6 +61,7 @@ __all__ = [
     "get_selected_text_wayland",
     "get_socket_path",
     "has_primary_selection",
+    "is_grim_slurp_available",
     "is_linux",
     "is_wayland",
     "is_windows",
