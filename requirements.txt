@@ -16,8 +16,9 @@ Pillow
 # Rich console output (colors, tables, etc.)
 rich
 
-# System tray (Windows-only — Linux uses pystray later / terminal+IPC for now)
+# System tray (platform-specific backends)
 infi.systray; sys_platform == "win32"
+pystray; sys_platform == "linux"
 
 # Audio loopback (Windows WASAPI via PyAudioWPatch; Linux uses stock PyAudio later)
 PyAudioWPatch; sys_platform == "win32"

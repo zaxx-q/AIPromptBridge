@@ -50,7 +50,7 @@ except ImportError:
     HAVE_GUI = False
     show_settings_window_blocking = None  # type: ignore[assignment]
 
-# System tray support (Windows / infi.systray)
+# System tray support (Windows: infi.systray / Linux: pystray)
 HAVE_TRAY = False
 try:
     from src.tray import HAVE_SYSTRAY, TrayApp, hide_console, show_console
@@ -1037,8 +1037,8 @@ def main():
     # Pre-launch system tray
     # Launching it early prevents race conditions and ensures it respects OS dark mode
     # before heavy UI modules block or alter global app/thread state.
-    # Phase 1 Linux: no tray — terminal + IPC only.
-    use_tray = HAVE_TRAY and is_windows()
+    # HAVE_TRAY is platform-gated (Windows infi.systray / Linux pystray).
+    use_tray = HAVE_TRAY
     tray = None
     if use_tray:
         # Start Flask server in background thread
@@ -1180,9 +1180,22 @@ def main():
         print()
 
     # ─── Execution Loop ───────────────────────────────────────────────────
-    use_tray = HAVE_TRAY and is_windows()
+    # Re-evaluate in case tray import state is relevant (HAVE_TRAY is fixed at import)
+    use_tray = HAVE_TRAY
 
     if use_tray:
+        if is_linux():
+            if HAVE_RICH:
+                console.print(
+                    "[dim]📌 System tray active (pystray). "
+                    "Needs a StatusNotifier host (waybar/dms/etc.) for the icon to appear.[/dim]"
+                )
+            else:
+                print(
+                    "📌 System tray active (pystray). "
+                    "Needs a StatusNotifier host (waybar/dms/etc.) for the icon to appear."
+                )
+
         # Start terminal session manager at the very end so commands box displays after all startup logs
         terminal_thread = threading.Thread(target=lambda: terminal_session_manager(), daemon=True)
         terminal_thread.start()
@@ -1200,17 +1213,23 @@ def main():
         os._exit(0)
 
     else:
-        # Fallback terminal behavior (expected on Linux Phase 1)
+        # Fallback terminal + IPC (no tray backend for this OS, or package missing)
         if not HAVE_TRAY:
             if is_linux():
                 if HAVE_RICH:
-                    console.print("[dim]📟 Running in terminal mode (Linux Phase 1 — tray/hotkeys via IPC)[/dim]")
+                    console.print(
+                        "[dim]📟 Running in terminal mode (tray unavailable — install pystray; hotkeys via IPC)[/dim]"
+                    )
                     console.print(
                         "   Window-manager binds: [cyan]uv run main.py --trigger snip[/cyan] "
                         "(also: textedit, audio, tts, chat, browser)"
                     )
+                    console.print(
+                        "   Tray requires: [cyan]pip install pystray[/cyan] "
+                        "+ StatusNotifier host (waybar/dms) + optional libappindicator"
+                    )
                 else:
-                    print("📟 Running in terminal mode (Linux Phase 1 — tray/hotkeys via IPC)")
+                    print("📟 Running in terminal mode (tray unavailable — install pystray; hotkeys via IPC)")
                     print("   Window-manager binds: uv run main.py --trigger snip")
             else:
                 if HAVE_RICH:
