@@ -901,7 +901,7 @@ class AudioAnalyzerWindow:
             from ...audio import is_pyaudio_available
 
             if not is_pyaudio_available():
-                self._update_status("PyAudioWPatch not available", self.colors.red)
+                self._update_status("PyAudio not available", self.colors.red)
                 return
 
             # Refresh device list

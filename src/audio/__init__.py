@@ -2,20 +2,22 @@
 """
 Audio capture package for AIPromptBridge.
 
-Provides audio recording capabilities using PyAudioWPatch for WASAPI support
-on Windows, including loopback device capture for system audio.
+Provides audio recording via PyAudio:
+- Windows: PyAudioWPatch (WASAPI loopback for system audio)
+- Linux: stock PyAudio / PortAudio (PipeWire/Pulse monitor sources)
 
 Components:
+- backend.py: Platform-specific PyAudio import
 - devices.py: Audio device enumeration and discovery
 - ffmpeg_utils.py: Shared FFmpeg binary detection, subprocess helpers, duration extraction
 - recorder.py: AudioRecorder class with recording, playback, and level monitoring
 """
 
+from .backend import HAVE_PYAUDIO, is_pyaudio_available
 from .devices import (
     AudioDevice,
     get_default_input_device,
     get_default_loopback_device,
-    is_pyaudio_available,
     list_input_devices,
     list_loopback_devices,
 )
@@ -38,6 +40,7 @@ from .recorder import COMPRESSION_PRESETS, AudioRecorder
 __all__ = [
     "CODEC_MAP",
     "COMPRESSION_PRESETS",
+    "HAVE_PYAUDIO",
     "AudioDevice",
     "AudioRecorder",
     "build_output_filename",

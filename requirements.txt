@@ -20,8 +20,10 @@ rich
 infi.systray; sys_platform == "win32"
 pystray; sys_platform == "linux"
 
-# Audio loopback (Windows WASAPI via PyAudioWPatch; Linux uses stock PyAudio later)
+# Audio capture (Windows WASAPI loopback via PyAudioWPatch; Linux PortAudio/PipeWire via stock PyAudio)
+# Linux system deps if wheel build fails: portaudio-devel (Fedora) or portaudio19-dev (Debian/Ubuntu)
 PyAudioWPatch; sys_platform == "win32"
+PyAudio; sys_platform == "linux"
 
 # PDF Tool dependencies
 pypdf>=4.0.0

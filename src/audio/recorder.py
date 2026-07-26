@@ -3,7 +3,8 @@
 Audio recorder with recording, playback, and level monitoring.
 
 Provides:
-- Recording from input devices and WASAPI loopback
+- Recording from microphones and system/desktop sources
+  (WASAPI loopback on Windows; PipeWire/Pulse monitors on Linux)
 - Real-time audio level monitoring (always active)
 - Audio playback with seek/pause controls
 - FFmpeg-based compression to Opus/OGG format
@@ -25,23 +26,14 @@ from pathlib import Path
 from queue import Empty, Queue
 from typing import Callable, List, Optional
 
-from .devices import AudioDevice, is_pyaudio_available
+from .backend import HAVE_PYAUDIO, get_pyaudio_install_hint, pyaudio
+from .devices import AudioDevice
 from .ffmpeg_utils import (
     get_audio_duration,
     get_creation_flags,
     get_ffmpeg_path,
     is_ffmpeg_available,
 )
-
-# Try to import PyAudioWPatch
-try:
-    import pyaudiowpatch as pyaudio
-
-    HAVE_PYAUDIO = True
-except ImportError:
-    HAVE_PYAUDIO = False
-    pyaudio = None
-
 
 # =============================================================================
 # Compression Presets
@@ -127,21 +119,21 @@ class AudioRecorder:
 
     Key features:
     - Single unified stream handles both level monitoring and recording
-    - Records from microphones or WASAPI loopback devices
+    - Records from microphones or system/desktop capture devices
     - Provides real-time audio level monitoring (always active when stream is open)
     - Recording is flag-based (instant start/stop, no stream conflicts)
     - Supports audio playback with seek/pause
     - Compresses audio using FFmpeg (Opus/OGG or MP3)
 
     Architecture:
-    - Call start_stream() when device is selected - opens WASAPI input once
+    - Call start_stream() when device is selected - opens PortAudio input once
     - Recording is controlled via start_recording()/stop_recording() flags
     - Level monitoring runs continuously while stream is active
     - Call stop_stream() when done or changing devices
     """
 
     CHUNK_SIZE = 512  # Small chunks for responsive level meter
-    LOOPBACK_CHUNK_SIZE = 4096  # Larger chunks for WASAPI loopback (buffers ~1sec)
+    LOOPBACK_CHUNK_SIZE = 4096  # Larger chunks for loopback/monitor (buffers more)
     FORMAT = pyaudio.paInt16 if HAVE_PYAUDIO else None
 
     def __init__(self, device: Optional[AudioDevice] = None):
@@ -151,11 +143,9 @@ class AudioRecorder:
         Args:
             device: Audio device to use. If None, uses default.
         """
-        if not HAVE_PYAUDIO:
-            raise RuntimeError("PyAudioWPatch is not installed. Install with: pip install PyAudioWPatch")
-
+        # Initialize fields first so __del__/cleanup are safe if construction fails
         self._device = device
-        self._pyaudio: Optional[pyaudio.PyAudio] = None
+        self._pyaudio = None
 
         # Unified stream state (new architecture - uses thread with blocking reads)
         self._stream = None
@@ -188,6 +178,9 @@ class AudioRecorder:
         self._playback_channels = 2
         self._playback_sample_width = 2
 
+        if not HAVE_PYAUDIO:
+            raise RuntimeError(f"PyAudio is not installed. Install with: {get_pyaudio_install_hint()}")
+
         logging.debug(f"[AudioRecorder] Initialized with device: {device}")
 
     @property
@@ -204,7 +197,13 @@ class AudioRecorder:
         self._device = device
         logging.debug(f"[AudioRecorder] Device changed to: {device}")
 
-    def _get_pyaudio(self) -> pyaudio.PyAudio:
+    @staticmethod
+    def _is_loopback_like_name(name: str) -> bool:
+        """Fallback name heuristic when AudioDevice.is_loopback is unset/stale."""
+        lower = (name or "").lower()
+        return "loopback" in lower or "monitor" in lower
+
+    def _get_pyaudio(self):
         """Get or create PyAudio instance."""
         if self._pyaudio is None:
             self._pyaudio = pyaudio.PyAudio()
@@ -253,7 +252,8 @@ class AudioRecorder:
 
                 # Store sample info for WAV generation
                 self._sample_rate = int(self._device.sample_rate)
-                self._channels = self._device.channels
+                channels = max(1, int(self._device.channels or 1))
+                self._channels = channels
                 p = self._get_pyaudio()
                 self._sample_width = p.get_sample_size(self.FORMAT)
 
@@ -277,31 +277,56 @@ class AudioRecorder:
 
                     return (in_data, pyaudio.paContinue)
 
-                # Detect if this is a loopback device (they have different buffering behavior)
-                is_loopback = "loopback" in self._device.name.lower()
+                # Loopback/monitor devices often deliver larger, less frequent buffers
+                is_loopback = bool(self._device.is_loopback) or self._is_loopback_like_name(self._device.name)
+                chunk_size = self.LOOPBACK_CHUNK_SIZE if is_loopback else self.CHUNK_SIZE
+                rate = int(self._device.sample_rate)
 
-                # For loopback devices, use larger buffer to get more data per callback
-                # WASAPI loopback typically buffers internally and delivers data less frequently
-                if is_loopback:
-                    # Use a moderate buffer size (e.g. 4096) to balance stability and update rate
-                    # Providing full 1-sec buffer causes level meter to lag (1Hz updates)
-                    chunk_size = self.LOOPBACK_CHUNK_SIZE
-                else:
-                    chunk_size = self.CHUNK_SIZE
+                # Open stream WITH callback - this uses PyAudio's native threading.
+                # If channel count fails (common on some PipeWire nodes), retry mono/stereo.
+                last_error: Optional[Exception] = None
+                channel_candidates = [channels]
+                for alt in (1, 2):
+                    if alt not in channel_candidates:
+                        channel_candidates.append(alt)
 
-                # Open stream WITH callback - this uses PyAudio's native threading
-                self._stream = p.open(
-                    format=self.FORMAT,
-                    channels=self._device.channels,
-                    rate=int(self._device.sample_rate),
-                    input=True,
-                    input_device_index=self._device.index,
-                    frames_per_buffer=chunk_size,
-                    stream_callback=stream_callback,
-                )
+                for try_channels in channel_candidates:
+                    try:
+                        self._stream = p.open(
+                            format=self.FORMAT,
+                            channels=try_channels,
+                            rate=rate,
+                            input=True,
+                            input_device_index=self._device.index,
+                            frames_per_buffer=chunk_size,
+                            stream_callback=stream_callback,
+                        )
+                        self._channels = try_channels
+                        last_error = None
+                        break
+                    except Exception as open_err:
+                        last_error = open_err
+                        logging.debug(
+                            f"[AudioRecorder] open failed channels={try_channels} "
+                            f"rate={rate} device={self._device.name!r}: {open_err}"
+                        )
+                        self._stream = None
+
+                if self._stream is None:
+                    logging.error(
+                        f"[AudioRecorder] Failed to start stream on {self._device.name!r} "
+                        f"(index={self._device.index}, rate={rate}, channels={channels}): "
+                        f"{last_error}"
+                    )
+                    self._stream_active = False
+                    return False
 
                 self._stream_active = True
-                logging.info(f"[AudioRecorder] Stream started on {self._device.name}")
+                logging.info(
+                    f"[AudioRecorder] Stream started on {self._device.name} "
+                    f"(rate={rate}, channels={self._channels}, "
+                    f"{'loopback/monitor' if is_loopback else 'input'})"
+                )
                 return True
 
             except Exception as e:
@@ -784,6 +809,8 @@ class AudioRecorder:
 
     def cleanup(self):
         """Clean up all resources."""
+        if not hasattr(self, "_stream_lock"):
+            return
         self.stop_stream()  # New unified stream
         self.stop_playback()
 
@@ -798,4 +825,7 @@ class AudioRecorder:
 
     def __del__(self):
         """Destructor."""
-        self.cleanup()
+        try:
+            self.cleanup()
+        except Exception:
+            pass
