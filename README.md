@@ -1,6 +1,6 @@
 # AIPromptBridge
 
-**AIPromptBridge** is a Windows system-wide app that brings AI assistance to your fingertips. Use global hotkeys to edit text using AI, capture and analyze audio or screen content, and chat with models, all from a lightweight system tray app.
+**AIPromptBridge** is a system-wide app that brings AI assistance to your fingertips. Use global hotkeys (Windows) or window-manager IPC triggers (Linux Wayland / niri) to edit text with AI, capture and analyze audio or screen content, and chat with models — all from a lightweight system tray app.
 
 <details>
   <summary>🎬 Click to expand video demo</summary>
@@ -152,10 +152,12 @@ The **TTS Processor** tool enables batch text-to-speech generation:
 ```bash
 git clone https://github.com/zaxx-q/AIPromptBridge.git
 cd AIPromptBridge
-pip install -r requirements.txt
-python main.py
+# Python 3.13.x recommended (see .python-version)
+uv pip install -r requirements.txt   # or: pip install -r requirements.txt
+uv run main.py --show-console        # or: python main.py
 ```
 
+**Linux (Wayland / niri):** install system tools (`wl-clipboard`, `wlrctl`, `grim`, `slurp`, PortAudio) and use `uv run main.py --trigger snip` (etc.) from compositor binds. Full guide: [docs/LINUX.md](docs/LINUX.md).
 ## 📋 Usage
 
 ### System Tray

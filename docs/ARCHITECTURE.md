@@ -4,19 +4,22 @@ This document describes the technical architecture of AIPromptBridge.
 
 ## Overview
 
-AIPromptBridge is a Windows application consisting of:
+AIPromptBridge is a **Windows-first** Python desktop app with **Linux Wayland** support (validated on **niri** / wlroots). Shared AI/GUI core; OS I/O is abstracted under `src/platform/` and audio backends. Linux details and system packages: [LINUX.md](LINUX.md).
+
+Major pieces:
 
 1. **Flask Web Server** - Internal REST API for session/model management
-2. **System Tray Application** - Background process management with `infi.systray`
-3. **CustomTkinter GUI** - Modern chat windows, session browser, and popups with multi-theme support
-4. **Rich Console Interface** - Modernized terminal UI with structured logging and panels
-5. **TextEditTool** - Global hotkey assistance with two-tier "Edit" and "General" prompt architecture
-6. **AI Provider System** - Unified abstraction for multiple AI backends
-7. **Theme System** - Multi-theme support with dark/light modes and system detection
-8. **Settings Infrastructure** - GUI editors for config.ini and prompt options with hot-reload
-9. **Tools Subsystem** - Batch file processing framework with checkpoints and audio optimization
-10. **TTS (Text-to-Speech)** - Gemini-powered speech synthesis with AI Director for expressive style control
-11. **Self-Update System** - Two-phase update from GitHub Releases with rollback protection
+2. **System Tray** - `infi.systray` (Windows) / `pystray` (Linux StatusNotifier)
+3. **CustomTkinter GUI** - Chat, session browser, popups, multi-theme UI
+4. **Rich Console Interface** - Terminal UI with structured logging
+5. **TextEditTool** - Selection capture + AI actions (hotkeys on Windows; IPC `--trigger` on Linux)
+6. **AI Provider System** - Unified multi-backend abstraction
+7. **Theme System** - Dark/light multi-theme support
+8. **Settings / Prompts** - GUI editors with hot-reload
+9. **Tools Subsystem** - Batch file processing, checkpoints, audio optimization
+10. **TTS** - Gemini speech synthesis with AI Director
+11. **Self-Update** - Two-phase GitHub Releases flow (Windows launcher apply)
+12. **Platform layer** (`src/platform/`) - IPC, clipboard, input, screenshot, single-instance
 
 ## Component Diagram
 
@@ -35,12 +38,19 @@ flowchart TB
         Popups["Popups<br/>(popups.py)"]
         Modifiers["Scrollable ModifierBar<br/>(popups.py)"]
         TypingInd["TypingIndicator<br/>(popups.py)"]
+        IPC["IPC / --trigger<br/>(platform/ipc.py)"]
+    end
+
+    subgraph OS["Platform (src/platform/)"]
+        Clip["clipboard.py"]
+        Input["input.py"]
+        Shot["screenshot.py"]
+        Inst["single_instance.py"]
     end
     
     subgraph Pipeline["Request Pipeline"]
         RP["request_pipeline.py<br/>• Logging<br/>• Token tracking<br/>• Origin tracking<br/>• Abort signal propagation"]
-    end
-    
+    end    
     subgraph APIClient["API Client"]
         AC["api_client.py<br/>create_provider()"]
     end
@@ -88,6 +98,10 @@ flowchart TB
     Gemini --> KM
     Anthropic --> KM
     OAI --> KM
+    IPC --> Inst
+    TET --> Clip
+    TET --> Input
+    Snip --> Shot
 ```
 
 ## Provider System
@@ -376,16 +390,18 @@ Per-session profile override (chat window dropdown)
 - **Tray Menu**: "Profiles" menu item
 - **Terminal**: `C` command for profile switching, `I` shows active profile
 
-## System Tray (Windows)
+## System Tray
 
-The tray application (`src/tray.py`) manages:
+`src/tray.py` exposes one `TrayApp` with platform backends:
 
-- Console show/hide handles both standard console and **Windows Terminal** (console X button is disabled in tray mode)
-- Application restart (spawns new process, exits current) via launcher where possible
-- Quick access to session browser
-- Config file editing
+| OS | Backend | Notes |
+|----|---------|--------|
+| Windows | `infi.systray` | Native `.ico`; console show/hide + Windows Terminal HWND |
+| Linux | `pystray` | Needs a StatusNotifier host (waybar, dms, …); Pillow image from `icon.ico` |
 
-### Console Window Behavior
+Shared menu actions (session browser, chat, snip, audio, TTS, settings, prompts, profiles, updates, restart, quit) call the same tool/GUI entry points used by hotkeys or IPC triggers. Tool enable flags rebuild the menu via config change subscription.
+
+### Console window behavior (Windows)
 
 | Action | Result |
 | -------- | -------- |
@@ -393,6 +409,32 @@ The tray application (`src/tray.py`) manages:
 | Tray → Hide Console | Hides console window |
 | Tray → Show Console | Shows and focuses console |
 | Tray → Quit | Clean shutdown |
+
+Linux omits console toggle items (no Win32 console HWND control).
+
+## Platform layer & Linux I/O
+
+OS-specific I/O is concentrated in `src/platform/` (no GUI imports):
+
+| Concern | Windows | Linux (Wayland / niri) |
+|---------|---------|-------------------------|
+| Invoke tools | pynput global hotkeys + tray | Unix-socket IPC: `main.py --trigger <name>` |
+| Single instance | Named mutex | Socket bind (same path as IPC) |
+| Clipboard / selection | pyperclip + SendInput / sequence numbers | `wl-copy`/`wl-paste`; primary first; hybrid Ctrl+C via `wlrctl` |
+| Type / paste into apps | pynput / SendInput | `wlrctl keyboard type` + chords |
+| Snip capture | Tk overlay + `PIL.ImageGrab` | `slurp` + `grim` → `CaptureResult` |
+| Desktop audio | PyAudioWPatch WASAPI loopback | PyAudio + PipeWire/Pulse **monitor** devices |
+
+See [LINUX.md](LINUX.md) for packages, niri binds, and limitations.
+
+### Audio backends
+
+`src/audio/backend.py` selects the PortAudio binding:
+
+- **Windows:** `pyaudiowpatch` (loopback APIs)
+- **Linux:** stock `pyaudio`; monitors classified in `devices.py` (name heuristics such as `.monitor`)
+
+Recorder unified stream (open once, flag-based record, level meter) is shared.
 
 ## Console Interface (Rich)
 

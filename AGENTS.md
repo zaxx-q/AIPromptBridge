@@ -10,12 +10,13 @@ Guidance for AI agents working in this repo.
 
 ## Project Overview
 
-AIPromptBridge — **Windows-only** Python desktop app. AI assistance via system tray, global hotkeys, Flask API.
+AIPromptBridge — Windows-first Python desktop app (Linux Wayland / niri supported). Tray + tools + Flask; hotkeys on Windows, IPC `--trigger` on Linux. OS I/O: `src/platform/`. Details: `docs/LINUX.md`.
 
 ## Commands
 
-- **Run**: `uv run main.py` (option: `--show-console` (debug mode))
-- **Install deps**: `uv pip install -r requirements.txt`
+- **Run**: `uv run main.py` (option: `--show-console`)
+- **Linux trigger**: `uv run main.py --trigger snip|textedit|audio|…` (requires running instance)
+- **Install deps**: `uv pip install -r requirements.txt` (Python **3.13.x**; see `.python-version`)
 
 ## Testing & Quality (optional, only do at the end)
 
@@ -61,10 +62,10 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **Usage**: GUI tools (`AudioTool`, `SnipTool`) and CLI tools (`FileProcessor`) delegate here instead of manual dict construction.
 
 ### 5. Audio Subsystem (Queue-Based Stream)
-- `AudioRecorder` uses **Unified Stream Architecture**. PyAudio WASAPI stream opens *once*, stays running for continuous visual level meter.
-- Recording toggles flag pushing frames into thread-safe `Queue`. Don't start/stop PyAudio stream for recording boundaries — drops frames, crashes level meter.
-- **FFmpeg**: Subprocess calls must use `get_creation_flags()` for `CREATE_NO_WINDOW` on Windows. Binary detection cached in `src/audio/ffmpeg_utils.py`.
-- **Export & Compression**: Centralized in `src/audio/export.py`. Always use for saving audio (TTS or recordings) — consistent format conversions (Opus, MP3, AAC), metadata embedding, safe filename generation.
+- Import via `src/audio/backend.py`: **PyAudioWPatch** (Windows WASAPI loopback) / stock **PyAudio** (Linux; monitor sources ≈ loopback).
+- `AudioRecorder` **Unified Stream**: open once for level meter; record via flag + `Queue` (don't stop stream at boundaries).
+- **FFmpeg**: `get_creation_flags()` for `CREATE_NO_WINDOW` on Windows. Detection in `src/audio/ffmpeg_utils.py`.
+- **Export**: `src/audio/export.py` for all saved audio (Opus/MP3/AAC, metadata, safe names).
 
 ### 6. Session Management & Origin Tracking
 - Sessions do NOT store provider info (read dynamically for hot-switching).
@@ -81,7 +82,8 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **KeyManager** (`src/key_manager.py`): Built by `KeyStore.build_key_managers()`. 429/401/403 → immediate key rotation; 5xx/empty → delay + retry same key.
 
 ### 8. Streaming & Keyboard Injection
-- **Pynput Typing**: When typing into active OS windows (TextEditTool replace mode), use 20-char buffer (`MIN_BUFFER_CHARS = 20`) with 5ms delay per character. Too fast → crashes target app.
+- **Windows**: pynput / SendInput; streaming type uses ~20-char buffer (`MIN_BUFFER_CHARS`) + small per-char delay.
+- **Linux**: `src/platform/input.py` (`wlrctl`) for type/paste; chunked type (no per-char subprocess spam). Selection: primary first, hybrid Ctrl+C via wlrctl if empty (`clipboard.py`).
 - **Typing Indicator**: `TypingIndicator` tooltip during streaming with abort hotkey.
 
 ### 9. Specific Provider Quirks
@@ -93,10 +95,10 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **Large Files (>15MB)**: Gemini Native auto-routes through Google **Files API** (`upload_file`) instead of inline Base64.
 
 ### 10. Tool Architectures
-- **TextEditTool**: Dual input (Edit/Ask), Compare Mode (hides popup, waits for 2nd selection, executes with both), ModifierBar injections.
-- **SnipTool**: `ScreenOverlay` → `CaptureResult` → `SnipPopup` → API.
-- **AudioTool**: Controller handles logic, `AudioAnalyzerWindow` handles recording/UI.
-- **TTS Tool**: Bypasses `RequestPipeline` (Gemini-only). Returns 24kHz PCM, converted to WAV via `src/audio/wav_utils.py`, exported via `src/audio/export.py`.
+- **TextEditTool**: Dual input (Edit/Ask), Compare Mode, ModifierBar. Linux invoke: `--trigger textedit` (no pynput hotkeys).
+- **SnipTool**: Windows `ScreenSnipOverlay`+ImageGrab; Linux `grim`/`slurp` → same `CaptureResult` → `SnipPopup` → API.
+- **AudioTool**: Controller + `AudioAnalyzerWindow` (mic / loopback-or-monitor).
+- **TTS Tool**: Bypasses `RequestPipeline` (Gemini-only). 24kHz PCM → WAV (`wav_utils`) → `export.py`.
 
 ### 11. Batch Tools System (Sync/Async)
 
@@ -157,3 +159,8 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **Runtime Switching**: `switch_active_profile()` in `web_server.py` updates CONFIG, AI_PARAMS, key managers, fires `_bulk_update` notification.
 - **GUI**: `ConnectionProfileManager` window (`src/gui/windows/connection_manager.py`). Accessible via Settings Window "Manage Profiles" button, tray menu, and terminal `P` command.
 - **Fields**: `provider`, `model`, `streaming`, `thinking`, `thinking_budget`, `thinking_level`, `reasoning_effort`, `temperature`, `max_tokens`, `request_timeout`, `base_url`, `api_key_name`, `api_key_pool`.
+
+### 20. Platform layer (Linux / dual-OS)
+- Put OS I/O in `src/platform/` (no GUI imports): IPC, clipboard, input, screenshot, single-instance.
+- Windows: keep Win32/pynput/WPatch paths behind `is_windows()`; do not force Linux CLIs on Windows.
+- Linux system tools are **external** (`wl-clipboard`, `wlrctl`, `grim`, `slurp`, …) — detect with `shutil.which`, degrade gracefully. Full guide: `docs/LINUX.md`.

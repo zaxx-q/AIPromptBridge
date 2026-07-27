@@ -25,6 +25,7 @@ AIPromptBridge/
 ├── docs/                       # Documentation
 │   ├── PROJECT_STRUCTURE.md    # This file
 │   ├── ARCHITECTURE.md         # Technical architecture details
+│   ├── LINUX.md                # Linux / Wayland (niri) support guide
 │   └── BUILD_PROCESS.md # Build system & architecture decisions
 │
 └── src/
@@ -40,15 +41,25 @@ AIPromptBridge/
     ├── request_pipeline.py     # Unified request processing with logging
     ├── session_manager.py      # Session persistence with sequential IDs and per-session model override
     ├── terminal.py             # Interactive terminal commands (includes Tools menu)
-    ├── tray.py                 # System tray application (Windows)
+    ├── tray.py                 # System tray (Windows infi.systray / Linux pystray)
     ├── updater.py              # Self-update: GitHub Releases check, download, staging, trigger
     ├── utils.py                # Utility functions and build state detection (is_compiled)
     ├── version.py              # Application version source of truth
     ├── web_server.py           # Flask server for internal API
     │
+    ├── platform/               # OS abstractions (no GUI imports)
+    │   ├── __init__.py
+    │   ├── detect.py           # is_windows / is_linux / is_wayland
+    │   ├── ipc.py              # Unix-socket --trigger protocol
+    │   ├── single_instance.py  # Mutex (Windows) / socket lock (Linux)
+    │   ├── clipboard.py        # wl-clipboard + hybrid selection (Linux)
+    │   ├── input.py            # wlrctl type / key chords (Linux)
+    │   └── screenshot.py       # grim + slurp region capture (Linux)
+    │
     ├── audio/                  # Audio Subsystem
     │   ├── __init__.py
-    │   ├── devices.py          # PyAudioWPatch device enumeration
+    │   ├── backend.py          # PyAudio import dispatch (WPatch vs stock)
+    │   ├── devices.py          # Device enumeration (WASAPI loopback / PipeWire monitors)
     │   ├── export.py           # Centralized audio export, compression, and metadata embedding
     │   ├── ffmpeg_utils.py     # Shared FFmpeg/FFprobe/FFplay detection and helpers
     │   ├── recorder.py         # Recorder class with recording, playback, and compression
@@ -61,15 +72,15 @@ AIPromptBridge/
     │   ├── core.py             # GUICoordinator singleton for thread-safe GUI
     │   ├── custom_widgets.py   # Reusable UI components (ScrollableButtonList, ScrollableComboBox)
     │   ├── emoji_renderer.py   # Twemoji-based color emoji support for Windows
-    │   ├── hotkey.py           # Global hotkey listener (pynput)
+    │   ├── hotkey.py           # Global hotkey listener (pynput; no-op on Linux Wayland)
     │   ├── platform.py         # UI toolkit authority (HAVE_CTK and fallback logic)
     │   ├── popups.py           # Modern themed popups with scrollable ModifierBar
     │   ├── prompts.py          # Unified PromptsConfig loader/manager
-    │   ├── screen_snip.py      # Screenshot capture and overlay
+    │   ├── screen_snip.py      # CaptureResult + Windows ImageGrab overlay
     │   ├── snip_popup.py       # Popup UI for screen snipping results
-    │   ├── snip_tool.py        # Screen Snip controller application
+    │   ├── snip_tool.py        # Screen Snip controller (Linux: platform screenshot)
     │   ├── text_edit_tool.py   # TextEditTool application controller
-    │   ├── text_handler.py     # Text selection and replacement
+    │   ├── text_handler.py     # Text selection and replacement (Win32 / Wayland paths)
     │   ├── themes.py           # ThemeRegistry with multi-theme support
     │   ├── utils.py            # GUI utilities (clipboard, markdown render)
     │   └── windows/            # Modular window implementations
@@ -132,7 +143,7 @@ AIPromptBridge/
 
 | Module | Purpose |
 |--------|---------|
-| `tray.py` | System tray icon with console show/hide, restart, session browser |
+| `tray.py` | System tray (Windows `infi.systray` / Linux `pystray`) + shared menu actions |
 | `web_server.py` | Flask server for internal API (sessions, models) |
 | `terminal.py` | Interactive terminal commands when console is visible |
 | `console.py` | Centralized Rich console configuration with custom theme |
@@ -145,6 +156,19 @@ AIPromptBridge/
 | `attachment_manager.py`| Manages external file storage for session attachments |
 | `updater.py` | Self-update: GitHub API, download, extraction, launcher signaling |
 
+### Platform (`src/platform/`)
+
+| Module | Purpose |
+|--------|---------|
+| `detect.py` | OS / session detection helpers |
+| `ipc.py` | Linux `--trigger` Unix-socket client/server |
+| `single_instance.py` | Single-instance lock (mutex or socket) |
+| `clipboard.py` | Wayland clipboard + primary + hybrid selection |
+| `input.py` | `wlrctl` typing and clipboard key chords |
+| `screenshot.py` | `grim`/`slurp` interactive region capture |
+
+See [LINUX.md](LINUX.md) for runtime packages and niri usage.
+
 ### GUI (`src/gui/`)
 
 | Module | Purpose |
@@ -152,15 +176,15 @@ AIPromptBridge/
 | `core.py` | GUICoordinator singleton managing all CustomTkinter windows |
 | `emoji_renderer.py` | EmojiRenderer for Windows color emoji support (Twemoji) |
 | `custom_widgets.py` | Custom scrollable lists and emoji-aware dropdowns (ScrollableComboBox) |
-| `text_edit_tool.py` | Global hotkey TextEditTool application |
-| `snip_tool.py` | Screen Snipping application controller (`Ctrl+Alt+X`) |
+| `text_edit_tool.py` | TextEditTool controller (hotkey or IPC trigger) |
+| `snip_tool.py` | Screen Snip controller (overlay or grim/slurp) |
 | `platform.py` | Central authority for UI toolkit availability and toolkit fallback |
 | `windows/` | Modular package for application windows |
 | `popups.py` | Themed popup dialogs with dual inputs (Edit/Ask) and scrollable ModifierBar |
-| `hotkey.py` | pynput-based global hotkey listener |
-| `themes.py` | ThemeRegistry with 7 themes, dark/light variants, system detection |
-| `windows/settings_window/` | Modular settings window package (mixin-based, 12 files) |
-| `windows/prompt_editor/` | Modular prompt editor package (mixin-based, 10 files) |
+| `hotkey.py` | pynput global hotkeys (registered on Windows only) |
+| `themes.py` | ThemeRegistry with multi-theme dark/light variants, system detection |
+| `windows/settings_window/` | Modular settings window package (mixin-based) |
+| `windows/prompt_editor/` | Modular prompt editor package (mixin-based) |
 
 ### Providers (`src/providers/`)
 

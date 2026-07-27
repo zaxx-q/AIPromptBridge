@@ -2,6 +2,8 @@
 
 This document outlines the build process for AIPromptBridge and documents key architectural decisions regarding the dual-launcher system.
 
+> **Note:** The split launcher / Nuitka internal binary flow described here is **Windows packaging**. Linux runs from source (`uv run main.py`); see [LINUX.md](LINUX.md).
+
 ## Overview
 
 The application uses a split-process architecture to balance startup speed, file organization, and antivirus (AV) evasion.
