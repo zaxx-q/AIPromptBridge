@@ -50,7 +50,7 @@ except ImportError:
     HAVE_GUI = False
     show_settings_window_blocking = None  # type: ignore[assignment]
 
-# System tray support (Windows: infi.systray / Linux: pystray)
+# System tray support (Windows: infi.systray / Linux: StatusNotifier via jeepney)
 HAVE_TRAY = False
 try:
     from src.tray import HAVE_SYSTRAY, TrayApp, hide_console, show_console
@@ -1044,7 +1044,7 @@ def main():
     # Pre-launch system tray
     # Launching it early prevents race conditions and ensures it respects OS dark mode
     # before heavy UI modules block or alter global app/thread state.
-    # HAVE_TRAY is platform-gated (Windows infi.systray / Linux pystray).
+    # HAVE_TRAY is platform-gated (Windows infi.systray / Linux StatusNotifier|pystray).
     use_tray = HAVE_TRAY
     tray = None
     if use_tray:
@@ -1194,13 +1194,13 @@ def main():
         if is_linux():
             if HAVE_RICH:
                 console.print(
-                    "[dim]📌 System tray active (pystray). "
-                    "Needs a StatusNotifier host (waybar/dms/etc.) for the icon to appear.[/dim]"
+                    "[dim]📌 System tray active (StatusNotifier). "
+                    "Host: dms/waybar/etc. must be running for the icon to appear.[/dim]"
                 )
             else:
                 print(
-                    "📌 System tray active (pystray). "
-                    "Needs a StatusNotifier host (waybar/dms/etc.) for the icon to appear."
+                    "📌 System tray active (StatusNotifier). "
+                    "Host: dms/waybar/etc. must be running for the icon to appear."
                 )
 
         # Start terminal session manager at the very end so commands box displays after all startup logs
@@ -1225,18 +1225,17 @@ def main():
             if is_linux():
                 if HAVE_RICH:
                     console.print(
-                        "[dim]📟 Running in terminal mode (tray unavailable — install pystray; hotkeys via IPC)[/dim]"
+                        "[dim]📟 Running in terminal mode (tray unavailable — install jeepney; hotkeys via IPC)[/dim]"
                     )
                     console.print(
                         "   Window-manager binds: [cyan]uv run main.py --trigger snip[/cyan] "
                         "(also: textedit, audio, tts, chat, browser)"
                     )
                     console.print(
-                        "   Tray requires: [cyan]pip install pystray[/cyan] "
-                        "+ StatusNotifier host (waybar/dms) + optional libappindicator"
+                        "   Tray requires: [cyan]pip install jeepney[/cyan] + StatusNotifier host (waybar/dms)"
                     )
                 else:
-                    print("📟 Running in terminal mode (tray unavailable — install pystray; hotkeys via IPC)")
+                    print("📟 Running in terminal mode (tray unavailable — install jeepney; hotkeys via IPC)")
                     print("   Window-manager binds: uv run main.py --trigger snip")
             else:
                 if HAVE_RICH:

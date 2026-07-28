@@ -91,8 +91,29 @@ try:
 except ImportError:
     pass
 
-# True when a tray backend is available for the current OS
-HAVE_SYSTRAY = (is_windows() and HAVE_INFI_SYSTRAY) or (is_linux() and HAVE_PYSTRAY)
+# Pure D-Bus StatusNotifierItem (preferred on Linux Wayland — works with dms/waybar)
+HAVE_STATUS_NOTIFIER = False
+try:
+    from .platform.status_notifier import (
+        StatusNotifierIcon,
+        TrayMenuEntry,
+        is_status_notifier_available,
+        is_status_notifier_host_registered,
+    )
+
+    HAVE_STATUS_NOTIFIER = is_status_notifier_available()
+except ImportError:
+    StatusNotifierIcon = None  # type: ignore[assignment,misc]
+    TrayMenuEntry = None  # type: ignore[assignment,misc]
+
+    def is_status_notifier_host_registered(timeout: float = 2.0) -> bool:  # type: ignore[misc]
+        return False
+
+
+# True when a tray backend is available for the current OS.
+# Linux: StatusNotifier (jeepney) preferred; pystray kept as optional fallback
+# only when AppIndicator GI bindings exist (otherwise pystray uses broken XEmbed).
+HAVE_SYSTRAY = (is_windows() and HAVE_INFI_SYSTRAY) or (is_linux() and (HAVE_STATUS_NOTIFIER or HAVE_PYSTRAY))
 
 # Tray icon max edge (px) for StatusNotifier / AppIndicator hosts
 _TRAY_ICON_MAX_SIZE = 64
@@ -438,7 +459,8 @@ class TrayApp:
             show_edit_file_items: Whether to show direct file editing options (debug mode)
         """
         self.systray = None  # Windows infi.systray instance
-        self._pystray_icon = None  # Linux pystray Icon instance
+        self._pystray_icon = None  # Linux pystray Icon instance (AppIndicator fallback)
+        self._sni_icon = None  # Linux StatusNotifierItem (jeepney) instance
         self.on_exit_callback = on_exit_callback
         self.console_visible = True
         # Console toggle is Windows-only (Win32 HWND); never show on Linux
@@ -471,9 +493,9 @@ class TrayApp:
                 print("[Warning] infi.systray not available - tray functionality disabled")
                 print("         Install with: pip install infi.systray")
             elif is_linux():
-                print("[Warning] pystray not available - tray functionality disabled")
-                print("         Install with: pip install pystray")
-                print("         (Also needs a StatusNotifier host: waybar, dms, etc.)")
+                print("[Warning] Linux tray backend not available - tray functionality disabled")
+                print("         Install with: pip install jeepney  (StatusNotifier / dms / waybar)")
+                print("         Optional: pip install pystray + system AppIndicator GI bindings")
             else:
                 print("[Warning] System tray not available on this platform")
 
@@ -844,7 +866,7 @@ class TrayApp:
 
         if is_windows() and HAVE_INFI_SYSTRAY:
             return self._start_windows(hide_console_on_start=hide_console_on_start)
-        if is_linux() and HAVE_PYSTRAY:
+        if is_linux():
             return self._start_linux()
 
         print("[Warning] No tray backend for this platform")
@@ -899,25 +921,118 @@ class TrayApp:
             return False
 
     def _start_linux(self):
-        """Start Linux pystray backend (blocks until quit). Requires a StatusNotifier host."""
-        try:
-            image = load_tray_image(self.icon_path)
-            menu = self._build_pystray_menu()
-            self._pystray_icon = PystrayIcon(
-                "aipromptbridge",
-                image,
-                "AIPromptBridge",
-                menu,
-            )
-            # Blocks until icon.stop() (Quit) or process exit
-            self._pystray_icon.run()
-            return True
-        except Exception as e:
-            print(f"[Error] Failed to start system tray (pystray): {e}")
-            print("         Ensure a StatusNotifier/AppIndicator host is running (waybar, dms, etc.)")
-            print("         Optional system package: libappindicator / ayatana-appindicator (distro-specific)")
-            self._pystray_icon = None
+        """
+        Start Linux tray backend (blocks until quit).
+
+        Prefer pure D-Bus StatusNotifierItem (works with dms/waybar on Wayland).
+        Fall back to pystray only when its AppIndicator backend is usable —
+        the XEmbed fallback cannot dock on pure Wayland.
+        """
+        image = load_tray_image(self.icon_path)
+
+        # 1) StatusNotifierItem via jeepney (correct protocol for dms / SNI hosts)
+        if HAVE_STATUS_NOTIFIER and StatusNotifierIcon is not None:
+            try:
+                if not is_status_notifier_host_registered():
+                    print(
+                        "[Warning] No StatusNotifier host registered yet "
+                        "(start dms/waybar/etc.). Trying SNI registration anyway..."
+                    )
+                menu_entries = self._build_sni_menu_entries()
+                default_cb = None
+                for entry in menu_entries:
+                    if entry.default and entry.callback is not None:
+                        default_cb = entry.callback
+                        break
+                self._sni_icon = StatusNotifierIcon(
+                    image=image,
+                    title="AIPromptBridge",
+                    app_id="aipromptbridge",
+                    menu=menu_entries,
+                    on_activate=default_cb,
+                )
+                # Blocks until stop() (Quit) or process exit
+                self._sni_icon.run()
+                return True
+            except Exception as e:
+                print(f"[Warning] StatusNotifier tray failed: {e}")
+                self._sni_icon = None
+
+        # 2) pystray AppIndicator (needs PyGObject + libappindicator GI)
+        if HAVE_PYSTRAY and self._pystray_backend_is_appindicator():
+            try:
+                menu = self._build_pystray_menu()
+                self._pystray_icon = PystrayIcon(
+                    "aipromptbridge",
+                    image,
+                    "AIPromptBridge",
+                    menu,
+                )
+                self._pystray_icon.run()
+                return True
+            except Exception as e:
+                print(f"[Warning] pystray AppIndicator tray failed: {e}")
+                self._pystray_icon = None
+
+        print("[Error] Failed to start system tray on Linux")
+        print("         Need a StatusNotifier host (dms, waybar, …) and: pip install jeepney")
+        print("         (pystray XEmbed backend cannot dock on pure Wayland)")
+        return False
+
+    @staticmethod
+    def _pystray_backend_is_appindicator() -> bool:
+        """True if pystray selected the AppIndicator backend (not broken XEmbed)."""
+        if not HAVE_PYSTRAY or PystrayIcon is None:
             return False
+        module = getattr(PystrayIcon, "__module__", "") or ""
+        return "appindicator" in module
+
+    def _wrap_tray_action(self, callback):
+        """Adapt TrayApp handlers ``(systray)`` for backends that pass different args."""
+
+        def action(*_args, **_kwargs):
+            callback(None)
+
+        return action
+
+    def _build_sni_menu_entries(self):
+        """Build StatusNotifier/dbusmenu entries from shared menu option logic."""
+        if TrayMenuEntry is None:
+            return []
+
+        menu_options = self.build_menu_options()
+        entries = []
+
+        for entry in menu_options:
+            text = entry[0]
+            callback = entry[2] if len(entry) >= 3 else entry[1]
+
+            if text == "---":
+                entries.append(TrayMenuEntry(label=None))
+                continue
+
+            is_default = "Session Browser" in text
+            entries.append(
+                TrayMenuEntry(
+                    label=text,
+                    callback=self._wrap_tray_action(callback),
+                    default=is_default,
+                )
+            )
+
+        if entries and entries[-1].label is not None:
+            entries.append(TrayMenuEntry(label=None))
+        entries.append(TrayMenuEntry(label="Quit", callback=self._on_exit_sni))
+        return entries
+
+    def _on_exit_sni(self):
+        """Quit handler for StatusNotifier backend."""
+        try:
+            if self._sni_icon is not None:
+                self._sni_icon.stop()
+        except Exception:
+            pass
+        self._on_exit(None)
 
     def _wrap_pystray_action(self, callback):
         """Adapt TrayApp handlers ``(systray)`` to pystray ``(icon, item)``."""
@@ -1006,6 +1121,12 @@ class TrayApp:
             unsubscribe_config_change(self._on_config_changed)
         except Exception:
             pass
+        if self._sni_icon is not None:
+            try:
+                self._sni_icon.stop()
+            except Exception:
+                pass
+            self._sni_icon = None
         if self._pystray_icon is not None:
             try:
                 self._pystray_icon.stop()
@@ -1119,6 +1240,12 @@ class TrayApp:
 
     def update_tray_menu(self):
         """Rebuild and update the tray menu options dynamically based on config changes."""
+        if self._sni_icon is not None:
+            try:
+                self._sni_icon.update_menu(self._build_sni_menu_entries())
+            except Exception as e:
+                print(f"[Warning] Failed to update StatusNotifier menu: {e}")
+            return
         if self._pystray_icon is not None:
             try:
                 self._pystray_icon.menu = self._build_pystray_menu()

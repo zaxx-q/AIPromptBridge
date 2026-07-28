@@ -18,6 +18,9 @@ rich
 
 # System tray (platform-specific backends)
 infi.systray; sys_platform == "win32"
+# Linux: pure D-Bus StatusNotifierItem (dms/waybar/niri). pystray alone falls back
+# to XEmbed which cannot dock on pure Wayland without AppIndicator GI bindings.
+jeepney; sys_platform == "linux"
 pystray; sys_platform == "linux"
 
 # Audio capture (Windows WASAPI loopback via PyAudioWPatch; Linux PortAudio/PipeWire via stock PyAudio)

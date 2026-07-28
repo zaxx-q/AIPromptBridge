@@ -8,6 +8,7 @@ import pytest
 from src.tray import (
     HAVE_INFI_SYSTRAY,
     HAVE_PYSTRAY,
+    HAVE_STATUS_NOTIFIER,
     HAVE_SYSTRAY,
     TrayApp,
     load_tray_image,
@@ -20,10 +21,7 @@ class TestTrayAvailability:
         from src.platform.detect import is_linux, is_windows
 
         if is_linux():
-            assert HAVE_SYSTRAY is HAVE_PYSTRAY
-            # Windows-only package should not force HAVE_SYSTRAY on Linux
-            if not HAVE_INFI_SYSTRAY:
-                assert HAVE_SYSTRAY is HAVE_PYSTRAY
+            assert HAVE_SYSTRAY is (HAVE_STATUS_NOTIFIER or HAVE_PYSTRAY)
         elif is_windows():
             assert HAVE_SYSTRAY is HAVE_INFI_SYSTRAY
         else:
@@ -161,9 +159,8 @@ class TestTrayMenuLinux:
             assert mock_icon.update_menu.called
             assert mock_icon.menu is not None
 
-    def test_start_linux_constructs_icon_without_run_blocking(self):
-        if not HAVE_PYSTRAY:
-            pytest.skip("pystray not installed")
+    def test_start_linux_prefers_status_notifier(self):
+        from src.platform.status_notifier import TrayMenuEntry
 
         config_mock = {
             "text_edit_tool_enabled": True,
@@ -171,27 +168,25 @@ class TestTrayMenuLinux:
             "audio_tool_enabled": True,
             "tts_enabled": True,
         }
-        mock_icon_instance = MagicMock()
-        mock_icon_cls = MagicMock(return_value=mock_icon_instance)
+        mock_sni_instance = MagicMock()
+        mock_sni_cls = MagicMock(return_value=mock_sni_instance)
 
         with (
             patch("src.tray.is_windows", return_value=False),
             patch("src.tray.is_linux", return_value=True),
             patch("src.tray.HAVE_SYSTRAY", True),
             patch("src.tray.HAVE_INFI_SYSTRAY", False),
-            patch("src.tray.HAVE_PYSTRAY", True),
-            patch("src.tray.PystrayIcon", mock_icon_cls),
+            patch("src.tray.HAVE_STATUS_NOTIFIER", True),
+            patch("src.tray.HAVE_PYSTRAY", False),
+            patch("src.tray.StatusNotifierIcon", mock_sni_cls),
+            patch("src.tray.TrayMenuEntry", TrayMenuEntry),
+            patch("src.tray.is_status_notifier_host_registered", return_value=True),
             patch("src.web_server.CONFIG", config_mock),
-            patch("src.tray.subscribe_config_change", create=True),
             patch("src.config.subscribe_config_change"),
         ):
             tray = TrayApp(allow_console_toggle=True, show_edit_file_items=False)
             result = tray.start(hide_console_on_start=False)
             assert result is True
-            mock_icon_cls.assert_called_once()
-            call_kwargs = mock_icon_cls.call_args
-            # Icon(name, image, title, menu) — positional
-            args = call_kwargs[0]
-            assert args[0] == "aipromptbridge"
-            assert args[2] == "AIPromptBridge"
-            mock_icon_instance.run.assert_called_once()
+            mock_sni_cls.assert_called_once()
+            assert mock_sni_cls.call_args.kwargs.get("title") == "AIPromptBridge"
+            mock_sni_instance.run.assert_called_once()
