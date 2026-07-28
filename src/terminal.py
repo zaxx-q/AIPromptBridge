@@ -3,7 +3,6 @@
 Terminal interactive session manager with enhanced console UI
 """
 
-import sys
 import time
 
 from rich.align import Align
@@ -294,38 +293,38 @@ def terminal_session_manager():
     # Print the commands box
     print_commands_box()
 
-    def get_input_nonblocking():
-        """Get keyboard input without blocking"""
-        if sys.platform == "win32":
-            import msvcrt
+    from .platform.console_input import RawConsole, is_console_input_available
 
-            if msvcrt.kbhit():
-                return msvcrt.getch().decode("utf-8", errors="ignore").lower()
-            return None
+    if not is_console_input_available():
+        if HAVE_RICH:
+            console.print(
+                "[yellow]⚠️  Interactive console keys unavailable "
+                "(stdin is not a TTY). Use the tray or "
+                "[cyan]uv run main.py --trigger …[/cyan].[/yellow]\n"
+            )
         else:
-            import select
-            import termios
-            import tty
+            print(
+                "⚠️  Interactive console keys unavailable (stdin is not a TTY). "
+                "Use the tray or: uv run main.py --trigger …\n"
+            )
+        # Keep the thread alive so callers that join/expect a daemon loop do not exit early.
+        while True:
+            time.sleep(3600)
 
-            old_settings = None
-            try:
-                old_settings = termios.tcgetattr(sys.stdin)
-                tty.setcbreak(sys.stdin.fileno())
-                if select.select([sys.stdin], [], [], 0.1)[0]:
-                    return sys.stdin.read(1).lower()
-            except Exception:
-                pass
-            finally:
-                if old_settings:
-                    try:
-                        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-                    except Exception:
-                        pass
-            return None
+    # Hold cbreak/raw mode for the whole session so single-key commands work on
+    # Linux without requiring Enter. Use keys.line_input() / keys.cooked() for
+    # multi-character prompts (restores canonical mode temporarily).
+    with RawConsole() as keys:
+        _terminal_command_loop(keys)
 
+
+def _terminal_command_loop(keys):
+    """Command dispatch loop; *keys* is a :class:`RawConsole` instance."""
     while True:
         try:
-            key = get_input_nonblocking()
+            key = keys.get_key(timeout=0.1)
+            if key is None:
+                continue
 
             if key == "l":
                 sessions = list_sessions()
@@ -519,7 +518,7 @@ def terminal_session_manager():
                         print("\n   Enter number, model name, or ?N for details (q = cancel): ", end="", flush=True)
 
                     try:
-                        choice = input().strip()
+                        choice = keys.line_input().strip()
 
                         # Handle model details request (?N syntax)
                         if choice.startswith("?"):
@@ -691,7 +690,7 @@ def terminal_session_manager():
 
                 print("\n   Enter number/name to switch, [E] edit profiles (q = cancel): ", end="", flush=True)
                 try:
-                    choice = input().strip()
+                    choice = keys.line_input().strip()
                     if choice.lower() == "e":
                         if HAVE_GUI:
                             if HAVE_RICH:
@@ -737,7 +736,7 @@ def terminal_session_manager():
                 else:
                     print("\nEnter session ID: ", end="", flush=True)
                 try:
-                    session_id = input().strip()
+                    session_id = keys.line_input().strip()
                     session = get_session(session_id)
                     if session:
                         if HAVE_RICH:
@@ -776,7 +775,7 @@ def terminal_session_manager():
                             print(f"{'─' * 64}\n")
 
                         if HAVE_GUI:
-                            open_gui = input("Open in GUI? [y/N]: ").strip().lower()
+                            open_gui = keys.line_input("Open in GUI? [y/N]: ").strip().lower()
                             if open_gui == "y":
                                 from .gui.core import show_chat_gui
 
@@ -789,9 +788,9 @@ def terminal_session_manager():
             elif key == "d":
                 print("\nEnter session ID to delete: ", end="", flush=True)
                 try:
-                    session_id = input().strip()
+                    session_id = keys.line_input().strip()
                     if get_session(session_id):
-                        confirm = input(f"Delete {session_id}? [y/N]: ").strip().lower()
+                        confirm = keys.line_input(f"Delete {session_id}? [y/N]: ").strip().lower()
                         if confirm == "y":
                             if delete_session(session_id):
                                 save_sessions()
@@ -834,15 +833,16 @@ def terminal_session_manager():
                         print("\n✗ GUI not available\n")
 
             elif key == "u":
-                # Check for updates
+                # Check for updates (may prompt via input())
                 from . import web_server
                 from .updater import check_and_prompt_terminal
 
                 config = web_server.CONFIG or {}
-                check_and_prompt_terminal(config)
+                with keys.cooked():
+                    check_and_prompt_terminal(config)
 
             elif key == "x":
-                # Open Tools menu
+                # Open Tools menu (cooked mode: wizard uses many input() prompts)
                 try:
                     from .tools.file_processor import show_tools_menu
                 except Exception as import_err:
@@ -864,7 +864,8 @@ def terminal_session_manager():
                     console.print("\n[bold]🧰  Opening Tools menu...[/bold]\n")
                 else:
                     print("\n🧰  Opening Tools menu...\n")
-                show_tools_menu()
+                with keys.cooked():
+                    show_tools_menu()
                 # Reprint commands box after returning
                 print()
                 print_commands_box()
@@ -894,8 +895,6 @@ def terminal_session_manager():
                 print("   [U] ⬆️ Update        Check for updates")
                 print("   [H] ❓ Help          Show this help")
                 print(f"{'─' * 64}\n")
-
-            time.sleep(0.1)
 
         except Exception as e:
             # Suppress atexit errors during shutdown

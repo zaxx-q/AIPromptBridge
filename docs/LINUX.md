@@ -65,15 +65,18 @@ OS-facing helpers live under **`src/platform/`** (no GUI imports):
 | `ipc.py` / `single_instance.py` | Trigger protocol + instance lock |
 | `clipboard.py` | `wl-copy` / `wl-paste`, primary, hybrid selection helper |
 | `input.py` | `wlrctl` type and key chords |
+| `console_input.py` | Non-blocking single-key TTY input (`termios` cbreak / Windows `msvcrt`) |
 | `screenshot.py` | `grim` / `slurp` |
 
 Audio import dispatch: `src/audio/backend.py` (WPatch on Windows, stock PyAudio on Linux). Device enumeration and monitor heuristics: `src/audio/devices.py`.
+
+Interactive console commands (`--show-console`) and batch Pause/Stop keys use `src/platform/console_input.py`: hold **cbreak** for single-key polls, restore **cooked** mode around `input()` line prompts.
 
 ## Known limitations
 
 - Pure Wayland apps that ignore virtual keyboard or selection protocols may not accept type/paste/hybrid capture.
 - Snip UX uses **slurp** (not the Windows frozen dim overlay).
-- Batch tools’ non-blocking terminal keys still assume Windows `msvcrt` in places.
+- Interactive console keys require a real TTY (`stdin.isatty()`); piped/redirected stdin falls back to tray / `--trigger`.
 - Self-update **apply** path is Windows launcher-oriented; source installs stay notification-oriented.
 - Multi-compositor (GNOME/KDE) support is best-effort; niri/wlroots is the validated target.
 

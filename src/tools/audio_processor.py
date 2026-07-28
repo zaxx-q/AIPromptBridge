@@ -12,6 +12,7 @@ Handles:
 - Output text merging after processing
 """
 
+import contextlib
 import json
 import os
 import shutil
@@ -1105,29 +1106,28 @@ class AudioProcessor:
         """
         import time
 
-        try:
-            import msvcrt  # Windows-only
+        from src.platform.console_input import RawConsole, get_key, is_console_input_available
 
-            has_msvcrt = True
-        except ImportError:
-            has_msvcrt = False
-
+        can_keys = is_console_input_available()
         start = time.time()
-        while process.poll() is None:
-            elapsed = time.time() - start
-            if elapsed > timeout:
-                process.terminate()
-                break
 
-            # Check for 'q' key press (Windows only)
-            if has_msvcrt and msvcrt.kbhit():
-                key = msvcrt.getch()
-                if key.lower() == b"q":
+        # Hold cbreak for the wait so Linux can stop with 'q' without Enter.
+        key_ctx = RawConsole() if can_keys else contextlib.nullcontext()
+        with key_ctx:
+            while process.poll() is None:
+                elapsed = time.time() - start
+                if elapsed > timeout:
                     process.terminate()
-                    print("\n⏹️ Stopped by user")
-                    return False
+                    break
 
-            time.sleep(0.1)  # Small delay to prevent CPU spinning
+                if can_keys:
+                    key = get_key(timeout=0.1)
+                    if key == "q":
+                        process.terminate()
+                        print("\n⏹️ Stopped by user")
+                        return False
+                else:
+                    time.sleep(0.1)  # Small delay to prevent CPU spinning
 
         return True
 

@@ -106,7 +106,7 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **Audio**: `ffmpeg` for optimization (Mono/16kHz) and chunking. FFmpeg binary detection centralized in `src/audio/ffmpeg_utils.py` (cached `shutil.which`). Import `is_ffmpeg_available()` from there or `src/audio`.
 - **Batch API**: `GeminiNativeProvider` supports `create_batch()` for async large jobs.
 - **Checkpoints**: `CheckpointManager` saves progress. **Failure Checkpoints** (`create_failed_checkpoint`) retry only failed files.
-- **Input**: `msvcrt` on Windows for non-blocking keyboard control (Pause/Stop/Abort) during terminal loops.
+- **Console keys**: Non-blocking terminal input via `src/platform/console_input.py` (`msvcrt` on Windows, `termios` cbreak + `select`/`os.read` on Linux). Use `RawConsole` for command loops / Pause·Stop listeners; `line_input()` / `cooked()` around blocking `input()` prompts.
 - **Debug Tool**: `python -m src.tools` for interactive file processing without full server.
 
 ### 12. Configuration & Hot-Reloading

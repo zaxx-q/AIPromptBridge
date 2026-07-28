@@ -9,14 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-try:
-    import msvcrt
-
-    HAVE_MSVCRT = True
-except ImportError:
-    HAVE_MSVCRT = False
-
 from src.console import HAVE_RICH, print_error, print_info, print_success, print_warning
+from src.platform.console_input import RawConsole, get_key, is_console_input_available
 
 from .base import BaseTool, ToolResult, ToolStatus
 from .checkpoint import TTSCheckpoint, TTSCheckpointManager
@@ -585,7 +579,7 @@ class TTSProcessor(BaseTool):
         print(f"\n🚀 Processing {len(remaining)} of {total} segment(s)")
         print(f"   Voice: {cp.voice_name}  |  Model: {cp.model}")
         print(f"   Output: {cp.output_mode}")
-        if HAVE_MSVCRT:
+        if is_console_input_available():
             print("\n   Controls: [P] Pause   [S] Stop & save progress")
         print("─" * 60)
 
@@ -912,7 +906,7 @@ class TTSProcessor(BaseTool):
 
     def _start_keyboard_listener(self):
         """Start background thread listening for [P]ause and [S]top keys."""
-        if not HAVE_MSVCRT:
+        if not is_console_input_available():
             return
         # Stop any existing listener first
         self._stop_keyboard_listener()
@@ -923,25 +917,20 @@ class TTSProcessor(BaseTool):
             event = self._keyboard_stop_event  # Local reference to avoid race condition
             if event is None:
                 return
-            while not event.is_set():
-                try:
-                    if msvcrt.kbhit():
-                        key = msvcrt.getch()
-                        # Skip extended key codes
-                        if key in (b"\x00", b"\xe0"):
-                            msvcrt.getch()
-                            continue
-                        key_lower = key.lower()
-                        if key_lower == b"p":
+            # Hold cbreak so Linux keys work without Enter.
+            with RawConsole():
+                while not event.is_set():
+                    try:
+                        key = get_key(timeout=0.05)
+                        if key == "p":
                             self.request_pause()
                             print("\n⏸️  Pause requested (press Enter in console to resume)...")
-                        elif key_lower == b"s":
+                        elif key == "s":
                             self.request_pause()
                             self._stop_requested = True
                             print("\n⏹️  Stop requested...")
-                    time.sleep(0.05)
-                except Exception:
-                    break
+                    except Exception:
+                        break
 
         t = threading.Thread(target=_listener, daemon=True, name="tts_keyboard_listener")
         t.start()

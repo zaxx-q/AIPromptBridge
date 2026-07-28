@@ -17,14 +17,6 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-# Windows-specific non-blocking keyboard input
-try:
-    import msvcrt
-
-    HAVE_MSVCRT = True
-except ImportError:
-    HAVE_MSVCRT = False
-
 # Import console utilities
 from src.console import (
     HAVE_RICH,
@@ -37,6 +29,9 @@ from src.console import (
     print_success,
     print_warning,
 )
+
+# Cross-platform non-blocking keyboard input (msvcrt / termios)
+from src.platform.console_input import RawConsole, get_key, is_console_input_available
 
 from .audio_processor import (
     BITRATE_OPTIONS,
@@ -2024,38 +2019,29 @@ class FileProcessor(BaseTool):
     # ─────────────────────────────────────────────────────────────────
 
     def _start_keyboard_listener(self):
-        """Start a background thread to listen for keyboard input (Windows only)"""
-        if not HAVE_MSVCRT:
+        """Start a background thread to listen for [P]ause / [S]top keys."""
+        if not is_console_input_available():
             return None
 
         self._keyboard_stop_event = threading.Event()
         self._stop_requested = False  # Track if stop (vs pause) was requested
 
         def keyboard_listener():
-            """Listen for keyboard input in background"""
-            while not self._keyboard_stop_event.is_set():
-                try:
-                    if msvcrt.kbhit():
-                        key = msvcrt.getch()
-                        # Handle special keys (arrows, function keys start with 0x00 or 0xE0)
-                        if key in (b"\x00", b"\xe0"):
-                            msvcrt.getch()  # Consume the second byte
-                            continue
-
-                        key_lower = key.lower()
-
-                        if key_lower == b"p":
+            """Listen for keyboard input in background (Windows msvcrt / Linux termios)."""
+            # Hold cbreak for the listener lifetime so Linux keys work without Enter.
+            with RawConsole():
+                while not self._keyboard_stop_event.is_set():
+                    try:
+                        key = get_key(timeout=0.05)
+                        if key == "p":
                             self.request_pause()
                             print("\n⏸️  Pause requested... (will pause after current file)")
-                        elif key_lower == b"s":
+                        elif key == "s":
                             self.request_pause()  # Stop is implemented as pause + immediate exit
                             self._stop_requested = True  # Mark as stop (vs pause)
                             print("\n⏹️  Stop requested... (saving progress after current file)")
-
-                    # Small sleep to prevent CPU spinning
-                    time.sleep(0.05)
-                except Exception:
-                    break
+                    except Exception:
+                        break
 
         thread = threading.Thread(target=keyboard_listener, daemon=True)
         thread.start()
@@ -2085,7 +2071,7 @@ class FileProcessor(BaseTool):
 
         # Start keyboard listener for interactive mode
         keyboard_thread = None
-        if interactive and HAVE_MSVCRT:
+        if interactive and is_console_input_available():
             keyboard_thread = self._start_keyboard_listener()
 
         # Resolve settings to print correct provider and model
@@ -2107,7 +2093,7 @@ class FileProcessor(BaseTool):
             print(f"   Delay:    {cp.delay_between_requests}s")
             if cp.use_batch:
                 print("   Mode:     BATCH API (Async)")
-            if HAVE_MSVCRT:
+            if is_console_input_available():
                 print("\n[P] Pause  [S] Stop (saves progress)")
             else:
                 print("\n(Keyboard controls not available - use Ctrl+C to stop)")
@@ -2147,7 +2133,7 @@ class FileProcessor(BaseTool):
                             self.request_resume()
                             self._stop_requested = False  # Reset stop flag
                             # Restart keyboard listener
-                            if HAVE_MSVCRT:
+                            if is_console_input_available():
                                 keyboard_thread = self._start_keyboard_listener()
                         except (EOFError, KeyboardInterrupt):
                             result.message = "Stopped by user"

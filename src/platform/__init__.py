@@ -16,6 +16,7 @@ from .clipboard import (
     paste_image_png,
     paste_text,
 )
+from .console_input import RawConsole, get_key, is_console_input_available
 from .detect import is_linux, is_wayland, is_windows
 from .input import (
     copy_via_clipboard_shortcut,
@@ -46,6 +47,7 @@ from .single_instance import InstanceLock, acquire_single_instance, acquire_sing
 __all__ = [
     "KNOWN_TRIGGERS",
     "InstanceLock",
+    "RawConsole",
     "TriggerServer",
     "acquire_single_instance",
     "acquire_single_instance_mutex",
@@ -60,9 +62,11 @@ __all__ = [
     "encode_reply_error",
     "encode_reply_ok",
     "encode_trigger",
+    "get_key",
     "get_selected_text_wayland",
     "get_socket_path",
     "has_primary_selection",
+    "is_console_input_available",
     "is_grim_slurp_available",
     "is_linux",
     "is_wayland",
