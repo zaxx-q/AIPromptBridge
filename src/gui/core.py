@@ -183,6 +183,17 @@ class GUICoordinator:
                     self._root = tk.Tk()
 
                 self._root.withdraw()  # Hidden root window
+
+                # Linux: probe Tk fonts + fix DrawEngine (no-xft / broken font_shapes).
+                # Must run on the GUI thread with a live interpreter before any windows.
+                if HAVE_CTK:
+                    try:
+                        from .ctk_bootstrap import configure_ctk_rendering
+
+                        configure_ctk_rendering(root=self._root)
+                    except Exception as boot_err:
+                        print(f"[GUICoordinator] CTk bootstrap error: {boot_err}")
+
                 self._running = True
                 self._started.set()
 

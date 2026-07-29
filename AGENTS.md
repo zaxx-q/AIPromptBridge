@@ -17,6 +17,7 @@ AIPromptBridge — Windows-first Python desktop app (Linux Wayland / niri suppor
 - **Run**: `uv run main.py` (option: `--show-console`)
 - **Linux trigger**: `uv run main.py --trigger snip|textedit|audio|…` (requires running instance)
 - **Install deps**: `uv pip install -r requirements.txt` (Python **3.13.x**; see `.python-version`)
+- **Linux GUI fonts**: Prefer distro `python3.13` + `python3.13-tkinter` for the venv (Xft Tk). uv standalone CPython ships **no-xft** Tk → bitmap `fixed` only, broken CTk corners. App auto-falls back to `circle_shapes` via `src/gui/ctk_bootstrap.py`; full text quality still needs distro Tk. Details: `docs/LINUX.md`.
 
 ## Testing & Quality (optional, only do at the end)
 
@@ -27,6 +28,7 @@ AIPromptBridge — Windows-first Python desktop app (Linux Wayland / niri suppor
 
 ### 1. GUI Threading & Dual-UI System (CRITICAL)
 - **Central Authority**: All GUI modules MUST import `ctk`, `CTkImage`, `HAVE_CTK` from `src/gui/platform.py`.
+- **Linux CTk bootstrap**: `configure_ctk_rendering()` in `src/gui/ctk_bootstrap.py` runs on CTk import (best-effort) and again from `GUICoordinator` with the live root. Do not set `DrawEngine.preferred_drawing_method` ad hoc in individual windows.
 - **Single Root**: Managed by `GUICoordinator` in `src/gui/core.py` (main thread only). **DO NOT create new `ctk.CTk()` or `tk.Tk()` instances**.
 - **Dual-UI Requirement**: Every major window must support both CustomTkinter and standard Tkinter (controlled via `ui_force_standard_tk`). New UI features → update both CTk code and `_tk.py` fallback (e.g., `audio_analyzer.py` and `audio_analyzer_tk.py`).
 - **Rich Text / Markdown**: `CTkTextbox` lacks text tag support. Chat/results use hybrid: standard `tk.Text` widgets styled like CTk, inside `CTkFrame` containers.

@@ -871,6 +871,27 @@ def list_themes() -> list:
 # =============================================================================
 
 
+def _default_ui_font_family() -> str:
+    """Platform default UI font family (Linux uses bootstrap probe when available)."""
+    if sys.platform == "win32":
+        return "Segoe UI"
+    if sys.platform == "darwin":
+        return "SF Pro Text"
+
+    # Linux: prefer family resolved against the live Tk font list
+    if sys.platform.startswith("linux"):
+        try:
+            from .ctk_bootstrap import ensure_configured, get_linux_ui_font_family
+
+            ensure_configured()
+            resolved = get_linux_ui_font_family()
+            if resolved:
+                return resolved
+        except Exception:
+            pass
+    return "DejaVu Sans"
+
+
 def get_ctk_font(size: int = 12, weight: str = "normal", family: str | None = None):
     """
     Get a font specification with appropriate defaults for the platform.
@@ -890,12 +911,7 @@ def get_ctk_font(size: int = 12, weight: str = "normal", family: str | None = No
         work perfectly with CTk widgets.
     """
     if family is None:
-        if sys.platform == "win32":
-            family = "Segoe UI"
-        elif sys.platform == "darwin":
-            family = "SF Pro Text"
-        else:
-            family = "DejaVu Sans"
+        family = _default_ui_font_family()
 
     # Always return tuple - works with both tk and CTk, and is thread-safe
     return (family, size, weight)
@@ -978,12 +994,7 @@ def get_tk_font(size: int = 12, weight: str = "normal", family: str | None = Non
         Tuple font specification ``(family, scaled_size, weight)``
     """
     if family is None:
-        if sys.platform == "win32":
-            family = "Segoe UI"
-        elif sys.platform == "darwin":
-            family = "SF Pro Text"
-        else:
-            family = "DejaVu Sans"
+        family = _default_ui_font_family()
 
     if weight and weight != "normal":
         return (family, scaled_tk_size(size), weight)

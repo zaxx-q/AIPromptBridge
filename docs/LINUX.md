@@ -33,6 +33,7 @@ binds {
 
 | Package / binary | Role |
 |------------------|------|
+| **`python3.13` + `python3.13-tkinter`** (distro) | **GUI:** Xft-capable Tk (real fonts + rounded CTk widgets). Prefer over uv’s standalone CPython for the venv. |
 | `wl-clipboard` (`wl-copy`, `wl-paste`) | Clipboard + primary selection |
 | `wlrctl` | Virtual keyboard: type, Ctrl+V/C (TextEdit replace/type, hybrid capture) |
 | `grim`, `slurp` | Screen region capture (SnipTool) |
@@ -41,6 +42,38 @@ binds {
 | StatusNotifier host (e.g. dms, waybar) | Tray icon via `pystray` |
 
 Python deps with markers: `pystray` and `PyAudio` on Linux; `infi.systray` and `PyAudioWPatch` on Windows only.
+
+### CustomTkinter / Tk fonts (important)
+
+CustomTkinter draws rounded corners with a special shapes font (`font_shapes`) and expects real FreeType fonts via **LibXft**.
+
+**uv’s standalone CPython** (python-build-standalone) ships Tk built **`no-xft`**. On those interpreters Tk only exposes the bitmap font `fixed`, so:
+
+| Symptom | Cause |
+|---------|--------|
+| Broken / “corrupted” corners on every CTk widget | Shapes font falls back to `fixed`; `font_shapes` drawing fails |
+| Pixelated / horrendous UI text | No Xft → no Roboto/Noto/DejaVu in Tk |
+
+**App mitigation** (`src/gui/ctk_bootstrap.py`, runs once on GUI start):
+
+- Probes whether `CustomTkinter_shapes_font` actually resolves in Tk
+- If not → forces `DrawEngine.preferred_drawing_method = "circle_shapes"` (usable corners globally)
+- Installs CTk Roboto + shapes fonts into `~/.fonts` and `~/.local/share/fonts` + `fc-cache` (helps once Xft Tk is available)
+- Logs a console warning when the font stack is degraded
+
+**Full fix (Windows-like fonts)** — recreate the venv on **distro** Python 3.13 with tkinter (Fedora example):
+
+```bash
+sudo dnf install python3.13 python3.13-tkinter
+cd /path/to/AIPromptBridge
+uv venv --python /usr/bin/python3.13
+uv pip install -r requirements.txt
+
+# Expect many families and a real sans face, not only "fixed":
+uv run python -c "import tkinter as tk; r=tk.Tk(); r.withdraw(); print(len(r.tk.call('font','families')), r.tk.call('font','actual','TkDefaultFont')); r.destroy()"
+```
+
+Do **not** try to `LD_LIBRARY_PATH` over uv’s `libtcl9tk9.0.so` with distro Tk — ABI skew is fragile.
 
 ## How Linux maps to features
 
@@ -79,6 +112,7 @@ Interactive console commands (`--show-console`) and batch Pause/Stop keys use `s
 - Interactive console keys require a real TTY (`stdin.isatty()`); piped/redirected stdin falls back to tray / `--trigger`.
 - Self-update **apply** path is Windows launcher-oriented; source installs stay notification-oriented.
 - Multi-compositor (GNOME/KDE) support is best-effort; niri/wlroots is the validated target.
+- **GUI fonts / corners:** uv standalone Python’s no-xft Tk cannot render modern fonts; use distro `python3.13-tkinter` (see above). Theme tweaks alone will not fix bitmap text.
 
 ## Related docs
 

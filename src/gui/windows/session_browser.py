@@ -624,6 +624,12 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
         if HAVE_CTK:
             sync_ctk_appearance()
             self.root = ctk.CTk()
+            try:
+                from ..ctk_bootstrap import ensure_ctk_window_ready
+
+                ensure_ctk_window_ready(self.root)
+            except Exception:
+                pass
         else:
             self.root = tk.Tk()
             self.root.configure(bg=self.colors["bg"])

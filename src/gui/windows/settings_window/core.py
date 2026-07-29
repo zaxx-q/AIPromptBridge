@@ -137,6 +137,15 @@ class SettingsWindow(
                 self.root = tk.Tk()
                 self.root.configure(bg=self.colors.bg)
 
+        # Linux CTk: probe fonts / DrawEngine before building widgets
+        if self.use_ctk:
+            try:
+                from ...ctk_bootstrap import ensure_ctk_window_ready
+
+                ensure_ctk_window_ready(self.root)
+            except Exception:
+                pass
+
         self.root.title("AIPromptBridge Settings")
         self.root.geometry("900x700")
         self.root.minsize(800, 600)

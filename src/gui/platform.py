@@ -61,6 +61,16 @@ if not _force_standard_tk:
 
         HAVE_CTK = True
         CTkImage = _CTkImage
+
+        # Safe Linux default only (no temporary Tk — that races the real CTk root).
+        # Full font probe runs in GUICoordinator / ensure_ctk_window_ready().
+        if sys.platform.startswith("linux"):
+            try:
+                from .ctk_bootstrap import configure_ctk_rendering
+
+                configure_ctk_rendering(root=None)
+            except Exception:
+                pass
     except ImportError:
         HAVE_CTK = False
         ctk = None

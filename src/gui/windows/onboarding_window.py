@@ -113,6 +113,14 @@ class OnboardingWizard:
             else:
                 self.root = tk.Tk()
 
+        if self.use_ctk:
+            try:
+                from ..ctk_bootstrap import ensure_ctk_window_ready
+
+                ensure_ctk_window_ready(self.root)
+            except Exception:
+                pass
+
         self.root.title("Welcome to AIPromptBridge")
         self.root.geometry("750x700")
         self.root.resizable(False, False)

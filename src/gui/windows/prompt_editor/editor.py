@@ -121,6 +121,14 @@ class PromptEditorWindow(
                 self.root = tk.Tk()
                 self.root.configure(bg=self.colors.bg)
 
+        if self.use_ctk:
+            try:
+                from ...ctk_bootstrap import ensure_ctk_window_ready
+
+                ensure_ctk_window_ready(self.root)
+            except Exception:
+                pass
+
         self.root.title("AIPromptBridge Prompt Editor")
         self.root.geometry("1000x825")
         self.root.minsize(900, 600)
