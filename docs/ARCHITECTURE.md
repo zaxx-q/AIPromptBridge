@@ -423,7 +423,7 @@ OS-specific I/O is concentrated in `src/platform/` (no GUI imports):
 | Clipboard / selection | pyperclip + SendInput / sequence numbers | `wl-copy`/`wl-paste`; primary first; hybrid Ctrl+C via `wlrctl` |
 | Type / paste into apps | pynput / SendInput | `wlrctl keyboard type` + chords |
 | Snip capture | Tk overlay + `PIL.ImageGrab` | `slurp` + `grim` → `CaptureResult` |
-| Desktop audio | PyAudioWPatch WASAPI loopback | PyAudio + PipeWire/Pulse **monitor** devices |
+| Desktop audio | PyAudioWPatch WASAPI loopback | `pactl` monitors + `ffmpeg -f pulse` (mic still PyAudio) |
 
 See [LINUX.md](LINUX.md) for packages, niri binds, and limitations.
 
@@ -432,7 +432,7 @@ See [LINUX.md](LINUX.md) for packages, niri binds, and limitations.
 `src/audio/backend.py` selects the PortAudio binding:
 
 - **Windows:** `pyaudiowpatch` (loopback APIs)
-- **Linux:** stock `pyaudio`; monitors classified in `devices.py` (name heuristics such as `.monitor`)
+- **Linux:** stock `pyaudio` for mics; system audio via `pulse_monitors.py` + ffmpeg pulse when PortAudio has no Pulse host API
 
 Recorder unified stream (open once, flag-based record, level meter) is shared.
 

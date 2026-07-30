@@ -4,7 +4,7 @@ Audio capture package for AIPromptBridge.
 
 Provides audio recording via PyAudio:
 - Windows: PyAudioWPatch (WASAPI loopback for system audio)
-- Linux: stock PyAudio / PortAudio (PipeWire/Pulse monitor sources)
+- Linux: stock PyAudio for mics; PipeWire/Pulse monitors via pactl + ffmpeg
 
 Components:
 - backend.py: Platform-specific PyAudio import

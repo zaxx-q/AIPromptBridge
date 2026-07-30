@@ -85,7 +85,7 @@ Do **not** try to `LD_LIBRARY_PATH` over uv’s `libtcl9tk9.0.so` with distro Tk
 | Selection capture | SendInput Ctrl+C + clipboard sequence | Primary selection first; hybrid **Ctrl+C** via `wlrctl` if empty |
 | Type / paste into apps | pynput / SendInput | `wlrctl` (+ `wl-copy` for paste) |
 | Snip | Tk overlay + `PIL.ImageGrab` | `slurp` geometry + `grim -g` → same `CaptureResult` |
-| System audio | WASAPI loopback (PyAudioWPatch) | PipeWire/Pulse **monitor** sources via PortAudio |
+| System audio | WASAPI loopback (PyAudioWPatch) | PipeWire/Pulse **monitor** sources via `pactl` + `ffmpeg -f pulse` (PortAudio often has no Pulse host API) |
 | Sounds | `winsound` | `paplay` / `pw-play` / `ffplay` |
 
 ## Platform code
@@ -101,7 +101,7 @@ OS-facing helpers live under **`src/platform/`** (no GUI imports):
 | `console_input.py` | Non-blocking single-key TTY input (`termios` cbreak / Windows `msvcrt`) |
 | `screenshot.py` | `grim` / `slurp` |
 
-Audio import dispatch: `src/audio/backend.py` (WPatch on Windows, stock PyAudio on Linux). Device enumeration and monitor heuristics: `src/audio/devices.py`.
+Audio import dispatch: `src/audio/backend.py` (WPatch on Windows, stock PyAudio on Linux). Device enumeration: `src/audio/devices.py`. Linux system-audio monitors: `src/audio/pulse_monitors.py` (`pactl list sources`) + ffmpeg pulse capture in `recorder.py`. Mic capture still uses PortAudio. Need `pactl` (pulseaudio-utils / PipeWire) and `ffmpeg` with pulse input for loopback when PortAudio is ALSA-only.
 
 Interactive console commands (`--show-console`) and batch Pause/Stop keys use `src/platform/console_input.py`: hold **cbreak** for single-key polls, restore **cooked** mode around `input()` line prompts.
 

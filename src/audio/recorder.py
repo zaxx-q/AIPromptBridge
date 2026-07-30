@@ -153,6 +153,9 @@ class AudioRecorder:
         self._stream_thread: Optional[threading.Thread] = None
         self._stream_lock = threading.Lock()
 
+        # Linux Pulse/PipeWire monitor capture (ffmpeg -f pulse → stdout)
+        self._pulse_proc: Optional[subprocess.Popen] = None
+
         # Recording uses a Queue for thread-safe, lossless audio capture
         # The queue approach ensures no data is lost at recording boundaries
         self._is_recording = False
@@ -178,7 +181,9 @@ class AudioRecorder:
         self._playback_channels = 2
         self._playback_sample_width = 2
 
-        if not HAVE_PYAUDIO:
+        # Pulse monitor capture only needs ffmpeg; mic/WASAPI still need PyAudio.
+        uses_pulse = bool(device and getattr(device, "uses_pulse_capture", False))
+        if not HAVE_PYAUDIO and not uses_pulse:
             raise RuntimeError(f"PyAudio is not installed. Install with: {get_pyaudio_install_hint()}")
 
         logging.debug(f"[AudioRecorder] Initialized with device: {device}")
@@ -226,9 +231,8 @@ class AudioRecorder:
         """
         Start the audio input stream for level monitoring and recording.
 
-        Opens a PyAudio stream with a callback. The callback is invoked by the audio
-        driver at the appropriate rate. For WASAPI loopback, this is typically once
-        per second with a large buffer of audio data.
+        Opens a PyAudio stream with a callback (mic / WASAPI), or an ffmpeg
+        ``-f pulse`` reader thread for Linux PipeWire/Pulse monitor devices.
 
         Args:
             level_callback: Optional callback for level updates (0.0-1.0)
@@ -250,100 +254,268 @@ class AudioRecorder:
             try:
                 self._level_callback = level_callback
 
-                # Store sample info for WAV generation
-                self._sample_rate = int(self._device.sample_rate)
-                channels = max(1, int(self._device.channels or 1))
-                self._channels = channels
-                p = self._get_pyaudio()
-                self._sample_width = p.get_sample_size(self.FORMAT)
+                # Linux PipeWire/Pulse monitors: capture via ffmpeg (PortAudio often
+                # has no Pulse host API and never lists *.monitor devices).
+                if getattr(self._device, "uses_pulse_capture", False):
+                    return self._start_pulse_stream_unlocked()
 
-                # Create callback (runs in PyAudio's thread)
-                def stream_callback(in_data, frame_count, time_info, status):
-                    """PyAudio callback - invoked by audio driver when data is available."""
-                    # Update level (always)
-                    self._current_level = get_rms_level(in_data, self._sample_width)
-
-                    # Call level callback if set
-                    if self._level_callback:
-                        try:
-                            self._level_callback(self._current_level)
-                        except Exception:
-                            pass
-
-                    # Queue audio data if recording (always queue, drain later)
-                    # This prevents data loss at recording boundaries
-                    if self._is_recording:
-                        self._audio_queue.put(in_data)
-
-                    return (in_data, pyaudio.paContinue)
-
-                # Loopback/monitor devices often deliver larger, less frequent buffers
-                is_loopback = bool(self._device.is_loopback) or self._is_loopback_like_name(self._device.name)
-                chunk_size = self.LOOPBACK_CHUNK_SIZE if is_loopback else self.CHUNK_SIZE
-                rate = int(self._device.sample_rate)
-
-                # Open stream WITH callback - this uses PyAudio's native threading.
-                # If channel count fails (common on some PipeWire nodes), retry mono/stereo.
-                last_error: Optional[Exception] = None
-                channel_candidates = [channels]
-                for alt in (1, 2):
-                    if alt not in channel_candidates:
-                        channel_candidates.append(alt)
-
-                for try_channels in channel_candidates:
-                    try:
-                        self._stream = p.open(
-                            format=self.FORMAT,
-                            channels=try_channels,
-                            rate=rate,
-                            input=True,
-                            input_device_index=self._device.index,
-                            frames_per_buffer=chunk_size,
-                            stream_callback=stream_callback,
-                        )
-                        self._channels = try_channels
-                        last_error = None
-                        break
-                    except Exception as open_err:
-                        last_error = open_err
-                        logging.debug(
-                            f"[AudioRecorder] open failed channels={try_channels} "
-                            f"rate={rate} device={self._device.name!r}: {open_err}"
-                        )
-                        self._stream = None
-
-                if self._stream is None:
-                    logging.error(
-                        f"[AudioRecorder] Failed to start stream on {self._device.name!r} "
-                        f"(index={self._device.index}, rate={rate}, channels={channels}): "
-                        f"{last_error}"
-                    )
-                    self._stream_active = False
-                    return False
-
-                self._stream_active = True
-                logging.info(
-                    f"[AudioRecorder] Stream started on {self._device.name} "
-                    f"(rate={rate}, channels={self._channels}, "
-                    f"{'loopback/monitor' if is_loopback else 'input'})"
-                )
-                return True
+                return self._start_portaudio_stream_unlocked()
 
             except Exception as e:
                 logging.error(f"[AudioRecorder] Failed to start stream: {e}")
                 self._stream_active = False
                 return False
 
+    def _start_portaudio_stream_unlocked(self) -> bool:
+        """Open a PyAudio input stream (caller holds ``_stream_lock``)."""
+        assert self._device is not None
+
+        # Store sample info for WAV generation
+        self._sample_rate = int(self._device.sample_rate)
+        channels = max(1, int(self._device.channels or 1))
+        self._channels = channels
+        p = self._get_pyaudio()
+        self._sample_width = p.get_sample_size(self.FORMAT)
+
+        # Create callback (runs in PyAudio's thread)
+        def stream_callback(in_data, frame_count, time_info, status):
+            """PyAudio callback - invoked by audio driver when data is available."""
+            # Update level (always)
+            self._current_level = get_rms_level(in_data, self._sample_width)
+
+            # Call level callback if set
+            if self._level_callback:
+                try:
+                    self._level_callback(self._current_level)
+                except Exception:
+                    pass
+
+            # Queue audio data if recording (always queue, drain later)
+            # This prevents data loss at recording boundaries
+            if self._is_recording:
+                self._audio_queue.put(in_data)
+
+            return (in_data, pyaudio.paContinue)
+
+        # Loopback/monitor devices often deliver larger, less frequent buffers
+        is_loopback = bool(self._device.is_loopback) or self._is_loopback_like_name(self._device.name)
+        chunk_size = self.LOOPBACK_CHUNK_SIZE if is_loopback else self.CHUNK_SIZE
+        rate = int(self._device.sample_rate)
+
+        # Open stream WITH callback - this uses PyAudio's native threading.
+        # If channel count fails (common on some PipeWire nodes), retry mono/stereo.
+        last_error: Optional[Exception] = None
+        channel_candidates = [channels]
+        for alt in (1, 2):
+            if alt not in channel_candidates:
+                channel_candidates.append(alt)
+
+        for try_channels in channel_candidates:
+            try:
+                self._stream = p.open(
+                    format=self.FORMAT,
+                    channels=try_channels,
+                    rate=rate,
+                    input=True,
+                    input_device_index=self._device.index,
+                    frames_per_buffer=chunk_size,
+                    stream_callback=stream_callback,
+                )
+                self._channels = try_channels
+                last_error = None
+                break
+            except Exception as open_err:
+                last_error = open_err
+                logging.debug(
+                    f"[AudioRecorder] open failed channels={try_channels} "
+                    f"rate={rate} device={self._device.name!r}: {open_err}"
+                )
+                self._stream = None
+
+        if self._stream is None:
+            logging.error(
+                f"[AudioRecorder] Failed to start stream on {self._device.name!r} "
+                f"(index={self._device.index}, rate={rate}, channels={channels}): "
+                f"{last_error}"
+            )
+            self._stream_active = False
+            return False
+
+        self._stream_active = True
+        logging.info(
+            f"[AudioRecorder] Stream started on {self._device.name} "
+            f"(rate={rate}, channels={self._channels}, "
+            f"{'loopback/monitor' if is_loopback else 'input'})"
+        )
+        return True
+
+    def _start_pulse_stream_unlocked(self) -> bool:
+        """
+        Capture a Pulse/PipeWire monitor via ``ffmpeg -f pulse`` (caller holds lock).
+
+        PortAudio on ALSA-only builds cannot open ``*.monitor`` sources by index.
+        FFmpeg's pulse input is the reliable path on PipeWire.
+        """
+        assert self._device is not None
+        pulse_name = self._device.pulse_name
+        if not pulse_name:
+            logging.error("[AudioRecorder] Pulse device missing pulse_name")
+            return False
+
+        if not is_ffmpeg_available():
+            logging.error(
+                "[AudioRecorder] FFmpeg required for Linux system-audio (monitor) capture"
+            )
+            return False
+
+        ffmpeg = get_ffmpeg_path()
+        if not ffmpeg:
+            logging.error("[AudioRecorder] FFmpeg path not resolved")
+            return False
+
+        rate = int(self._device.sample_rate or 48000)
+        channels = max(1, int(self._device.channels or 2))
+        # Prefer stereo for sink monitors; allow mono if device reports 1
+        if channels > 2:
+            channels = 2
+
+        self._sample_rate = rate
+        self._channels = channels
+        self._sample_width = 2  # s16le
+
+        # frames_per_buffer-equivalent chunk for level meter (~LOOPBACK_CHUNK_SIZE)
+        frames = self.LOOPBACK_CHUNK_SIZE
+        bytes_per_chunk = frames * channels * self._sample_width
+
+        cmd = [
+            ffmpeg,
+            "-loglevel",
+            "error",
+            "-f",
+            "pulse",
+            "-i",
+            pulse_name,
+            "-f",
+            "s16le",
+            "-ac",
+            str(channels),
+            "-ar",
+            str(rate),
+            "pipe:1",
+        ]
+
+        try:
+            self._pulse_proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
+                creationflags=get_creation_flags(),
+            )
+        except Exception as e:
+            logging.error(f"[AudioRecorder] Failed to start ffmpeg pulse capture: {e}")
+            self._pulse_proc = None
+            self._stream_active = False
+            return False
+
+        self._stream_active = True
+        self._stream_thread = threading.Thread(
+            target=self._pulse_read_loop,
+            args=(bytes_per_chunk,),
+            daemon=True,
+            name="PulseMonitorCapture",
+        )
+        self._stream_thread.start()
+
+        logging.info(
+            f"[AudioRecorder] Pulse monitor stream started on {self._device.name!r} "
+            f"(source={pulse_name!r}, rate={rate}, channels={channels})"
+        )
+        return True
+
+    def _pulse_read_loop(self, bytes_per_chunk: int) -> None:
+        """Read s16le PCM from ffmpeg stdout; update level and record queue."""
+        proc = self._pulse_proc
+        if not proc or not proc.stdout:
+            return
+
+        try:
+            while self._stream_active and proc.poll() is None:
+                try:
+                    data = proc.stdout.read(bytes_per_chunk)
+                except Exception as e:
+                    logging.debug(f"[AudioRecorder] Pulse read error: {e}")
+                    break
+                if not data:
+                    break
+
+                self._current_level = get_rms_level(data, self._sample_width)
+                if self._level_callback:
+                    try:
+                        self._level_callback(self._current_level)
+                    except Exception:
+                        pass
+
+                if self._is_recording:
+                    self._audio_queue.put(data)
+        except Exception as e:
+            logging.error(f"[AudioRecorder] Pulse read loop error: {e}")
+        finally:
+            # If ffmpeg exited early while we thought we were active, log stderr
+            if proc.poll() is not None and proc.returncode not in (0, None, -15, -9):
+                try:
+                    err = (proc.stderr.read() if proc.stderr else b"") or b""
+                    if err:
+                        logging.warning(
+                            "[AudioRecorder] ffmpeg pulse exited %s: %s",
+                            proc.returncode,
+                            err.decode(errors="replace")[:300],
+                        )
+                except Exception:
+                    pass
+            self._current_level = 0.0
+
+    def _stop_pulse_proc(self) -> None:
+        """Terminate ffmpeg pulse capture process if running."""
+        proc = self._pulse_proc
+        self._pulse_proc = None
+        if not proc:
+            return
+        try:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1.5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    try:
+                        proc.wait(timeout=0.5)
+                    except Exception:
+                        pass
+        except Exception as e:
+            logging.debug(f"[AudioRecorder] Error stopping pulse proc: {e}")
+        finally:
+            try:
+                if proc.stdout:
+                    proc.stdout.close()
+            except Exception:
+                pass
+            try:
+                if proc.stderr:
+                    proc.stderr.close()
+            except Exception:
+                pass
+
     def stop_stream(self):
         """Stop the audio input stream."""
         with self._stream_lock:
-            if not self._stream_active:
+            if not self._stream_active and self._stream is None and self._pulse_proc is None:
                 return
 
             self._stream_active = False
             self._is_recording = False
 
-            # Close the stream
+            # Close PortAudio stream
             if self._stream:
                 try:
                     self._stream.stop_stream()
@@ -351,6 +523,16 @@ class AudioRecorder:
                 except Exception as e:
                     logging.debug(f"[AudioRecorder] Error closing stream: {e}")
                 self._stream = None
+
+            # Stop ffmpeg pulse capture
+            self._stop_pulse_proc()
+
+            # Join pulse reader thread
+            thread = self._stream_thread
+            self._stream_thread = None
+
+        if thread and thread.is_alive():
+            thread.join(timeout=2.0)
 
         self._current_level = 0.0
         self._close_pyaudio()

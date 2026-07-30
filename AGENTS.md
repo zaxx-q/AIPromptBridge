@@ -64,7 +64,8 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **Usage**: GUI tools (`AudioTool`, `SnipTool`) and CLI tools (`FileProcessor`) delegate here instead of manual dict construction.
 
 ### 5. Audio Subsystem (Queue-Based Stream)
-- Import via `src/audio/backend.py`: **PyAudioWPatch** (Windows WASAPI loopback) / stock **PyAudio** (Linux; monitor sources ≈ loopback).
+- Import via `src/audio/backend.py`: **PyAudioWPatch** (Windows WASAPI loopback) / stock **PyAudio** (Linux mics).
+- Linux **system audio**: `src/audio/pulse_monitors.py` (`pactl`) + `ffmpeg -f pulse` in `AudioRecorder` (PortAudio often lacks Pulse host API / `*.monitor` names).
 - `AudioRecorder` **Unified Stream**: open once for level meter; record via flag + `Queue` (don't stop stream at boundaries).
 - **FFmpeg**: `get_creation_flags()` for `CREATE_NO_WINDOW` on Windows. Detection in `src/audio/ffmpeg_utils.py`.
 - **Export**: `src/audio/export.py` for all saved audio (Opus/MP3/AAC, metadata, safe names).

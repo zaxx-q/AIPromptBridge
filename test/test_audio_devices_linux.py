@@ -121,8 +121,11 @@ class _FakePyAudio:
 
 
 @contextmanager
-def _patch_linux_backend(devices: list[dict[str, Any]]):
+def _patch_linux_backend(devices: list[dict[str, Any]], *, pulse_monitors: list | None = None):
+    """Patch PortAudio enumeration; pulse_monitors defaults to [] (no pactl)."""
     fake = _FakePyAudio(devices)
+    if pulse_monitors is None:
+        pulse_monitors = []
 
     @contextmanager
     def _open_pyaudio():
@@ -132,6 +135,7 @@ def _patch_linux_backend(devices: list[dict[str, Any]]):
         patch("src.audio.devices.HAVE_PYAUDIO", True),
         patch("src.audio.devices.open_pyaudio", _open_pyaudio),
         patch("src.audio.devices.sys.platform", "linux"),
+        patch("src.audio.devices._list_pulse_monitor_devices", return_value=pulse_monitors),
     ):
         yield fake
 
@@ -190,11 +194,81 @@ def test_get_default_loopback_device_linux_none_when_empty():
         assert list_loopback_devices() == []
 
 
-def test_list_devices_empty_when_pyaudio_missing():
-    with patch("src.audio.devices.HAVE_PYAUDIO", False):
+def test_list_devices_empty_when_pyaudio_missing_and_no_pulse():
+    with (
+        patch("src.audio.devices.HAVE_PYAUDIO", False),
+        patch("src.audio.devices.sys.platform", "linux"),
+        patch("src.audio.devices._list_pulse_monitor_devices", return_value=[]),
+    ):
         assert list_input_devices() == []
         assert list_loopback_devices() == []
         assert get_default_loopback_device() is None
+
+
+def test_list_loopback_includes_pulse_monitors_when_portaudio_has_none():
+    """ALSA-only PortAudio: no *.monitor names; pactl supplies loopback devices."""
+    only_mics = [
+        _device_info(0, "USB Microphone", max_input=1),
+        _device_info(1, "pipewire", max_input=64),
+    ]
+    pulse = [
+        AudioDevice(
+            name="USB Audio Device Analog Stereo",
+            index=-1000,
+            is_loopback=True,
+            channels=2,
+            sample_rate=48000,
+            host_api=-1,
+            backend="pulse",
+            pulse_name="alsa_output.usb-Device-00.analog-stereo.monitor",
+        )
+    ]
+    with _patch_linux_backend(only_mics, pulse_monitors=pulse):
+        loops = list_loopback_devices()
+        default = get_default_loopback_device()
+
+    assert len(loops) == 1
+    assert loops[0].name == "USB Audio Device Analog Stereo"
+    assert loops[0].uses_pulse_capture is True
+    assert loops[0].pulse_name.endswith(".monitor")
+    assert default is not None
+    assert default.pulse_name == loops[0].pulse_name
+
+
+def test_default_loopback_prefers_default_sink_monitor():
+    pulse = [
+        AudioDevice(
+            name="HDMI",
+            index=-1000,
+            is_loopback=True,
+            channels=2,
+            sample_rate=48000,
+            backend="pulse",
+            pulse_name="alsa_output.pci-hdmi.monitor",
+        ),
+        AudioDevice(
+            name="USB Audio Device Analog Stereo",
+            index=-1001,
+            is_loopback=True,
+            channels=2,
+            sample_rate=48000,
+            backend="pulse",
+            pulse_name="alsa_output.usb-headphones.analog-stereo.monitor",
+        ),
+    ]
+    # get_default_loopback_device does a late import from pulse_monitors
+    with (
+        _patch_linux_backend([], pulse_monitors=pulse),
+        patch(
+            "src.audio.pulse_monitors.get_default_sink_name",
+            return_value="alsa_output.usb-headphones.analog-stereo",
+        ),
+    ):
+        default = get_default_loopback_device()
+
+    assert default is not None
+    assert default.name == "USB Audio Device Analog Stereo"
+    assert "usb-headphones" in (default.pulse_name or "")
 
 
 def test_windows_path_uses_loopback_generator_not_monitor_names():
