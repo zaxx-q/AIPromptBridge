@@ -6,7 +6,7 @@ Modular settings window split into:
 - config_io.py: ConfigData, parse/save config.ini (pure data, no GUI)
 - widgets.py: ToggleSwitch, FormFieldsMixin (uniform layout helpers)
 - core.py: SettingsWindow class composing all tab mixins
-- tab_general.py: General tab (startup, behavior, updates, server)
+- tab_general.py: General tab (startup/autostart, behavior, updates, server)
 - tab_provider.py: Connection tab (connection profile, key pools, request settings)
 - tab_tools.py: Tools tab (TextEditTool, ScreenSnip, Audio Tool, Typing)
 - tab_tts.py: TTS tab (text-to-speech, director, export)

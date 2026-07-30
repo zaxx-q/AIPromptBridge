@@ -3,14 +3,15 @@
 General tab mixin for Settings Window.
 
 Sections:
-    🖥️ Windows Startup — run at startup toggle + info
+    🖥️ Startup / Launch at Login — run at startup toggle + info
     🧠 Behavior — chat behavior, session settings, image format
     ⬆️ Updates — auto-check + check now button
     🖥️ Server Settings — locked host/port fields
 """
 
 import tkinter as tk
-from typing import Callable
+
+from src.platform.detect import is_linux
 
 from ...custom_widgets import create_section_header
 from ...platform import HAVE_CTK, ctk
@@ -25,11 +26,23 @@ class GeneralTabMixin:
         """Create the General settings tab."""
         content = self._create_tab_scroll_frame(frame)
 
-        # --- Windows Startup ---
-        create_section_header(content, "🖥️ Windows Startup", self.colors)
-        self._add_startup_toggle_field(
-            content, "run_at_startup", "Run at Windows startup", hint="Launch AIPromptBridge when Windows starts"
-        )
+        # --- Startup / Launch at Login ---
+        if is_linux():
+            create_section_header(content, "🖥️ Launch at Login", self.colors)
+            self._add_startup_toggle_field(
+                content,
+                "run_at_startup",
+                "Run at login (XDG autostart)",
+                hint="Writes ~/.config/autostart/aipromptbridge.desktop",
+            )
+        else:
+            create_section_header(content, "🖥️ Windows Startup", self.colors)
+            self._add_startup_toggle_field(
+                content,
+                "run_at_startup",
+                "Run at Windows startup",
+                hint="Launch AIPromptBridge when Windows starts",
+            )
         self._add_startup_info_label(content)
 
         # --- Behavior ---
@@ -331,11 +344,11 @@ class GeneralTabMixin:
                 self.widgets["port"].configure(text_color=text_color)
 
     def _add_startup_toggle_field(self, parent, key: str, label: str, hint: str | None = None):
-        """Add a startup toggle field that reads/writes to registry immediately."""
+        """Add a startup toggle that reads/writes OS autostart immediately (registry or XDG)."""
         row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
         row.pack(fill="x", pady=4)
 
-        # Read current startup state from registry
+        # Read current startup state from OS (Windows registry or Linux XDG desktop)
         try:
             from ....startup_manager import is_startup_enabled
 
@@ -376,7 +389,7 @@ class GeneralTabMixin:
                 )
 
     def _on_startup_toggle(self):
-        """Handle Windows startup toggle change immediately."""
+        """Handle launch-at-login toggle change immediately (registry or XDG desktop)."""
         startup_key = "run_at_startup"
         if startup_key not in self.vars:
             return
@@ -398,9 +411,14 @@ class GeneralTabMixin:
                     self.status_label.configure(text=f"✅ {message}", text_color=self.colors.accent_green)
                 else:
                     self.status_label.configure(text=f"✅ {message}", fg=self.colors.accent_green)
+                # Refresh target info label if present
+                if hasattr(self, "_startup_info_label"):
+                    self._refresh_startup_info_label()
 
         except Exception as e:
-            print(f"[Settings] Startup toggle error: {e}")
+            from src.console import print_error
+
+            print_error(f"[Settings] Startup toggle error: {e}")
             if self.use_ctk:
                 self.status_label.configure(text=f"❌ Error: {e}", text_color=self.colors.accent_red)
             else:
@@ -410,36 +428,65 @@ class GeneralTabMixin:
         """Handle obfuscation toggle — actual change applied on save."""
         pass  # Applied in _save via _save_obfuscation_setting in core.py
 
-    def _add_startup_info_label(self, parent):
-        """Add an info label showing current startup target."""
-        row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
-        row.pack(fill="x", pady=(0, 4))
-
-        # Get startup info
+    def _format_startup_info_text(self) -> str:
+        """Build the muted Target/info line for the startup section."""
         try:
             from ....startup_manager import get_startup_info
 
             info = get_startup_info()
 
-            if info["path"]:
-                mode_text = f" ({info['mode']} mode)" if info["mode"] else ""
+            if info.get("path"):
+                mode_text = f" ({info['mode']} mode)" if info.get("mode") else ""
                 path_short = info["path"]
-                if len(path_short) > 50:
-                    path_short = "..." + path_short[-47:]
-                info_text = f"Target: {path_short}{mode_text}"
-            else:
-                info_text = "Launcher not found (running in development mode?)"
+                # Linux Exec lines can be long; allow a bit more before ellipsis
+                max_len = 90 if is_linux() else 50
+                if len(path_short) > max_len:
+                    path_short = "..." + path_short[-(max_len - 3) :]
+                text = f"Target: {path_short}{mode_text}"
+                if is_linux():
+                    text += "\nNote: pure niri may need spawn-at-startup in config.kdl (XDG is still written)."
+                return text
+            if is_linux():
+                return "Start target not found (run from project root, or check compiled install layout)"
+            return "Launcher not found (running in development mode?)"
         except Exception as e:
-            info_text = f"Error: {e}"
+            return f"Error: {e}"
+
+    def _add_startup_info_label(self, parent):
+        """Add an info label showing current startup target."""
+        row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        row.pack(fill="x", pady=(0, 4))
+
+        info_text = self._format_startup_info_text()
 
         if self.use_ctk:
-            ctk.CTkLabel(
-                row, text=info_text, font=get_ctk_font(11), **get_ctk_label_colors(self.colors, muted=True)
-            ).pack(side="left", padx=(32, 0))
-        else:
-            tk.Label(row, text=info_text, font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote).pack(
-                side="left", padx=(32, 0)
+            self._startup_info_label = ctk.CTkLabel(
+                row,
+                text=info_text,
+                font=get_ctk_font(11),
+                justify="left",
+                **get_ctk_label_colors(self.colors, muted=True),
             )
+            self._startup_info_label.pack(side="left", padx=(32, 0))
+        else:
+            self._startup_info_label = tk.Label(
+                row,
+                text=info_text,
+                font=("Segoe UI", 9),
+                bg=self.colors.bg,
+                fg=self.colors.blockquote,
+                justify="left",
+            )
+            self._startup_info_label.pack(side="left", padx=(32, 0))
+
+    def _refresh_startup_info_label(self):
+        """Update the startup Target line after a toggle."""
+        if not hasattr(self, "_startup_info_label"):
+            return
+        try:
+            self._startup_info_label.configure(text=self._format_startup_info_text())
+        except Exception:
+            pass
 
     def _create_welcome_guide_row(self, parent):
         """Create the Welcome Guide button row."""

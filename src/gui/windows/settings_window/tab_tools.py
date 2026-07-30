@@ -3,13 +3,15 @@
 Tools tab mixin for Settings Window.
 
 Sections:
-    ✏️ TextEditTool — enable, hotkeys
-    📸 ScreenSnip — enable, hotkey
-    🎤 Audio Tool — enable, hotkey, device, loopback, level meter style
+    ✏️ TextEditTool — enable, hotkeys (Windows) / IPC triggers (Linux)
+    📸 ScreenSnip — enable, hotkey / trigger
+    🎤 Audio Tool — enable, hotkey / trigger, device, loopback, level meter style
     ⌨️ Typing — typing delay and speed
 """
 
 import tkinter as tk
+
+from src.platform.detect import is_linux
 
 from ...custom_widgets import create_section_header
 from ...platform import HAVE_CTK, ctk
@@ -22,9 +24,13 @@ class ToolsTabMixin:
     def _create_tools_tab(self, frame):
         """Create the Tools settings tab (TextEditTool + ScreenSnip + Audio + Typing)."""
         content = self._create_tab_scroll_frame(frame)
+        linux = is_linux()
+
+        if linux:
+            self._add_linux_trigger_reference(content)
 
         # --- TextEditTool ---
-        create_section_header(content, "✏️ TextEditTool", self.colors)
+        create_section_header(content, "✏️ TextEditTool", self.colors, top_padding=20 if linux else 0)
 
         self._add_toggle_field(
             content,
@@ -34,23 +40,26 @@ class ToolsTabMixin:
             hint="⚠️ Restart required",
         )
 
-        self._add_entry_field(
-            content,
-            "text_edit_tool_hotkey",
-            "Activation hotkey:",
-            self.config_data.config.get("text_edit_tool_hotkey", "ctrl+space"),
-            size="md",
-            hint="⚠️ Restart required",
-        )
+        if linux:
+            self._add_linux_trigger_line(content, "textedit")
+        else:
+            self._add_entry_field(
+                content,
+                "text_edit_tool_hotkey",
+                "Activation hotkey:",
+                self.config_data.config.get("text_edit_tool_hotkey", "ctrl+space"),
+                size="md",
+                hint="⚠️ Restart required",
+            )
 
-        self._add_entry_field(
-            content,
-            "text_edit_tool_abort_hotkey",
-            "Abort hotkey:",
-            self.config_data.config.get("text_edit_tool_abort_hotkey", "escape"),
-            size="md",
-            hint="⚠️ Restart required",
-        )
+            self._add_entry_field(
+                content,
+                "text_edit_tool_abort_hotkey",
+                "Abort hotkey:",
+                self.config_data.config.get("text_edit_tool_abort_hotkey", "escape"),
+                size="md",
+                hint="⚠️ Restart required",
+            )
 
         self._add_toggle_field(
             content,
@@ -71,14 +80,17 @@ class ToolsTabMixin:
             hint="⚠️ Restart required",
         )
 
-        self._add_entry_field(
-            content,
-            "screen_snip_hotkey",
-            "ScreenSnip hotkey:",
-            self.config_data.config.get("screen_snip_hotkey", "ctrl+alt+x"),
-            size="md",
-            hint="⚠️ Restart required",
-        )
+        if linux:
+            self._add_linux_trigger_line(content, "snip")
+        else:
+            self._add_entry_field(
+                content,
+                "screen_snip_hotkey",
+                "ScreenSnip hotkey:",
+                self.config_data.config.get("screen_snip_hotkey", "ctrl+alt+x"),
+                size="md",
+                hint="⚠️ Restart required",
+            )
 
         # --- Audio Tool ---
         create_section_header(content, "🎤 Audio Tool", self.colors, top_padding=20)
@@ -91,14 +103,17 @@ class ToolsTabMixin:
             hint="⚠️ Restart required",
         )
 
-        self._add_entry_field(
-            content,
-            "audio_tool_hotkey",
-            "Audio Tool hotkey:",
-            self.config_data.config.get("audio_tool_hotkey", "ctrl+alt+a"),
-            size="md",
-            hint="⚠️ Restart required",
-        )
+        if linux:
+            self._add_linux_trigger_line(content, "audio")
+        else:
+            self._add_entry_field(
+                content,
+                "audio_tool_hotkey",
+                "Audio Tool hotkey:",
+                self.config_data.config.get("audio_tool_hotkey", "ctrl+alt+a"),
+                size="md",
+                hint="⚠️ Restart required",
+            )
 
         self._add_entry_field(
             content,
@@ -157,3 +172,102 @@ class ToolsTabMixin:
             100,
             hint="Delay per character. 0 = no limit. Useful if apps get overwhelmed by fast input.",
         )
+
+    def _add_linux_trigger_reference(self, parent):
+        """Read-only block listing IPC --trigger commands for compositor binds."""
+        create_section_header(parent, "⌨️ IPC Triggers (Linux)", self.colors)
+
+        intro = (
+            "Global hotkeys are not registered on Wayland. Bind your compositor to a "
+            "running instance (does not start the app). Full command list:"
+        )
+        if self.use_ctk:
+            ctk.CTkLabel(
+                parent,
+                text=intro,
+                font=get_ctk_font(11),
+                justify="left",
+                wraplength=560,
+                **get_ctk_label_colors(self.colors, muted=True),
+            ).pack(anchor="w", pady=(0, 6))
+        else:
+            tk.Label(
+                parent,
+                text=intro,
+                font=("Segoe UI", 9),
+                justify="left",
+                wraplength=560,
+                bg=self.colors.bg,
+                fg=self.colors.blockquote,
+            ).pack(anchor="w", pady=(0, 6))
+
+        try:
+            from ....startup_manager import (
+                format_trigger_command_display,
+                get_project_root,
+                list_trigger_commands,
+            )
+
+            rows = list_trigger_commands()
+            root = get_project_root()
+        except Exception:
+            rows = []
+            root = None
+
+        if rows:
+            lines = []
+            for name, _cmd in rows:
+                # Short display form (source: uv run…; compiled: binary --trigger…)
+                lines.append(f"  {name:<10}  {format_trigger_command_display(name)}")
+            body = "\n".join(lines)
+            if root is not None:
+                example = format_trigger_command_display("textedit")
+                body += f"\n\nProject root: {root}"
+                body += f'\n\nniri example:\n  bind "Mod+Shift+T" {{ spawn-sh "cd {root} && {example}"; }}'
+        else:
+            body = "  (Could not resolve start command — check install / project root.)"
+
+        if self.use_ctk:
+            ctk.CTkLabel(
+                parent,
+                text=body,
+                font=get_ctk_font(11),
+                justify="left",
+                **get_ctk_label_colors(self.colors, muted=True),
+            ).pack(anchor="w", pady=(0, 4))
+        else:
+            tk.Label(
+                parent,
+                text=body,
+                font=("Consolas", 9),
+                justify="left",
+                bg=self.colors.bg,
+                fg=self.colors.blockquote,
+            ).pack(anchor="w", pady=(0, 4))
+
+    def _add_linux_trigger_line(self, parent, trigger: str):
+        """Single muted line under a tool: Trigger: … --trigger <name>."""
+        try:
+            from ....startup_manager import format_trigger_command_display
+
+            text = f"Trigger: {format_trigger_command_display(trigger)}"
+        except Exception:
+            text = f"Trigger: --trigger {trigger}"
+        row = ctk.CTkFrame(parent, fg_color="transparent") if self.use_ctk else tk.Frame(parent, bg=self.colors.bg)
+        row.pack(fill="x", pady=(0, 4))
+
+        if self.use_ctk:
+            ctk.CTkLabel(
+                row,
+                text=text,
+                font=get_ctk_font(11),
+                **get_ctk_label_colors(self.colors, muted=True),
+            ).pack(side="left", padx=(0, 0))
+        else:
+            tk.Label(
+                row,
+                text=text,
+                font=("Segoe UI", 9),
+                bg=self.colors.bg,
+                fg=self.colors.blockquote,
+            ).pack(side="left")

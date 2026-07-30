@@ -80,6 +80,7 @@ Do **not** try to `LD_LIBRARY_PATH` over uv’s `libtcl9tk9.0.so` with distro Tk
 | Feature | Windows | Linux (Wayland / niri) |
 |---------|---------|-------------------------|
 | Start tools | Global hotkeys (pynput) + tray | **IPC** `--trigger` + tray (if SNI host) |
+| Launch at login | Registry `HKCU\…\Run` | **XDG autostart** `~/.config/autostart/aipromptbridge.desktop` |
 | Single instance | Named mutex | Unix socket bind (same path as IPC) |
 | Tray | `infi.systray` | `pystray` (AppIndicator / StatusNotifier) |
 | Selection capture | SendInput Ctrl+C + clipboard sequence | Primary selection first; hybrid **Ctrl+C** via `wlrctl` if empty |
@@ -87,6 +88,28 @@ Do **not** try to `LD_LIBRARY_PATH` over uv’s `libtcl9tk9.0.so` with distro Tk
 | Snip | Tk overlay + `PIL.ImageGrab` | `slurp` geometry + `grim -g` → same `CaptureResult` |
 | System audio | WASAPI loopback (PyAudioWPatch) | PipeWire/Pulse **monitor** sources via `pactl` + `ffmpeg -f pulse` (PortAudio often has no Pulse host API) |
 | Sounds | `winsound` | `paplay` / `pw-play` / `ffplay` |
+| Settings → Tools hotkeys | Editable global hotkey fields | Read-only **IPC trigger** command list |
+
+## Autostart (XDG `.desktop`)
+
+Settings → **General** → **Launch at Login** toggles an XDG autostart entry (same Settings toggle that uses the Windows Run registry on Windows).
+
+| | |
+|--|--|
+| File | `$XDG_CONFIG_HOME/autostart/aipromptbridge.desktop` (default `~/.config/autostart/`) |
+| `Exec` (source) | Current interpreter + absolute `main.py` (same venv as the running app) |
+| `Exec` (compiled) | Outer launcher if split layout (`…/AIPromptBridge` + `bin/Internal`), else `sys.executable` |
+| `Path` | Deploy / project root (CWD-relative `config.ini` / `keys.json` / sessions; for `bin/` internals = parent of `bin/`) |
+
+Implemented in `src/startup_manager.py` (`set_startup` / `is_startup_enabled` / `get_startup_info`). Linux packaging is still deferred, but the compiled branch matches the Windows split-build layout so a future freeze does not keep writing a broken `python main.py` autostart line.
+
+**niri caveat:** a bare niri session often does **not** process XDG autostart by itself. The toggle still writes the standard desktop file (for GNOME/KDE/XFCE and sessions that run `dex` / systemd user autostart). On pure niri, also add something like:
+
+```kdl
+spawn-at-startup "sh" "-c" "cd /path/to/AIPromptBridge && uv run main.py"
+```
+
+(or the absolute `Exec` line shown as **Target** in Settings).
 
 ## Platform code
 
@@ -113,6 +136,7 @@ Interactive console commands (`--show-console`) and batch Pause/Stop keys use `s
 - Self-update **apply** path is Windows launcher-oriented; source installs stay notification-oriented.
 - Multi-compositor (GNOME/KDE) support is best-effort; niri/wlroots is the validated target.
 - **GUI fonts / corners:** uv standalone Python’s no-xft Tk cannot render modern fonts; use distro `python3.13-tkinter` (see above). Theme tweaks alone will not fix bitmap text.
+- **Autostart:** XDG `.desktop` is written; pure niri may still need `spawn-at-startup` (see above).
 
 ## Related docs
 

@@ -3,13 +3,15 @@
 TTS tab mixin for Settings Window.
 
 Sections:
-    🗣️ Text-to-Speech — enable, hotkey, model, voice
+    🗣️ Text-to-Speech — enable, hotkey (Windows) / IPC trigger (Linux), model, voice
     🎬 AI Director — enable, auto-run, model
     💾 Export & Playback — format, directory, autoplay
     🌐 Endpoint — use official endpoint toggle
 """
 
 import tkinter as tk
+
+from src.platform.detect import is_linux
 
 from ...custom_widgets import create_section_header
 from ...platform import HAVE_CTK, ctk
@@ -40,14 +42,40 @@ class TTSTabMixin:
             hint="Enable Gemini Text-to-Speech features (Restart required)",
         )
 
-        self._add_entry_field(
-            content,
-            "tts_hotkey",
-            "Activation hotkey:",
-            self.config_data.config.get("tts_hotkey", "ctrl+alt+t"),
-            size="md",
-            hint="⚠️ Restart required",
-        )
+        if is_linux():
+            # Reuse Tools-tab helper when mixed in on SettingsWindow
+            if hasattr(self, "_add_linux_trigger_line"):
+                self._add_linux_trigger_line(content, "tts")
+            else:
+                try:
+                    from ....startup_manager import format_trigger_command_display
+
+                    text = f"Trigger: {format_trigger_command_display('tts')}"
+                except Exception:
+                    text = "Trigger: --trigger tts"
+                row = (
+                    ctk.CTkFrame(content, fg_color="transparent")
+                    if self.use_ctk
+                    else tk.Frame(content, bg=self.colors.bg)
+                )
+                row.pack(fill="x", pady=(0, 4))
+                if self.use_ctk:
+                    ctk.CTkLabel(
+                        row, text=text, font=get_ctk_font(11), **get_ctk_label_colors(self.colors, muted=True)
+                    ).pack(side="left")
+                else:
+                    tk.Label(row, text=text, font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote).pack(
+                        side="left"
+                    )
+        else:
+            self._add_entry_field(
+                content,
+                "tts_hotkey",
+                "Activation hotkey:",
+                self.config_data.config.get("tts_hotkey", "ctrl+alt+t"),
+                size="md",
+                hint="⚠️ Restart required",
+            )
 
         # Model Dropdown
         self._add_dropdown_field(
