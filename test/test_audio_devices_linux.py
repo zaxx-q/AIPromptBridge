@@ -12,6 +12,7 @@ from src.audio.devices import (
     AudioDevice,
     get_default_loopback_device,
     is_monitor_device_name,
+    is_virtual_alsa_device_name,
     list_input_devices,
     list_loopback_devices,
 )
@@ -55,6 +56,22 @@ def test_is_monitor_device_name_false(name: str):
     assert is_monitor_device_name(name) is False
 
 
+@pytest.mark.parametrize(
+    "name",
+    ["default", "pipewire", "sysdefault", "spdif", "hdmi", "DMIX", "surround51"],
+)
+def test_is_virtual_alsa_device_name_true(name: str):
+    assert is_virtual_alsa_device_name(name) is True
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["USB Microphone", "HDA Intel PCH: ALC897 Analog (hw:0,0)", "USB Audio Device Mono"],
+)
+def test_is_virtual_alsa_device_name_false(name: str):
+    assert is_virtual_alsa_device_name(name) is False
+
+
 # ---------------------------------------------------------------------------
 # Mocked PortAudio enumeration
 # ---------------------------------------------------------------------------
@@ -88,7 +105,13 @@ SAMPLE_LINUX_DEVICES = [
     _device_info(2, "alsa_output.pci-0000_00_1f.3.analog-stereo.monitor", max_input=2),
     _device_info(3, "Monitor of HDMI / DisplayPort 3 Output", max_input=2),
     _device_info(4, "HD Audio Speaker", max_input=0),  # output-only — ignored
-    _device_info(5, "pipewire", max_input=64),  # virtual default input
+    _device_info(5, "pipewire", max_input=64),  # virtual — excluded
+    _device_info(6, "default", max_input=128),  # virtual — excluded
+    _device_info(7, "sysdefault", max_input=128),
+    _device_info(8, "Zen", max_input=2, host_api=2),  # JACK app — excluded
+    _device_info(9, "Lavf62.12.102", max_input=2, host_api=2),
+    _device_info(10, "cava", max_input=2, host_api=2),
+    _device_info(11, "USB Audio Device Analog Stereo", max_input=2, host_api=2),  # JACK sink
 ]
 
 
@@ -107,6 +130,12 @@ class _FakePyAudio:
     def get_device_info_by_index(self, i: int) -> dict[str, Any]:
         return dict(self._devices[i])
 
+    def get_host_api_info_by_index(self, i: int) -> dict[str, Any]:
+        # 0 = ALSA, 2 = JACK (matches SAMPLE host_api values)
+        if i == 2:
+            return {"index": 2, "name": "JACK Audio Connection Kit", "type": 12}
+        return {"index": i, "name": "ALSA", "type": 8}
+
     def get_default_input_device_info(self) -> dict[str, Any]:
         for d in self._devices:
             if d.get("maxInputChannels", 0) > 0 and not is_monitor_device_name(d["name"]):
@@ -121,11 +150,18 @@ class _FakePyAudio:
 
 
 @contextmanager
-def _patch_linux_backend(devices: list[dict[str, Any]], *, pulse_monitors: list | None = None):
-    """Patch PortAudio enumeration; pulse_monitors defaults to [] (no pactl)."""
+def _patch_linux_backend(
+    devices: list[dict[str, Any]],
+    *,
+    pulse_monitors: list | None = None,
+    pulse_inputs: list | None = None,
+):
+    """Patch PortAudio enumeration; pulse lists default to []."""
     fake = _FakePyAudio(devices)
     if pulse_monitors is None:
         pulse_monitors = []
+    if pulse_inputs is None:
+        pulse_inputs = []
 
     @contextmanager
     def _open_pyaudio():
@@ -136,6 +172,7 @@ def _patch_linux_backend(devices: list[dict[str, Any]], *, pulse_monitors: list 
         patch("src.audio.devices.open_pyaudio", _open_pyaudio),
         patch("src.audio.devices.sys.platform", "linux"),
         patch("src.audio.devices._list_pulse_monitor_devices", return_value=pulse_monitors),
+        patch("src.audio.devices._list_pulse_input_devices", return_value=pulse_inputs),
     ):
         yield fake
 
@@ -147,11 +184,32 @@ def test_list_input_devices_excludes_monitors_on_linux():
     names = [d.name for d in mics]
     assert "USB Microphone" in names
     assert "HDA Intel PCH: ALC897 Analog (hw:0,0)" in names
-    assert "pipewire" in names
+    # Virtual / JACK app zoo must not appear
+    for junk in ("pipewire", "default", "sysdefault", "Zen", "Lavf62.12.102", "cava"):
+        assert junk not in names
     assert all(not d.is_loopback for d in mics)
     assert not any("monitor" in n.lower() and is_monitor_device_name(n) for n in names)
     # Output-only device excluded
     assert "HD Audio Speaker" not in names
+
+
+def test_list_input_devices_prefers_pulse_mics():
+    pulse = [
+        AudioDevice(
+            name="USB Audio Device Mono",
+            index=-2000,
+            is_loopback=False,
+            channels=1,
+            sample_rate=48000,
+            backend="pulse",
+            pulse_name="alsa_input.usb-Device-00.mono-fallback",
+        )
+    ]
+    with _patch_linux_backend(SAMPLE_LINUX_DEVICES, pulse_inputs=pulse):
+        mics = list_input_devices()
+
+    assert mics[0].name == "USB Audio Device Mono"
+    assert mics[0].uses_pulse_capture is True
 
 
 def test_list_loopback_devices_finds_monitors_on_linux():
@@ -199,6 +257,7 @@ def test_list_devices_empty_when_pyaudio_missing_and_no_pulse():
         patch("src.audio.devices.HAVE_PYAUDIO", False),
         patch("src.audio.devices.sys.platform", "linux"),
         patch("src.audio.devices._list_pulse_monitor_devices", return_value=[]),
+        patch("src.audio.devices._list_pulse_input_devices", return_value=[]),
     ):
         assert list_input_devices() == []
         assert list_loopback_devices() == []

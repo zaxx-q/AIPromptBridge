@@ -25,9 +25,12 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 __all__ = [
+    "PulseInputSource",
     "PulseMonitorSource",
     "get_default_sink_name",
+    "get_default_source_name",
     "is_pactl_available",
+    "list_pulse_input_sources",
     "list_pulse_monitor_sources",
 ]
 
@@ -39,9 +42,10 @@ _availability_checked = False
 _availability_lock = threading.Lock()
 _missing_warned = False
 
-# Stable synthetic PortAudio-style index base for pulse-backed devices
+# Stable synthetic PortAudio-style index bases for pulse-backed devices
 # (negative so they never collide with real PortAudio indices).
-PULSE_DEVICE_INDEX_BASE = -1000
+PULSE_DEVICE_INDEX_BASE = -1000  # monitors / loopback
+PULSE_INPUT_INDEX_BASE = -2000  # real microphones
 
 
 @dataclass(frozen=True)
@@ -78,6 +82,20 @@ class PulseMonitorSource:
         if base.endswith(".monitor"):
             base = base[: -len(".monitor")]
         return base.split(".")[-1] if base else self.name
+
+
+@dataclass(frozen=True)
+class PulseInputSource:
+    """A real PipeWire/Pulse recording source (microphone), not a sink monitor."""
+
+    name: str
+    description: str
+    channels: int = 1
+    sample_rate: int = 48000
+
+    def display_label(self) -> str:
+        desc = (self.description or "").strip()
+        return desc or self.name
 
 
 def _refresh_pactl_cache() -> None:
@@ -142,6 +160,15 @@ def get_default_sink_name() -> Optional[str]:
     return name or None
 
 
+def get_default_source_name() -> Optional[str]:
+    """Return the default Pulse/PipeWire source name, or None."""
+    out = _run_pactl("get-default-source")
+    if not out:
+        return None
+    name = out.strip().splitlines()[0].strip() if out.strip() else ""
+    return name or None
+
+
 def _parse_channel_count(block: str) -> int:
     """Best-effort channel count from a pactl source block."""
     # Sample Specification: s16le 2ch 48000Hz
@@ -170,6 +197,13 @@ def _parse_sample_rate(block: str) -> int:
     return 48000
 
 
+def _iter_pactl_source_blocks() -> List[str]:
+    text = _run_pactl("list", "sources")
+    if not text:
+        return []
+    return re.split(r"\n(?=Source #)", text)
+
+
 def list_pulse_monitor_sources() -> List[PulseMonitorSource]:
     """
     List Pulse/PipeWire sources that monitor a sink (system audio).
@@ -177,14 +211,8 @@ def list_pulse_monitor_sources() -> List[PulseMonitorSource]:
     Parses ``pactl list sources``. Sources with ``Monitor of Sink: n/a``
     (real microphones) are excluded.
     """
-    text = _run_pactl("list", "sources")
-    if not text:
-        return []
-
     sources: List[PulseMonitorSource] = []
-    # Split on "Source #" headers (pactl list sources)
-    blocks = re.split(r"\n(?=Source #)", text)
-    for block in blocks:
+    for block in _iter_pactl_source_blocks():
         name_m = re.search(r"^\s*Name:\s*(\S+)\s*$", block, re.M)
         if not name_m:
             continue
@@ -212,5 +240,50 @@ def list_pulse_monitor_sources() -> List[PulseMonitorSource]:
         logging.debug("[PulseMonitors] Found %d monitor source(s)", len(sources))
     else:
         logging.debug("[PulseMonitors] No monitor sources from pactl")
+
+    return sources
+
+
+def list_pulse_input_sources() -> List[PulseInputSource]:
+    """
+    List real microphones / recording sources (not sink monitors).
+
+    These are safer to expose in the UI than PortAudio's JACK client list
+    (browsers, cava, ffmpeg, …) which come and go and often crash on open.
+    """
+    sources: List[PulseInputSource] = []
+    for block in _iter_pactl_source_blocks():
+        name_m = re.search(r"^\s*Name:\s*(\S+)\s*$", block, re.M)
+        if not name_m:
+            continue
+        mon_m = re.search(r"^\s*Monitor of Sink:\s*(\S+)\s*$", block, re.M)
+        # Real inputs: missing Monitor field, or explicitly n/a
+        if mon_m:
+            sink = mon_m.group(1).strip()
+            if sink and sink.lower() != "n/a":
+                continue  # this is a monitor
+
+        name = name_m.group(1)
+        # Skip filter/virtual oddities if any show up as non-monitors
+        lower = name.lower()
+        if lower.endswith(".monitor"):
+            continue
+
+        desc_m = re.search(r"^\s*Description:\s*(.+)\s*$", block, re.M)
+        description = desc_m.group(1).strip() if desc_m else name
+
+        sources.append(
+            PulseInputSource(
+                name=name,
+                description=description,
+                channels=min(2, _parse_channel_count(block)),
+                sample_rate=_parse_sample_rate(block),
+            )
+        )
+
+    if sources:
+        logging.debug("[PulseMonitors] Found %d input source(s)", len(sources))
+    else:
+        logging.debug("[PulseMonitors] No input sources from pactl")
 
     return sources

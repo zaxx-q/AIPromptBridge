@@ -7,6 +7,7 @@ from unittest.mock import patch
 from src.audio.pulse_monitors import (
     PulseMonitorSource,
     get_default_sink_name,
+    list_pulse_input_sources,
     list_pulse_monitor_sources,
 )
 
@@ -56,6 +57,16 @@ def test_list_pulse_monitor_sources_parses_only_monitors():
     assert "Monitor of" in mon.description
     # Mic with Monitor of Sink: n/a must be excluded
     assert all("mono" not in m.name.lower() or m.name.endswith(".monitor") for m in mons)
+
+
+def test_list_pulse_input_sources_excludes_monitors():
+    with patch("src.audio.pulse_monitors._run_pactl", return_value=SAMPLE_PACTL_SOURCES):
+        mics = list_pulse_input_sources()
+
+    assert len(mics) == 1
+    assert mics[0].description == "USB Audio Device Mono"
+    assert mics[0].name.endswith("mono-fallback")
+    assert mics[0].channels == 1
 
 
 def test_display_label_strips_monitor_of():

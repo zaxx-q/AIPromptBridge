@@ -12,6 +12,7 @@ System build deps when installing wheels from source (if needed):
 
 from __future__ import annotations
 
+import os
 import sys
 from contextlib import contextmanager
 from typing import Any, Iterator, Optional
@@ -43,6 +44,44 @@ def get_pyaudio_install_hint() -> str:
 
 
 @contextmanager
+def suppress_alsa_stderr() -> Iterator[None]:
+    """
+    Temporarily silence ALSA's chatty stderr probes.
+
+    PortAudio's ALSA host API enumerates many non-existent PCMs (hdmi, phoneline,
+    dmix, …) and each miss logs to stderr. Harmless but floods the console on
+    Linux when opening PyAudio or starting playback. No-op on Windows.
+    """
+    if sys.platform == "win32":
+        yield
+        return
+
+    try:
+        devnull_fd = os.open(os.devnull, os.O_WRONLY)
+        saved_fd = os.dup(2)
+    except OSError:
+        yield
+        return
+
+    try:
+        os.dup2(devnull_fd, 2)
+        yield
+    finally:
+        try:
+            os.dup2(saved_fd, 2)
+        except OSError:
+            pass
+        try:
+            os.close(saved_fd)
+        except OSError:
+            pass
+        try:
+            os.close(devnull_fd)
+        except OSError:
+            pass
+
+
+@contextmanager
 def open_pyaudio() -> Iterator[Any]:
     """
     Open a PyAudio instance and always terminate it.
@@ -53,7 +92,8 @@ def open_pyaudio() -> Iterator[Any]:
     if not HAVE_PYAUDIO or pyaudio is None:
         raise RuntimeError(f"PyAudio is not installed. Install with: {get_pyaudio_install_hint()}")
 
-    pa = pyaudio.PyAudio()
+    with suppress_alsa_stderr():
+        pa = pyaudio.PyAudio()
     try:
         yield pa
     finally:

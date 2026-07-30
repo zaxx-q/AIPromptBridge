@@ -28,6 +28,7 @@ __all__ = [
     "get_default_loopback_device",
     "is_monitor_device_name",
     "is_pyaudio_available",
+    "is_virtual_alsa_device_name",
     "list_input_devices",
     "list_loopback_devices",
 ]
@@ -35,6 +36,40 @@ __all__ = [
 # Capture backends for AudioRecorder
 BACKEND_PORTAUDIO = "portaudio"
 BACKEND_PULSE = "pulse"
+
+# ALSA/PipeWire virtual PCMs and card aliases — not useful mic choices.
+# PortAudio also lists every JACK/PipeWire *client* (browsers, cava, ffmpeg) which
+# come and go and often crash when opened as capture devices.
+_VIRTUAL_ALSA_DEVICE_NAMES = frozenset(
+    {
+        "default",
+        "pipewire",
+        "pulse",
+        "sysdefault",
+        "spdif",
+        "hdmi",
+        "dmix",
+        "dsnoop",
+        "front",
+        "rear",
+        "side",
+        "center_lfe",
+        "iec958",
+        "phoneline",
+        "modem",
+        "null",
+        "surround",
+        "surround21",
+        "surround40",
+        "surround41",
+        "surround50",
+        "surround51",
+        "surround71",
+    }
+)
+
+# PortAudio virtual devices advertise absurd channel counts (e.g. 128).
+_MAX_REASONABLE_INPUT_CHANNELS = 8
 
 
 @dataclass
@@ -94,19 +129,76 @@ def is_monitor_device_name(name: str) -> bool:
     return False
 
 
+def is_virtual_alsa_device_name(name: str) -> bool:
+    """True for ALSA/PipeWire virtual PCMs (default, pipewire, sysdefault, …)."""
+    if not name:
+        return False
+    lower = name.lower().strip()
+    if lower in _VIRTUAL_ALSA_DEVICE_NAMES:
+        return True
+    # Parameterized aliases: hdmi:0, surround51:CARD=…
+    base = lower.split(":", 1)[0].strip()
+    if base in _VIRTUAL_ALSA_DEVICE_NAMES:
+        return True
+    if base.startswith("surround") or base.startswith("hdmi"):
+        return True
+    return False
+
+
 def _device_from_info(info: Dict[str, Any], *, is_loopback: bool) -> AudioDevice:
     """Build AudioDevice from a PortAudio device-info dict."""
     index = int(info.get("index", -1))
+    raw_ch = max(1, int(info.get("maxInputChannels", 1) or 1))
+    # Cap to mono/stereo for open — virtual devices claim 64–128 channels.
+    channels = max(1, min(raw_ch, 2))
     return AudioDevice(
         name=str(info.get("name", f"Device {index}")),
         index=index,
         is_loopback=is_loopback,
-        channels=max(1, int(info.get("maxInputChannels", 1) or 1)),
+        channels=channels,
         sample_rate=int(info.get("defaultSampleRate", 44100) or 44100),
         host_api=int(info.get("hostApi", 0) or 0),
         backend=BACKEND_PORTAUDIO,
         pulse_name=None,
     )
+
+
+def _host_api_name(p: Any, host_api_index: int) -> str:
+    try:
+        info = p.get_host_api_info_by_index(int(host_api_index))
+        return str(info.get("name", "") or "")
+    except Exception:
+        return ""
+
+
+def _is_linux_portaudio_mic_candidate(p: Any, info: Dict[str, Any]) -> bool:
+    """
+    Filter PortAudio rows suitable as microphones on Linux.
+
+    Drops: monitors, ALSA virtuals, absurd channel counts, and the entire JACK
+    host API (PipeWire exposes every running client — Zen, cava, Lavf, … — which
+    are not mics and frequently crash PortAudio on open).
+    """
+    name = str(info.get("name", ""))
+    if is_monitor_device_name(name):
+        return False
+    if is_virtual_alsa_device_name(name):
+        return False
+
+    max_in = int(info.get("maxInputChannels", 0) or 0)
+    max_out = int(info.get("maxOutputChannels", 0) or 0)
+    if max_in < 1 or max_in > _MAX_REASONABLE_INPUT_CHANNELS:
+        return False
+
+    api_name = _host_api_name(p, int(info.get("hostApi", 0) or 0)).lower()
+    if "jack" in api_name:
+        return False
+
+    # Dual I/O with many outs is usually a sink///virtual, not a mic
+    if max_out > 0 and max_in >= 2 and "hw:" not in name.lower():
+        return False
+
+    return True
 
 
 def _iter_input_infos(p: Any):
@@ -125,22 +217,50 @@ def _iter_input_infos(p: Any):
             continue
 
 
+def _list_pulse_input_devices() -> List[AudioDevice]:
+    """Linux: real mics from pactl → ffmpeg pulse capture (stable vs JACK clients)."""
+    try:
+        from .pulse_monitors import PULSE_INPUT_INDEX_BASE, list_pulse_input_sources
+    except ImportError:
+        return []
+
+    devices: List[AudioDevice] = []
+    for i, src in enumerate(list_pulse_input_sources()):
+        devices.append(
+            AudioDevice(
+                name=src.display_label(),
+                index=PULSE_INPUT_INDEX_BASE - i,
+                is_loopback=False,
+                channels=max(1, min(2, int(src.channels or 1))),
+                sample_rate=int(src.sample_rate or 48000),
+                host_api=-1,
+                backend=BACKEND_PULSE,
+                pulse_name=src.name,
+            )
+        )
+    return devices
+
+
 def list_input_devices() -> List[AudioDevice]:
     """
     List available microphones (non-loopback / non-monitor inputs).
 
+    Linux: prefer Pulse/PipeWire recording sources (pactl) plus filtered ALSA
+    hardware nodes. Virtual PCMs (default/pipewire/sysdefault) and JACK client
+    streams (browsers, visualizers, ffmpeg) are excluded — they clutter the UI
+    and often crash PortAudio when selected.
+
     Returns:
         List of AudioDevice objects for input devices.
     """
-    if not HAVE_PYAUDIO:
-        logging.warning("[AudioDevices] PyAudio not available")
-        return []
-
     devices: List[AudioDevice] = []
 
     try:
-        with open_pyaudio() as p:
-            if sys.platform == "win32":
+        if sys.platform == "win32":
+            if not HAVE_PYAUDIO:
+                logging.warning("[AudioDevices] PyAudio not available")
+                return []
+            with open_pyaudio() as p:
                 for info in _iter_input_infos(p):
                     # WPatch marks WASAPI loopbacks with isLoopbackDevice
                     if info.get("isLoopbackDevice", False):
@@ -149,15 +269,40 @@ def list_input_devices() -> List[AudioDevice]:
                         devices.append(_device_from_info(info, is_loopback=False))
                     except Exception as e:
                         logging.debug(f"[AudioDevices] Error building input device: {e}")
-            else:
-                for info in _iter_input_infos(p):
-                    name = str(info.get("name", ""))
-                    if is_monitor_device_name(name):
-                        continue
-                    try:
-                        devices.append(_device_from_info(info, is_loopback=False))
-                    except Exception as e:
-                        logging.debug(f"[AudioDevices] Error building input device: {e}")
+        else:
+            # 1) Stable pulse sources (real mics) — capture via ffmpeg
+            pulse_mics = _list_pulse_input_devices()
+            devices.extend(pulse_mics)
+            seen = {d.name.lower() for d in devices}
+            for d in pulse_mics:
+                if d.pulse_name:
+                    seen.add(d.pulse_name.lower())
+
+            # 2) Filtered PortAudio ALSA hw devices (skip JACK app zoo)
+            if HAVE_PYAUDIO:
+                try:
+                    with open_pyaudio() as p:
+                        for info in _iter_input_infos(p):
+                            if not _is_linux_portaudio_mic_candidate(p, info):
+                                continue
+                            try:
+                                dev = _device_from_info(info, is_loopback=False)
+                            except Exception as e:
+                                logging.debug(f"[AudioDevices] Error building input device: {e}")
+                                continue
+                            if dev.name.lower() in seen:
+                                continue
+                            # Skip ALSA hw duplicates of pulse labels (rough)
+                            if any(dev.name.lower() in s or s in dev.name.lower() for s in seen if len(s) > 5):
+                                # Keep distinct hw: names like "USB Audio Device: - (hw:0,0)"
+                                if "hw:" not in dev.name.lower():
+                                    continue
+                            devices.append(dev)
+                            seen.add(dev.name.lower())
+                except Exception as e:
+                    logging.debug(f"[AudioDevices] PortAudio mic scan failed: {e}")
+            elif not devices:
+                logging.warning("[AudioDevices] PyAudio not available and no pulse mics")
 
         logging.debug(f"[AudioDevices] Listed {len(devices)} microphone device(s)")
 
@@ -287,9 +432,35 @@ def get_default_input_device() -> Optional[AudioDevice]:
     """
     Get the default input device (microphone).
 
+    Linux: prefer the Pulse/PipeWire default source when it is a real mic
+    (not a monitor), matched against ``list_input_devices()``. Avoids PortAudio's
+    virtual ``default``/``pipewire`` (128-ch) devices that crash on open.
+
     Returns:
         AudioDevice for the default input, or None if not available.
     """
+    if sys.platform != "win32":
+        try:
+            mics = list_input_devices()
+            if not mics:
+                return None
+            try:
+                from .pulse_monitors import get_default_source_name
+
+                default_src = get_default_source_name()
+            except ImportError:
+                default_src = None
+
+            if default_src and not str(default_src).endswith(".monitor"):
+                for d in mics:
+                    if d.pulse_name and d.pulse_name == default_src:
+                        return d
+            # First listed real mic (pulse sources are sorted first)
+            return mics[0]
+        except Exception as e:
+            logging.error(f"[AudioDevices] Error getting default input: {e}")
+            return None
+
     if not HAVE_PYAUDIO:
         return None
 
@@ -297,12 +468,7 @@ def get_default_input_device() -> Optional[AudioDevice]:
         with open_pyaudio() as p:
             try:
                 info = p.get_default_input_device_info()
-                name = str(info.get("name", "Default Input"))
-                # On Linux, default may theoretically be a monitor — still return it
-                # as an input default; UI separates mic vs system via list_* helpers.
-                return _device_from_info(
-                    info, is_loopback=is_monitor_device_name(name) if sys.platform != "win32" else False
-                )
+                return _device_from_info(info, is_loopback=False)
             except OSError:
                 logging.debug("[AudioDevices] No default input device found")
                 return None

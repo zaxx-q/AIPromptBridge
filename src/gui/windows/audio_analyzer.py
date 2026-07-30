@@ -57,7 +57,11 @@ class AudioAnalyzerWindow:
     DURATION_UPDATE_INTERVAL = 100  # ms between duration display updates
 
     # Level meter sensitivity settings
-    LEVEL_AMPLIFICATION = 6.0  # Amplify raw RMS levels for better visibility
+    # Mic RMS is often quiet → strong boost. System/loopback (esp. PipeWire monitors)
+    # is already near digital full-scale, so the same boost pegs the meter constantly.
+    LEVEL_AMPLIFICATION = 6.0  # Default / microphone
+    LEVEL_AMPLIFICATION_LOOPBACK = 2.0  # Desktop/system capture
+    LEVEL_AMPLIFICATION_LOOPBACK_LINUX = 1.75  # Pulse monitors run hotter than WASAPI
     LEVEL_SMOOTHING = 0.3  # Smoothing factor (0 = no smoothing, 1 = max smoothing)
 
     def __init__(
@@ -1022,6 +1026,29 @@ class AudioAnalyzerWindow:
         except Exception as e:
             logging.error(f"[AudioAnalyzer] Failed to update recorder: {e}")
 
+    def _level_amplification_factor(self) -> float:
+        """
+        RMS→meter gain. Mics need a large boost; loopback/system audio does not.
+
+        Linux PipeWire monitors are typically hotter than Windows WASAPI loopback,
+        so loopback on Linux uses a slightly lower factor.
+        """
+        dev = self.current_device
+        if dev is not None and getattr(dev, "is_loopback", False):
+            try:
+                from ...platform import is_linux
+
+                if is_linux():
+                    return self.LEVEL_AMPLIFICATION_LOOPBACK_LINUX
+            except Exception:
+                pass
+            return self.LEVEL_AMPLIFICATION_LOOPBACK
+        return self.LEVEL_AMPLIFICATION
+
+    def _amplify_level(self, raw_level: float) -> float:
+        """Map raw 0–1 RMS to display level with device-aware gain."""
+        return min(1.0, max(0.0, float(raw_level) * self._level_amplification_factor()))
+
     def _create_level_callback(self):
         """Create the level callback function (simplified like transcription_popup.py).
 
@@ -1034,8 +1061,8 @@ class AudioAnalyzerWindow:
             if self._destroyed:
                 return
 
-            # Simple amplification for visibility
-            amplified = min(1.0, level * self.LEVEL_AMPLIFICATION)
+            # Device-aware amplification (loopback must not use mic boost)
+            amplified = self._amplify_level(level)
 
             # Update via GUICoordinator (thread-safe like transcription_popup.py)
             try:
@@ -1069,8 +1096,8 @@ class AudioAnalyzerWindow:
             # Get level from recorder (always available when stream is active)
             level = self.recorder.get_level() if self.recorder else 0.0
 
-            # Apply amplification and smoothing
-            amplified = min(1.0, level * self.LEVEL_AMPLIFICATION)
+            # Apply device-aware amplification and smoothing
+            amplified = self._amplify_level(level)
             smoothed = self._current_level * self.LEVEL_SMOOTHING + amplified * (1.0 - self.LEVEL_SMOOTHING)
             self._current_level = smoothed
 
@@ -1291,8 +1318,8 @@ class AudioAnalyzerWindow:
             # Poll the recorder's current level (updated by recording callback)
             level = self.recorder.get_level()
 
-            # Apply our amplification and smoothing
-            amplified = min(1.0, level * self.LEVEL_AMPLIFICATION)
+            # Apply device-aware amplification and smoothing
+            amplified = self._amplify_level(level)
             smoothed = self._current_level * self.LEVEL_SMOOTHING + amplified * (1.0 - self.LEVEL_SMOOTHING)
             self._current_level = smoothed
 
