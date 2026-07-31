@@ -9,7 +9,7 @@ on:
       version:
         description: 'Version Tag (Leave empty to use CHANGELOG.md latest)'
         required: false
-        default: '' # Leave blank to use CHANGELOG.md
+        default: ''
       release_notes:
         description: 'Short Summary (Edit the full release page later for long text)'
         required: false
@@ -19,78 +19,133 @@ on:
         required: false
         type: boolean
         default: true
+      platform:
+        description: 'Which platform(s) to build'
+        required: false
+        type: choice
+        options:
+          - all
+          - windows
+          - linux
+        default: all
 
 permissions:
   contents: write
 
 jobs:
-  build-and-release:
-    runs-on: windows-latest
-
+  # ── Shared version resolution ──────────────────────────────────────────────
+  determine-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      clean_version: ${{ steps.ver.outputs.clean_version }}
+      build_windows: ${{ steps.ver.outputs.build_windows }}
+      build_linux: ${{ steps.ver.outputs.build_linux }}
+      create_release: ${{ steps.ver.outputs.create_release }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Required to get git tags
+          fetch-depth: 0
 
-      # --- LOGIC TO HANDLE EMPTY INPUT ---
-      - name: Determine Version
-        id: get_version
-        shell: pwsh
+      - name: Determine Version & Platforms
+        id: ver
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_PLATFORM: ${{ inputs.platform }}
+          INPUT_CREATE_RELEASE: ${{ inputs.create_release }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          # Priority:
-          # 1. Git Tag (if triggered by tag push)
-          # 2. Workflow Input (if provided manually)
-          # 3. CHANGELOG.md Latest Version (if manually triggered empty)
+          set -euo pipefail
 
-          $refType = "${{ github.ref_type }}"
-          $refName = "${{ github.ref_name }}"
-          $inputVer = "${{ inputs.version }}"
-          $changelogPath = "CHANGELOG.md"
+          if [[ "${REF_TYPE}" == "tag" ]]; then
+            FINAL_VERSION="${REF_NAME}"
+            echo "Triggered by Git Tag: ${FINAL_VERSION}"
+          elif [[ -n "${INPUT_VERSION// }" ]]; then
+            FINAL_VERSION="${INPUT_VERSION}"
+            echo "Triggered manually with input: ${FINAL_VERSION}"
+          else
+            echo "Reading latest version from CHANGELOG.md..."
+            if [[ ! -f CHANGELOG.md ]]; then
+              echo "CHANGELOG.md not found!" >&2
+              exit 1
+            fi
+            DETECTED="$(grep -m1 -E '^## \[(v?[0-9]+\.[0-9].*)\]' CHANGELOG.md | sed -E 's/^## \[//; s/\].*//')"
+            if [[ -z "${DETECTED}" ]]; then
+              echo "Could not find any version header (## [x.x.x]) in CHANGELOG.md!" >&2
+              exit 1
+            fi
+            FINAL_VERSION="${DETECTED}"
+            echo "Found latest version in CHANGELOG: ${FINAL_VERSION}"
+          fi
 
-          if ($refType -eq 'tag') {
-              # 1. Triggered by Tag
-              Write-Host "Triggered by Git Tag: $refName"
-              $finalVersion = $refName
-          } elseif (-not [string]::IsNullOrWhiteSpace($inputVer)) {
-              # 2. Manual Trigger with Input
-              Write-Host "Triggered manually with input: $inputVer"
-              $finalVersion = $inputVer
-          } else {
-              # 3. Manual Trigger Empty -> Read CHANGELOG.md
-              Write-Host "Triggered manually (empty input). Reading latest version from $changelogPath..."
-              
-              if (Test-Path $changelogPath) {
-                  $content = Get-Content $changelogPath -Raw
-                  # Regex to find the first version header like ## [4.0.1] or ## [v4.0.1]
-                  # We only care about the first match (latest version)
-                  if ($content -match '## \[(v?[\d\.]+)\]') {
-                      $detectedVersion = $Matches[1]
-                      Write-Host "Found latest version in CHANGELOG: $detectedVersion"
-                      $finalVersion = $detectedVersion
-                  } else {
-                      Write-Error "Could not find any version header (## [x.x.x]) in $changelogPath!"
-                      exit 1
-                  }
-              } else {
-                  Write-Error "$changelogPath not found!"
-                  exit 1
-              }
-          }
+          FINAL_VERSION="$(echo "${FINAL_VERSION}" | tr -d '[:space:]')"
+          if [[ "${FINAL_VERSION}" != [vV]* ]]; then
+            FINAL_VERSION="v${FINAL_VERSION}"
+          fi
+          CLEAN_VERSION="${FINAL_VERSION#v}"
+          CLEAN_VERSION="${CLEAN_VERSION#V}"
 
-          # Normalize to ensure 'v' prefix for Release Tag/Title consistency
-          $finalVersion = $finalVersion.Trim()
-          if (-not $finalVersion.ToLower().StartsWith("v")) {
-              $finalVersion = "v$finalVersion"
-          }
-          
-          Write-Host "Final Determined Version: $finalVersion"
-          
-          # Save to GITHUB_ENV so all other steps use this variable
-          echo "RELEASE_VERSION=$finalVersion" >> $env:GITHUB_ENV
-          
-          # Set the job name dynamically for the UI
-          echo "::notice::Building Release: $finalVersion"
+          # Platform selection: tags always build all; dispatch respects input
+          PLATFORM="${INPUT_PLATFORM:-all}"
+          if [[ "${EVENT_NAME}" == "push" ]]; then
+            PLATFORM="all"
+          fi
+          case "${PLATFORM}" in
+            all)
+              BUILD_WINDOWS=true
+              BUILD_LINUX=true
+              ;;
+            windows)
+              BUILD_WINDOWS=true
+              BUILD_LINUX=false
+              ;;
+            linux)
+              BUILD_WINDOWS=false
+              BUILD_LINUX=true
+              ;;
+            *)
+              echo "Unknown platform: ${PLATFORM}" >&2
+              exit 1
+              ;;
+          esac
+
+          # create_release: true on tag push; honor input on workflow_dispatch
+          if [[ "${EVENT_NAME}" == "push" ]]; then
+            CREATE_RELEASE=true
+          else
+            # inputs.create_release is the string "true"/"false" for boolean inputs
+            if [[ "${INPUT_CREATE_RELEASE}" == "true" ]]; then
+              CREATE_RELEASE=true
+            else
+              CREATE_RELEASE=false
+            fi
+          fi
+
+          echo "Final version: ${FINAL_VERSION} (clean=${CLEAN_VERSION})"
+          echo "Build windows=${BUILD_WINDOWS} linux=${BUILD_LINUX} create_release=${CREATE_RELEASE}"
+          echo "::notice::Building Release: ${FINAL_VERSION} (windows=${BUILD_WINDOWS}, linux=${BUILD_LINUX})"
+
+          {
+            echo "version=${FINAL_VERSION}"
+            echo "clean_version=${CLEAN_VERSION}"
+            echo "build_windows=${BUILD_WINDOWS}"
+            echo "build_linux=${BUILD_LINUX}"
+            echo "create_release=${CREATE_RELEASE}"
+          } >> "${GITHUB_OUTPUT}"
+
+  # ── Windows (existing Nuitka + cx_Freeze split) ────────────────────────────
+  build-windows:
+    needs: determine-version
+    if: needs.determine-version.outputs.build_windows == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -105,21 +160,14 @@ jobs:
 
       - name: Patch Version in src/version.py
         shell: pwsh
+        env:
+          CLEAN_VERSION: ${{ needs.determine-version.outputs.clean_version }}
         run: |
-          # Use the variable we calculated in step 1
-          $fullVersion = "$env:RELEASE_VERSION"
-          
-          # Strip 'v' prefix for version.py (e.g., v2.8.0 -> 2.8.0)
-          $cleanVersion = $fullVersion.TrimStart('vV')
-          
+          $cleanVersion = "$env:CLEAN_VERSION"
           Write-Host "Patching src/version.py to version: $cleanVersion"
-          
           $filePath = "src/version.py"
           $content = Get-Content $filePath -Raw
-          
-          # Match __version__ = "..."
           $pattern = '__version__\s*=\s*["'']([^"'']+)["'']'
-          
           if ($content -match $pattern) {
               $newContent = $content -replace $pattern, "__version__ = ""$cleanVersion"""
               [System.IO.File]::WriteAllText((Get-Item $filePath).FullName, $newContent)
@@ -134,7 +182,6 @@ jobs:
           script-name: main.py
           mode: standalone
           output-dir: build_internal
-          # Migrated from main.py
           enable-plugins: tk-inter
           windows-console-mode: hide
           windows-icon-from-ico: icon.ico
@@ -163,19 +210,16 @@ jobs:
         run: |
           Write-Host "Installing cx_Freeze..."
           pip install cx_Freeze
-          
+
           Write-Host "Building Launchers with cx_Freeze..."
           python src/launchers/setup_launchers.py build
-          
+
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Failed to build launchers!"
             exit 1
           }
-          
-          # cx_Freeze output is in build_launchers_cx/
-          # We need to verify what's inside
+
           $buildDir = "build_launchers_cx"
-          
           if (Test-Path $buildDir) {
              Write-Host "✓ Build successful. Contents:"
              Get-ChildItem -Recurse $buildDir | Select-Object Name, Length
@@ -185,123 +229,249 @@ jobs:
           }
 
       - name: Assemble Deployment Package
-        id: assemble_package
         shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.determine-version.outputs.version }}
         run: |
-          # Define structure
           $distRoot = "dist_final"
           $binDir = "$distRoot/bin"
-          
+
           New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-          
-          # 1. Move Internal Standalone to bin/
-          # Nuitka-Action outputs standalone to {output-dir}/{output-filename}.dist when output-filename is provided
-          # Update: It actually to defaults to {script-name-base}.dist despite output-filename
+
           $internalSource = "build_internal/main.dist"
           if (-not (Test-Path $internalSource)) { Write-Error "Internal build not found at $internalSource"; exit 1 }
-          
-          # Move contents of dist to bin/
+
           Copy-Item -Path "$internalSource/*" -Destination $binDir -Recurse -Force
-          
-          # 2. Move Launchers to Root
-          # cx_Freeze creates a directory structure. Since we want the launcher at root,
-          # we move ALL contents of the build directory to the root of the distribution.
-          # This includes AIPromptBridge.exe, python DLLs, etc.
-          
+
           $buildDir = "build_launchers_cx"
-          
-          # Copy everything from build_launchers_cx/* to dist_final/
           Write-Host "Copying Launcher runtime files to root..."
           Copy-Item -Path "$buildDir/*" -Destination $distRoot -Recurse -Force
-          
-          # Verify executables
-          if (Test-Path "$distRoot/AIPromptBridge.exe") {
-             Write-Host "✓ Console Launcher present"
-          } else {
+
+          if (-not (Test-Path "$distRoot/AIPromptBridge.exe")) {
              Write-Error "Console Launcher missing!"
              exit 1
           }
-          
-          if (Test-Path "$distRoot/AIPromptBridge-NoConsole.exe") {
-             Write-Host "✓ GUI Launcher present"
-          } else {
+          if (-not (Test-Path "$distRoot/AIPromptBridge-NoConsole.exe")) {
              Write-Error "GUI Launcher missing!"
              exit 1
           }
 
-          # Zip it up
-          $zipName = "AIPromptBridge-$env:RELEASE_VERSION.zip"
+          $zipName = "AIPromptBridge-$env:RELEASE_VERSION-windows-x86_64.zip"
           Compress-Archive -Path "$distRoot\*" -DestinationPath $zipName
-          
-          echo "ASSET_PATH=$zipName" >> $env:GITHUB_ENV
+          Write-Host "Created $zipName"
 
-      - name: Prepare Release Notes
-        id: release_notes
-        shell: pwsh
-        env:
-          INPUT_NOTES: ${{ inputs.release_notes }}
-        run: |
-          $releaseBodyFile = "release_body.md"
-          
-          if (-not [string]::IsNullOrWhiteSpace($env:INPUT_NOTES)) {
-             Write-Host "User provided release notes."
-             $env:INPUT_NOTES | Out-File -FilePath $releaseBodyFile -Encoding utf8
-          } else {
-             Write-Host "No input notes provided. Extracting from CHANGELOG.md..."
-             $version = "$env:RELEASE_VERSION"
-             $cleanVersion = $version.TrimStart('vV')
-             $changelogPath = "CHANGELOG.md"
-             
-             if (Test-Path $changelogPath) {
-                $content = Get-Content $changelogPath -Raw
-                # Find start index of "## [$cleanVersion]"
-                $searchStr = "## [$cleanVersion]"
-                $startIndex = $content.IndexOf($searchStr)
-                
-                if ($startIndex -ge 0) {
-                   $endIndex = $content.Length
-                   
-                   # Search for next "## [" starting after the current match
-                   $nextSearchStart = $startIndex + $searchStr.Length
-                   
-                   # Regex to find next header start "## ["
-                   $regex = [regex]"(?m)^## \["
-                   $match = $regex.Match($content, $nextSearchStart)
-                   
-                   if ($match.Success) {
-                      $endIndex = $match.Index
-                   }
-                   
-                   $notes = $content.Substring($startIndex, $endIndex - $startIndex).Trim()
-                   Write-Host "Found release notes for $cleanVersion"
-                   $notes | Out-File -FilePath $releaseBodyFile -Encoding utf8
-                } else {
-                   Write-Warning "Could not find entry for '$searchStr' in CHANGELOG.md"
-                   "Release $version" | Out-File -FilePath $releaseBodyFile -Encoding utf8
-                }
-             } else {
-                Write-Warning "CHANGELOG.md not found!"
-                "Release $version" | Out-File -FilePath $releaseBodyFile -Encoding utf8
-             }
-          }
-
-      - name: Upload Build Artifact
+      - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AIPromptBridge-${{ env.RELEASE_VERSION }}
-          path: ${{ env.ASSET_PATH }}
+          name: AIPromptBridge-${{ needs.determine-version.outputs.version }}-windows-x86_64
+          path: AIPromptBridge-${{ needs.determine-version.outputs.version }}-windows-x86_64.zip
           if-no-files-found: error
+          include-hidden-files: true
+
+  # ── Linux (Nuitka standalone + shell launcher) ─────────────────────────────
+  build-linux:
+    needs: determine-version
+    if: needs.determine-version.outputs.build_linux == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install system build dependencies (Xft Tk + PortAudio)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository -y ppa:deadsnakes/ppa
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            python3.13 \
+            python3.13-dev \
+            python3.13-venv \
+            python3.13-tk \
+            build-essential \
+            patchelf \
+            ccache \
+            pkg-config \
+            portaudio19-dev \
+            libportaudio2 \
+            xvfb \
+            libxft2 \
+            libx11-6
+
+      - name: Probe Tk font stack (require Xft, not bitmap-only)
+        run: |
+          set -euo pipefail
+          # Headless display for Tk root; fail closed if only "fixed" fonts exist.
+          xvfb-run -a python3.13 - <<'PY'
+          import tkinter as tk
+          root = tk.Tk()
+          root.withdraw()
+          families = root.tk.call("font", "families")
+          n = len(families)
+          actual = root.tk.call("font", "actual", "TkDefaultFont")
+          print(f"Tk font families: {n}")
+          print(f"TkDefaultFont actual: {actual}")
+          root.destroy()
+          if n <= 5:
+              raise SystemExit(
+                  f"Tk font stack looks degraded ({n} families). "
+                  "Need distro python3.13-tk with Xft for CustomTkinter freeze."
+              )
+          PY
+
+      - name: Create venv and install Python deps
+        run: |
+          set -euo pipefail
+          python3.13 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # Nuitka + common helpers (ordered-set/zstandard speed up standalone)
+          pip install "nuitka" "ordered-set" "zstandard"
+
+      - name: Patch Version in src/version.py
+        env:
+          CLEAN_VERSION: ${{ needs.determine-version.outputs.clean_version }}
+        run: |
+          set -euo pipefail
+          . .venv/bin/activate
+          python - <<'PY'
+          import os, re
+          path = "src/version.py"
+          clean = os.environ["CLEAN_VERSION"]
+          text = open(path, encoding="utf-8").read()
+          new, n = re.subn(
+              r'__version__\s*=\s*["\'][^"\']+["\']',
+              f'__version__ = "{clean}"',
+              text,
+              count=1,
+          )
+          if n != 1:
+              raise SystemExit("Could not patch __version__ in src/version.py")
+          open(path, "w", encoding="utf-8").write(new)
+          print(f"Patched __version__ = {clean!r}")
+          PY
+
+      - name: Build Internal Standalone (Nuitka)
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+        run: |
+          set -euo pipefail
+          . .venv/bin/activate
+          mkdir -p "${CCACHE_DIR}"
+          export PATH="/usr/lib/ccache:${PATH}"
+
+          python -m nuitka \
+            --standalone \
+            --output-dir=build_internal \
+            --output-filename=AIPromptBridge_Internal \
+            --enable-plugin=tk-inter \
+            --include-data-dir=assets=assets \
+            --include-data-files=icon.ico=icon.ico \
+            --include-package=rich \
+            --include-package-data=customtkinter \
+            --include-package-data=emoji \
+            --nofollow-import-to=pytest \
+            --nofollow-import-to=unittest \
+            --nofollow-import-to=notebook \
+            --nofollow-import-to=numpy \
+            --nofollow-import-to=pandas \
+            --nofollow-import-to=scipy \
+            --nofollow-import-to=matplotlib \
+            --nofollow-import-to=cv2 \
+            --nofollow-import-to=xmlrpc \
+            --nofollow-import-to=curses \
+            --noinclude-unittest-mode=nofollow \
+            --assume-yes-for-downloads \
+            --show-scons \
+            main.py
+
+          ls -la build_internal/ || true
+          ls -la build_internal/main.dist/ | head -50
+
+      - name: Assemble Linux tarball
+        env:
+          RELEASE_VERSION: ${{ needs.determine-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/assemble_linux_package.sh scripts/linux_launcher.sh
+          ./scripts/assemble_linux_package.sh "${RELEASE_VERSION}" .
+          ls -lh AIPromptBridge-*-linux-x86_64.tar.gz
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIPromptBridge-${{ needs.determine-version.outputs.version }}-linux-x86_64
+          path: AIPromptBridge-${{ needs.determine-version.outputs.version }}-linux-x86_64.tar.gz
+          if-no-files-found: error
+          include-hidden-files: true
+
+  # ── Publish GitHub Release ─────────────────────────────────────────────────
+  publish-release:
+    needs: [determine-version, build-windows, build-linux]
+    # Skipped platform jobs report result=skipped; always() lets us still publish
+    # when the selected platform(s) succeeded and create_release is true.
+    if: |
+      always() &&
+      !cancelled() &&
+      needs.determine-version.result == 'success' &&
+      needs.determine-version.outputs.create_release == 'true' &&
+      (needs.determine-version.outputs.build_windows != 'true' || needs.build-windows.result == 'success') &&
+      (needs.determine-version.outputs.build_linux != 'true' || needs.build-linux.result == 'success') &&
+      (needs.determine-version.outputs.build_windows == 'true' || needs.determine-version.outputs.build_linux == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Windows artifact
+        if: needs.determine-version.outputs.build_windows == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: AIPromptBridge-${{ needs.determine-version.outputs.version }}-windows-x86_64
+          path: release-assets
+
+      - name: Download Linux artifact
+        if: needs.determine-version.outputs.build_linux == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: AIPromptBridge-${{ needs.determine-version.outputs.version }}-linux-x86_64
+          path: release-assets
+
+      - name: Prepare Release Notes
+        env:
+          INPUT_NOTES: ${{ inputs.release_notes }}
+          RELEASE_VERSION: ${{ needs.determine-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          RELEASE_BODY=release_body.md
+          if [[ -n "${INPUT_NOTES// }" ]]; then
+            printf '%s\n' "${INPUT_NOTES}" > "${RELEASE_BODY}"
+          elif [[ -f CHANGELOG.md ]]; then
+            python3 scripts/extract_changelog_section.py \
+              --changelog CHANGELOG.md \
+              --version "${RELEASE_VERSION}" \
+              --output "${RELEASE_BODY}"
+          else
+            echo "Release ${RELEASE_VERSION}" > "${RELEASE_BODY}"
+          fi
+          echo "Release body:"
+          cat "${RELEASE_BODY}"
+          echo "---"
+          ls -la release-assets || true
 
       - name: Create GitHub Release
-        if: github.event_name == 'push' || inputs.create_release == true
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
         with:
-          # Use the determined version
-          tag_name: ${{ env.RELEASE_VERSION }}
-          name: ${{ env.RELEASE_VERSION }}
+          tag_name: ${{ needs.determine-version.outputs.version }}
+          name: ${{ needs.determine-version.outputs.version }}
           body_path: release_body.md
-          files: ${{ env.ASSET_PATH }}
+          files: release-assets/*
           prerelease: false
           generate_release_notes: true
+          fail_on_unmatched_files: true

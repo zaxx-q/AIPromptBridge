@@ -180,6 +180,56 @@ def test_compiled_start_and_trigger_commands(tmp_path: Path, monkeypatch: pytest
     assert "uv run" not in display
 
 
+def test_get_launcher_path_finds_linux_shell_wrapper(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Compiled Linux split layout: outer ./AIPromptBridge is discovered from bin/Internal."""
+    import src.startup_manager as sm
+
+    deploy = tmp_path / "deploy"
+    bin_dir = deploy / "bin"
+    bin_dir.mkdir(parents=True)
+    internal = bin_dir / "AIPromptBridge_Internal"
+    internal.write_text("x", encoding="utf-8")
+    launcher = deploy / "AIPromptBridge"
+    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+    launcher.chmod(0o755)
+
+    monkeypatch.setattr(sm, "is_compiled", lambda: True)
+    monkeypatch.setattr(sm, "is_linux", lambda: True)
+    monkeypatch.setattr(sm, "is_windows", lambda: False)
+    monkeypatch.setattr(sys, "executable", str(internal))
+    monkeypatch.setattr(sys, "argv", ["AIPromptBridge_Internal", "--launched-mode=console"])
+    monkeypatch.chdir(deploy)
+
+    found = sm.get_launcher_path()
+    assert found is not None
+    assert Path(found).resolve() == launcher.resolve()
+
+
+def test_get_launcher_path_prefers_windows_console_exe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Compiled Windows: prefer AIPromptBridge.exe for console launched-mode."""
+    import src.startup_manager as sm
+
+    deploy = tmp_path / "deploy"
+    bin_dir = deploy / "bin"
+    bin_dir.mkdir(parents=True)
+    internal = bin_dir / "AIPromptBridge_Internal.exe"
+    internal.write_text("x", encoding="utf-8")
+    (deploy / "AIPromptBridge-NoConsole.exe").write_text("gui", encoding="utf-8")
+    console = deploy / "AIPromptBridge.exe"
+    console.write_text("console", encoding="utf-8")
+
+    monkeypatch.setattr(sm, "is_compiled", lambda: True)
+    monkeypatch.setattr(sm, "is_linux", lambda: False)
+    monkeypatch.setattr(sm, "is_windows", lambda: True)
+    monkeypatch.setattr(sys, "executable", str(internal))
+    monkeypatch.setattr(sys, "argv", ["AIPromptBridge_Internal.exe", "--launched-mode=console"])
+    monkeypatch.chdir(deploy)
+
+    found = sm.get_launcher_path()
+    assert found is not None
+    assert Path(found).name == "AIPromptBridge.exe"
+
+
 @pytest.mark.skipif(not is_linux(), reason="XDG autostart is Linux-only")
 def test_linux_compiled_autostart_desktop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Compiled Linux autostart writes Exec=<binary> without main.py."""

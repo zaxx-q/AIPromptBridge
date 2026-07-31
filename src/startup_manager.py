@@ -6,11 +6,11 @@ Cross-platform launch-at-login:
 - **Windows**: registry ``HKEY_CURRENT_USER\\…\\Run`` (compiled launcher exe only).
 - **Linux**: XDG autostart ``~/.config/autostart/aipromptbridge.desktop``
   - Source: current interpreter + ``main.py``, ``Path=`` project root
-  - Compiled (future Linux freeze / Windows-style split): binary or launcher,
+  - Compiled (Nuitka split): outer ``AIPromptBridge`` shell launcher preferred,
     ``Path=`` deploy root so CWD-relative config works
 
-Supports robust detection of Windows launchers in both Nuitka compiled builds
-(split structure) and local development environments.
+Supports launcher detection for Windows (``.exe``) and Linux (shell wrapper)
+Nuitka split builds, plus local development environments.
 """
 
 from __future__ import annotations
@@ -171,40 +171,47 @@ def list_trigger_commands() -> list[tuple[str, str]]:
     return rows
 
 
-# ─── Windows launcher detection ───────────────────────────────────────────────
+# ─── Launcher detection (Windows + Linux split layout) ───────────────────────
+
+
+def _preferred_launcher_names() -> list[str]:
+    """
+    Ordered list of outer launcher basenames for the current platform/mode.
+
+    Windows split build uses ``AIPromptBridge.exe`` / ``AIPromptBridge-NoConsole.exe``.
+    Linux Nuitka packaging uses a single shell wrapper ``AIPromptBridge`` at deploy root.
+    """
+    launched_mode = None
+    for arg in sys.argv:
+        if arg.startswith("--launched-mode="):
+            launched_mode = arg.split("=", 1)[1].strip().lower()
+            break
+
+    if is_linux():
+        # Single console-oriented wrapper; no separate NoConsole binary.
+        return ["AIPromptBridge"]
+
+    if launched_mode == "gui":
+        return ["AIPromptBridge-NoConsole.exe", "AIPromptBridge.exe"]
+    return ["AIPromptBridge.exe", "AIPromptBridge-NoConsole.exe"]
 
 
 def get_launcher_path() -> Optional[str]:
     """
-    Get the absolute path to the appropriate launcher executable (Windows).
+    Get the absolute path to the appropriate outer launcher executable.
 
-    This handles the deployment structure where:
+    Deployment structure (Windows and Linux):
     - Root/
-      - AIPromptBridge.exe (Console Launcher)
-      - AIPromptBridge-NoConsole.exe (GUI Launcher)
+      - AIPromptBridge[.exe] (outer launcher / shell wrapper)
+      - AIPromptBridge-NoConsole.exe (Windows GUI launcher only)
       - bin/
-        - AIPromptBridge_Internal.exe (This process, sys.executable)
+        - AIPromptBridge_Internal[.exe] (this process when compiled)
 
     Returns:
         Path to the launcher executable (str) or None if not found.
     """
-    # 1. Identify which launcher variant we prefer based on current mode
-    preferred_launcher = "AIPromptBridge.exe"  # Default
-    for arg in sys.argv:
-        if arg.startswith("--launched-mode="):
-            mode = arg.split("=")[1].strip().lower()
-            if mode == "gui":
-                preferred_launcher = "AIPromptBridge-NoConsole.exe"
-            elif mode == "console":
-                preferred_launcher = "AIPromptBridge.exe"
-            break
-
-    launchers_to_check = [preferred_launcher]
-    # Add the other one as fallback
-    if preferred_launcher == "AIPromptBridge.exe":
-        launchers_to_check.append("AIPromptBridge-NoConsole.exe")
-    else:
-        launchers_to_check.append("AIPromptBridge.exe")
+    launchers_to_check = _preferred_launcher_names()
+    preferred_launcher = launchers_to_check[0]
 
     # 2. Determine potential root directories
     search_roots = []
@@ -212,12 +219,12 @@ def get_launcher_path() -> Optional[str]:
     if is_compiled():
         exe_path = Path(sys.executable).resolve()
 
-        # PATH STRATEGY 1: Split Structure (bin/Internal.exe -> ../Launcher.exe)
+        # PATH STRATEGY 1: Split Structure (bin/Internal -> ../Launcher)
         # This is the standard release structure
         if exe_path.parent.name.lower() == "bin":
             search_roots.append(exe_path.parent.parent)
 
-        # PATH STRATEGY 2: Flat Structure (Internal.exe -> ./Launcher.exe)
+        # PATH STRATEGY 2: Flat Structure (Internal -> ./Launcher)
         search_roots.append(exe_path.parent)
 
         # PATH STRATEGY 3: Main Module CWD override
@@ -245,8 +252,8 @@ def get_launcher_path() -> Optional[str]:
                 return str(candidate.resolve())
 
     # 4. Dev Fallback: Return script path if no exe found
-    # (Only in dev mode)
-    if not is_compiled():
+    # (Only in dev mode; Windows launchers only)
+    if not is_compiled() and not is_linux():
         for root in search_roots:
             if preferred_launcher == "AIPromptBridge-NoConsole.exe":
                 candidate = root / "launcher_gui.py"

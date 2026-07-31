@@ -140,11 +140,12 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **Dialogs**: Use `ask_themed_string(parent, title, prompt, colors)` or `ThemedInputDialog` instead of `simpledialog.askstring` for UI consistency.
 
 ### 16. Workspace Management (Split Build)
-- Split structure bypasses Antivirus false positives:
-  - **Root**: `AIPromptBridge.exe` (Launchers via cx_Freeze).
-  - **Bin**: `bin/AIPromptBridge_Internal.exe` (Heavy app via Nuitka).
+- Split structure (Windows AV-friendly layout; Linux matches the same CWD rules):
+  - **Root**: Windows `AIPromptBridge.exe` / `AIPromptBridge-NoConsole.exe` (cx_Freeze); Linux `AIPromptBridge` (shell wrapper in `scripts/linux_launcher.sh`).
+  - **Bin**: `bin/AIPromptBridge_Internal[.exe]` (Nuitka standalone).
 - **CWD Handling**: Compiled mode → `setup_workspace()` in `main.py` forces CWD to launcher's directory (parent of `bin/`), migrates stale config files via background thread.
 - Internal binary without `--launched-mode` flag intentionally refuses to start.
+- **CI packaging**: `.github/workflows/release.yml` builds Windows zip + Linux tar.gz; Linux freezes with **Xft system Tk** (deadsnakes `python3.13-tk`). Assemble via `scripts/assemble_linux_package.sh`. Details: `docs/BUILD_PROCESS.md`.
 
 ### 17. Console Output
 - Do NOT use `print()`. Use `src/console.py`: `print_success()`, `print_error()`, `print_warning()`, `print_info()`, `print_panel()`.

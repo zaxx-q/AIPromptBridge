@@ -139,13 +139,18 @@ The **TTS Processor** tool enables batch text-to-speech generation:
 
 ### Download (Recommended)
 
-1. Download `AIPromptBridge.zip` from [GitHub Releases](https://github.com/zaxx-q/AIPromptBridge/releases)
-2. Extract and run `AIPromptBridge.exe` (use `AIPromptBridge-NoConsole.exe` to hide console)
-3. On first launch, a setup wizard will automatically run to guide you step-by-step to quickly get started
-4. If you skip setup wizard or need to make changes later:
-   - Access **Profiles** to edit and test your connection profiles.
-   - Access **Settings** to customize theme modes, general behavior, and tool configurations.
-5. The app runs minimized to the Windows system tray. Double-click tray icon to hide/unhide the console.
+Grab the latest assets from [GitHub Releases](https://github.com/zaxx-q/AIPromptBridge/releases):
+
+| Platform | Asset | Run |
+|----------|-------|-----|
+| **Windows** | `AIPromptBridge-v*-windows-x86_64.zip` | `AIPromptBridge.exe` (or `AIPromptBridge-NoConsole.exe` to hide console) |
+| **Linux** (x86_64, glibc ≈ Ubuntu 24.04+) | `AIPromptBridge-v*-linux-x86_64.tar.gz` | `./AIPromptBridge` |
+
+1. Extract the archive for your OS.
+2. On first launch, a setup wizard guides API keys / connection setup.
+3. If you skip the wizard or need changes later: **Profiles**, **Settings**, and tool configuration.
+4. **Windows:** runs minimized to the system tray (double-click tray icon to hide/unhide the console).  
+   **Linux:** tray needs a StatusNotifier host (e.g. waybar/dms); use `./AIPromptBridge --trigger …` from compositor binds. Runtime tools: `wl-clipboard`, `wlrctl`, `grim`, `slurp`, `pactl`, `ffmpeg` — see [docs/LINUX.md](docs/LINUX.md).
 
 ### From Source (Alternative)
 
@@ -157,7 +162,7 @@ uv pip install -r requirements.txt   # or: pip install -r requirements.txt
 uv run main.py --show-console        # or: python main.py
 ```
 
-**Linux (Wayland / niri):** install system tools (`wl-clipboard`, `wlrctl`, `grim`, `slurp`, PortAudio) and use `uv run main.py --trigger snip` (etc.) from compositor binds. Full guide: [docs/LINUX.md](docs/LINUX.md).
+**Linux (Wayland / niri):** install system tools (`wl-clipboard`, `wlrctl`, `grim`, `slurp`, PortAudio, `pactl`, `ffmpeg`) and use `uv run main.py --trigger snip` (etc.) from compositor binds. Prefer distro `python3.13` + `python3.13-tkinter` for full GUI fonts. Full guide: [docs/LINUX.md](docs/LINUX.md).
 ## 📋 Usage
 
 ### System Tray

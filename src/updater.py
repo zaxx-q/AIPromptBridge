@@ -117,6 +117,65 @@ def is_newer_version(remote_version: str, local_version: str | None = None) -> b
     return parse_version(remote_version) > parse_version(local_version)
 
 
+# ─── Release asset selection ───────────────────────────────────────────────────
+
+
+def _select_release_asset(assets: list) -> Tuple[str, int, str]:
+    """
+    Pick the best downloadable asset for this OS from a GitHub release assets list.
+
+    Returns:
+        (download_url, asset_size, asset_name) — empty strings / 0 when none match.
+
+    Windows: prefer ``*windows*`` / ``*win*`` ``.zip``, else any ``.zip`` with
+    ``aipromptbridge`` in the name (legacy single-asset releases).
+    Linux: prefer ``*linux*`` ``.tar.gz`` / ``.tgz`` / ``.zip`` for release-page
+    links; full in-place self-update apply is still Windows-only for now.
+    """
+    from .platform.detect import is_linux, is_windows
+
+    def _norm(asset: dict) -> Tuple[str, str, int, str]:
+        name = asset.get("name", "") or ""
+        return (
+            name.lower(),
+            asset.get("browser_download_url") or "",
+            int(asset.get("size") or 0),
+            name,
+        )
+
+    ranked: list[Tuple[int, str, int, str]] = []  # priority, url, size, name
+
+    for asset in assets:
+        lname, url, size, name = _norm(asset)
+        if not url or not lname:
+            continue
+
+        if is_windows():
+            if lname.endswith(".zip") and ("windows" in lname or "win" in lname):
+                ranked.append((0, url, size, name))
+            elif lname.endswith(".zip") and "aipromptbridge" in lname and "linux" not in lname:
+                ranked.append((1, url, size, name))
+            elif lname.endswith(".zip") and "linux" not in lname:
+                ranked.append((2, url, size, name))
+        elif is_linux():
+            if "linux" in lname and (lname.endswith(".tar.gz") or lname.endswith(".tgz")):
+                ranked.append((0, url, size, name))
+            elif "linux" in lname and lname.endswith(".zip"):
+                ranked.append((1, url, size, name))
+            elif lname.endswith(".tar.gz") or lname.endswith(".tgz"):
+                ranked.append((2, url, size, name))
+        else:
+            # Other platforms: no auto-selected binary asset
+            continue
+
+    if not ranked:
+        return "", 0, ""
+
+    ranked.sort(key=lambda t: t[0])
+    _, url, size, name = ranked[0]
+    return url, size, name
+
+
 # ─── GitHub API ────────────────────────────────────────────────────────────────
 
 
@@ -169,30 +228,9 @@ def check_for_update() -> Optional[UpdateInfo]:
         if not is_newer_version(tag_name):
             return None
 
-        # Find the correct asset (Windows zip)
+        # Platform-aware asset selection (Windows zip auto-apply; Linux notify link)
         assets = release.get("assets", [])
-        download_url = None
-        asset_size = 0
-        asset_name = ""
-
-        for asset in assets:
-            name = asset.get("name", "").lower()
-            # Look for Windows zip asset
-            if name.endswith(".zip") and ("windows" in name or "win" in name or "aipromptbridge" in name):
-                download_url = asset.get("browser_download_url")
-                asset_size = asset.get("size", 0)
-                asset_name = asset.get("name", "")
-                break
-
-        # Fallback: take the first zip asset
-        if not download_url:
-            for asset in assets:
-                name = asset.get("name", "").lower()
-                if name.endswith(".zip"):
-                    download_url = asset.get("browser_download_url")
-                    asset_size = asset.get("size", 0)
-                    asset_name = asset.get("name", "")
-                    break
+        download_url, asset_size, asset_name = _select_release_asset(assets)
 
         if not download_url:
             # No suitable asset found — still report the update for notification
@@ -591,7 +629,7 @@ def _print_update_notification(info: UpdateInfo):
             lines = info.release_notes.strip().split("\n")[:2]
             for line in lines:
                 console.print(f"   [dim]{line.strip()}[/dim]")
-        if is_compiled():
+        if is_compiled() and _supports_in_place_update():
             console.print("   [cyan]Press [bold]U[/bold] in the terminal or use tray menu to install.[/cyan]")
         else:
             console.print(f"   [cyan]Download: [link={info.release_url}]{info.release_url}[/link][/cyan]")
@@ -599,7 +637,7 @@ def _print_update_notification(info: UpdateInfo):
     else:
         print()
         print(f"⬆️  Update available: v{info.version} (current: v{__version__})")
-        if is_compiled():
+        if is_compiled() and _supports_in_place_update():
             print("   Press U in the terminal or use tray menu to install.")
         else:
             print(f"   Download: {info.release_url}")
@@ -607,6 +645,14 @@ def _print_update_notification(info: UpdateInfo):
 
 
 # ─── Full Update Flow (for UI callbacks) ──────────────────────────────────────
+
+
+def _supports_in_place_update() -> bool:
+    """True when compiled self-update apply (exit 42 / launcher swap) is supported."""
+    from .platform.detect import is_windows
+
+    # Linux tarball packaging is notification-oriented for now (no launcher apply path).
+    return is_compiled() and is_windows()
 
 
 def perform_update(
@@ -626,6 +672,14 @@ def perform_update(
     """
     if not is_compiled():
         return False, (f"Update v{update_info.version} is available!\nDownload from: {update_info.release_url}")
+
+    if not _supports_in_place_update():
+        url = update_info.download_url or update_info.release_url
+        return False, (
+            f"Update v{update_info.version} is available!\n"
+            f"Automatic install is not supported on this platform yet.\n"
+            f"Download: {url}"
+        )
 
     if not update_info.download_url:
         return False, (
@@ -701,17 +755,16 @@ def check_and_prompt_terminal(config: dict) -> bool:
                 print(f"   {line.strip()}")
         print()
 
-    if not is_compiled():
-        # Source mode — notification only
+    if not _supports_in_place_update():
+        # Source mode, or compiled Linux (no launcher apply path yet) — notification only
+        url = info.download_url or info.release_url
         if HAVE_RICH:
-            console.print(
-                f"[cyan]📦 Running from source. Download: [link={info.release_url}]{info.release_url}[/link][/cyan]\n"
-            )
+            console.print(f"[cyan]📦 Download: [link={url}]{url}[/link][/cyan]\n")
         else:
-            print(f"📦 Running from source. Download: {info.release_url}\n")
+            print(f"📦 Download: {url}\n")
         return False
 
-    # Compiled mode — prompt for download
+    # Compiled Windows — prompt for download
     if info.asset_size > 0:
         size_mb = info.asset_size / (1024 * 1024)
         size_str = f" ({size_mb:.1f} MB)"

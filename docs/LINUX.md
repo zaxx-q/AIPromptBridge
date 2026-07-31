@@ -1,8 +1,10 @@
 # Linux Support (Wayland / niri)
 
-AIPromptBridge runs on **Windows** (primary) and **Linux Wayland** (wlroots compositors such as **niri**). Linux is source-install oriented: config stays **CWD-relative** (portable layout). Official split-build packaging (cx_Freeze / Nuitka) remains Windows-focused.
+AIPromptBridge runs on **Windows** (primary) and **Linux Wayland** (wlroots compositors such as **niri**). Config stays **CWD-relative** (portable layout) for both **source** and **Nuitka** installs.
 
 Python: **3.13.x** (see `.python-version`). Install deps with `uv pip install -r requirements.txt` (platform markers skip Windows-only packages on Linux).
+
+**Packaging:** GitHub Releases ship a Linux x86_64 tarball (`AIPromptBridge-v*-linux-x86_64.tar.gz`) built with Nuitka on Ubuntu 24.04 (Xft system Tk). Details: [BUILD_PROCESS.md](BUILD_PROCESS.md).
 
 ## Quick start
 
@@ -98,10 +100,10 @@ Settings → **General** → **Launch at Login** toggles an XDG autostart entry 
 |--|--|
 | File | `$XDG_CONFIG_HOME/autostart/aipromptbridge.desktop` (default `~/.config/autostart/`) |
 | `Exec` (source) | Current interpreter + absolute `main.py` (same venv as the running app) |
-| `Exec` (compiled) | Outer launcher if split layout (`…/AIPromptBridge` + `bin/Internal`), else `sys.executable` |
+| `Exec` (compiled) | Outer launcher `…/AIPromptBridge` (shell wrapper) when present; else `sys.executable` |
 | `Path` | Deploy / project root (CWD-relative `config.ini` / `keys.json` / sessions; for `bin/` internals = parent of `bin/`) |
 
-Implemented in `src/startup_manager.py` (`set_startup` / `is_startup_enabled` / `get_startup_info`). Linux packaging is still deferred, but the compiled branch matches the Windows split-build layout so a future freeze does not keep writing a broken `python main.py` autostart line.
+Implemented in `src/startup_manager.py` (`set_startup` / `is_startup_enabled` / `get_startup_info`).
 
 **niri caveat:** a bare niri session often does **not** process XDG autostart by itself. The toggle still writes the standard desktop file (for GNOME/KDE/XFCE and sessions that run `dex` / systemd user autostart). On pure niri, also add something like:
 
@@ -110,6 +112,37 @@ spawn-at-startup "sh" "-c" "cd /path/to/AIPromptBridge && uv run main.py"
 ```
 
 (or the absolute `Exec` line shown as **Target** in Settings).
+
+## Prebuilt package (Nuitka)
+
+Release assets include a Linux tarball alongside the Windows zip:
+
+```bash
+tar -xzf AIPromptBridge-vX.Y.Z-linux-x86_64.tar.gz
+cd AIPromptBridge-vX.Y.Z-linux-x86_64
+./AIPromptBridge --show-console
+./AIPromptBridge --trigger textedit   # needs a running instance
+```
+
+Layout:
+
+```
+AIPromptBridge-…-linux-x86_64/
+  AIPromptBridge              # shell launcher (use this)
+  bin/AIPromptBridge_Internal # Nuitka standalone
+  bin/…                       # bundled libs + assets
+  README-linux.txt
+```
+
+**Runtime packages** are still required (same table as [System packages](#system-packages)): `wl-clipboard`, `wlrctl`, `grim`, `slurp`, `pactl`, `ffmpeg`, PortAudio, StatusNotifier host.
+
+**glibc:** built on **Ubuntu 24.04** x86_64. Older distributions may not run the binary; use a source install instead.
+
+**Self-update:** compiled Linux builds **notify** when a newer release exists and link the tarball; in-place apply (swap `bin/`) is Windows-only for now. Extract a new tarball over your deploy folder (or beside it) manually.
+
+**Tk quality:** the CI freeze uses distro `python3.13-tk` (Xft). That is independent of your host’s source-venv Tk; the package embeds the build-time Tk stack inside `bin/`.
+
+CI entry points: `.github/workflows/release.yml` (`platform: linux` on `workflow_dispatch` for dry runs), `scripts/assemble_linux_package.sh`.
 
 ## Platform code
 

@@ -731,22 +731,36 @@ def setup_workspace(launched_mode):
 
     if not launched_mode:
         # Compiled binary run directly without a launcher - refuse to start
-        msg = (
-            "This executable must be launched via one of the launcher files:\n"
-            "- AIPromptBridge.exe (Console)\n"
-            "- AIPromptBridge-NoConsole.exe (GUI)\n\n"
-            "Direct execution of the internal binary is not supported as it bypasses workspace configuration."
-        )
-        try:
-            # 0x10 = MB_ICONERROR
-            ctypes.windll.user32.MessageBoxW(0, msg, "AIPromptBridge Error", 0x10)
-        except Exception:
-            # Fallback if no GUI
+        if is_windows():
+            msg = (
+                "This executable must be launched via one of the launcher files:\n"
+                "- AIPromptBridge.exe (Console)\n"
+                "- AIPromptBridge-NoConsole.exe (GUI)\n\n"
+                "Direct execution of the internal binary is not supported as it "
+                "bypasses workspace configuration."
+            )
+        else:
+            msg = (
+                "This executable must be launched via the outer launcher:\n"
+                "- ./AIPromptBridge  (deploy root; passes --launched-mode)\n\n"
+                "Direct execution of bin/AIPromptBridge_Internal is not supported "
+                "as it bypasses workspace configuration."
+            )
+        shown_gui = False
+        if is_windows():
+            try:
+                # 0x10 = MB_ICONERROR
+                ctypes.windll.user32.MessageBoxW(0, msg, "AIPromptBridge Error", 0x10)
+                shown_gui = True
+            except Exception:
+                pass
+        if not shown_gui:
             print(f"❌ {msg}")
             import contextlib
 
             with contextlib.suppress(EOFError):
-                input("Press Enter to exit...")
+                if sys.stdin is not None and sys.stdin.isatty():
+                    input("Press Enter to exit...")
         return False
 
     # Compiled with launcher: CWD = root directory (parent of bin/)

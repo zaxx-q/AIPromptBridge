@@ -553,28 +553,43 @@ class TrayApp:
         except Exception:
             pass
 
-        # Strategy 1: Compiled Mode - Restart via Launcher
+        # Strategy 1: Compiled Mode - Restart via outer launcher
         if app_is_compiled and launched_mode:
             try:
-                bin_dir = Path(sys.executable).parent
-                root_dir = bin_dir.parent
+                from .startup_manager import get_launcher_path
 
-                # Determine correct launcher
-                # Console mode is AIPromptBridge.exe
-                # GUI mode is AIPromptBridge-NoConsole.exe
-                launcher_name = "AIPromptBridge-NoConsole.exe" if launched_mode == "gui" else "AIPromptBridge.exe"
-                launcher_path = root_dir / launcher_name
+                launcher_path_str = get_launcher_path()
+                launcher_path = Path(launcher_path_str) if launcher_path_str else None
 
-                if launcher_path.exists():
-                    print(f"🔄 Restarting via launcher: {launcher_name}")
+                # Fallback name search if helper returns None
+                if launcher_path is None or not launcher_path.is_file():
+                    bin_dir = Path(sys.executable).parent
+                    root_dir = bin_dir.parent
+                    if sys.platform == "win32":
+                        names = (
+                            ["AIPromptBridge-NoConsole.exe", "AIPromptBridge.exe"]
+                            if launched_mode == "gui"
+                            else ["AIPromptBridge.exe", "AIPromptBridge-NoConsole.exe"]
+                        )
+                    else:
+                        names = ["AIPromptBridge"]
+                    for name in names:
+                        candidate = root_dir / name
+                        if candidate.is_file():
+                            launcher_path = candidate
+                            break
+
+                if launcher_path is not None and launcher_path.is_file():
+                    print(f"🔄 Restarting via launcher: {launcher_path.name}")
 
                     # Remove --launched-mode arg as launcher adds it
                     new_args = [arg for arg in sys.argv[1:] if not arg.startswith("--launched-mode")]
-
                     cmd = [str(launcher_path), *new_args]
 
-                    # Detached process group
-                    subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+                    if sys.platform == "win32":
+                        subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+                    else:
+                        subprocess.Popen(cmd, start_new_session=True)
                     os._exit(0)
             except Exception as e:
                 print(f"[Error] Launcher restart failed, falling back: {e}")
@@ -597,6 +612,7 @@ class TrayApp:
                 print(f"[Error] Failed to start new process: {e}")
                 return
         else:
+            # Linux/macOS: re-exec current process image with same argv
             os.execv(sys.executable, [sys.executable, script, *args])
 
         os._exit(0)
