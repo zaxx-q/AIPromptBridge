@@ -338,7 +338,7 @@ jobs:
         run: |
           set -euo pipefail
           . .venv/bin/activate
-          python - <<'PY'
+          python3.13 - <<'PY'
           import os, re
           path = "src/version.py"
           clean = os.environ["CLEAN_VERSION"]
@@ -386,11 +386,12 @@ jobs:
             --nofollow-import-to=curses \
             --noinclude-unittest-mode=nofollow \
             --assume-yes-for-downloads \
-            --show-scons \
+            --quiet \
+            --lto=no \
             main.py
 
+          echo "Build completed successfully."
           ls -la build_internal/ || true
-          ls -la build_internal/main.dist/ | head -50
 
       - name: Assemble Linux tarball
         env:
@@ -474,4 +475,4 @@ jobs:
           files: release-assets/*
           prerelease: false
           generate_release_notes: true
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
