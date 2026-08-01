@@ -176,6 +176,62 @@ def send_trigger(
             pass
 
 
+def cli_main(argv: list[str] | None = None) -> int:
+    """
+    Fast CLI for ``--trigger`` / ``python -m src.platform.ipc <name>``.
+
+    Stdlib-only module path: safe for compositor binds. Exit 0 on ok, 1 on error.
+    Quiet on success (niri-friendly); errors go to stderr.
+    """
+    import sys
+
+    raw = list(sys.argv[1:] if argv is None else argv)
+    # Accept bare name, ``--trigger name``, or ``--trigger=name``
+    name = ""
+    if not raw or raw[0] in ("-h", "--help"):
+        print(
+            "Usage: python -m src.platform.ipc <trigger>\n"
+            f"Triggers: {', '.join(KNOWN_TRIGGERS)}\n"
+            "Requires a running AIPromptBridge instance (does not auto-start).",
+            file=sys.stderr,
+        )
+        return 0 if raw and raw[0] in ("-h", "--help") else 1
+
+    if raw[0] == "--trigger":
+        if len(raw) < 2:
+            print("error: missing trigger name after --trigger", file=sys.stderr)
+            return 1
+        name = raw[1].strip().lower()
+    elif raw[0].startswith("--trigger="):
+        name = raw[0].split("=", 1)[1].strip().lower()
+    elif raw[0].startswith("-"):
+        print(f"error: unknown option: {raw[0]}", file=sys.stderr)
+        return 1
+    else:
+        name = raw[0].strip().lower()
+
+    if not name:
+        print("error: missing trigger name", file=sys.stderr)
+        return 1
+
+    if sys.platform == "win32":
+        print(
+            "error: IPC --trigger is only available on Linux (Windows uses tray / global hotkeys).",
+            file=sys.stderr,
+        )
+        return 1
+
+    ok, message = send_trigger(name)
+    if ok:
+        return 0
+    print(f"error: trigger {name}: {message}", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli_main())
+
+
 class TriggerServer:
     """
     Background AF_UNIX server that dispatches trigger messages.

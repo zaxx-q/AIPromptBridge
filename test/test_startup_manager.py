@@ -49,8 +49,9 @@ def test_format_start_and_trigger_commands():
 
     trig = format_trigger_command("snip")
     assert trig is not None
-    assert "--trigger" in trig
     assert "snip" in trig
+    # Source prefers fast client (aipb_trigger / -m src.platform.ipc), not fat main.py
+    assert "aipb_trigger" in trig or "src.platform.ipc" in trig or "--trigger" in trig
 
 
 def test_list_trigger_commands_covers_core():

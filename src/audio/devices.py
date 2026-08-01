@@ -18,9 +18,9 @@ from typing import Any, Dict, List, Optional
 from .backend import HAVE_PYAUDIO, is_pyaudio_available, open_pyaudio, pyaudio
 
 __all__ = [
-    "HAVE_PYAUDIO",
     "BACKEND_PORTAUDIO",
     "BACKEND_PULSE",
+    "HAVE_PYAUDIO",
     "AudioDevice",
     "find_device_by_name",
     "get_all_devices",

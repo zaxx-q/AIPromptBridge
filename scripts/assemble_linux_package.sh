@@ -74,8 +74,9 @@ if [[ "$(basename "${INTERNAL}")" != "AIPromptBridge_Internal" ]]; then
 fi
 chmod +x "${STAGE}/bin/AIPromptBridge_Internal"
 
-# Outer launcher + README
+# Outer launcher + fast IPC client + README
 install -m 755 "${ROOT}/scripts/linux_launcher.sh" "${STAGE}/AIPromptBridge"
+install -m 755 "${ROOT}/scripts/aipb_trigger.py" "${STAGE}/aipb_trigger.py"
 install -m 644 "${ROOT}/scripts/README-linux.txt" "${STAGE}/README-linux.txt"
 
 # Optional icon at root for convenience

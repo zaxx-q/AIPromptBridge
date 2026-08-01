@@ -192,7 +192,7 @@ def _probe_shapes_font(root, families_lower: set[str]) -> bool:
         if fl in ("fixed", "default", "cursor", "browser"):
             return False
         # Accept exact or substring match (some Tk builds report slightly different names)
-        if _SHAPES_FONT_NAME.lower() in fl or fl in families_lower and "customtkinter" in fl:
+        if _SHAPES_FONT_NAME.lower() in fl or (fl in families_lower and "customtkinter" in fl):
             return True
         # If family name changed but is not a known bitmap fallback, still treat as usable
         return "customtkinter" in fl or "shapes" in fl

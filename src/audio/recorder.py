@@ -372,9 +372,7 @@ class AudioRecorder:
             return False
 
         if not is_ffmpeg_available():
-            logging.error(
-                "[AudioRecorder] FFmpeg required for Linux system-audio (monitor) capture"
-            )
+            logging.error("[AudioRecorder] FFmpeg required for Linux system-audio (monitor) capture")
             return False
 
         ffmpeg = get_ffmpeg_path()

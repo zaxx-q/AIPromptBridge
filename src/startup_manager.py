@@ -117,12 +117,28 @@ def format_start_command() -> Optional[str]:
     return f"{shlex.quote(sys.executable)} {shlex.quote(str(main_py))}"
 
 
+def get_trigger_client_path() -> Optional[Path]:
+    """
+    Path to the fast stdlib IPC client script when present (source tree).
+
+    Prefer ``scripts/aipb_trigger.py`` so compositor binds avoid loading full ``main.py``.
+    """
+    if is_compiled():
+        return None
+    root = get_project_root()
+    for candidate in (root / "scripts" / "aipb_trigger.py", root / "aipb_trigger.py"):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def format_trigger_command(trigger: str) -> Optional[str]:
     """
-    Shell-safe IPC client command: ``… --trigger <name>``.
+    Shell-safe IPC client command: ``… --trigger <name>`` or fast client.
 
-    Compiled → ``<exe> --trigger <name>`` (same binary / launcher).
-    Source → ``<python> <main.py> --trigger <name>``.
+    Compiled → ``<launcher> --trigger <name>`` (outer shell uses ``aipb_trigger.py``).
+    Source → ``python3 scripts/aipb_trigger.py <name>`` when present; else
+    ``<python> -m src.platform.ipc <name>``; last resort ``main.py --trigger``.
     """
     name = (trigger or "").strip().lower()
     if not name:
@@ -134,25 +150,31 @@ def format_trigger_command(trigger: str) -> Optional[str]:
             return None
         return f"{shlex.quote(exe)} --trigger {shlex.quote(name)}"
 
-    main_py = get_main_script_path()
-    if main_py is None:
-        return None
-    return f"{shlex.quote(sys.executable)} {shlex.quote(str(main_py))} --trigger {shlex.quote(name)}"
+    client = get_trigger_client_path()
+    if client is not None:
+        # System python3 is fine (stdlib-only client); fall back to current interpreter.
+        py = "python3" if is_linux() else sys.executable
+        return f"{shlex.quote(py)} {shlex.quote(str(client))} {shlex.quote(name)}"
+
+    # Module form still avoids full main.py import graph when run as -m
+    return f"{shlex.quote(sys.executable)} -m src.platform.ipc {shlex.quote(name)}"
 
 
 def format_trigger_command_display(trigger: str) -> str:
     """
     Short human-readable trigger line for Settings (not necessarily shell-safe).
 
-    Source prefers the common ``uv run main.py --trigger …`` form; compiled shows the
-    executable basename.
+    Compiled: launcher basename. Source: fast client / module form.
     """
     name = (trigger or "").strip().lower() or "?"
     if is_compiled():
         exe = get_start_executable()
         base = Path(exe).name if exe else "AIPromptBridge"
         return f"{base} --trigger {name}"
-    return f"uv run main.py --trigger {name}"
+    client = get_trigger_client_path()
+    if client is not None:
+        return f"python3 {client.name} {name}"
+    return f"python -m src.platform.ipc {name}"
 
 
 def list_trigger_commands() -> list[tuple[str, str]]:

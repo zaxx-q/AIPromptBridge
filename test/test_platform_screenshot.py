@@ -275,6 +275,7 @@ def test_png_bytes_to_capture_result_empty():
 
 def test_never_uses_shell_true():
     """Guardrail: no shell=True on any subprocess call."""
+
     def which(name: str):
         return {"grim": "/usr/bin/grim", "slurp": "/usr/bin/slurp"}.get(name)
 

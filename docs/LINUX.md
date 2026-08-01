@@ -15,19 +15,31 @@ uv pip install -r requirements.txt
 uv run main.py --show-console
 ```
 
-Trigger tools from another terminal or a window-manager bind (no in-process global hotkeys on pure Wayland):
+Trigger tools from another terminal or a window-manager bind (no in-process global hotkeys on pure Wayland). **Prefer the fast IPC client** so each keypress does not cold-start Nuitka or the full `main.py` import graph (~3–6 s → tens of ms):
 
 ```bash
-uv run main.py --trigger textedit   # also: snip, audio, tts, chat, browser, settings, prompts
+# Compiled install (outer launcher → aipb_trigger.py + system python3):
+AIPromptBridge --trigger textedit
+
+# Source checkout (stdlib only — best for binds):
+python3 scripts/aipb_trigger.py snip
+python -m src.platform.ipc audio
+
+# Also works after lazy imports, but slower than the scripts above:
+uv run main.py --trigger chat
+
+# Triggers: snip, textedit, audio, tts, chat, browser, settings, prompts
 ```
 
-Example **niri** binds (adjust path / `uv` as needed):
+Example **niri** binds:
 
 ```kdl
 binds {
-    Mod+Shift+T { spawn-sh "cd /path/to/AIPromptBridge && uv run main.py --trigger textedit"; }
-    Mod+Shift+S { spawn-sh "cd /path/to/AIPromptBridge && uv run main.py --trigger snip"; }
-    Mod+Shift+A { spawn-sh "cd /path/to/AIPromptBridge && uv run main.py --trigger audio"; }
+    // Compiled PATH install:
+    Mod+Shift+T { spawn-sh "AIPromptBridge --trigger textedit"; }
+    Mod+Shift+S { spawn-sh "AIPromptBridge --trigger snip"; }
+    Mod+Shift+A { spawn-sh "AIPromptBridge --trigger audio"; }
+    // Source: spawn-sh "python3 /path/to/AIPromptBridge/scripts/aipb_trigger.py snip";
 }
 ```
 
@@ -124,11 +136,22 @@ cd AIPromptBridge-vX.Y.Z-linux-x86_64
 ./AIPromptBridge --trigger textedit   # needs a running instance
 ```
 
+Optional PATH install — keep the full tree together and symlink only the outer launcher (it resolves symlinks to find `bin/`):
+
+```bash
+# e.g. extract/move package to ~/.local/AIPromptBridge/
+ln -sf ~/.local/AIPromptBridge/AIPromptBridge ~/.local/bin/AIPromptBridge
+AIPromptBridge --show-console
+```
+
+Do **not** copy only `AIPromptBridge` into `~/.local/bin` without `bin/` beside the real script — config and the Nuitka tree stay at the deploy root.
+
 Layout:
 
 ```
 AIPromptBridge-…-linux-x86_64/
   AIPromptBridge              # shell launcher (use this)
+  aipb_trigger.py             # fast --trigger client (stdlib)
   bin/AIPromptBridge_Internal # Nuitka standalone
   bin/…                       # bundled libs + assets
   README-linux.txt

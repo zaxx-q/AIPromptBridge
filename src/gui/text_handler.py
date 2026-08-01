@@ -360,9 +360,7 @@ class TextHandler:
             selected_text = self.get_selected_text(max_wait=0.4)
             if selected_text:
                 return selected_text
-            logging.warning(
-                "No text captured on first attempt, retrying with slow-app hybrid strategy"
-            )
+            logging.warning("No text captured on first attempt, retrying with slow-app hybrid strategy")
             return self._get_selected_text_slow_app()
 
         # Fast path — works for most apps
@@ -501,8 +499,7 @@ class TextHandler:
             try:
                 if not platform_copy_text(cleaned):
                     logging.warning(
-                        "Linux replace_selected_text: failed to set clipboard "
-                        "(wl-clipboard missing or error)"
+                        "Linux replace_selected_text: failed to set clipboard (wl-clipboard missing or error)"
                     )
                     return False
 

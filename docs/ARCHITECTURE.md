@@ -243,8 +243,8 @@ All AI requests flow through `RequestPipeline` for consistent observability, uti
 
 ```python
 pipeline = RequestPipeline(
-    origin=RequestOrigin.CHAT_WINDOW, # or POPUP_INPUT, SNIP_TOOL, etc.
-    session_id=session.id
+    origin=RequestOrigin.CHAT_WINDOW,  # or POPUP_INPUT, SNIP_TOOL, etc.
+    session_id=session.id,
 )
 result = pipeline.execute(provider, messages, config, ai_params, key_manager)
 ```
@@ -623,10 +623,11 @@ from src.gui.settings_window import show_settings_window
 from src.gui.windows.prompt_editor import show_prompt_editor
 
 show_settings_window()  # Opens Settings window
-show_prompt_editor()    # Opens Prompt Editor
+show_prompt_editor()  # Opens Prompt Editor
 
 # ConnectionProfileManager can be opened independently
 from src.gui.core import show_connection_manager
+
 show_connection_manager()
 ```
 

@@ -15,7 +15,7 @@ AIPromptBridge — Windows-first Python desktop app (Linux Wayland / niri suppor
 ## Commands
 
 - **Run**: `uv run main.py` (option: `--show-console`)
-- **Linux trigger**: `uv run main.py --trigger snip|textedit|audio|…` (requires running instance)
+- **Linux trigger**: `AIPromptBridge --trigger snip|…` (compiled: fast `aipb_trigger.py`) or `python -m src.platform.ipc snip` / `python3 scripts/aipb_trigger.py snip` (source). Requires running instance; do not cold-start Nuitka for binds.
 - **Install deps**: `uv pip install -r requirements.txt` (Python **3.13.x**; see `.python-version`)
 - **Linux GUI fonts**: Prefer distro `python3.13` + `python3.13-tkinter` for the venv (Xft Tk). uv standalone CPython ships **no-xft** Tk → bitmap `fixed` only, broken CTk corners. App auto-falls back to `circle_shapes` via `src/gui/ctk_bootstrap.py`; full text quality still needs distro Tk. Details: `docs/LINUX.md`.
 

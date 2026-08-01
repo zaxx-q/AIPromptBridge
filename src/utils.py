@@ -181,10 +181,7 @@ def _play_sound_linux(sound_path, async_play: bool = True) -> bool:
             logging.debug(f"[Sound] {name} failed for {sound_path}: {e}")
             continue
 
-    logging.debug(
-        "[Sound] No Linux audio player found (tried paplay, pw-play, ffplay); "
-        f"skipping {sound_path}"
-    )
+    logging.debug(f"[Sound] No Linux audio player found (tried paplay, pw-play, ffplay); skipping {sound_path}")
     return False
 
 

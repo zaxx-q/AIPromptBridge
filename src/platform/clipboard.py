@@ -345,11 +345,7 @@ def _capture_via_ctrl_c(
                     captured = current
                     break
 
-            if (
-                resend_after is not None
-                and not resent
-                and (time.time() - start) >= resend_after
-            ):
+            if resend_after is not None and not resent and (time.time() - start) >= resend_after:
                 resent = True
                 logger.debug("Hybrid capture: re-sending Ctrl+C for slow app")
                 try:

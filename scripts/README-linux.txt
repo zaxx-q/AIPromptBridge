@@ -4,6 +4,7 @@ AIPromptBridge — Linux package
 Layout
 ------
   AIPromptBridge              Outer launcher (run this)
+  aipb_trigger.py             Fast stdlib IPC client (--trigger path)
   bin/AIPromptBridge_Internal Nuitka standalone app
   bin/…                       Bundled libraries and assets
   README-linux.txt            This file
@@ -14,14 +15,22 @@ Quick start
   cd AIPromptBridge-*-linux-x86_64   # or the extracted folder name
   ./AIPromptBridge --show-console
 
-  # IPC triggers (requires a running instance), e.g. from niri binds:
+  # IPC triggers (requires a running instance), e.g. from niri binds.
+  # --trigger uses aipb_trigger.py + system python3 (tens of ms), NOT the
+  # full Nuitka binary:
   ./AIPromptBridge --trigger textedit
   ./AIPromptBridge --trigger snip
   ./AIPromptBridge --trigger audio
 
-Config (config.ini, keys.json, prompts.json, sessions) is CWD-relative:
-keep the deploy folder as your working directory, or launch via the
-absolute path to ./AIPromptBridge from that folder.
+Optional PATH install (symlink the outer launcher only — keep bin/ next to it):
+  mkdir -p ~/.local/AIPromptBridge
+  # move/extract the full package into ~/.local/AIPromptBridge/
+  ln -sf ~/.local/AIPromptBridge/AIPromptBridge ~/.local/bin/AIPromptBridge
+  # Then: AIPromptBridge --show-console
+
+Config (config.ini, keys.json, prompts.json, sessions) lives in the deploy
+root (the folder that contains AIPromptBridge + bin/), not next to a PATH
+symlink. The launcher always chdirs there.
 
 Runtime system packages (not bundled)
 -------------------------------------

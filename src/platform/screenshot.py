@@ -80,8 +80,7 @@ def capture_region_interactive() -> bytes | None:
     """
     if not is_grim_slurp_available():
         logger.error(
-            "Cannot capture region: grim and/or slurp not available. "
-            "Install 'grim' and 'slurp' system packages."
+            "Cannot capture region: grim and/or slurp not available. Install 'grim' and 'slurp' system packages."
         )
         return None
 
@@ -104,10 +103,7 @@ def capture_full_screen() -> bytes | None:
 
     _refresh_binary_cache()
     if not _grim_path:
-        logger.error(
-            "Cannot capture full screen: grim not available. "
-            "Install the 'grim' system package."
-        )
+        logger.error("Cannot capture full screen: grim not available. Install the 'grim' system package.")
         return None
 
     return _run_grim_full()
@@ -126,10 +122,7 @@ def capture_output(output_name: str) -> bytes | None:
 
     _refresh_binary_cache()
     if not _grim_path:
-        logger.error(
-            "Cannot capture output: grim not available. "
-            "Install the 'grim' system package."
-        )
+        logger.error("Cannot capture output: grim not available. Install the 'grim' system package.")
         return None
 
     return _run_grim(["-o", str(output_name).strip(), "-"])

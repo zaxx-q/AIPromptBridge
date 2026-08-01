@@ -25,7 +25,7 @@ Source #51
 	Base Volume: 65536 / 100% / 0.00 dB
 	Monitor of Sink: alsa_output.usb-C-Media_Electronics_Inc._USB_Audio_Device-00.analog-stereo
 	Latency: 0 usec, configured 0 usec
-	Flags: DECK HARDWARE DECIBEL_VOLUME LATENCY 
+	Flags: DECK HARDWARE DECIBEL_VOLUME LATENCY
 
 Source #52
 	State: SUSPENDED
@@ -40,7 +40,7 @@ Source #52
 	Base Volume: 27111 /  41% / -23.00 dB
 	Monitor of Sink: n/a
 	Latency: 0 usec, configured 0 usec
-	Flags: HARDWARE HW_MUTE_CTRL HW_VOLUME_CTRL DECIBEL_VOLUME LATENCY 
+	Flags: HARDWARE HW_MUTE_CTRL HW_VOLUME_CTRL DECIBEL_VOLUME LATENCY
 """
 
 

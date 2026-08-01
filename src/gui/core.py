@@ -482,10 +482,7 @@ class GUICoordinator:
             try:
                 from ..console import print_error
 
-                print_error(
-                    "Snip capture requires grim and slurp. "
-                    "Install both system packages, then try again."
-                )
+                print_error("Snip capture requires grim and slurp. Install both system packages, then try again.")
             except Exception:
                 pass
             if on_cancel:

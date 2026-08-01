@@ -46,11 +46,16 @@ To keep the launcher footprint minimal (~6MB total), we aggressively strip unuse
 Linux does **not** use cx_Freeze. The outer launcher is `scripts/linux_launcher.sh`, installed as `AIPromptBridge` at the package root:
 
 ```bash
+_LAUNCHER="$(readlink -f "${BASH_SOURCE[0]}")"   # resolve PATH symlinks
+ROOT="$(cd "$(dirname "${_LAUNCHER}")" && pwd)"
+# --trigger → system python3 + aipb_trigger.py (stdlib IPC, ~tens of ms)
+# else     → Nuitka Internal with --launched-mode=console
 exec "$ROOT/bin/AIPromptBridge_Internal" --launched-mode=console "$@"
 ```
 
-`--launched-mode` is required: `main.setup_workspace()` refuses a bare internal binary so CWD/config always resolve to the deploy root (parent of `bin/`).
+`--launched-mode` is required: `main.setup_workspace()` refuses a bare internal binary so CWD/config always resolve to the deploy root (parent of `bin/`). Symlink resolution lets users put only a link on `PATH` (e.g. `~/.local/bin/AIPromptBridge` → install root) without breaking the `bin/` lookup.
 
+**`--trigger` fast path:** compositor binds must not cold-start the ~100MB Nuitka tree. The outer launcher execs `aipb_trigger.py` (stdlib-only; also in source as `scripts/aipb_trigger.py` / `python -m src.platform.ipc`) so hotkeys stay in the tens of milliseconds.
 ## Component 2: The Internal Application (Bin)
 
 The core application (`main.py`) is compiled using **Nuitka** in `standalone` mode on both platforms.
