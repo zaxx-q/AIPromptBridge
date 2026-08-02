@@ -5,6 +5,7 @@ Intentionally free of GUI / audio / provider imports.
 """
 
 from .clipboard import (
+    capture_selection_for_textedit,
     capture_selection_hybrid,
     copy_bytes,
     copy_text,
@@ -36,6 +37,7 @@ from .ipc import (
     parse_reply,
     send_trigger,
 )
+from .pointer import get_pointer_position
 from .screenshot import (
     capture_full_screen,
     capture_output,
@@ -54,6 +56,7 @@ __all__ = [
     "capture_full_screen",
     "capture_output",
     "capture_region_interactive",
+    "capture_selection_for_textedit",
     "capture_selection_hybrid",
     "copy_bytes",
     "copy_text",
@@ -63,6 +66,7 @@ __all__ = [
     "encode_reply_ok",
     "encode_trigger",
     "get_key",
+    "get_pointer_position",
     "get_selected_text_wayland",
     "get_socket_path",
     "has_primary_selection",

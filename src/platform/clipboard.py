@@ -262,13 +262,13 @@ def copy_bytes(data: bytes, mime: str, *, primary: bool = False) -> bool:
         return False
 
 
-def get_selected_text_wayland() -> str:
+def get_selected_text_wayland(*, include_clipboard: bool = True) -> str:
     """
     Read currently selected text on Wayland.
 
     Prefers **primary selection** (mouse highlight, no clipboard pollution).
-    If primary is empty, falls back to a **read-only** clipboard paste
-    (user may have already copied). Does **not** inject Ctrl+C.
+    When ``include_clipboard`` is true, falls back to a **read-only**
+    clipboard paste (user may have already copied). Does **not** inject Ctrl+C.
     """
     if not is_linux():
         return ""
@@ -276,6 +276,9 @@ def get_selected_text_wayland() -> str:
     primary = paste_text(primary=True)
     if primary and primary.strip():
         return primary
+
+    if not include_clipboard:
+        return ""
 
     # Optional read-only fallback: clipboard already filled by the user.
     clipboard = paste_text(primary=False)
@@ -378,6 +381,7 @@ def capture_selection_hybrid(
     timeout: float = _HYBRID_DEFAULT_TIMEOUT,
     poll_interval: float = _HYBRID_POLL_INTERVAL,
     allow_ctrl_c: bool = True,
+    include_clipboard: bool = True,
     resend_after: Optional[float] = None,
 ) -> str:
     """
@@ -385,7 +389,7 @@ def capture_selection_hybrid(
 
     Order:
       1. Primary selection (mouse highlight — no clipboard pollution).
-      2. Read-only clipboard (user may already have copied).
+      2. Optional read-only clipboard (user may already have copied).
       3. If still empty and ``allow_ctrl_c``: backup clipboard → wlrctl Ctrl+C →
          poll clipboard until change/timeout → restore backup → return text.
 
@@ -393,6 +397,8 @@ def capture_selection_hybrid(
         timeout: Max seconds to wait for clipboard after Ctrl+C.
         poll_interval: Sleep between clipboard polls.
         allow_ctrl_c: When False, only steps 1–2 (same as get_selected_text_wayland).
+        include_clipboard: Whether step 2 may treat ordinary clipboard content as
+            a selection. TextEdit disables this to avoid stale copied text.
         resend_after: If set, re-send Ctrl+C once after this many seconds of polling
             (slow-app retry). Only applies to the Ctrl+C path.
 
@@ -402,8 +408,9 @@ def capture_selection_hybrid(
     if not is_linux():
         return ""
 
-    # Prefer primary / existing clipboard — never inject when already have text.
-    existing = get_selected_text_wayland()
+    # Prefer primary / optional existing clipboard — never inject when already
+    # have text. TextEdit deliberately excludes ordinary clipboard contents.
+    existing = get_selected_text_wayland(include_clipboard=include_clipboard)
     if existing and existing.strip():
         return existing
 
@@ -413,6 +420,29 @@ def capture_selection_hybrid(
     return _capture_via_ctrl_c(
         timeout=timeout,
         poll_interval=poll_interval,
+        resend_after=resend_after,
+    )
+
+
+def capture_selection_for_textedit(
+    *,
+    timeout: float = _HYBRID_DEFAULT_TIMEOUT,
+    poll_interval: float = _HYBRID_POLL_INTERVAL,
+    allow_ctrl_c: bool = True,
+    resend_after: Optional[float] = None,
+) -> str:
+    """Capture an active selection for TextEdit without trusting stale clipboard text.
+
+    Primary selection remains first for terminals and mouse selection. If it is
+    empty, the Ctrl+C path confirms that the normal clipboard changed before
+    accepting it; it is then restored. This intentionally does not clear the
+    primary selection, preserving middle-click paste behavior.
+    """
+    return capture_selection_hybrid(
+        timeout=timeout,
+        poll_interval=poll_interval,
+        allow_ctrl_c=allow_ctrl_c,
+        include_clipboard=False,
         resend_after=resend_after,
     )
 

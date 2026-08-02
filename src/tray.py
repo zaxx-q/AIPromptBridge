@@ -669,15 +669,13 @@ class TrayApp:
             print(f"[Error] Could not open connection profiles: {e}")
 
     def _on_direct_chat(self, systray):
-        """Show direct chat popup (equivalent to Ctrl+Space with no selection)"""
+        """Show Direct Chat without capturing a selection."""
         try:
             from .gui.text_edit_tool import get_instance
 
             app = get_instance()
-            if app:
-                # Trigger hotkey action - since tray is focused, likely no text is selected,
-                # so it will open the direct chat input popup.
-                app._on_hotkey_pressed()
+            if app and hasattr(app, "show_direct_chat"):
+                app.show_direct_chat()
             else:
                 print("[Warning] TextEditTool not running")
         except Exception as e:

@@ -33,6 +33,7 @@ from .popups import (
     ModifierBar,
     SegmentedToggle,
     Tooltip,
+    _get_popup_position,
     _make_draggable,
     create_profile_dropdown_ctk,
     create_profile_dropdown_tk,
@@ -1046,11 +1047,7 @@ class AttachedSnipPopup:
         """Position the window."""
         self.root.update_idletasks()
 
-        x = self.x
-        y = self.y
-        if x is None or y is None:
-            x = self.root.winfo_pointerx()
-            y = self.root.winfo_pointery() + 20
+        x, y = _get_popup_position(self.root, self.x, self.y)
 
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -1100,6 +1097,8 @@ class AttachedSnipPopup:
 
         try:
             self.root.deiconify()
+            # Reapply after mapping for override-redirect Wayland popups.
+            self._position_window()
             self.root.bind("<Escape>", lambda e: self._close())
             self.root.lift()
             self.root.focus_force()

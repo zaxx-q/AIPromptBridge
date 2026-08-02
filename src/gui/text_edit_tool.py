@@ -168,11 +168,43 @@ class TextEditToolApp:
         # Multiple concurrent invocations are allowed - each operates independently
         threading.Thread(target=self._show_popup, daemon=True).start()
 
+    def _get_popup_position(self) -> tuple[Optional[int], Optional[int]]:
+        """Get a compositor cursor position without querying Tk off its GUI thread."""
+        try:
+            from ..platform.pointer import get_pointer_position
+
+            position = get_pointer_position()
+            if position is not None:
+                return position[0], position[1] + 20
+        except Exception as exc:
+            logging.debug("Could not get compositor cursor position: %s", exc)
+        return None, None
+
+    def show_direct_chat(self):
+        """Open Direct Chat without reading the current selection or clipboard."""
+        logging.debug("Showing Direct Chat input popup")
+
+        from .core import GUICoordinator
+
+        on_tts = self._on_tts_requested if self.config.get("tts_enabled", True) else None
+        x, y = self._get_popup_position()
+        GUICoordinator.get_instance().request_input_popup(
+            on_submit=self._on_direct_chat,
+            on_close=self._on_popup_closed,
+            x=x,
+            y=y,
+            on_tts=on_tts,
+        )
+
     def _show_popup(self):
         """Show the appropriate popup window via GUICoordinator."""
         logging.debug("Showing popup window via GUICoordinator")
 
         from .core import GUICoordinator
+
+        # Capture before selection retrieval so the popup follows the invocation
+        # point even when a slow application needs a Ctrl+C retry.
+        x, y = self._get_popup_position()
 
         # Get selected text (captured locally to avoid race conditions
         # when multiple hotkey presses trigger concurrent popups)
@@ -193,6 +225,8 @@ class TextEditToolApp:
                 on_option_selected=self._on_option_selected,
                 on_close=self._on_popup_closed,
                 selected_text=selected_text,
+                x=x,
+                y=y,
                 on_tts=on_tts,
                 on_request_compare_text=self._on_request_compare_text,
             )
@@ -200,7 +234,11 @@ class TextEditToolApp:
             # No text selected - show simple input popup via coordinator
             logging.debug("No text selected, showing input popup")
             GUICoordinator.get_instance().request_input_popup(
-                on_submit=self._on_direct_chat, on_close=self._on_popup_closed, on_tts=on_tts
+                on_submit=self._on_direct_chat,
+                on_close=self._on_popup_closed,
+                x=x,
+                y=y,
+                on_tts=on_tts,
             )
 
     def _on_popup_closed(self):

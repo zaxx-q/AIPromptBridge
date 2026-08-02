@@ -36,6 +36,7 @@ else:
     HAVE_WIN32 = False
 
 # Import CustomTkinter with fallback
+from ..platform.pointer import get_pointer_position
 from .custom_widgets import create_emoji_button
 from .platform import HAVE_CTK, ctk
 
@@ -75,6 +76,30 @@ def get_colors() -> ThemeColors:
     the centralized theme registry.
     """
     return _get_theme_colors()
+
+
+def _get_popup_position(
+    root,
+    x: Optional[int] = None,
+    y: Optional[int] = None,
+    *,
+    offset_x: int = 0,
+    offset_y: int = 20,
+) -> tuple[int, int]:
+    """Choose popup coordinates, preferring a compositor cursor position.
+
+    Under pure Wayland, Tk may query an idle Xwayland cursor rather than the
+    visible Wayland cursor. Compositor IPC is tried first; unsupported
+    compositors deliberately retain the Tk fallback used on Windows and X11.
+    """
+    if x is not None and y is not None:
+        return x, y
+
+    position = get_pointer_position()
+    if position is not None:
+        return position[0] + offset_x, position[1] + offset_y
+
+    return root.winfo_pointerx() + offset_x, root.winfo_pointery() + offset_y
 
 
 # Transparency color for Windows (must be a color not used in UI)
@@ -1622,6 +1647,8 @@ class AttachedInputPopup:
             return
         try:
             self.root.deiconify()
+            # Mapping can cause a Wayland compositor to discard pre-show geometry.
+            self._position_window()
             self.root.bind("<Escape>", lambda e: self._close())
             self.root.lift()
             self.root.focus_force()
@@ -1633,11 +1660,7 @@ class AttachedInputPopup:
         """Position the window near the cursor."""
         self.root.update_idletasks()
 
-        x = self.x
-        y = self.y
-        if x is None or y is None:
-            x = self.root.winfo_pointerx()
-            y = self.root.winfo_pointery() + 20
+        x, y = _get_popup_position(self.root, self.x, self.y)
 
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -2227,6 +2250,9 @@ class AttachedPromptPopup:
             return
         try:
             self.root.deiconify()
+            # Reapply after mapping; some Wayland compositors ignore geometry
+            # assigned while an override-redirect popup is withdrawn.
+            self._position_window()
             self.root.bind("<Escape>", lambda e: self._close())
             self.root.lift()
             self.root.focus_force()
@@ -2361,11 +2387,7 @@ class AttachedPromptPopup:
         """Position the window."""
         self.root.update_idletasks()
 
-        x = self.x
-        y = self.y
-        if x is None or y is None:
-            x = self.root.winfo_pointerx()
-            y = self.root.winfo_pointery() + 20
+        x, y = _get_popup_position(self.root, self.x, self.y)
 
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -2764,8 +2786,11 @@ class TypingIndicator:
             return
 
         try:
-            x = self.root.winfo_pointerx() + self.OFFSET_X
-            y = self.root.winfo_pointery() + self.OFFSET_Y
+            x, y = _get_popup_position(
+                self.root,
+                offset_x=self.OFFSET_X,
+                offset_y=self.OFFSET_Y,
+            )
 
             screen_width = self.root.winfo_screenwidth()
             screen_height = self.root.winfo_screenheight()
@@ -2775,9 +2800,9 @@ class TypingIndicator:
             window_height = self.root.winfo_height()
 
             if x + window_width > screen_width:
-                x = self.root.winfo_pointerx() - window_width - 10
+                x -= window_width + (2 * self.OFFSET_X) + 10
             if y + window_height > screen_height:
-                y = self.root.winfo_pointery() - window_height - 10
+                y -= window_height + (2 * self.OFFSET_Y) + 10
 
             self.root.geometry(f"+{x}+{y}")
         except tk.TclError:

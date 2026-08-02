@@ -658,9 +658,16 @@ def dispatch_trigger(name: str) -> tuple:
             from src.gui.text_edit_tool import get_instance
 
             app = get_instance()
-            if app is None or not hasattr(app, "_on_hotkey_pressed"):
+            if app is None:
                 return False, "tool unavailable"
-            app._on_hotkey_pressed()
+            if name == "chat":
+                if not hasattr(app, "show_direct_chat"):
+                    return False, "tool unavailable"
+                app.show_direct_chat()
+            else:
+                if not hasattr(app, "_on_hotkey_pressed"):
+                    return False, "tool unavailable"
+                app._on_hotkey_pressed()
             return True, ""
 
         if name == "snip":

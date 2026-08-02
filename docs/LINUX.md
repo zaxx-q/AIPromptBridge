@@ -97,7 +97,7 @@ Do **not** try to `LD_LIBRARY_PATH` over uv’s `libtcl9tk9.0.so` with distro Tk
 | Launch at login | Registry `HKCU\…\Run` | **XDG autostart** `~/.config/autostart/aipromptbridge.desktop` |
 | Single instance | Named mutex | Unix socket bind (same path as IPC) |
 | Tray | `infi.systray` | `pystray` (AppIndicator / StatusNotifier) |
-| Selection capture | SendInput Ctrl+C + clipboard sequence | Primary selection first; hybrid **Ctrl+C** via `wlrctl` if empty |
+| Selection capture | SendInput Ctrl+C + clipboard sequence | Primary selection first; hybrid **Ctrl+C** via `wlrctl` if empty (ordinary clipboard is not treated as a selection) |
 | Type / paste into apps | pynput / SendInput | `wlrctl` (+ `wl-copy` for paste) |
 | Snip | Tk overlay + `PIL.ImageGrab` | `slurp` geometry + `grim -g` → same `CaptureResult` |
 | System audio | WASAPI loopback (PyAudioWPatch) | PipeWire/Pulse **monitor** sources via `pactl` + `ffmpeg -f pulse` (PortAudio often has no Pulse host API) |
@@ -176,6 +176,7 @@ OS-facing helpers live under **`src/platform/`** (no GUI imports):
 | `detect.py` | `is_windows` / `is_linux` / `is_wayland` |
 | `ipc.py` / `single_instance.py` | Trigger protocol + instance lock |
 | `clipboard.py` | `wl-copy` / `wl-paste`, primary, hybrid selection helper |
+| `pointer.py` | Best-effort compositor cursor lookup (Hyprland; optional Sway seat fields) |
 | `input.py` | `wlrctl` type and key chords |
 | `console_input.py` | Non-blocking single-key TTY input (`termios` cbreak / Windows `msvcrt`) |
 | `screenshot.py` | `grim` / `slurp` |
@@ -187,6 +188,9 @@ Interactive console commands (`--show-console`) and batch Pause/Stop keys use `s
 ## Known limitations
 
 - Pure Wayland apps that ignore virtual keyboard or selection protocols may not accept type/paste/hybrid capture.
+- **Direct Chat:** tray **Direct Chat** and `--trigger chat` always open the input popup; they never capture the primary selection or clipboard. Use `--trigger textedit` for selection-based actions.
+- **Selections:** Wayland primary selection can remain after a mouse highlight. TextEdit intentionally ignores ordinary clipboard contents, but a non-empty primary selection is still used so terminal mouse selections and middle-click paste remain intact.
+- **Popup position:** Hyprland cursor IPC places popups near the visible cursor. niri 26.04 has no public cursor-position IPC, so Tk/Xwayland coordinates are the fallback and may be stale when the focused app is native Wayland.
 - Snip UX uses **slurp** (not the Windows frozen dim overlay).
 - Interactive console keys require a real TTY (`stdin.isatty()`); piped/redirected stdin falls back to tray / `--trigger`.
 - Self-update **apply** path is Windows launcher-oriented; source installs stay notification-oriented.

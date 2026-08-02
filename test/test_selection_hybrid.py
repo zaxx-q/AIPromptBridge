@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.platform import clipboard as clipboard_mod
-from src.platform.clipboard import capture_selection_hybrid, get_selected_text_wayland
+from src.platform.clipboard import capture_selection_for_textedit, capture_selection_hybrid, get_selected_text_wayland
 
 
 @pytest.fixture(autouse=True)
@@ -152,6 +152,18 @@ def test_hybrid_allow_ctrl_c_false_skips_inject():
         assert result == ""
         mock_get.assert_called_once()
         mock_copy.assert_not_called()
+
+
+def test_textedit_capture_excludes_regular_clipboard_fallback():
+    """TextEdit does not mistake unrelated copied text for a live selection."""
+    with (
+        patch.object(clipboard_mod, "is_linux", return_value=True),
+        patch.object(clipboard_mod, "get_selected_text_wayland", return_value="") as mock_get,
+        patch("src.platform.input.is_wlrctl_available", return_value=False),
+    ):
+        assert capture_selection_for_textedit() == ""
+
+    mock_get.assert_called_once_with(include_clipboard=False)
 
 
 def test_hybrid_non_linux_returns_empty():

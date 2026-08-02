@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover - optional on minimal Linux envs
 from pynput import keyboard as pykeyboard
 
 from ..platform import is_linux, is_windows
-from ..platform.clipboard import capture_selection_hybrid
+from ..platform.clipboard import capture_selection_for_textedit
 from ..platform.clipboard import copy_text as platform_copy_text
 from ..platform.clipboard import paste_text as platform_paste_text
 from ..platform.input import (
@@ -249,8 +249,9 @@ class TextHandler:
         Get the currently selected text from any application.
 
         **Linux/Wayland:** hybrid capture — primary selection first (mouse
-        highlight, no clipboard pollution), then read-only clipboard, then
-        optional wlrctl Ctrl+C + clipboard poll with restore when still empty.
+        highlight, no clipboard pollution), then optional wlrctl Ctrl+C +
+        clipboard poll with restore when still empty. Existing clipboard text
+        alone is not treated as an active selection.
 
         **Windows:** uses clipboard sequence number + SendInput Ctrl+C, then
         restores the previous clipboard content.
@@ -264,7 +265,7 @@ class TextHandler:
         """
         if is_linux():
             try:
-                return capture_selection_hybrid(timeout=max_wait, allow_ctrl_c=True)
+                return capture_selection_for_textedit(timeout=max_wait, allow_ctrl_c=True)
             except Exception as e:
                 logging.error(f"Linux selection capture failed: {e}")
                 return ""
@@ -340,7 +341,7 @@ class TextHandler:
         """
         Get selected text with a smart retry for slow applications.
 
-        **Linux:** hybrid capture once (primary → clipboard → Ctrl+C). If empty,
+        **Linux:** hybrid capture once (primary → Ctrl+C). If empty,
         retries the Ctrl+C path with a longer poll (1.2s) and one mid-wait re-send.
 
         **Windows:**
@@ -390,7 +391,7 @@ class TextHandler:
         """
         if is_linux():
             try:
-                return capture_selection_hybrid(
+                return capture_selection_for_textedit(
                     timeout=1.2,
                     poll_interval=0.02,
                     allow_ctrl_c=True,

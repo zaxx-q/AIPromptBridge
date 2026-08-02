@@ -176,6 +176,15 @@ class SnipToolApp:
         prompts_config = self._get_combined_prompts()
 
         from .core import GUICoordinator
+        from ..platform.pointer import get_pointer_position
+
+        x = y = None
+        try:
+            position = get_pointer_position()
+            if position is not None:
+                x, y = position[0], position[1] + 20
+        except Exception as exc:
+            logging.debug("Could not get compositor cursor position: %s", exc)
 
         GUICoordinator.get_instance().request_snip_popup(
             capture_result=capture_result,
@@ -183,6 +192,8 @@ class SnipToolApp:
             on_action=on_action_with_capture,
             on_close=self._on_popup_closed,
             on_request_compare_capture=self._on_request_compare_capture,
+            x=x,
+            y=y,
         )
 
     def _on_request_compare_capture(self, on_capture, on_cancel):
