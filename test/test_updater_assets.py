@@ -54,14 +54,10 @@ def test_select_release_asset_linux_prefers_linux_tarball(monkeypatch):
     assert size == 11
 
 
-def test_supports_in_place_update_windows_only(monkeypatch):
+def test_supports_in_place_update(monkeypatch):
+    """In-place update is supported for compiled installs on any platform."""
     monkeypatch.setattr(updater, "is_compiled", lambda: True)
-    monkeypatch.setattr("src.platform.detect.is_windows", lambda: True)
     assert updater._supports_in_place_update() is True
 
-    monkeypatch.setattr("src.platform.detect.is_windows", lambda: False)
-    assert updater._supports_in_place_update() is False
-
     monkeypatch.setattr(updater, "is_compiled", lambda: False)
-    monkeypatch.setattr("src.platform.detect.is_windows", lambda: True)
     assert updater._supports_in_place_update() is False

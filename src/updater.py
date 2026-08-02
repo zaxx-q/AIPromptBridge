@@ -13,6 +13,7 @@ import json
 import os
 import shutil
 import sys
+import tarfile
 import tempfile
 import threading
 import zipfile
@@ -332,12 +333,72 @@ def download_update(
         return None
 
 
+def _extract_zip(zip_path: str, staging_dir: Path):
+    """Extract a .zip archive into the staging directory."""
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        # Check for a single root directory inside the zip
+        top_level = set()
+        for name in zf.namelist():
+            parts = name.split("/")
+            if parts[0]:
+                top_level.add(parts[0])
+
+        if len(top_level) == 1:
+            # Zip has a single root directory — extract and rename
+            root_name = top_level.pop()
+            zf.extractall(str(staging_dir.parent))
+            extracted_path = staging_dir.parent / root_name
+            if extracted_path != staging_dir:
+                if staging_dir.exists():
+                    shutil.rmtree(staging_dir)
+                extracted_path.rename(staging_dir)
+        else:
+            # Zip contents are at the root level
+            zf.extractall(str(staging_dir))
+
+
+def _extract_tarball(tar_path: str, staging_dir: Path):
+    """Extract a .tar.gz / .tgz archive into the staging directory."""
+    with tarfile.open(tar_path, "r:gz") as tf:
+        # Security: filter out absolute paths and path traversal
+        members = tf.getmembers()
+        safe_members = []
+        for m in members:
+            # Skip absolute paths or path traversal attempts
+            if m.name.startswith("/") or ".." in m.name.split("/"):
+                continue
+            safe_members.append(m)
+
+        # Check for a single root directory inside the tarball
+        top_level = set()
+        for m in safe_members:
+            parts = m.name.split("/")
+            if parts[0]:
+                top_level.add(parts[0])
+
+        if len(top_level) == 1:
+            # Tarball has a single root directory — extract and rename
+            root_name = top_level.pop()
+            tf.extractall(str(staging_dir.parent), members=safe_members)
+            extracted_path = staging_dir.parent / root_name
+            if extracted_path != staging_dir:
+                if staging_dir.exists():
+                    shutil.rmtree(staging_dir)
+                extracted_path.rename(staging_dir)
+        else:
+            # Tarball contents are at the root level
+            staging_dir.mkdir(parents=True, exist_ok=True)
+            tf.extractall(str(staging_dir), members=safe_members)
+
+
 def prepare_update(zip_path: str, update_info: UpdateInfo) -> bool:
     """
-    Extract the downloaded zip to the staging directory and write the manifest.
+    Extract the downloaded archive to the staging directory and write the manifest.
+
+    Supports .zip (Windows) and .tar.gz/.tgz (Linux) archives.
 
     Args:
-        zip_path: Path to the downloaded zip file
+        zip_path: Path to the downloaded archive file
         update_info: UpdateInfo for this update
 
     Returns:
@@ -355,27 +416,15 @@ def prepare_update(zip_path: str, update_info: UpdateInfo) -> bool:
         else:
             print("Extracting update...")
 
-        # Extract zip
-        with zipfile.ZipFile(zip_path, "r") as zf:
-            # Check for a single root directory inside the zip
-            top_level = set()
-            for name in zf.namelist():
-                parts = name.split("/")
-                if parts[0]:
-                    top_level.add(parts[0])
-
-            if len(top_level) == 1:
-                # Zip has a single root directory — extract and rename
-                root_name = top_level.pop()
-                zf.extractall(str(staging_dir.parent))
-                extracted_path = staging_dir.parent / root_name
-                if extracted_path != staging_dir:
-                    if staging_dir.exists():
-                        shutil.rmtree(staging_dir)
-                    extracted_path.rename(staging_dir)
-            else:
-                # Zip contents are at the root level
-                zf.extractall(str(staging_dir))
+        # Determine archive type and extract
+        lower_path = zip_path.lower()
+        if lower_path.endswith((".tar.gz", ".tgz")):
+            _extract_tarball(zip_path, staging_dir)
+        elif lower_path.endswith(".zip"):
+            _extract_zip(zip_path, staging_dir)
+        else:
+            print_error(f"Unsupported archive format: {zip_path}")
+            return False
 
         # Verify staging dir has content
         if not staging_dir.exists() or not any(staging_dir.iterdir()):
@@ -385,7 +434,7 @@ def prepare_update(zip_path: str, update_info: UpdateInfo) -> bool:
         # Write manifest
         _write_manifest(update_info)
 
-        # Cleanup downloaded zip
+        # Cleanup downloaded archive
         try:
             temp_dir = os.path.dirname(zip_path)
             shutil.rmtree(temp_dir, ignore_errors=True)
@@ -399,8 +448,8 @@ def prepare_update(zip_path: str, update_info: UpdateInfo) -> bool:
 
         return True
 
-    except zipfile.BadZipFile:
-        print_error("Downloaded file is not a valid zip archive.")
+    except (zipfile.BadZipFile, tarfile.TarError) as e:
+        print_error(f"Archive is corrupted or invalid: {e}")
         _cleanup_staging()
         return False
     except Exception as e:
@@ -411,6 +460,8 @@ def prepare_update(zip_path: str, update_info: UpdateInfo) -> bool:
 
 def _write_manifest(update_info: UpdateInfo):
     """Write the update manifest file for the launcher."""
+    from .platform.detect import is_linux
+
     # Determine which launcher to use for relaunch
     launched_mode = None
     for arg in sys.argv:
@@ -418,7 +469,10 @@ def _write_manifest(update_info: UpdateInfo):
             launched_mode = arg.split("=")[1]
             break
 
-    if launched_mode == "gui":
+    if is_linux():
+        # Linux: shell launcher is just "AIPromptBridge" (no .exe, no gui variant)
+        launcher_name = "AIPromptBridge"
+    elif launched_mode == "gui":
         launcher_name = "AIPromptBridge-NoConsole.exe"
     else:
         launcher_name = "AIPromptBridge.exe"
@@ -459,21 +513,216 @@ def _cleanup_staging():
 
 def trigger_update():
     """
-    Signal the launcher to apply the update.
+    Signal/perform the update apply and restart.
 
-    - Console mode: exit with code 42 (launcher catches this)
-    - GUI mode: spawn the console launcher with --apply-update PID
+    - Windows console mode: exit with code 42 (cx_Freeze launcher catches this)
+    - Windows GUI mode: spawn the console launcher with --apply-update PID
+    - Linux: apply the update in-process, then os.execv the outer launcher
     """
-    launched_mode = None
-    for arg in sys.argv:
-        if arg.startswith("--launched-mode="):
-            launched_mode = arg.split("=")[1]
-            break
+    from .platform.detect import is_linux
 
-    if launched_mode == "gui":
-        _trigger_update_gui_mode()
+    if is_linux():
+        _trigger_update_linux()
     else:
-        _trigger_update_console_mode()
+        launched_mode = None
+        for arg in sys.argv:
+            if arg.startswith("--launched-mode="):
+                launched_mode = arg.split("=")[1]
+                break
+
+        if launched_mode == "gui":
+            _trigger_update_gui_mode()
+        else:
+            _trigger_update_console_mode()
+
+
+def _trigger_update_linux():
+    """
+    Linux: apply the staged update in-process, then os.execv the launcher.
+
+    Since the shell launcher used `exec` to replace itself with the Nuitka
+    binary, there is no parent process to coordinate with. We do the entire
+    apply + relaunch from here.
+    """
+    if HAVE_RICH:
+        console.print("\n[bold cyan]🔄 Applying update...[/bold cyan]")
+    else:
+        print("\n🔄 Applying update...")
+
+    try:
+        success = _apply_update_linux()
+    except Exception as e:
+        print_error(f"Update apply failed: {e}")
+        print_info("Update has been staged. It will be applied on next launch.")
+        return
+
+    if not success:
+        print_info("Update has been staged. It will be applied on next launch.")
+        return
+
+    # Determine the outer launcher path for relaunch
+    if is_compiled():
+        bin_dir = Path(sys.executable).parent
+        root_dir = bin_dir.parent
+    else:
+        root_dir = Path.cwd()
+
+    # Read manifest for relaunch info before it's cleaned up
+    manifest_path = root_dir / MANIFEST_FILE
+    launcher_name = "AIPromptBridge"
+    original_args = []
+    try:
+        if manifest_path.exists():
+            with open(manifest_path, "r") as f:
+                manifest = json.load(f)
+            launcher_name = manifest.get("launcher_to_relaunch", "AIPromptBridge")
+            original_args = manifest.get("original_args", [])
+            # Clean up manifest
+            manifest_path.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+    launcher_path = root_dir / launcher_name
+    if not launcher_path.exists():
+        print_warning(f"Launcher not found at {launcher_path}. Please restart manually.")
+        os._exit(0)
+
+    if HAVE_RICH:
+        console.print(f"[bold cyan]🔄 Restarting via {launcher_name}...[/bold cyan]\n")
+    else:
+        print(f"🔄 Restarting via {launcher_name}...\n")
+
+    # os.execv replaces the current process with the launcher
+    launcher_str = str(launcher_path)
+    os.execv(launcher_str, [launcher_str, *original_args])
+
+
+def _apply_update_linux() -> bool:
+    """
+    Apply a staged update on Linux: swap bin/ and update root files.
+
+    Returns True on success, False on failure (with rollback attempted).
+    """
+    if is_compiled():
+        bin_dir_parent = Path(sys.executable).parent.parent
+    else:
+        bin_dir_parent = Path.cwd()
+
+    staging_dir = bin_dir_parent / STAGING_DIR
+    bin_dir = bin_dir_parent / "bin"
+    backup_dir = bin_dir_parent / BACKUP_DIR
+    manifest_path = bin_dir_parent / MANIFEST_FILE
+
+    # Read manifest
+    try:
+        with open(manifest_path, "r") as f:
+            manifest = json.load(f)
+    except Exception as e:
+        print_error(f"Failed to read update manifest: {e}")
+        return False
+
+    version = manifest.get("version", "unknown")
+
+    # Verify staging
+    staging_bin = staging_dir / "bin"
+    if not staging_bin.exists():
+        print_error(f"Staging directory missing: {staging_bin}")
+        try:
+            manifest_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return False
+
+    # Backup current bin/
+    if HAVE_RICH:
+        console.print("   [dim]Backing up current installation...[/dim]")
+    else:
+        print("   Backing up current installation...")
+
+    try:
+        if backup_dir.exists():
+            shutil.rmtree(backup_dir, ignore_errors=True)
+        if bin_dir.exists():
+            os.rename(str(bin_dir), str(backup_dir))
+    except Exception as e:
+        print_error(f"Backup failed: {e}")
+        return False
+
+    # Deploy new bin/
+    if HAVE_RICH:
+        console.print("   [dim]Installing update...[/dim]")
+    else:
+        print("   Installing update...")
+
+    try:
+        shutil.move(str(staging_bin), str(bin_dir))
+    except Exception as e:
+        print_error(f"Failed to deploy new bin/: {e}")
+        # Rollback
+        if backup_dir.exists() and not bin_dir.exists():
+            try:
+                os.rename(str(backup_dir), str(bin_dir))
+                print_info("Rolled back to previous version.")
+            except OSError:
+                print_error("Rollback also failed! Manual recovery may be needed.")
+        return False
+
+    # Update root files (launcher script, aipb_trigger.py, etc.)
+    _update_root_files_linux(str(bin_dir_parent), str(staging_dir))
+
+    # Cleanup
+    try:
+        shutil.rmtree(backup_dir, ignore_errors=True)
+    except Exception:
+        pass
+    try:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+    except Exception:
+        pass
+
+    if HAVE_RICH:
+        print_success(f"Updated to v{version} successfully!")
+    else:
+        print(f"✅ Updated to v{version} successfully!")
+
+    return True
+
+
+# Files at the package root that should be updated from staging
+_LINUX_ROOT_UPDATE_FILES = [
+    "AIPromptBridge",  # outer shell launcher
+    "aipb_trigger.py",  # fast IPC client
+    "README-linux.txt",  # readme
+    "icon.ico",  # icon (if present)
+]
+
+
+def _update_root_files_linux(root_dir: str, staging_dir: str):
+    """Update root-level files from staging on Linux (simple overwrite)."""
+    for name in _LINUX_ROOT_UPDATE_FILES:
+        staging_path = os.path.join(staging_dir, name)
+        target_path = os.path.join(root_dir, name)
+
+        if not os.path.exists(staging_path):
+            continue
+
+        try:
+            # Linux: no file locking, just overwrite
+            if os.path.exists(target_path):
+                if os.path.isdir(target_path):
+                    shutil.rmtree(target_path)
+                else:
+                    os.remove(target_path)
+            if os.path.isdir(staging_path):
+                shutil.copytree(staging_path, target_path)
+            else:
+                shutil.copy2(staging_path, target_path)
+
+            # Preserve execute permission for scripts
+            if name in ("AIPromptBridge", "aipb_trigger.py"):
+                os.chmod(target_path, 0o755)
+        except Exception as e:
+            print_warning(f"Failed to update root file {name}: {e}")
 
 
 def _trigger_update_console_mode():
@@ -648,11 +897,10 @@ def _print_update_notification(info: UpdateInfo):
 
 
 def _supports_in_place_update() -> bool:
-    """True when compiled self-update apply (exit 42 / launcher swap) is supported."""
-    from .platform.detect import is_windows
-
-    # Linux tarball packaging is notification-oriented for now (no launcher apply path).
-    return is_compiled() and is_windows()
+    """True when compiled self-update can download + apply in-place."""
+    # Compiled installs on Windows (launcher exit code 42 + bin swap) and
+    # Linux (Python-driven bin swap + os.execv relaunch) are both supported.
+    return is_compiled()
 
 
 def perform_update(
@@ -756,7 +1004,7 @@ def check_and_prompt_terminal(config: dict) -> bool:
         print()
 
     if not _supports_in_place_update():
-        # Source mode, or compiled Linux (no launcher apply path yet) — notification only
+        # Source mode — notification only
         url = info.download_url or info.release_url
         if HAVE_RICH:
             console.print(f"[cyan]📦 Download: [link={url}]{url}[/link][/cyan]\n")
@@ -764,7 +1012,7 @@ def check_and_prompt_terminal(config: dict) -> bool:
             print(f"📦 Download: {url}\n")
         return False
 
-    # Compiled Windows — prompt for download
+    # Compiled install — prompt for download
     if info.asset_size > 0:
         size_mb = info.asset_size / (1024 * 1024)
         size_str = f" ({size_mb:.1f} MB)"

@@ -175,8 +175,8 @@ class SnipToolApp:
         # Get combined prompts for popup
         prompts_config = self._get_combined_prompts()
 
-        from .core import GUICoordinator
         from ..platform.pointer import get_pointer_position
+        from .core import GUICoordinator
 
         x = y = None
         try:

@@ -10,12 +10,12 @@ This document outlines the build process for AIPromptBridge and documents key ar
 
 Both official packages use a **split layout** so config stays CWD-relative at the deploy root while heavy deps live under `bin/`:
 
-| | Windows | Linux |
-|--|---------|--------|
-| **Root launcher** | `AIPromptBridge.exe` / `AIPromptBridge-NoConsole.exe` (cx_Freeze) | `AIPromptBridge` (shell wrapper) |
-| **Internal app** | `bin/AIPromptBridge_Internal.exe` (Nuitka standalone) | `bin/AIPromptBridge_Internal` (Nuitka standalone) |
-| **Artifact** | `AIPromptBridge-vX.Y.Z-windows-x86_64.zip` | `AIPromptBridge-vX.Y.Z-linux-x86_64.tar.gz` |
-| **Self-update apply** | Yes (launcher exit 42 / bin swap) | Notification + manual download (for now) |
+|                       | Windows                                                           | Linux                                             |
+| --------------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
+| **Root launcher**     | `AIPromptBridge.exe` / `AIPromptBridge-NoConsole.exe` (cx_Freeze) | `AIPromptBridge` (shell wrapper)                  |
+| **Internal app**      | `bin/AIPromptBridge_Internal.exe` (Nuitka standalone)             | `bin/AIPromptBridge_Internal` (Nuitka standalone) |
+| **Artifact**          | `AIPromptBridge-vX.Y.Z-windows-x86_64.zip`                        | `AIPromptBridge-vX.Y.Z-linux-x86_64.tar.gz`       |
+| **Self-update apply** | Yes (launcher exit 42 / bin swap)                                 | Yes (Python-driven bin swap + os.execv relaunch)  |
 
 ## Component 1: The Launchers (Root)
 
@@ -24,22 +24,26 @@ Both official packages use a **split layout** so config stays CWD-relative at th
 The launchers (`launcher_console.py` and `launcher_gui.py`) are compiled using **cx_Freeze**.
 
 #### Why cx_Freeze?
-*   **Clean Root Directory**: cx_Freeze places all dependency files in a `lib/` subdirectory, keeping the root folder clean (unlike Nuitka Standalone, which dumps many `.pyd` and `.dll` files next to the executable).
-*   **AV Evasion**: cx_Freeze wrappers are generally less prone to false positives from antivirus software compared to compiled C# executables or PyInstaller bootloaders.
-*   **Startup Speed**: Faster than Nuitka Onefile (which requires unpacking to a temp directory).
-*   **Update apply**: Console launcher owns `bin/` replacement after the internal process exits with code 42.
+
+- **Clean Root Directory**: cx_Freeze places all dependency files in a `lib/` subdirectory, keeping the root folder clean (unlike Nuitka Standalone, which dumps many `.pyd` and `.dll` files next to the executable).
+- **AV Evasion**: cx_Freeze wrappers are generally less prone to false positives from antivirus software compared to compiled C# executables or PyInstaller bootloaders.
+- **Startup Speed**: Faster than Nuitka Onefile (which requires unpacking to a temp directory).
+- **Update apply**: Console launcher owns `bin/` replacement after the internal process exits with code 42.
 
 #### Optimization Strategy
+
 To keep the launcher footprint minimal (~6MB total), we aggressively strip unused libraries in `src/launchers/setup_launchers.py`:
-*   **Excluded Packages**: `email`, `importlib` (partial), `ctypes`, `typing`, `distutils`, `multiprocessing`, `unittest`, `logging`.
-*   **Zip Excludes**: We explicitly force the removal of persistent packages like `email` and `pkg_resources` from `library.zip`.
-*   **Encoding Stripping**: We remove unused encodings, keeping only essentials like `utf-8`, `ascii`, and `mbcs`.
+
+- **Excluded Packages**: `email`, `importlib` (partial), `ctypes`, `typing`, `distutils`, `multiprocessing`, `unittest`, `logging`.
+- **Zip Excludes**: We explicitly force the removal of persistent packages like `email` and `pkg_resources` from `library.zip`.
+- **Encoding Stripping**: We remove unused encodings, keeping only essentials like `utf-8`, `ascii`, and `mbcs`.
 
 #### Known Limitations
-*   **Duplicate Python DLL**: The root launcher requires `python313.dll` (or similar version) to be present in the root directory. This results in a duplication of the Python DLL (one in root for launcher, one in `bin/` for internal app).
-    *   *Reason*: The Windows PE loader searches for DLLs in the executable's directory. We cannot easily point the root launcher to use the DLL in `bin/` without recompiling the cx_Freeze C stub or using unstable hacks.
-    *   *Decision*: We accept the ~4MB duplication to maintain a clean file structure and AV safety.
-*   **Symlinks**: We do **not** use symbolic links to deduplicate the DLL because they are unreliable in ZIP distributions (often failing extraction or requiring Admin privileges).
+
+- **Duplicate Python DLL**: The root launcher requires `python313.dll` (or similar version) to be present in the root directory. This results in a duplication of the Python DLL (one in root for launcher, one in `bin/` for internal app).
+  - _Reason_: The Windows PE loader searches for DLLs in the executable's directory. We cannot easily point the root launcher to use the DLL in `bin/` without recompiling the cx_Freeze C stub or using unstable hacks.
+  - _Decision_: We accept the ~4MB duplication to maintain a clean file structure and AV safety.
+- **Symlinks**: We do **not** use symbolic links to deduplicate the DLL because they are unreliable in ZIP distributions (often failing extraction or requiring Admin privileges).
 
 ### Linux — shell wrapper
 
@@ -56,14 +60,16 @@ exec "$ROOT/bin/AIPromptBridge_Internal" --launched-mode=console "$@"
 `--launched-mode` is required: `main.setup_workspace()` refuses a bare internal binary so CWD/config always resolve to the deploy root (parent of `bin/`). Symlink resolution lets users put only a link on `PATH` (e.g. `~/.local/bin/AIPromptBridge` → install root) without breaking the `bin/` lookup.
 
 **`--trigger` fast path:** compositor binds must not cold-start the ~100MB Nuitka tree. The outer launcher execs `aipb_trigger.py` (stdlib-only; also in source as `scripts/aipb_trigger.py` / `python -m src.platform.ipc`) so hotkeys stay in the tens of milliseconds.
+
 ## Component 2: The Internal Application (Bin)
 
 The core application (`main.py`) is compiled using **Nuitka** in `standalone` mode on both platforms.
 
 ### Why Nuitka?
-*   **Performance**: Compiles Python to C, offering better performance for the heavy logic.
-*   **Dependency Management**: Nuitka's standalone mode is excellent at bundling complex dependencies like `customtkinter`, `rich`, and `PIL`.
-*   **Isolation**: Placing the internal app in `bin/` allows it to have its own massive dependency tree without cluttering the user's root folder.
+
+- **Performance**: Compiles Python to C, offering better performance for the heavy logic.
+- **Dependency Management**: Nuitka's standalone mode is excellent at bundling complex dependencies like `customtkinter`, `rich`, and `PIL`.
+- **Isolation**: Placing the internal app in `bin/` allows it to have its own massive dependency tree without cluttering the user's root folder.
 
 ### Linux Tk / Xft requirement
 
@@ -73,17 +79,17 @@ CustomTkinter needs an **Xft-capable** Tk at freeze time. CI uses **deadsnakes `
 
 Automated in `.github/workflows/release.yml`:
 
-| Job | Runner | Role |
-|-----|--------|------|
-| `determine-version` | ubuntu | Resolve `vX.Y.Z`, platform flags (`all` / `windows` / `linux`), whether to publish |
-| `build-windows` | windows-latest | Nuitka internal + cx_Freeze launchers → zip |
-| `build-linux` | ubuntu-24.04 | System Python 3.13+Tk → Nuitka → `scripts/assemble_linux_package.sh` → tar.gz |
-| `publish-release` | ubuntu | Download artifacts, extract CHANGELOG notes, create GitHub Release |
+| Job                 | Runner         | Role                                                                               |
+| ------------------- | -------------- | ---------------------------------------------------------------------------------- |
+| `determine-version` | ubuntu         | Resolve `vX.Y.Z`, platform flags (`all` / `windows` / `linux`), whether to publish |
+| `build-windows`     | windows-latest | Nuitka internal + cx_Freeze launchers → zip                                        |
+| `build-linux`       | ubuntu-24.04   | System Python 3.13+Tk → Nuitka → `scripts/assemble_linux_package.sh` → tar.gz      |
+| `publish-release`   | ubuntu         | Download artifacts, extract CHANGELOG notes, create GitHub Release                 |
 
 ### Triggers
 
-*   **Tag push** (`v*`): build **both** platforms and create a release.
-*   **workflow_dispatch**: optional `version`, `release_notes`, `create_release`, and **`platform`** (`all` / `windows` / `linux`) for faster iteration (e.g. Linux-only dry runs with `create_release=false`).
+- **Tag push** (`v*`): build **both** platforms and create a release.
+- **workflow_dispatch**: optional `version`, `release_notes`, `create_release`, and **`platform`** (`all` / `windows` / `linux`) for faster iteration (e.g. Linux-only dry runs with `create_release=false`).
 
 ### Windows steps (summary)
 
@@ -121,19 +127,19 @@ Prefer validating via GHA `workflow_dispatch` with `platform=linux` and `create_
 
 Not bundled; same as source install:
 
-| Package | Role |
-|---------|------|
-| `wl-clipboard`, `wlrctl` | clipboard / type-paste |
-| `grim`, `slurp` | snip |
-| `pactl`, `ffmpeg` | system-audio loopback |
-| `libportaudio2` | mic (if not fully bundled into `.dist`) |
-| StatusNotifier host | tray |
+| Package                  | Role                                    |
+| ------------------------ | --------------------------------------- |
+| `wl-clipboard`, `wlrctl` | clipboard / type-paste                  |
+| `grim`, `slurp`          | snip                                    |
+| `pactl`, `ffmpeg`        | system-audio loopback                   |
+| `libportaudio2`          | mic (if not fully bundled into `.dist`) |
+| StatusNotifier host      | tray                                    |
 
 **glibc baseline**: Ubuntu 24.04 x86_64. Older distros may need a source install.
 
 ## Related code
 
-*   `main.setup_workspace()` — compiled CWD / `--launched-mode` gate  
-*   `src/startup_manager.py` — launcher discovery (`AIPromptBridge` on Linux, `.exe` on Windows)  
-*   `src/updater.py` — platform asset selection; in-place apply is Windows-only  
-*   `scripts/linux_launcher.sh`, `scripts/assemble_linux_package.sh`, `scripts/README-linux.txt`
+- `main.setup_workspace()` — compiled CWD / `--launched-mode` gate
+- `src/startup_manager.py` — launcher discovery (`AIPromptBridge` on Linux, `.exe` on Windows)
+- `src/updater.py` — platform asset selection; in-place apply on both Windows and Linux
+- `scripts/linux_launcher.sh`, `scripts/assemble_linux_package.sh`, `scripts/README-linux.txt`

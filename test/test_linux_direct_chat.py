@@ -3,8 +3,8 @@
 from unittest.mock import MagicMock, patch
 
 import main
-from src.gui.text_edit_tool import TextEditToolApp
 from src.gui.snip_tool import SnipToolApp
+from src.gui.text_edit_tool import TextEditToolApp
 from src.tray import TrayApp
 
 
@@ -54,7 +54,7 @@ def test_chat_and_textedit_triggers_take_separate_routes(monkeypatch):
 def test_snip_popup_receives_compositor_cursor_position():
     capture = MagicMock(width=640, height=480)
     with (
-        patch("src.gui.snip_tool.PromptsConfig") as mock_prompts_class,
+        patch("src.gui.snip_tool.PromptsConfig") as _mock_prompts_class,
         patch("src.gui.core.GUICoordinator") as mock_coordinator_class,
         patch("src.platform.pointer.get_pointer_position", return_value=(300, 400)),
     ):

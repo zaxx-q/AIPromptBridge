@@ -384,6 +384,88 @@ def test_prepare_update():
         shutil.rmtree(work_dir, ignore_errors=True)
 
 
+# ════════════════════════════════════════════════════════════════════════════
+# TEST 3b: Prepare Update (Tar.gz Extraction)
+# ════════════════════════════════════════════════════════════════════════════
+
+
+def test_prepare_update_tarball():
+    section("TEST 3b: Prepare Update (Tar.gz → Staging)")
+
+    import tarfile as _tarfile
+
+    from src.updater import STAGING_DIR
+
+    work_dir = tempfile.mkdtemp(prefix="aipb_test_prepare_tar_")
+    original_cwd = os.getcwd()
+
+    try:
+        os.chdir(work_dir)
+
+        # Create a fake tarball mimicking Linux release layout
+        tar_path = os.path.join(work_dir, "AIPromptBridge-v5.0.0-linux-x86_64.tar.gz")
+        root_name = "AIPromptBridge-v5.0.0-linux-x86_64"
+
+        with _tarfile.open(tar_path, "w:gz") as tf:
+            # bin/ contents
+            for fname, content in [
+                (f"{root_name}/bin/AIPromptBridge_Internal", "FAKE_INTERNAL_5.0.0"),
+                (f"{root_name}/bin/icon.ico", "FAKE_ICON"),
+                (f"{root_name}/AIPromptBridge", "#!/usr/bin/env bash\nFAKE_LAUNCHER"),
+                (f"{root_name}/aipb_trigger.py", "#!/usr/bin/env python3\nFAKE_TRIGGER"),
+                (f"{root_name}/README-linux.txt", "FAKE README"),
+            ]:
+                import io
+
+                data = content.encode("utf-8")
+                info = _tarfile.TarInfo(name=fname)
+                info.size = len(data)
+                tf.addfile(info, io.BytesIO(data))
+
+        # Use the updater's extraction logic
+        from src.updater import _extract_tarball
+
+        staging_dir = Path(STAGING_DIR)
+        if staging_dir.exists():
+            shutil.rmtree(staging_dir)
+
+        _extract_tarball(tar_path, staging_dir)
+
+        # Verify staging directory
+        if staging_dir.exists() and any(staging_dir.iterdir()):
+            ok("Tarball: staging directory created with content")
+        else:
+            fail("Tarball: staging directory", "empty or missing")
+
+        # Verify bin/ inside staging
+        staging_bin = staging_dir / "bin"
+        if staging_bin.exists():
+            ok("Tarball: staging has bin/ directory")
+        else:
+            fail("Tarball: staging bin/", "missing")
+
+        internal = staging_bin / "AIPromptBridge_Internal"
+        if internal.exists():
+            content = internal.read_text()
+            if "5.0.0" in content:
+                ok("Tarball: staged Internal contains new version marker")
+            else:
+                fail("Tarball: staged Internal content", f"got: {content}")
+        else:
+            fail("Tarball: staged Internal", "file missing")
+
+        # Verify root-level files
+        launcher = staging_dir / "AIPromptBridge"
+        if launcher.exists():
+            ok("Tarball: staging has outer launcher")
+        else:
+            fail("Tarball: staging launcher", "missing")
+
+    finally:
+        os.chdir(original_cwd)
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+
 # ════��═══════════════════════════════════════════════════════════════════════
 # TEST 4: Apply Update (Launcher Logic)
 # ════════════════════════════════════════════════════════════════════════════
@@ -1192,6 +1274,7 @@ def main():
         test_version_parsing,
         test_github_api_parsing,
         test_prepare_update,
+        test_prepare_update_tarball,
         test_apply_update,
         test_startup_recovery,
         test_root_file_update,
