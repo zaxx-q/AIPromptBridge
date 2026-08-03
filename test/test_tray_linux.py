@@ -190,3 +190,31 @@ class TestTrayMenuLinux:
             mock_sni_cls.assert_called_once()
             assert mock_sni_cls.call_args.kwargs.get("title") == "AIPromptBridge"
             mock_sni_instance.run.assert_called_once()
+
+    def test_on_restart_compiled_linux_uses_execv(self):
+        from pathlib import Path
+
+        launcher_file = "/home/test/.local/AIPromptBridge/AIPromptBridge"
+
+        with (
+            patch("sys.platform", "linux"),
+            patch("src.tray.is_compiled", return_value=True),
+            patch(
+                "sys.argv",
+                [
+                    "/home/test/.local/AIPromptBridge/bin/AIPromptBridge_Internal",
+                    "--launched-mode=console",
+                    "--show-console",
+                ],
+            ),
+            patch("src.startup_manager.get_launcher_path", return_value=launcher_file),
+            patch.object(Path, "is_file", return_value=True),
+            patch("os.execv") as mock_execv,
+        ):
+            tray = TrayApp()
+            tray._on_restart(systray=None)
+
+            mock_execv.assert_called_once_with(
+                launcher_file,
+                [launcher_file, "--show-console"],
+            )

@@ -1,5 +1,21 @@
 # Changelog
 
+## [8.1.0] - 2026-08-03
+
+### New Features
+
+- **"Humanize" Text Edit Action**: Added a new built-in prompt to the TextEditTool to transform AI-generated writing into natural, human-sounding text. Based on [Wikipedia's "Signs of AI writing"](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) guide, maintained by WikiProject AI Cleanup. This comprehensive guide comes from observations of thousands of instances of AI-generated text.
+
+### Improvements
+
+- **Linux Eliminated GUI Cold-Start Delay**: GUI initialization and font loading now warm up in the background during application startup, removing the cold-start delay when opening the first popup or window.
+- **Linux Idle CPU Consumption**: Replaced polling-based GUI loops with native event-driven event handling, eliminating idle CPU consumption. Reduced system theme and background IPC polling frequency on Linux.
+
+### Fixes
+
+- **Linux Dropdown & Menu Behavior**: Fixed mousewheel scrolling in dropdown combo boxes and ensured popup menus (such as split button menus and message context menus) dismiss properly when clicking outside of them on Linux.
+- **Linux Terminal Output on Restart**: Fixed restarting the compiled Linux application from the system tray to ensure console output remains attached to the terminal emulator instead of detaching into a new background session.
+
 ## [8.0.0] - Linux Wayland Support
 
 ### Added

@@ -590,9 +590,9 @@ class TrayApp:
 
                     if sys.platform == "win32":
                         subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+                        os._exit(0)
                     else:
-                        subprocess.Popen(cmd, start_new_session=True)
-                    os._exit(0)
+                        os.execv(str(launcher_path), cmd)
             except Exception as e:
                 print(f"[Error] Launcher restart failed, falling back: {e}")
 
