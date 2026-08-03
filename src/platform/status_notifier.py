@@ -598,7 +598,7 @@ class StatusNotifierIcon:
         try:
             while not self._stop.is_set():
                 try:
-                    msg = self._conn.receive(timeout=0.5)
+                    msg = self._conn.receive(timeout=2.0)
                 except TimeoutError:
                     continue
                 except Exception:

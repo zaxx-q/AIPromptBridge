@@ -199,6 +199,8 @@ def _cooked_unix() -> Iterator[None]:
 def _read_key_windows(timeout: float) -> Optional[str]:
     msvcrt = _load_msvcrt()
     if msvcrt is None:
+        if timeout > 0:
+            time.sleep(timeout)
         return None
 
     deadline = time.monotonic() + max(0.0, timeout)
@@ -255,12 +257,16 @@ def _read_key_unix(timeout: float, *, hold_raw: bool) -> Optional[str]:
 
     fd = _stdin_fd()
     if fd is None:
+        if timeout > 0:
+            time.sleep(timeout)
         return None
 
     entered = False
     if not hold_raw:
         entered = _enable_raw_unix()
         if not entered:
+            if timeout > 0:
+                time.sleep(timeout)
             return None
 
     try:
@@ -274,7 +280,7 @@ def _read_key_unix(timeout: float, *, hold_raw: bool) -> Optional[str]:
 
         if not effectively_raw:
             if timeout > 0:
-                time.sleep(min(timeout, 0.05))
+                time.sleep(timeout)
             return None
 
         try:

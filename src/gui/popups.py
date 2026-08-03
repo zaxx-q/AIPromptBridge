@@ -3218,8 +3218,7 @@ def show_error_popup(title: str, message: str, details: Optional[str] = None):
     from .core import GUICoordinator
 
     coordinator = GUICoordinator.get_instance()
-    coordinator.ensure_running()
-    coordinator._request_queue.put({"type": "error_popup", "title": title, "message": message, "details": details})
+    coordinator.request_error_popup(title, message, details)
 
 
 # =============================================================================

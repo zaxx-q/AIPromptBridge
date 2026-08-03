@@ -195,20 +195,24 @@ class GUICoordinator:
                         print(f"[GUICoordinator] CTk bootstrap error: {boot_err}")
 
                 self._running = True
+
+                # Bind virtual event for immediate queue processing
+                self._root.bind("<<QueueReady>>", lambda _e: self._process_queue())
+
+                # Periodic fallback poll (catches any missed event_generate calls)
+                def _poll_queue():
+                    if not self._running:
+                        self._root.quit()  # Exit mainloop
+                        return
+                    self._process_queue()
+                    self._root.after(500, _poll_queue)  # 2 Hz fallback
+
+                self._root.after(100, _poll_queue)
+
                 self._started.set()
 
-                # Main event loop
-                while self._running:
-                    # Process pending window creation requests
-                    self._process_queue()
-
-                    # Update Tk event loop
-                    try:
-                        self._root.update()
-                    except tk.TclError:
-                        break
-
-                    time.sleep(0.01)  # ~100 FPS
+                # Use Tk's native blocking event loop
+                self._root.mainloop()
 
             except Exception as e:
                 print(f"[GUICoordinator] Error in GUI thread: {e}")
@@ -218,6 +222,19 @@ class GUICoordinator:
 
         self._gui_thread = threading.Thread(target=run_gui, daemon=True, name="GUI-Thread")
         self._gui_thread.start()
+
+    def _enqueue_request(self, request: dict):
+        """Post a request to the GUI queue and wake the event loop."""
+        self._request_queue.put(request)
+        self._wake_gui()
+
+    def _wake_gui(self):
+        """Wake the Tk event loop to process the queue immediately."""
+        try:
+            if self._root and self._running:
+                self._root.event_generate("<<QueueReady>>", when="tail")
+        except (tk.TclError, RuntimeError, AttributeError):
+            pass  # Root destroyed or not yet ready
 
     def _sync_appearance_mode(self):
         """Sync CustomTkinter appearance mode with config."""
@@ -549,7 +566,7 @@ class GUICoordinator:
     def request_chat_window(self, session, initial_response=None):
         """Request creation of a chat window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({"type": "chat", "session": session, "initial_response": initial_response})
+        self._enqueue_request({"type": "chat", "session": session, "initial_response": initial_response})
 
     def request_streaming_chat_window(self, session, timeout: float = 5.0) -> StreamingChatCallbacks:
         """
@@ -569,7 +586,7 @@ class GUICoordinator:
 
         callbacks = StreamingChatCallbacks()
 
-        self._request_queue.put({"type": "streaming_chat", "session": session, "callbacks": callbacks})
+        self._enqueue_request({"type": "streaming_chat", "session": session, "callbacks": callbacks})
 
         # Wait for window to be created on GUI thread
         callbacks.ready.wait(timeout=timeout)
@@ -579,7 +596,7 @@ class GUICoordinator:
     def request_browser_window(self):
         """Request creation of a session browser window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({"type": "browser"})
+        self._enqueue_request({"type": "browser"})
 
     def request_input_popup(
         self,
@@ -591,7 +608,7 @@ class GUICoordinator:
     ):
         """Request creation of an input popup (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put(
+        self._enqueue_request(
             {"type": "popup_input", "on_submit": on_submit, "on_close": on_close, "x": x, "y": y, "on_tts": on_tts}
         )
 
@@ -608,7 +625,7 @@ class GUICoordinator:
     ):
         """Request creation of a prompt selection popup (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put(
+        self._enqueue_request(
             {
                 "type": "popup_prompt",
                 "options": options,
@@ -625,44 +642,49 @@ class GUICoordinator:
     def run_on_gui_thread(self, callback: Callable):
         """Run a callback on the GUI thread (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({"type": "callback", "callback": callback})
+        self._enqueue_request({"type": "callback", "callback": callback})
 
     def request_typing_indicator(self, abort_hotkey: str = "Escape", on_dismiss: Optional[Callable] = None):
         """Request showing a typing indicator (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({"type": "typing_indicator", "abort_hotkey": abort_hotkey, "on_dismiss": on_dismiss})
+        self._enqueue_request({"type": "typing_indicator", "abort_hotkey": abort_hotkey, "on_dismiss": on_dismiss})
 
     def request_dismiss_typing_indicator(self):
         """Request dismissing the typing indicator (thread-safe)"""
         if self._running:
-            self._request_queue.put({"type": "dismiss_typing_indicator"})
+            self._enqueue_request({"type": "dismiss_typing_indicator"})
 
     def request_toast_notification(self, title: str, message: str, timeout_ms: int = 3000):
         """Request a toast notification (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put(
+        self._enqueue_request(
             {"type": "toast_notification", "title": title, "message": message, "timeout_ms": timeout_ms}
         )
 
     def request_dismiss_toast_notification(self):
         """Request dismissing the toast notification (thread-safe)"""
         if self._running:
-            self._request_queue.put({"type": "dismiss_toast_notification"})
+            self._enqueue_request({"type": "dismiss_toast_notification"})
 
     def request_settings_window(self, on_close: Optional[Callable] = None, initial_tab: str | None = None):
         """Request creation of a settings window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({"type": "settings", "on_close": on_close, "initial_tab": initial_tab})
+        self._enqueue_request({"type": "settings", "on_close": on_close, "initial_tab": initial_tab})
 
     def request_prompt_editor_window(self):
         """Request creation of a prompt editor window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({"type": "prompt_editor"})
+        self._enqueue_request({"type": "prompt_editor"})
 
     def request_connection_manager(self, on_close=None):
         """Request creation of a connection profile manager window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({"type": "connection_manager", "on_close": on_close})
+        self._enqueue_request({"type": "connection_manager", "on_close": on_close})
+
+    def request_error_popup(self, title: str, message: str, details: Optional[str] = None):
+        """Request creation of an error popup (thread-safe)"""
+        self.ensure_running()
+        self._enqueue_request({"type": "error_popup", "title": title, "message": message, "details": details})
 
     def request_snip_overlay(self, on_capture, on_cancel):
         """
@@ -680,14 +702,14 @@ class GUICoordinator:
             self._start_linux_region_capture(on_capture, on_cancel)
             return
 
-        self._request_queue.put({"type": "snip_overlay", "on_capture": on_capture, "on_cancel": on_cancel})
+        self._enqueue_request({"type": "snip_overlay", "on_capture": on_capture, "on_cancel": on_cancel})
 
     def request_snip_popup(
         self, capture_result, prompts_config, on_action, on_close=None, on_request_compare_capture=None, x=None, y=None
     ):
         """Request creation of a snip popup (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put(
+        self._enqueue_request(
             {
                 "type": "snip_popup",
                 "capture_result": capture_result,
@@ -703,7 +725,7 @@ class GUICoordinator:
     def request_audio_analyzer_window(self, config, ai_params, key_managers, on_action=None, on_close=None):
         """Request creation of an audio analyzer window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put(
+        self._enqueue_request(
             {
                 "type": "audio_analyzer",
                 "config": config,
@@ -746,7 +768,7 @@ class GUICoordinator:
             print("[Warning] TTS not enabled")
             return
 
-        self._request_queue.put(
+        self._enqueue_request(
             {
                 "type": "tts_window",
                 "config": config,
@@ -767,7 +789,7 @@ class GUICoordinator:
     def request_onboarding_window(self, on_close: Optional[Callable] = None):
         """Request creation of an onboarding window (thread-safe)"""
         self.ensure_running()
-        self._request_queue.put({"type": "onboarding", "on_close": on_close})
+        self._enqueue_request({"type": "onboarding", "on_close": on_close})
 
     def get_root(self):
         """Get the root CTk/Tk instance (only safe to use from GUI thread!)"""
@@ -785,6 +807,7 @@ class GUICoordinator:
     def shutdown(self):
         """Shutdown the GUI coordinator"""
         self._running = False
+        self._wake_gui()
 
 
 def show_chat_gui(session, initial_response=None):

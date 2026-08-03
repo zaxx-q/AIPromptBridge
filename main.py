@@ -1297,6 +1297,22 @@ def main():
                     f"or python -m src.platform.ipc <name> (socket: {get_socket_path()})"
                 )
 
+    # ─── Early GUI Warm-Up (Linux) ────────────────────────────────────────
+    # Start GUICoordinator eagerly so the first user interaction (snip, textedit,
+    # tray → settings) doesn't pay the ~0.5–2.5 s cold-start cost of
+    # ctk.CTk() + configure_ctk_rendering() + fc-cache.
+    if HAVE_GUI:
+        try:
+            from src.gui.core import GUICoordinator
+
+            coordinator = GUICoordinator.get_instance()
+            # Fire-and-forget: ensure_running() spawns the GUI thread and
+            # blocks until _started is set, but with mainloop()-based loop
+            # (Fix 1) this returns as soon as the root + bindings are ready.
+            coordinator.ensure_running()
+        except Exception:
+            pass  # Non-critical — lazy init will still work on first GUI action
+
     if HAVE_RICH:
         console.print()
     else:
@@ -1329,7 +1345,7 @@ def main():
 
         try:
             while True:
-                time.sleep(1)
+                time.sleep(3600)
         except (KeyboardInterrupt, SystemExit):
             pass
         cleanup()

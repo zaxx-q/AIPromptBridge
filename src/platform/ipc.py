@@ -320,20 +320,23 @@ class TriggerServer:
 
     def _serve_loop(self) -> None:
         assert self._sock is not None
-        try:
-            self._sock.settimeout(1.0)
-        except OSError:
-            pass
+        # Blocking accept — stop() nudges by connecting to the socket.
 
         while not self._stop.is_set():
             try:
                 conn, _addr = self._sock.accept()
-            except socket.timeout:
-                continue
             except OSError:
                 if self._stop.is_set():
                     break
                 continue
+
+            # Check if we were nudged to stop
+            if self._stop.is_set():
+                try:
+                    conn.close()
+                except OSError:
+                    pass
+                break
 
             try:
                 self._handle_connection(conn)

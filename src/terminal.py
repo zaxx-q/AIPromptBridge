@@ -322,7 +322,7 @@ def _terminal_command_loop(keys):
     """Command dispatch loop; *keys* is a :class:`RawConsole` instance."""
     while True:
         try:
-            key = keys.get_key(timeout=0.1)
+            key = keys.get_key(timeout=1.0)
             if key is None:
                 continue
 
