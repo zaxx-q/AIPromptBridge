@@ -365,6 +365,81 @@ def create_emoji_button(
         return btn
 
 
+def post_popup_menu(menu: tk.Menu, x: int, y: int):
+    """Post a tk.Menu and ensure it closes when clicking anywhere outside it on Linux and Windows."""
+    try:
+        menu.unpost()
+    except Exception:
+        pass
+
+    try:
+        menu.post(x, y)
+        menu.update_idletasks()
+    except tk.TclError:
+        return
+
+    try:
+        top = menu.winfo_toplevel()
+    except Exception:
+        return
+
+    active = True
+    mw = menu.winfo_reqwidth()
+    mh = menu.winfo_reqheight()
+    x_end = x + mw
+    y_end = y + mh
+
+    def cleanup():
+        nonlocal active
+        if not active:
+            return
+        active = False
+        try:
+            if menu.winfo_exists():
+                menu.unpost()
+        except Exception:
+            pass
+
+    def on_global_click(event):
+        nonlocal active
+        if not active:
+            return
+        try:
+            if not menu.winfo_exists() or not menu.winfo_viewable():
+                cleanup()
+                return
+
+            ex = getattr(event, "x_root", None)
+            ey = getattr(event, "y_root", None)
+
+            if ex is None or ey is None:
+                cleanup()
+                return
+
+            if not (x <= ex <= x_end and y <= ey <= y_end):
+                cleanup()
+        except Exception:
+            cleanup()
+
+    def check_alive():
+        if not active:
+            return
+        try:
+            if not menu.winfo_exists() or not menu.winfo_viewable():
+                cleanup()
+                return
+            top.after(150, check_alive)
+        except Exception:
+            cleanup()
+
+    try:
+        top.bind_all("<Button-1>", on_global_click, add="+")
+        top.bind_all("<Button-3>", on_global_click, add="+")
+        top.after(150, check_alive)
+    except Exception:
+        pass
+
+
 class SplitButton:
     """
     A unified split button that displays as a single rounded capsule.
@@ -542,7 +617,7 @@ class SplitButton:
             # Post menu directly under the right-side arrow index
             x = self.main_btn.winfo_rootx() + self.main_btn.winfo_width() - 110
             y = self.main_btn.winfo_rooty() + self.main_btn.winfo_height()
-            self._menu.post(x, y)
+            post_popup_menu(self._menu, x, y)
         except tk.TclError:
             pass
 
@@ -699,6 +774,20 @@ class ScrollableComboBox:
             self.entry.bind("<Button-1>", self._on_entry_click)
             self.entry.bind("<FocusOut>", self._on_focus_out)
 
+            for w in (self._container, self.entry, self._arrow_btn):
+                w.bind("<MouseWheel>", self._on_mousewheel)
+                w.bind("<Button-4>", self._on_mousewheel)
+                w.bind("<Button-5>", self._on_mousewheel)
+
+            if hasattr(self.entry, "_entry"):
+                self.entry._entry.bind("<MouseWheel>", self._on_mousewheel)
+                self.entry._entry.bind("<Button-4>", self._on_mousewheel)
+                self.entry._entry.bind("<Button-5>", self._on_mousewheel)
+            if hasattr(self._arrow_btn, "_canvas"):
+                self._arrow_btn._canvas.bind("<MouseWheel>", self._on_mousewheel)
+                self._arrow_btn._canvas.bind("<Button-4>", self._on_mousewheel)
+                self._arrow_btn._canvas.bind("<Button-5>", self._on_mousewheel)
+
         else:
             # Tk fallback
             self._container = tk.Frame(
@@ -738,6 +827,11 @@ class ScrollableComboBox:
             self.entry.bind("<Escape>", lambda e: self._close_dropdown())
             self.entry.bind("<Button-1>", self._on_entry_click)
             self.entry.bind("<FocusOut>", self._on_focus_out)
+
+            for w in (self._container, self.entry, self._arrow_btn):
+                w.bind("<MouseWheel>", self._on_mousewheel)
+                w.bind("<Button-4>", self._on_mousewheel)
+                w.bind("<Button-5>", self._on_mousewheel)
 
     def _compute_filtered_values(self):
         """Recompute _filtered_values from current entry text.
@@ -930,6 +1024,7 @@ class ScrollableComboBox:
         )
 
         # Add scrollbar if needed
+        scrollbar = None
         if num_items > self.MAX_VISIBLE_ITEMS:
             scrollbar = tk.Scrollbar(inner, orient="vertical", command=self._text_widget.yview)
             scrollbar.pack(side="right", fill="y")
@@ -952,8 +1047,18 @@ class ScrollableComboBox:
         self._text_widget.bind("<Button-1>", self._on_text_click)
         self._text_widget.bind("<Motion>", self._on_text_motion)
         self._text_widget.bind("<Leave>", self._on_text_leave)
-        # Stop scroll propagation
-        self._text_widget.bind("<MouseWheel>", self._on_mousewheel)
+
+        # Stop scroll propagation on Linux and Windows
+        for w in (self._text_widget, inner, self._dropdown_window):
+            w.bind("<MouseWheel>", self._on_mousewheel)
+            w.bind("<Button-4>", self._on_mousewheel)
+            w.bind("<Button-5>", self._on_mousewheel)
+
+        if scrollbar:
+            scrollbar.bind("<MouseWheel>", self._on_mousewheel)
+            scrollbar.bind("<Button-4>", self._on_mousewheel)
+            scrollbar.bind("<Button-5>", self._on_mousewheel)
+
         self._dropdown_window.bind("<Escape>", lambda e: self._close_dropdown())
 
         # Position and show
@@ -1009,11 +1114,29 @@ class ScrollableComboBox:
         self._populate_dropdown_items()
 
     def _on_mousewheel(self, event):
-        """Handle mousewheel scrolling - stop propagation and boost speed."""
-        if self._text_widget:
-            # Scroll the text widget (3x faster speed)
-            units = int(-1 * (event.delta / 120) * 3)
-            self._text_widget.yview_scroll(units, "units")
+        """Handle mousewheel scrolling - stop propagation and scroll dropdown list."""
+        if not self._dropdown_open or not self._text_widget:
+            return
+
+        try:
+            if hasattr(event, "num") and event.num == 4:
+                units = -3  # Linux scroll up
+            elif hasattr(event, "num") and event.num == 5:
+                units = 3  # Linux scroll down
+            elif getattr(event, "delta", 0):
+                delta = event.delta
+                if abs(delta) >= 120:
+                    units = int(-1 * (delta / 120) * 3)
+                else:
+                    units = -3 if delta > 0 else 3
+            else:
+                units = 0
+
+            if units != 0:
+                self._text_widget.yview_scroll(units, "units")
+        except tk.TclError:
+            pass
+
         return "break"
 
     def _on_text_click(self, event):

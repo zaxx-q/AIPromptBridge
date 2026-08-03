@@ -17,7 +17,7 @@ from typing import Dict, List, Optional
 from ...model_defaults import get_fallback_models
 from ...session_manager import add_session
 from ..core import get_next_window_id, register_window, unregister_window
-from ..custom_widgets import ScrollableComboBox, SplitButton
+from ..custom_widgets import ScrollableComboBox, SplitButton, post_popup_menu
 from ..emoji_renderer import prepare_emoji_content
 from ..platform import HAVE_CTK, ctk
 from ..themes import (
@@ -3153,12 +3153,12 @@ class ChatWindowBase(ABC):
         menu.add_command(label="  Branch From Here", command=lambda: self._branch_from_here(index))
 
         try:
-            menu.post(event.x_root, event.y_root)
+            post_popup_menu(menu, event.x_root, event.y_root)
         except (tk.TclError, AttributeError):
             # Fallback for events without x_root/y_root
             x = self.chat_text.winfo_rootx() + event.x
             y = self.chat_text.winfo_rooty() + event.y
-            menu.post(x, y)
+            post_popup_menu(menu, x, y)
 
     def _delete_message(self, index: int):
         """Delete a single message from the session."""
