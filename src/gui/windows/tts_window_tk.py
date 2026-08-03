@@ -10,7 +10,7 @@ from typing import Any, Callable, Optional
 
 from ..custom_widgets import ScrollableComboBox
 from ..popups import Tooltip
-from ..themes import get_colors
+from ..themes import get_colors, get_tk_font
 
 # Reuse wrappers from audio_analyzer_tk
 from .audio_analyzer_tk import TkCheckBoxWrapper, TkOptionMenuWrapper, TkSliderWrapper
@@ -66,7 +66,7 @@ def _create_section_frame_tk(parent, title: str, colors) -> tk.Frame:
     frame.pack(fill="x", pady=(0, 8))
 
     # Title
-    tk.Label(frame, text=title, font=("Segoe UI", 10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
+    tk.Label(frame, text=title, font=get_tk_font(10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
         anchor="w", padx=12, pady=(10, 5)
     )
 
@@ -92,7 +92,7 @@ def _create_top_action_bar_tk(window, parent):
     left_frame = tk.Frame(bar, bg=colors.base)
     left_frame.pack(side="left", fill="x", expand=True)
 
-    tk.Label(left_frame, text="TTS Model:", font=("Segoe UI", 10), bg=colors.base, fg=colors.text).pack(
+    tk.Label(left_frame, text="TTS Model:", font=get_tk_font(10), bg=colors.base, fg=colors.text).pack(
         side="left", padx=(0, 5)
     )
 
@@ -109,7 +109,7 @@ def _create_top_action_bar_tk(window, parent):
     window.generate_audio_btn = tk.Button(
         right_frame,
         text="🔊 Generate Audio",
-        font=("Segoe UI", 11, "bold"),
+        font=get_tk_font(11, "bold"),
         bg=colors.green,
         fg=colors.accent_fg,
         relief="flat",
@@ -172,7 +172,7 @@ def _create_speaker_mode_section_tk(window, parent):
         variable=window.speaker_mode_var,
         value="single",
         command=window._on_speaker_mode_changed,
-        font=("Segoe UI", 10),
+        font=get_tk_font(10),
         bg=colors.surface0,
         fg=colors.text,
         selectcolor=colors.surface0,
@@ -186,7 +186,7 @@ def _create_speaker_mode_section_tk(window, parent):
         variable=window.speaker_mode_var,
         value="multi",
         command=window._on_speaker_mode_changed,
-        font=("Segoe UI", 10),
+        font=get_tk_font(10),
         bg=colors.surface0,
         fg=colors.text,
         selectcolor=colors.surface0,
@@ -207,7 +207,7 @@ def _create_multi_speaker_section_tk(window, parent):
     tk.Label(
         window.multi_speaker_frame,
         text="Multi-Speaker Config",
-        font=("Segoe UI", 10, "bold"),
+        font=get_tk_font(10, "bold"),
         bg=colors.surface0,
         fg=colors.accent,
     ).pack(anchor="w", padx=12, pady=(10, 5))
@@ -227,13 +227,13 @@ def _create_multi_speaker_section_tk(window, parent):
     s1_row = tk.Frame(ms_content, bg=colors.surface0)
     s1_row.pack(fill="x", pady=(0, 5))
 
-    tk.Label(s1_row, text="Speaker 1:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0).pack(
+    tk.Label(s1_row, text="Speaker 1:", font=get_tk_font(9), bg=colors.surface0, fg=colors.overlay0).pack(
         side="left", padx=(0, 5)
     )
 
     window.speaker1_name_entry = tk.Entry(
         s1_row,
-        font=("Segoe UI", 9),
+        font=get_tk_font(9),
         width=10,
         bg=colors.surface1,
         fg=colors.text,
@@ -260,13 +260,13 @@ def _create_multi_speaker_section_tk(window, parent):
     s2_row = tk.Frame(ms_content, bg=colors.surface0)
     s2_row.pack(fill="x")
 
-    tk.Label(s2_row, text="Speaker 2:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0).pack(
+    tk.Label(s2_row, text="Speaker 2:", font=get_tk_font(9), bg=colors.surface0, fg=colors.overlay0).pack(
         side="left", padx=(0, 5)
     )
 
     window.speaker2_name_entry = tk.Entry(
         s2_row,
-        font=("Segoe UI", 9),
+        font=get_tk_font(9),
         width=10,
         bg=colors.surface1,
         fg=colors.text,
@@ -302,7 +302,7 @@ def _create_preview_section_tk(window, parent):
     window.play_pause_btn = tk.Button(
         row_frame,
         text="▶",
-        font=("Segoe UI", 12),
+        font=get_tk_font(12),
         bg=colors.green,
         fg=colors.accent_fg,
         relief="flat",
@@ -320,7 +320,7 @@ def _create_preview_section_tk(window, parent):
 
     # Position label
     window.position_label = tk.Label(
-        row_frame, text="00:00 / 00:00", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0
+        row_frame, text="00:00 / 00:00", font=get_tk_font(9), bg=colors.surface0, fg=colors.overlay0
     )
     window.position_label.pack(side="left")
 
@@ -333,14 +333,14 @@ def _create_export_section_tk(window, parent):
     # Format info label (read from config)
     fmt = window.config.get("audio_output_format", "ogg").upper()
     tk.Label(
-        content, text=f"Format: {fmt} (set in config)", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0
+        content, text=f"Format: {fmt} (set in config)", font=get_tk_font(9), bg=colors.surface0, fg=colors.overlay0
     ).pack(fill="x", pady=(0, 5))
 
     # Save button
     window.save_btn = tk.Button(
         content,
         text="💾 Save Audio",
-        font=("Segoe UI", 10),
+        font=get_tk_font(10),
         bg=colors.surface1,
         fg=colors.text,
         relief="flat",
@@ -364,14 +364,14 @@ def _create_input_text_section_tk(window, parent):
     frame = tk.Frame(parent, bg=colors.surface0, highlightbackground=colors.surface2, highlightthickness=1, bd=0)
     frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
 
-    tk.Label(frame, text="Input Text", font=("Segoe UI", 10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
+    tk.Label(frame, text="Input Text", font=get_tk_font(10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
         anchor="w", padx=12, pady=(10, 5)
     )
 
     window.input_textbox = tk.Text(
         frame,
         wrap=tk.WORD,
-        font=("Segoe UI", 11),
+        font=get_tk_font(11),
         bg=colors.text_bg,
         fg=colors.text,
         insertbackground=colors.text,
@@ -397,7 +397,7 @@ def _create_director_section_tk(window, parent):
     header = tk.Frame(frame, bg=colors.surface0)
     header.pack(fill="x", padx=12, pady=(10, 5))
 
-    tk.Label(header, text="AI Director", font=("Segoe UI", 10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
+    tk.Label(header, text="AI Director", font=get_tk_font(10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
         side="left"
     )
 
@@ -416,7 +416,7 @@ def _create_director_section_tk(window, parent):
 
     # Director Profile Override (optional)
     tk.Label(
-        controls, text="Director Connection Profile:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0
+        controls, text="Director Connection Profile:", font=get_tk_font(9), bg=colors.surface0, fg=colors.overlay0
     ).pack(side="left", padx=(0, 5))
 
     from ...connection_profiles import ProfileStore
@@ -440,7 +440,7 @@ def _create_director_section_tk(window, parent):
     window.generate_style_btn = tk.Button(
         controls,
         text="🎬 Generate Style",
-        font=("Segoe UI", 9, "bold"),
+        font=get_tk_font(9, "bold"),
         bg=colors.accent,
         fg=colors.accent_fg,
         relief="flat",
@@ -454,7 +454,7 @@ def _create_director_section_tk(window, parent):
     window.style_textbox = tk.Text(
         frame,
         wrap=tk.WORD,
-        font=("Segoe UI", 10),
+        font=get_tk_font(10),
         bg=colors.text_bg,
         fg=colors.text,
         insertbackground=colors.text,
@@ -490,7 +490,7 @@ def _create_bottom_bar_tk(window):
     window.status_label = tk.Label(
         status_container,
         text="Ready — Enter text and click Generate Audio",
-        font=("Segoe UI", 9),
+        font=get_tk_font(9),
         bg=colors.surface0,
         fg=colors.overlay0,
         anchor="w",

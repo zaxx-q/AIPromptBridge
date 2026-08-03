@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Tests for markdown to HTML conversion and plaintext formatting."""
 
+from unittest.mock import patch
+
+from src.gui import utils as gui_utils
 from src.gui.utils import markdown_to_html
 from src.utils import strip_markdown
 
@@ -55,3 +58,29 @@ def test_markdown_to_html_table():
         "</table>"
     )
     assert markdown_to_html(text) == expected
+
+
+def test_linux_rich_copy_uses_html_and_wraps_document():
+    markdown = "This is **bold**."
+    with (
+        patch.object(gui_utils.sys, "platform", "linux"),
+        patch("src.platform.clipboard.copy_rich_text", return_value=True) as copy_rich,
+    ):
+        assert gui_utils.copy_as_html_to_clipboard(markdown) is True
+
+    copy_rich.assert_called_once_with(
+        "<html><body><p>This is <strong>bold</strong>.</p></body></html>",
+        markdown,
+    )
+
+
+def test_linux_rich_copy_falls_back_to_markdown_when_html_copy_fails():
+    markdown = "This is **bold**."
+    with (
+        patch.object(gui_utils.sys, "platform", "linux"),
+        patch("src.platform.clipboard.copy_rich_text", return_value=False),
+        patch.object(gui_utils, "copy_to_clipboard", return_value=True) as copy_plain,
+    ):
+        assert gui_utils.copy_as_html_to_clipboard(markdown) is True
+
+    copy_plain.assert_called_once_with(markdown, None)

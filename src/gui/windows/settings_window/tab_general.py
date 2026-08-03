@@ -15,7 +15,7 @@ from src.platform.detect import is_linux
 
 from ...custom_widgets import create_section_header
 from ...platform import HAVE_CTK, ctk
-from ...themes import get_ctk_font, get_ctk_label_colors
+from ...themes import get_ctk_font, get_ctk_label_colors, get_tk_font
 from .widgets import LABEL_WIDTH, ToggleSwitch
 
 
@@ -198,7 +198,7 @@ class GeneralTabMixin:
             check_btn = tk.Button(
                 update_row,
                 text="Check Now",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.accent,
                 fg=self.colors.accent_fg,
                 activebackground=self.colors.surface1,
@@ -211,7 +211,7 @@ class GeneralTabMixin:
             check_btn.pack(side="left")
 
             self._update_status_label = tk.Label(
-                update_row, text="", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote
+                update_row, text="", font=get_tk_font(9), bg=self.colors.bg, fg=self.colors.blockquote
             )
             self._update_status_label.pack(side="left", padx=(15, 0))
 
@@ -300,7 +300,7 @@ class GeneralTabMixin:
                 row,
                 text="Unlock server settings (advanced)",
                 variable=self.vars["unlock_server_settings"],
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 activebackground=self.colors.bg,
@@ -313,7 +313,7 @@ class GeneralTabMixin:
             tk.Label(
                 row,
                 text="⚠️ Port auto-switches if occupied. Restart required.",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors.bg,
                 fg=self.colors.blockquote,
             ).pack(side="left", padx=(15, 0))
@@ -378,13 +378,13 @@ class GeneralTabMixin:
                     row, text=hint, font=get_ctk_font(11), **get_ctk_label_colors(self.colors, muted=True)
                 ).pack(side="left", padx=(15, 0))
         else:
-            tk.Label(row, text=label, font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            tk.Label(row, text=label, font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
             toggle = ToggleSwitch(row, self.vars[key], self.colors, command=self._on_startup_toggle)
             toggle.pack(side="left", padx=(10, 0))
             self.widgets[key] = toggle
 
             if hint:
-                tk.Label(row, text=hint, font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote).pack(
+                tk.Label(row, text=hint, font=get_tk_font(9), bg=self.colors.bg, fg=self.colors.blockquote).pack(
                     side="left", padx=(15, 0)
                 )
 
@@ -472,7 +472,7 @@ class GeneralTabMixin:
             self._startup_info_label = tk.Label(
                 row,
                 text=info_text,
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors.bg,
                 fg=self.colors.blockquote,
                 justify="left",
@@ -520,7 +520,7 @@ class GeneralTabMixin:
             guide_btn = tk.Button(
                 row,
                 text="Run Welcome Guide",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.accent,
                 fg=self.colors.accent_fg,
                 activebackground=self.colors.surface1,
@@ -535,7 +535,7 @@ class GeneralTabMixin:
             hint_lbl = tk.Label(
                 row,
                 text="Launch the onboarding wizard to configure keys, profiles, and take a feature tour.",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors.bg,
                 fg=self.colors.blockquote,
             )

@@ -11,7 +11,7 @@ import tkinter as tk
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from .platform import HAVE_CTK, ctk
-from .themes import ThemeColors, get_ctk_button_colors, get_ctk_combobox_colors, get_ctk_font
+from .themes import ThemeColors, get_ctk_button_colors, get_ctk_combobox_colors, get_ctk_font, get_tk_font
 
 try:
     from .emoji_renderer import HAVE_PIL, get_emoji_renderer
@@ -296,7 +296,7 @@ def create_section_header(parent, text: str, colors: ThemeColors, emoji: str | N
     else:
         # Fallback tk
         full_text = f"{emoji} {text}" if emoji else text
-        lbl = tk.Label(parent, text=full_text, font=("Segoe UI", 11, "bold"), bg=colors.bg, fg=colors.accent)
+        lbl = tk.Label(parent, text=full_text, font=get_tk_font(11, "bold"), bg=colors.bg, fg=colors.accent)
         lbl.pack(anchor="w", pady=(top_padding, 10))
         return lbl
 
@@ -360,7 +360,7 @@ def create_emoji_button(
             fg_color = colors.fg
 
         btn = tk.Button(
-            parent, text=full_text, command=command, font=("Segoe UI", 9), bg=bg_color, fg=fg_color, padx=10, pady=5
+            parent, text=full_text, command=command, font=get_tk_font(9), bg=bg_color, fg=fg_color, padx=10, pady=5
         )
         return btn
 
@@ -445,7 +445,7 @@ class SplitButton:
             self.main_btn = tk.Button(
                 parent,
                 text=f"  {text}  │  ▼",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=bg_color,
                 fg=fg_color,
                 relief=tk.FLAT,
@@ -465,7 +465,7 @@ class SplitButton:
             activeforeground=colors.accent_fg,
             relief=tk.FLAT,
             borderwidth=1,
-            font=("Segoe UI", 10),
+            font=get_tk_font(10),
         )
         for item in self.menu_items:
             label, callback = item
@@ -504,7 +504,7 @@ class SplitButton:
                 sep_x + (15 * scale),
                 scaled_h / 2,
                 text="▼",
-                font=("Segoe UI", 10, "bold"),
+                font=get_tk_font(10, "bold"),
                 fill=text_color,
                 anchor="center",
                 tags="custom_split",
@@ -708,7 +708,7 @@ class ScrollableComboBox:
 
             self.entry = tk.Entry(
                 self._container,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.input_bg,
                 fg=self.colors.fg,
                 readonlybackground=self.colors.input_bg,
@@ -722,7 +722,7 @@ class ScrollableComboBox:
             self._arrow_btn = tk.Button(
                 self._container,
                 text="▼",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors.surface1,
                 fg=self.colors.fg,
                 relief="flat",
@@ -916,7 +916,7 @@ class ScrollableComboBox:
         # Use tk.Text for high performance (handles 1000+ items smoothly)
         self._text_widget = tk.Text(
             inner,
-            font=("Segoe UI", 10),
+            font=get_tk_font(10),
             bg=self.colors.surface0,
             fg=self.colors.fg,
             cursor="hand2",
@@ -1129,7 +1129,7 @@ class ScrollableComboBox:
             label = tk.Label(
                 frame,
                 text=text,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.surface0,
                 fg=self.colors.text,
                 padx=8,
@@ -1537,10 +1537,10 @@ class ThemedInputDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             )
             self.entry.pack(fill="x", pady=(0, 15))
         else:
-            tk.Label(main_frame, text=prompt, font=("Segoe UI", 11), bg=colors.bg, fg=colors.fg).pack(
+            tk.Label(main_frame, text=prompt, font=get_tk_font(11), bg=colors.bg, fg=colors.fg).pack(
                 anchor="w", pady=(0, 10)
             )
-            self.entry = tk.Entry(main_frame, font=("Segoe UI", 11), bg=colors.input_bg, fg=colors.fg, width=40)
+            self.entry = tk.Entry(main_frame, font=get_tk_font(11), bg=colors.input_bg, fg=colors.fg, width=40)
             self.entry.pack(fill="x", pady=(0, 15), ipady=6)
 
         self.entry.focus_set()

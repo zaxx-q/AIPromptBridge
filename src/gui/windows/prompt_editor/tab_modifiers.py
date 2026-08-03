@@ -16,6 +16,7 @@ from ...themes import (
     get_ctk_font,
     get_ctk_label_colors,
     get_ctk_textbox_colors,
+    get_tk_font,
 )
 
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
@@ -132,7 +133,7 @@ class ModifiersTabMixin:
                 tk.Label(
                     row,
                     text=field_label,
-                    font=("Segoe UI", 10),
+                    font=get_tk_font(10),
                     width=10,
                     anchor="w",
                     bg=self.colors.bg,
@@ -142,7 +143,7 @@ class ModifiersTabMixin:
                 tk.Entry(
                     row,
                     textvariable=self.modifier_widgets[field_key],
-                    font=("Segoe UI", 10),
+                    font=get_tk_font(10),
                     width=width // 8,
                     bg=self.colors.input_bg,
                     fg=self.colors.fg,
@@ -164,7 +165,7 @@ class ModifiersTabMixin:
                 row, height=100, font=get_ctk_font(12), **get_ctk_textbox_colors(self.colors)
             )
         else:
-            tk.Label(row, text="Injection:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(
+            tk.Label(row, text="Injection:", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg).pack(
                 anchor="w"
             )
             self.modifier_widgets["injection"] = tk.Text(
@@ -205,7 +206,7 @@ class ModifiersTabMixin:
                 row,
                 text="Forces chat window",
                 variable=self.modifier_widgets["forces_chat_var"],
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 selectcolor=self.colors.input_bg,
@@ -215,7 +216,7 @@ class ModifiersTabMixin:
                 row,
                 text="Hidden from toolbar (Disable)",
                 variable=self.modifier_widgets["hidden_var"],
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 selectcolor=self.colors.input_bg,
@@ -234,7 +235,7 @@ class ModifiersTabMixin:
                 row, text="Default for Tools:", font=get_ctk_font(13), **get_ctk_label_colors(self.colors)
             ).pack(anchor="w")
         else:
-            tk.Label(row, text="Default for Tools:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(
+            tk.Label(row, text="Default for Tools:", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg).pack(
                 anchor="w"
             )
 
@@ -288,7 +289,7 @@ class ModifiersTabMixin:
                     tools_row,
                     text=f"{emoji_char} {label_text}",
                     variable=self.modifier_widgets[var_key],
-                    font=("Segoe UI", 9),
+                    font=get_tk_font(9),
                     bg=self.colors.bg,
                     fg=self.colors.fg,
                     selectcolor=self.colors.input_bg,

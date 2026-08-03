@@ -15,7 +15,7 @@ from src.platform.detect import is_linux
 
 from ...custom_widgets import create_section_header
 from ...platform import HAVE_CTK, ctk
-from ...themes import get_ctk_font, get_ctk_label_colors
+from ...themes import get_ctk_font, get_ctk_label_colors, get_tk_font
 
 
 class TTSTabMixin:
@@ -64,7 +64,7 @@ class TTSTabMixin:
                         row, text=text, font=get_ctk_font(11), **get_ctk_label_colors(self.colors, muted=True)
                     ).pack(side="left")
                 else:
-                    tk.Label(row, text=text, font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote).pack(
+                    tk.Label(row, text=text, font=get_tk_font(9), bg=self.colors.bg, fg=self.colors.blockquote).pack(
                         side="left"
                     )
         else:

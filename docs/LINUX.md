@@ -161,7 +161,7 @@ AIPromptBridge-…-linux-x86_64/
 
 **glibc:** built on **Ubuntu 24.04** x86_64. Older distributions may not run the binary; use a source install instead.
 
-**Self-update:** compiled Linux builds **notify** when a newer release exists and link the tarball; in-place apply (swap `bin/`) is Windows-only for now. Extract a new tarball over your deploy folder (or beside it) manually.
+**Self-update:** compiled Linux builds support **full in-place updates** — download, extract, swap `bin/` + root files, and `os.execv` relaunch. Source installs are notification-only (link to releases page).
 
 **Tk quality:** the CI freeze uses distro `python3.13-tk` (Xft). That is independent of your host’s source-venv Tk; the package embeds the build-time Tk stack inside `bin/`.
 
@@ -193,7 +193,7 @@ Interactive console commands (`--show-console`) and batch Pause/Stop keys use `s
 - **Popup position:** Hyprland cursor IPC places popups near the visible cursor. niri 26.04 has no public cursor-position IPC, so Tk/Xwayland coordinates are the fallback and may be stale when the focused app is native Wayland.
 - Snip UX uses **slurp** (not the Windows frozen dim overlay).
 - Interactive console keys require a real TTY (`stdin.isatty()`); piped/redirected stdin falls back to tray / `--trigger`.
-- Self-update **apply** path is Windows launcher-oriented; source installs stay notification-oriented.
+- Self-update **apply** works for compiled installs on both Windows and Linux; source installs are notification-only.
 - Multi-compositor (GNOME/KDE) support is best-effort; niri/wlroots is the validated target.
 - **GUI fonts / corners:** uv standalone Python’s no-xft Tk cannot render modern fonts; use distro `python3.13-tkinter` (see above). Theme tweaks alone will not fix bitmap text.
 - **Autostart:** XDG `.desktop` is written; pure niri may still need `spawn-at-startup` (see above).

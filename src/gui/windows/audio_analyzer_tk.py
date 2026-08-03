@@ -10,7 +10,7 @@ from typing import Any, Callable, Optional
 
 from ..custom_widgets import ScrollableComboBox
 from ..popups import CarouselButtonList, ModifierBar, SegmentedToggle, Tooltip
-from ..themes import get_colors
+from ..themes import get_colors, get_tk_font
 
 
 class TkOptionMenuWrapper:
@@ -173,7 +173,7 @@ def _create_section_frame_tk(parent, title: str, colors) -> tk.Frame:
     frame.pack(fill="x", pady=(0, 10))
 
     # Title
-    tk.Label(frame, text=title, font=("Segoe UI", 10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
+    tk.Label(frame, text=title, font=get_tk_font(10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
         anchor="w", padx=12, pady=(10, 5)
     )
 
@@ -196,7 +196,7 @@ def _create_top_action_bar_tk(window, parent):
 
     # Provider (hidden in profile mode)
     window.provider_label_widget = tk.Label(
-        left_frame, text="Provider:", font=("Segoe UI", 10), bg=colors.base, fg=colors.text
+        left_frame, text="Provider:", font=get_tk_font(10), bg=colors.base, fg=colors.text
     )
 
     providers = ["google", "openrouter", "custom"]
@@ -212,7 +212,7 @@ def _create_top_action_bar_tk(window, parent):
     # Model/Profile
     dropdown_label = "Profile:" if window._use_profile_mode else "Model:"
     window.model_label_widget = tk.Label(
-        left_frame, text=dropdown_label, font=("Segoe UI", 10), bg=colors.base, fg=colors.text
+        left_frame, text=dropdown_label, font=get_tk_font(10), bg=colors.base, fg=colors.text
     )
     window.model_label_widget.pack(side="left", padx=(0, 5))
 
@@ -243,7 +243,7 @@ def _create_top_action_bar_tk(window, parent):
     window.send_btn = tk.Button(
         right_frame,
         text="📤 Send",
-        font=("Segoe UI", 10, "bold"),
+        font=get_tk_font(10, "bold"),
         bg=colors.green,
         fg=colors.accent_fg,
         relief="flat",
@@ -258,7 +258,7 @@ def _create_top_action_bar_tk(window, parent):
     window.save_btn = tk.Button(
         right_frame,
         text="💾 Save Audio",
-        font=("Segoe UI", 10),
+        font=get_tk_font(10),
         bg=colors.surface1,
         fg=colors.text,
         relief="flat",
@@ -279,7 +279,7 @@ def _create_audio_source_section_tk(window, parent):
     row = tk.Frame(content, bg=colors.surface0)
     row.pack(fill="x", pady=(0, 8))
 
-    tk.Label(row, text="Device:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.text).pack(
+    tk.Label(row, text="Device:", font=get_tk_font(9), bg=colors.surface0, fg=colors.text).pack(
         side="left", padx=(0, 5)
     )
 
@@ -293,7 +293,7 @@ def _create_audio_source_section_tk(window, parent):
     refresh_btn = tk.Button(
         row,
         text="🔄",
-        font=("Segoe UI", 10),
+        font=get_tk_font(10),
         bg=colors.surface1,
         fg=colors.text,
         relief="flat",
@@ -324,7 +324,7 @@ def _create_audio_source_section_tk(window, parent):
             selectcolor=colors.surface0,
             activebackground=colors.surface0,
             activeforeground=colors.text,
-            font=("Segoe UI", 9),
+            font=get_tk_font(9),
         )
 
     create_radio("🎤 Input", "input").pack(side="left", padx=(0, 15))
@@ -343,7 +343,7 @@ def _create_recording_section_tk(window, parent):
     window.record_btn = tk.Button(
         row,
         text="🔴 Record",
-        font=("Segoe UI", 10, "bold"),
+        font=get_tk_font(10, "bold"),
         bg=colors.red,
         fg=colors.accent_fg,
         relief="flat",
@@ -355,7 +355,7 @@ def _create_recording_section_tk(window, parent):
 
     # Duration
     window.duration_label = tk.Label(
-        row, text="00:00:00", font=("Segoe UI", 11, "bold"), bg=colors.surface0, fg=colors.text
+        row, text="00:00:00", font=get_tk_font(11, "bold"), bg=colors.surface0, fg=colors.text
     )
     window.duration_label.pack(side="left")
 
@@ -363,7 +363,7 @@ def _create_recording_section_tk(window, parent):
     upload_btn = tk.Button(
         row,
         text="📁 Upload",
-        font=("Segoe UI", 10),
+        font=get_tk_font(10),
         bg=colors.surface1,
         fg=colors.text,
         relief="flat",
@@ -390,7 +390,7 @@ def _create_compression_section_tk(window, parent):
     window.compression_cb.pack(side="left", padx=(0, 10))
 
     # Compression Preset Dropdown
-    tk.Label(row, text="Preset:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0).pack(
+    tk.Label(row, text="Preset:", font=get_tk_font(9), bg=colors.surface0, fg=colors.overlay0).pack(
         side="left", padx=(0, 5)
     )
 
@@ -411,12 +411,12 @@ def _create_compression_section_tk(window, parent):
     info_row = tk.Frame(content, bg=colors.surface0)
     info_row.pack(fill="x")
 
-    window.size_label = tk.Label(info_row, text="", font=("Segoe UI", 8), bg=colors.surface0, fg=colors.overlay0)
+    window.size_label = tk.Label(info_row, text="", font=get_tk_font(8), bg=colors.surface0, fg=colors.overlay0)
     window.size_label.pack(side="left")
 
     desc = current_preset.get("description", "")
     window.preset_desc_label = tk.Label(
-        info_row, text=f"• {desc}" if desc else "", font=("Segoe UI", 8), bg=colors.surface0, fg=colors.overlay0
+        info_row, text=f"• {desc}" if desc else "", font=get_tk_font(8), bg=colors.surface0, fg=colors.overlay0
     )
     window.preset_desc_label.pack(side="right")
 
@@ -433,7 +433,7 @@ def _create_preview_section_tk(window, parent):
     window.play_pause_btn = tk.Button(
         row,
         text="▶",
-        font=("Segoe UI", 12),
+        font=get_tk_font(12),
         bg=colors.green,
         fg=colors.accent_fg,
         relief="flat",
@@ -458,7 +458,7 @@ def _create_preview_section_tk(window, parent):
     window.seek_slider.configure(state="disabled")
 
     # Position
-    window.position_label = tk.Label(row, text="00:00", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0)
+    window.position_label = tk.Label(row, text="00:00", font=get_tk_font(9), bg=colors.surface0, fg=colors.overlay0)
     window.position_label.pack(side="left")
 
 
@@ -479,7 +479,7 @@ def _create_display_options_section_tk(window, parent):
     tk.Label(
         content,
         text="Override where the AI response is shown.",
-        font=("Segoe UI", 8),
+        font=get_tk_font(8),
         bg=colors.surface0,
         fg=colors.overlay0,
         justify="center",
@@ -495,7 +495,7 @@ def _create_prompt_section_tk(window, parent, row, col):
     frame = tk.Frame(parent, bg=colors.surface0, highlightbackground=colors.surface2, highlightthickness=1, bd=0)
     frame.grid(row=row, column=col, sticky="new", padx=5, pady=0)
 
-    tk.Label(frame, text="Prompt Selection", font=("Segoe UI", 10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
+    tk.Label(frame, text="Prompt Selection", font=get_tk_font(10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
         anchor="w", padx=12, pady=(10, 5)
     )
 
@@ -508,7 +508,7 @@ def _create_prompt_section_tk(window, parent, row, col):
 
     window.custom_input = tk.Entry(
         input_frame,
-        font=("Segoe UI", 10),
+        font=get_tk_font(10),
         bg=colors.surface1,
         fg=colors.text,
         relief="flat",
@@ -537,7 +537,7 @@ def _create_prompt_section_tk(window, parent, row, col):
     set_btn = tk.Button(
         input_frame,
         text="Set",
-        font=("Segoe UI", 9),
+        font=get_tk_font(9),
         bg=colors.surface1,
         fg=colors.text,
         relief="flat",
@@ -613,14 +613,14 @@ def _create_result_section_tk(window, parent, row, col):
     header = tk.Frame(frame, bg=colors.surface0)
     header.pack(fill="x", padx=12, pady=(10, 5))
 
-    tk.Label(header, text="Result", font=("Segoe UI", 10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
+    tk.Label(header, text="Result", font=get_tk_font(10, "bold"), bg=colors.surface0, fg=colors.accent).pack(
         side="left"
     )
 
     window.copy_btn = tk.Button(
         header,
         text="📋 Copy",
-        font=("Segoe UI", 9),
+        font=get_tk_font(9),
         bg=colors.surface1,
         fg=colors.text,
         relief="flat",
@@ -638,7 +638,7 @@ def _create_result_section_tk(window, parent, row, col):
     window.result_text_widget = tk.Text(
         text_frame,
         wrap=tk.WORD,
-        font=("Segoe UI", 11),
+        font=get_tk_font(11),
         bg=colors.text_bg,
         fg=colors.text,
         insertbackground=colors.text,
@@ -664,7 +664,7 @@ def _create_bottom_bar_tk(window):
     meter_row = tk.Frame(bottom_frame, bg=colors.surface0)
     meter_row.pack(fill="x", padx=15, pady=(8, 0))
 
-    tk.Label(meter_row, text="Level:", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0).pack(
+    tk.Label(meter_row, text="Level:", font=get_tk_font(9), bg=colors.surface0, fg=colors.overlay0).pack(
         side="left", padx=(0, 8)
     )
 
@@ -684,7 +684,7 @@ def _create_bottom_bar_tk(window):
     status_row.pack(fill="x", padx=15, pady=(4, 8))
 
     window.status_label = tk.Label(
-        status_row, text="Ready", font=("Segoe UI", 9), bg=colors.surface0, fg=colors.overlay0, anchor="w"
+        status_row, text="Ready", font=get_tk_font(9), bg=colors.surface0, fg=colors.overlay0, anchor="w"
     )
     window.status_label.pack(side="left")
 
@@ -692,7 +692,7 @@ def _create_bottom_bar_tk(window):
     window.action_indicator_label = tk.Label(
         status_row,
         text=f"Action: {window.selected_action_key}",
-        font=("Segoe UI", 9, "bold"),
+        font=get_tk_font(9, "bold"),
         bg=colors.surface0,
         fg=colors.accent,
         anchor="e",

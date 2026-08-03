@@ -20,6 +20,7 @@ from ...themes import (
     get_ctk_entry_colors,
     get_ctk_font,
     get_ctk_label_colors,
+    get_tk_font,
     list_themes,
 )
 from .widgets import LABEL_WIDTH
@@ -172,21 +173,21 @@ class ThemeTabMixin:
             tk.Label(
                 inner,
                 text=f"Theme: {theme_name.title()} ({'Dark' if is_dark else 'Light'})",
-                font=("Segoe UI", 12, "bold"),
+                font=get_tk_font(12, "bold"),
                 bg=preview_colors.bg,
                 fg=preview_colors.fg,
             ).pack(anchor="w")
             tk.Label(
                 inner,
                 text="This is how text will look in this theme.",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=preview_colors.bg,
                 fg=preview_colors.fg,
             ).pack(anchor="w", pady=(5, 0))
             tk.Label(
                 inner,
                 text="Muted/secondary text appears like this.",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=preview_colors.bg,
                 fg=preview_colors.blockquote,
             ).pack(anchor="w")
@@ -214,7 +215,7 @@ class ThemeTabMixin:
                     pady=5,
                 ).pack(side="left", padx=4)
             else:
-                tk.Label(btn_row, text=label, font=("Segoe UI", 9), bg=color, fg=fg, padx=10, pady=3).pack(
+                tk.Label(btn_row, text=label, font=get_tk_font(9), bg=color, fg=fg, padx=10, pady=3).pack(
                     side="left", padx=2
                 )
 
@@ -232,6 +233,6 @@ class ThemeTabMixin:
             sample_entry.pack(anchor="w", pady=(12, 0))
             sample_entry.insert(0, "Sample input field")
         else:
-            sample_entry = tk.Entry(inner, font=("Segoe UI", 10), bg=preview_colors.input_bg, fg=preview_colors.fg)
+            sample_entry = tk.Entry(inner, font=get_tk_font(10), bg=preview_colors.input_bg, fg=preview_colors.fg)
             sample_entry.insert(0, "Sample input field")
             sample_entry.pack(anchor="w", pady=(10, 0))

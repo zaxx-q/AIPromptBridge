@@ -12,7 +12,7 @@ import tkinter as tk
 
 from ...custom_widgets import create_emoji_button, create_section_header
 from ...platform import HAVE_CTK, ctk
-from ...themes import get_ctk_font, get_ctk_label_colors
+from ...themes import get_ctk_font, get_ctk_label_colors, get_tk_font
 
 
 class ProviderTabMixin:
@@ -41,7 +41,7 @@ class ProviderTabMixin:
             tk.Label(
                 content,
                 text="Assign which key pool each provider draws API keys from.",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 justify="left",
                 bg=self.colors.bg,
                 fg=self.colors.blockquote,
@@ -120,7 +120,7 @@ class ProviderTabMixin:
             tk.Label(
                 row,
                 text="Active Profile:",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=LABEL_WIDTH // 8,
                 anchor="w",
                 bg=self.colors.bg,
@@ -150,7 +150,7 @@ class ProviderTabMixin:
             )
         else:
             self._profile_status = tk.Label(
-                row, text="", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.accent_green
+                row, text="", font=get_tk_font(9), bg=self.colors.bg, fg=self.colors.accent_green
             )
         self._profile_status.pack(side="left", padx=(12, 0))
 
@@ -172,7 +172,7 @@ class ProviderTabMixin:
                 **get_ctk_label_colors(self.colors, muted=True),
             ).pack(side="left", padx=(12, 0))
         else:
-            tk.Label(btn_row, text=hint_text, font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote).pack(
+            tk.Label(btn_row, text=hint_text, font=get_tk_font(9), bg=self.colors.bg, fg=self.colors.blockquote).pack(
                 side="left", padx=(12, 0)
             )
 
@@ -291,7 +291,7 @@ class ProviderTabMixin:
             tk.Label(
                 row,
                 text=label_text,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=LABEL_WIDTH // 8,
                 anchor="w",
                 bg=self.colors.bg,

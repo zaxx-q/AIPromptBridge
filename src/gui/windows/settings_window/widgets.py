@@ -24,6 +24,7 @@ from ...themes import (
     get_ctk_entry_colors,
     get_ctk_font,
     get_ctk_label_colors,
+    get_tk_font,
 )
 
 # =============================================================================
@@ -155,7 +156,7 @@ class FormFieldsMixin:
             tk.Label(
                 row,
                 text=label,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=LABEL_WIDTH // 8,
                 anchor="w",
                 bg=self.colors.bg,
@@ -164,7 +165,7 @@ class FormFieldsMixin:
             entry = tk.Entry(
                 row,
                 textvariable=self.vars[key],
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=width // 8,
                 bg=self.colors.input_bg,
                 fg=self.colors.fg,
@@ -214,7 +215,7 @@ class FormFieldsMixin:
             self.widgets[key] = ctk.CTkSwitch(row, **switch_kwargs)
             self.widgets[key].pack(side="left")
         else:
-            tk.Label(row, text=label, font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
+            tk.Label(row, text=label, font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg).pack(side="left")
             toggle = ToggleSwitch(row, self.vars[key], self.colors, command=command)
             toggle.pack(side="left", padx=(10, 0))
             self.widgets[key] = toggle
@@ -281,7 +282,7 @@ class FormFieldsMixin:
             tk.Label(
                 row,
                 text=label,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=LABEL_WIDTH // 8,
                 anchor="w",
                 bg=self.colors.bg,
@@ -359,7 +360,7 @@ class FormFieldsMixin:
             tk.Label(
                 row,
                 text=label,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=LABEL_WIDTH // 8,
                 anchor="w",
                 bg=self.colors.bg,
@@ -425,7 +426,7 @@ class FormFieldsMixin:
             tk.Label(
                 row,
                 text=label,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=LABEL_WIDTH // 8,
                 anchor="w",
                 bg=self.colors.bg,
@@ -459,7 +460,7 @@ class FormFieldsMixin:
             tk.Label(
                 parent,
                 text=text,
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 wraplength=HINT_WRAP_LENGTH,
                 justify="left",
                 anchor="w",
@@ -474,7 +475,7 @@ class FormFieldsMixin:
                 side="left", padx=(12, 0)
             )
         else:
-            tk.Label(row, text=text, font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote).pack(
+            tk.Label(row, text=text, font=get_tk_font(9), bg=self.colors.bg, fg=self.colors.blockquote).pack(
                 side="left", padx=(12, 0)
             )
 

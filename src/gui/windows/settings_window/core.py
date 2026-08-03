@@ -30,6 +30,7 @@ from ...themes import (
     get_colors,
     get_ctk_font,
     get_ctk_label_colors,
+    get_tk_font,
     sync_ctk_appearance,
 )
 from ..utils import set_window_icon
@@ -352,10 +353,10 @@ class SettingsWindow(
             ).pack(side="left", padx=(20, 0))
         else:
             tk.Label(
-                title_frame, text="⚙️ Settings", font=("Segoe UI", 16, "bold"), bg=self.colors.bg, fg=self.colors.fg
+                title_frame, text="⚙️ Settings", font=get_tk_font(16, "bold"), bg=self.colors.bg, fg=self.colors.fg
             ).pack(side="left")
             tk.Label(
-                title_frame, text="Edit config.ini", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.blockquote
+                title_frame, text="Edit config.ini", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.blockquote
             ).pack(side="left", padx=(15, 0))
 
     def _create_notebook(self, parent):
@@ -462,7 +463,7 @@ class SettingsWindow(
             )
         else:
             self.status_label = tk.Label(
-                btn_frame, text="", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.accent_green
+                btn_frame, text="", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.accent_green
             )
         self.status_label.pack(side="left", padx=20)
 

@@ -10,6 +10,7 @@ import pytest
 from src.platform import clipboard as clipboard_mod
 from src.platform.clipboard import (
     copy_bytes,
+    copy_rich_text,
     copy_text,
     get_selected_text_wayland,
     has_primary_selection,
@@ -71,6 +72,7 @@ def test_is_wl_clipboard_available_false_on_non_linux():
         assert list_types() == []
         assert paste_bytes("image/png") == b""
         assert copy_bytes(b"x", "image/png") is False
+        assert copy_rich_text("<p>x</p>", "x") is False
         assert get_selected_text_wayland() == ""
 
 
@@ -155,6 +157,7 @@ def test_missing_binary_safe_failure_no_crash():
         assert list_types() == []
         assert paste_bytes("text/plain") == b""
         assert copy_bytes(b"data", "image/png") is False
+        assert copy_rich_text("<p>x</p>", "x") is False
         assert get_selected_text_wayland() == ""
 
 
@@ -200,6 +203,29 @@ def test_paste_bytes_and_copy_bytes_pass_mime():
         assert "--type" in args
         assert "image/png" in args
         assert run.call_args[1]["input"] == b"\x89PNG"
+
+
+def test_copy_rich_text_offers_html_mime():
+    def which(name: str):
+        return f"/usr/bin/{name}"
+
+    html = "<html><body><strong>café</strong></body></html>"
+    with (
+        patch.object(clipboard_mod, "is_linux", return_value=True),
+        patch.object(clipboard_mod.shutil, "which", side_effect=which),
+        patch.object(clipboard_mod.subprocess, "run", return_value=_completed()) as run,
+    ):
+        assert copy_rich_text(html, "café") is True
+        args = run.call_args[0][0]
+        assert args[0] == "/usr/bin/wl-copy"
+        assert "--type" in args
+        assert "text/html" in args
+        assert run.call_args[1]["input"] == html.encode("utf-8")
+
+
+def test_copy_rich_text_rejects_empty_html():
+    with patch.object(clipboard_mod, "is_linux", return_value=True):
+        assert copy_rich_text("", "plain") is False
 
 
 def test_get_selected_text_wayland_prefers_primary():

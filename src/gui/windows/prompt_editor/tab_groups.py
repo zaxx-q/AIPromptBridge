@@ -10,7 +10,7 @@ from tkinter import messagebox
 
 from ...custom_widgets import ScrollableButtonList, ask_themed_string, create_emoji_button, create_section_header
 from ...platform import HAVE_CTK, ctk
-from ...themes import get_ctk_entry_colors, get_ctk_font, get_ctk_label_colors, get_ctk_textbox_colors
+from ...themes import get_ctk_entry_colors, get_ctk_font, get_ctk_label_colors, get_ctk_textbox_colors, get_tk_font
 
 
 class GroupsTabMixin:
@@ -168,13 +168,13 @@ class GroupsTabMixin:
             ).pack(side="left", padx=(12, 0))
         else:
             tk.Label(
-                row, text="Name:", font=("Segoe UI", 10), width=10, anchor="w", bg=self.colors.bg, fg=self.colors.fg
+                row, text="Name:", font=get_tk_font(10), width=10, anchor="w", bg=self.colors.bg, fg=self.colors.fg
             ).pack(side="left")
             self.group_widgets["name_var"] = tk.StringVar()
             tk.Entry(
                 row,
                 textvariable=self.group_widgets["name_var"],
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=25,
                 bg=self.colors.input_bg,
                 fg=self.colors.fg,
@@ -203,7 +203,7 @@ class GroupsTabMixin:
                 row,
                 text="Enabled (show this group in the corresponding tool)",
                 variable=self.group_widgets["enabled_var"],
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 selectcolor=self.colors.input_bg,
@@ -232,12 +232,12 @@ class GroupsTabMixin:
             tk.Label(
                 row,
                 text="Items (one action name per line):",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
             ).pack(anchor="w")
             self.group_widgets["items"] = tk.Text(
-                row, font=("Segoe UI", 10), bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
+                row, font=get_tk_font(10), bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
             )
         self.group_widgets["items"].pack(fill="both", expand=True, pady=(2, 0))
 

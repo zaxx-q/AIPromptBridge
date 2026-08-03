@@ -130,8 +130,8 @@ def _select_release_asset(assets: list) -> Tuple[str, int, str]:
 
     Windows: prefer ``*windows*`` / ``*win*`` ``.zip``, else any ``.zip`` with
     ``aipromptbridge`` in the name (legacy single-asset releases).
-    Linux: prefer ``*linux*`` ``.tar.gz`` / ``.tgz`` / ``.zip`` for release-page
-    links; full in-place self-update apply is still Windows-only for now.
+    Linux: prefer ``*linux*`` ``.tar.gz`` / ``.tgz`` / ``.zip``. Compiled Linux
+    installs support full in-place self-update (bin swap + os.execv relaunch).
     """
     from .platform.detect import is_linux, is_windows
 
@@ -229,7 +229,7 @@ def check_for_update() -> Optional[UpdateInfo]:
         if not is_newer_version(tag_name):
             return None
 
-        # Platform-aware asset selection (Windows zip auto-apply; Linux notify link)
+        # Platform-aware asset selection for compiled in-place updates.
         assets = release.get("assets", [])
         download_url, asset_size, asset_name = _select_release_asset(assets)
 

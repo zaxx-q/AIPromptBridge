@@ -33,6 +33,7 @@ from ..themes import (
     get_ctk_entry_colors,
     get_ctk_font,
     get_ctk_label_colors,
+    get_tk_font,
 )
 from .utils import set_window_icon
 
@@ -215,7 +216,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 self, text="🔌  Connection Profiles", font=get_ctk_font(16, "bold"), **get_ctk_label_colors(c)
             ).pack(anchor="w", padx=20, pady=(15, 10))
         else:
-            tk.Label(self, text="🔌  Connection Profiles", font=("Segoe UI", 14, "bold"), bg=c.bg, fg=c.fg).pack(
+            tk.Label(self, text="🔌  Connection Profiles", font=get_tk_font(14, "bold"), bg=c.bg, fg=c.fg).pack(
                 anchor="w", padx=20, pady=(15, 10)
             )
 
@@ -282,10 +283,10 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self.name_entry.pack(side="left", fill="x", expand=True, padx=(8, 0))
         else:
             tk.Label(
-                row, text="Profile Name:", font=("Segoe UI", 10, "bold"), width=14, anchor="w", bg=c.bg, fg=c.fg
+                row, text="Profile Name:", font=get_tk_font(10, "bold"), width=14, anchor="w", bg=c.bg, fg=c.fg
             ).pack(side="left")
             self.name_var = tk.StringVar()
-            self.name_entry = tk.Entry(row, textvariable=self.name_var, font=("Segoe UI", 10), bg=c.input_bg, fg=c.fg)
+            self.name_entry = tk.Entry(row, textvariable=self.name_var, font=get_tk_font(10), bg=c.input_bg, fg=c.fg)
             self.name_entry.pack(side="left", fill="x", expand=True, padx=(5, 0))
 
         # --- Description ---
@@ -305,11 +306,11 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 **get_ctk_entry_colors(c),
             ).pack(side="left", fill="x", expand=True, padx=(8, 0))
         else:
-            tk.Label(row, text="Description:", font=("Segoe UI", 9), width=14, anchor="w", bg=c.bg, fg=c.fg).pack(
+            tk.Label(row, text="Description:", font=get_tk_font(9), width=14, anchor="w", bg=c.bg, fg=c.fg).pack(
                 side="left"
             )
             self.description_var = tk.StringVar()
-            tk.Entry(row, textvariable=self.description_var, font=("Segoe UI", 9), bg=c.input_bg, fg=c.fg).pack(
+            tk.Entry(row, textvariable=self.description_var, font=get_tk_font(9), bg=c.input_bg, fg=c.fg).pack(
                 side="left", fill="x", expand=True, padx=(5, 0)
             )
 
@@ -375,7 +376,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 ).pack(anchor="w", padx=12, pady=(8, 2))
         else:
             tk.Label(
-                self._summary_frame, text="Profile Summary", font=("Segoe UI", 11, "bold"), bg=c.surface0, fg=c.fg
+                self._summary_frame, text="Profile Summary", font=get_tk_font(11, "bold"), bg=c.surface0, fg=c.fg
             ).pack(anchor="w", padx=12, pady=(8, 2))
 
         # Summary content area (optimized to cache widgets)
@@ -395,7 +396,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         else:
             self._summary_active_lbl = tk.Label(
                 self._summary_content,
-                font=("Segoe UI", 10, "bold"),
+                font=get_tk_font(10, "bold"),
                 bg=c.surface0,
                 fg=c.accent,
             )
@@ -440,18 +441,18 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 )
             else:
                 icon_lbl = tk.Label(
-                    self._summary_grid_frame, text=icon, font=("Segoe UI", 10), bg=c.surface0, fg=c.fg, width=3
+                    self._summary_grid_frame, text=icon, font=get_tk_font(10), bg=c.surface0, fg=c.fg, width=3
                 )
                 key_lbl = tk.Label(
                     self._summary_grid_frame,
                     text=f"{label_field}:",
-                    font=("Segoe UI", 10),
+                    font=get_tk_font(10),
                     bg=c.surface0,
                     fg=c.blockquote,
                     anchor="w",
                 )
                 val_lbl = tk.Label(
-                    self._summary_grid_frame, text="", font=("Segoe UI", 10, "bold"), bg=c.surface0, fg=c.fg, anchor="w"
+                    self._summary_grid_frame, text="", font=get_tk_font(10, "bold"), bg=c.surface0, fg=c.fg, anchor="w"
                 )
             self._summary_row_widgets[key_field] = (icon_lbl, key_lbl, val_lbl)
 
@@ -470,7 +471,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         if self.use_ctk:
             self.save_status = ctk.CTkLabel(btn_row, text="", font=get_ctk_font(11), text_color=c.accent_green)
         else:
-            self.save_status = tk.Label(btn_row, text="", font=("Segoe UI", 9), bg=c.bg, fg=c.accent_green)
+            self.save_status = tk.Label(btn_row, text="", font=get_tk_font(9), bg=c.bg, fg=c.accent_green)
         self.save_status.pack(side="left", padx=12)
 
         self._on_provider_change("")
@@ -488,7 +489,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             )
         else:
             help_label = tk.Label(
-                parent, text="?", font=("Segoe UI", 9, "bold"), bg=c.bg, fg=c.accent, cursor="question_arrow"
+                parent, text="?", font=get_tk_font(9, "bold"), bg=c.bg, fg=c.accent, cursor="question_arrow"
             )
         help_label.pack(side="left", padx=(2, 0))
         Tooltip(help_label, help_text)
@@ -508,7 +509,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 row, text="Enabled", variable=var, font=get_ctk_font(12), text_color=c.fg, fg_color=c.accent
             ).pack(side="left", padx=(8, 0))
         else:
-            font = ("Segoe UI", 9, "bold") if is_required else ("Segoe UI", 9)
+            font = get_tk_font(9, "bold") if is_required else get_tk_font(9)
             tk.Label(row, text=f"{label}:", font=font, width=14, anchor="w", bg=c.bg, fg=c.fg).pack(side="left")
             self._add_help_icon(row, key, c)
             tk.Checkbutton(row, text="Enabled", variable=var, bg=c.bg, fg=c.fg, selectcolor=c.input_bg).pack(
@@ -550,18 +551,18 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         else:
             from tkinter import ttk as ttk_local
 
-            font = ("Segoe UI", 9, "bold") if is_required else ("Segoe UI", 9)
+            font = get_tk_font(9, "bold") if is_required else get_tk_font(9)
             tk.Label(row, text=f"{label}:", font=font, width=14, anchor="w", bg=c.bg, fg=c.fg).pack(side="left")
             self._add_help_icon(row, key, c)
             dropdown = ttk_local.Combobox(row, textvariable=var, values=[], width=22)
             dropdown.pack(side="left", padx=(5, 0))
             self._model_dropdown_widget = dropdown
 
-            tk.Button(row, text="🔄", font=("Segoe UI", 9), bg=c.surface1, fg=c.fg, command=self._refresh_models).pack(
+            tk.Button(row, text="🔄", font=get_tk_font(9), bg=c.surface1, fg=c.fg, command=self._refresh_models).pack(
                 side="left", padx=(4, 0)
             )
 
-            self._model_status_label = tk.Label(row, text="", font=("Segoe UI", 8), bg=c.bg, fg=c.blockquote, width=14)
+            self._model_status_label = tk.Label(row, text="", font=get_tk_font(8), bg=c.bg, fg=c.blockquote, width=14)
             self._model_status_label.pack(side="left", padx=(4, 0))
 
         # Track unsaved changes
@@ -596,7 +597,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         else:
             from tkinter import ttk as ttk_local
 
-            font = ("Segoe UI", 9, "bold") if is_required else ("Segoe UI", 9)
+            font = get_tk_font(9, "bold") if is_required else get_tk_font(9)
             tk.Label(row, text=f"{label}:", font=font, width=14, anchor="w", bg=c.bg, fg=c.fg).pack(side="left")
             self._add_help_icon(row, key, c)
             combo = ttk_local.Combobox(row, textvariable=var, values=options or [], state="readonly", width=18)
@@ -623,11 +624,11 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 row, textvariable=var, font=get_ctk_font(12), height=30, width=250, **get_ctk_entry_colors(c)
             ).pack(side="left", padx=(8, 0))
         else:
-            font = ("Segoe UI", 9, "bold") if is_required else ("Segoe UI", 9)
+            font = get_tk_font(9, "bold") if is_required else get_tk_font(9)
             lbl = tk.Label(row, text=f"{label}:", font=font, width=14, anchor="w", bg=c.bg, fg=c.fg)
             lbl.pack(side="left")
             self._add_help_icon(row, key, c)
-            tk.Entry(row, textvariable=var, font=("Segoe UI", 9), bg=c.input_bg, fg=c.fg, width=25).pack(
+            tk.Entry(row, textvariable=var, font=get_tk_font(9), bg=c.input_bg, fg=c.fg, width=25).pack(
                 side="left", padx=(5, 0)
             )
 
@@ -657,7 +658,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             dropdown.pack(side="left", padx=(8, 0))
             self._api_key_name_dropdown = dropdown
         else:
-            font = ("Segoe UI", 9, "bold") if is_required else ("Segoe UI", 9)
+            font = get_tk_font(9, "bold") if is_required else get_tk_font(9)
             tk.Label(row, text=f"{label}:", font=font, width=14, anchor="w", bg=c.bg, fg=c.fg).pack(side="left")
             self._add_help_icon(row, key, c)
             dropdown = ScrollableComboBox(
@@ -713,12 +714,12 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 if self.use_ctk:
                     self._custom_url_label.configure(font=get_ctk_font(12, "bold"))
                 else:
-                    self._custom_url_label.configure(font=("Segoe UI", 9, "bold"))
+                    self._custom_url_label.configure(font=get_tk_font(9, "bold"))
             else:
                 if self.use_ctk:
                     self._custom_url_label.configure(font=get_ctk_font(12))
                 else:
-                    self._custom_url_label.configure(font=("Segoe UI", 9))
+                    self._custom_url_label.configure(font=get_tk_font(9))
 
         # Update summary when provider changes
         self._update_summary()
@@ -1010,7 +1011,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             else:
                 self._summary_active_lbl.configure(
                     text="★ Active Profile",
-                    font=("Segoe UI", 10, "bold"),
+                    font=get_tk_font(10, "bold"),
                     fg=c.accent,
                 )
             self._summary_active_lbl.pack(anchor="w", pady=(2, 0))

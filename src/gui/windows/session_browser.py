@@ -509,13 +509,13 @@ class BrowserWindowBase(ABC):
             ).pack(side="right")
         else:
             tk.Label(
-                dialog, text="Session Title:", font=("Segoe UI", 10), bg=self.colors["bg"], fg=self.colors["fg"]
+                dialog, text="Session Title:", font=get_tk_font(10), bg=self.colors["bg"], fg=self.colors["fg"]
             ).pack(anchor="w", padx=20, pady=(15, 5))
 
             entry = tk.Entry(
                 dialog,
                 textvariable=title_var,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.get("input_bg", self.colors["text_bg"]),
                 fg=self.colors["fg"],
                 insertbackground=self.colors["fg"],
@@ -531,7 +531,7 @@ class BrowserWindowBase(ABC):
             tk.Button(
                 btn_frame,
                 text="Save",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors["accent"],
                 fg=self.colors["accent_fg"],
                 relief=tk.FLAT,
@@ -544,7 +544,7 @@ class BrowserWindowBase(ABC):
             tk.Button(
                 btn_frame,
                 text="Cancel",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors["button_bg"],
                 fg=self.colors["fg"],
                 relief=tk.FLAT,
@@ -710,7 +710,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             tk.Label(
                 self.root,
                 text="📋 Saved Chat Sessions",
-                font=("Segoe UI", 14, "bold"),
+                font=get_tk_font(14, "bold"),
                 bg=self.colors["bg"],
                 fg=self.colors["accent"],
             ).grid(row=0, column=0, sticky=tk.W, padx=15, pady=(15, 10))
@@ -862,7 +862,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
                 btn = tk.Button(
                     btn_frame,
                     text=text,
-                    font=("Segoe UI", 9),
+                    font=get_tk_font(9),
                     bg=bg_color,
                     fg=fg_color,
                     relief=tk.FLAT,
@@ -876,7 +876,7 @@ class StandaloneSessionBrowserWindow(BrowserWindowBase):
             self.status_label = tk.Label(
                 btn_frame,
                 text="Click on a session to select it",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors["bg"],
                 fg=self.colors["blockquote"],
             )
@@ -1041,7 +1041,7 @@ class AttachedBrowserWindow(BrowserWindowBase):
             tk.Label(
                 self.root,
                 text="📋 Saved Chat Sessions",
-                font=("Segoe UI", 14, "bold"),
+                font=get_tk_font(14, "bold"),
                 bg=self.colors["bg"],
                 fg=self.colors["accent"],
             ).grid(row=0, column=0, sticky=tk.W, padx=15, pady=(15, 10))
@@ -1191,7 +1191,7 @@ class AttachedBrowserWindow(BrowserWindowBase):
                 btn = tk.Button(
                     btn_frame,
                     text=text,
-                    font=("Segoe UI", 9),
+                    font=get_tk_font(9),
                     bg=bg_color,
                     fg=fg_color,
                     relief=tk.FLAT,
@@ -1205,7 +1205,7 @@ class AttachedBrowserWindow(BrowserWindowBase):
             self.status_label = tk.Label(
                 btn_frame,
                 text="Click on a session to select it",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors["bg"],
                 fg=self.colors["blockquote"],
             )

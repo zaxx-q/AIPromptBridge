@@ -37,7 +37,7 @@ if sys.platform == "win32":
 from .platform import HAVE_CTK, ctk
 
 # Import theme system
-from .themes import ThemeColors, ThemeRegistry, get_ctk_font, scaled_tk_size
+from .themes import ThemeColors, ThemeRegistry, get_ctk_font, get_tk_font, scaled_tk_size
 from .themes import get_color_scheme as _get_color_scheme
 from .themes import is_dark_mode as _is_dark_mode
 
@@ -58,6 +58,11 @@ from .latex_renderer import extract_latex_blocks, latex_to_unicode
 # downstream insertion can still apply the latex_inline styling tag.
 _LATEX_SENTINEL_START = "\x02"  # STX control char – safe for tk.Text
 _LATEX_SENTINEL_END = "\x03"  # ETX control char
+
+# Miscellaneous Technical glyphs such as ⎨ / ⎬ used by display math.  Segoe
+# UI Symbol is available on Windows; DejaVu Sans carries the same characters
+# on Linux and is the dependable cross-desktop fallback.
+_SYMBOL_FONT_FAMILY = "Segoe UI Symbol" if sys.platform == "win32" else "DejaVu Sans"
 
 
 def is_dark_mode() -> bool:
@@ -494,7 +499,7 @@ def setup_text_tags(text_widget: tk.Text, colors: Union[Dict[str, str], ThemeCol
     # Technical symbols font (center pieces) - used for characters
     # that are missing or look poor in monospaced fonts.
     text_widget.tag_configure(
-        "latex_symbols", font=("Segoe UI Symbol", _s(24)), foreground=colors.get("accent_yellow", colors["accent"])
+        "latex_symbols", font=(_SYMBOL_FONT_FAMILY, _s(24)), foreground=colors.get("accent_yellow", colors["accent"])
     )
 
     # Raise thinking_block_layout above user_message/assistant_message so its background takes priority
@@ -822,7 +827,8 @@ def render_markdown(
         _font_obj = tkfont.Font(font=widget_font)
     except Exception:
         try:
-            _font_obj = tkfont.Font(family="Segoe UI", size=scaled_tk_size(11))
+            family, size = get_tk_font(11)[:2]
+            _font_obj = tkfont.Font(family=family, size=size)
         except Exception:
             _font_obj = None
 
@@ -1515,12 +1521,16 @@ def copy_as_html_to_clipboard(markdown_text: str, root=None) -> bool:
     html_body = markdown_to_html(markdown_text)
 
     if sys.platform != "win32":
-        # Non-Windows: plain text only.
-        # Linux/Wayland: no multi-MIME HTML+text stack this phase — plain
-        # markdown (or HTML body as text) via wl-copy is enough for Phase 2.
-        # Rich paste into LibreOffice/etc. remains incomplete until multi-MIME.
         if sys.platform.startswith("linux"):
-            # Prefer original markdown as plain text for general paste targets.
+            # Linux/Wayland: offer text/html via wl-copy for rich paste targets.
+            # Plain-text-only targets should use "Copy as Markdown" instead.
+            from ..platform.clipboard import copy_rich_text
+
+            full_html = f"<html><body>{html_body}</body></html>"
+            if copy_rich_text(full_html, markdown_text):
+                return True
+            # wl-copy is unavailable or rejected the rich offer: preserve the
+            # existing plain-markdown fallback rather than failing the action.
             return copy_to_clipboard(markdown_text, root)
         return copy_to_clipboard(html_body, root)
 
@@ -1736,7 +1746,7 @@ def get_tk_text_for_ctk_frame(parent_frame, colors: Union[Dict[str, str], ThemeC
 
     # Default font
     if sys.platform == "win32":
-        font = ("Segoe UI", 11)
+        font = get_tk_font(11)
     else:
         font = ("DejaVu Sans", 11)
 

@@ -244,7 +244,7 @@ class ChatWindowBase(ABC):
             self.info_label.grid(row=0, column=0, sticky="w", padx=15, pady=(5, 2))
         else:
             self.info_label = tk.Label(
-                self.root, text=info_text, font=("Segoe UI", 9), bg=self.colors["bg"], fg=self.colors["blockquote"]
+                self.root, text=info_text, font=get_tk_font(9), bg=self.colors["bg"], fg=self.colors["blockquote"]
             )
             self.info_label.grid(row=0, column=0, sticky=tk.W, padx=15, pady=(5, 2))
 
@@ -488,7 +488,7 @@ class ChatWindowBase(ABC):
             self.rename_btn = tk.Button(
                 btn_frame,
                 text="✏️",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.get("accent_yellow", "#f9e2af"),
                 fg=self.colors["bg"],
                 relief=tk.FLAT,
@@ -502,7 +502,7 @@ class ChatWindowBase(ABC):
             self.delete_btn = tk.Button(
                 btn_frame,
                 text="🗑️",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.get("accent_red", "#f38ba8"),
                 fg=self.colors["accent_fg"],
                 relief=tk.FLAT,
@@ -517,7 +517,7 @@ class ChatWindowBase(ABC):
             self.wrap_btn = tk.Button(
                 btn_frame,
                 text="Wrap: ON",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors["button_bg"],
                 fg=self.colors["fg"],
                 relief=tk.FLAT,
@@ -531,7 +531,7 @@ class ChatWindowBase(ABC):
             self.md_btn = tk.Button(
                 btn_frame,
                 text="Markdown",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors["button_bg"],
                 fg=self.colors["fg"],
                 relief=tk.FLAT,
@@ -545,7 +545,7 @@ class ChatWindowBase(ABC):
             self.scroll_btn = tk.Button(
                 btn_frame,
                 text="Scroll: ON",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors["button_bg"],
                 fg=self.colors["fg"],
                 relief=tk.FLAT,
@@ -565,7 +565,7 @@ class ChatWindowBase(ABC):
             self.manual_toggle_btn = tk.Button(
                 right_container,
                 text=toggle_text,
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors["button_bg"],
                 fg=self.colors["fg"],
                 relief=tk.FLAT,
@@ -591,7 +591,7 @@ class ChatWindowBase(ABC):
             self.model_label_widget = tk.Label(
                 self._profile_widgets_frame,
                 text=dropdown_label,
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors["bg"],
                 fg=self.colors["fg"],
             )
@@ -621,7 +621,7 @@ class ChatWindowBase(ABC):
             self.provider_label_widget = tk.Label(
                 self._manual_widgets_frame,
                 text="Provider:",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors["bg"],
                 fg=self.colors["fg"],
             )
@@ -638,7 +638,7 @@ class ChatWindowBase(ABC):
             self.manual_model_label_widget = tk.Label(
                 self._manual_widgets_frame,
                 text="Model:",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors["bg"],
                 fg=self.colors["fg"],
             )
@@ -869,7 +869,7 @@ class ChatWindowBase(ABC):
             self.input_text = tk.Text(
                 input_frame,
                 height=4,
-                font=("Segoe UI", 11),
+                font=get_tk_font(11),
                 bg=self.colors["input_bg"],
                 fg=self.colors["fg"],
                 insertbackground=self.colors["fg"],
@@ -884,14 +884,14 @@ class ChatWindowBase(ABC):
 
             # Pending attachments indicator
             self._attachments_label = tk.Label(
-                input_frame, text="", font=("Segoe UI", 9), bg=self.colors["bg"], fg=self.colors["accent"]
+                input_frame, text="", font=get_tk_font(9), bg=self.colors["bg"], fg=self.colors["accent"]
             )
 
             # Attachment button
             self.attach_btn = tk.Button(
                 input_frame,
                 text="📎",
-                font=("Segoe UI", 14),
+                font=get_tk_font(14),
                 bg=self.colors["button_bg"],
                 fg=self.colors["fg"],
                 relief=tk.FLAT,
@@ -1033,7 +1033,7 @@ class ChatWindowBase(ABC):
             self.send_btn = tk.Button(
                 btn_row,
                 text="Send",
-                font=("Segoe UI", 10, "bold"),
+                font=get_tk_font(10, "bold"),
                 bg=self.colors["accent"],
                 fg=self.colors["accent_fg"],
                 relief=tk.FLAT,
@@ -1048,7 +1048,7 @@ class ChatWindowBase(ABC):
             self.regen_btn = tk.Button(
                 btn_row,
                 text="🔄 Regen",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.get("accent_yellow", "#f9e2af"),
                 fg=self.colors["bg"],
                 relief=tk.FLAT,
@@ -1093,7 +1093,7 @@ class ChatWindowBase(ABC):
             btn = tk.Button(
                 btn_row,
                 text="Close",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors["button_bg"],
                 fg=self.colors["fg"],
                 relief=tk.FLAT,
@@ -1105,7 +1105,7 @@ class ChatWindowBase(ABC):
             btn.pack(side=tk.LEFT, padx=2)
 
             self.status_label = tk.Label(
-                btn_row, text="", font=("Segoe UI", 9), bg=self.colors["bg"], fg=self.colors["accent"]
+                btn_row, text="", font=get_tk_font(9), bg=self.colors["bg"], fg=self.colors["accent"]
             )
             self.status_label.pack(side=tk.LEFT, padx=15)
 
@@ -2490,20 +2490,20 @@ class ChatWindowBase(ABC):
             open_btn.pack(side="left", padx=(0, 8))
         else:
             icon_label = tk.Label(
-                player_frame, text="🔊", font=("Segoe UI", 12), bg=self.colors["surface0"], fg=self.colors["fg"]
+                player_frame, text="🔊", font=get_tk_font(12), bg=self.colors["surface0"], fg=self.colors["fg"]
             )
             icon_label.pack(side=tk.LEFT, padx=(8, 4))
 
             display_name = filename[:30] + "..." if len(filename) > 30 else filename
             name_label = tk.Label(
-                player_frame, text=display_name, font=("Segoe UI", 10), bg=self.colors["surface0"], fg=self.colors["fg"]
+                player_frame, text=display_name, font=get_tk_font(10), bg=self.colors["surface0"], fg=self.colors["fg"]
             )
             name_label.pack(side=tk.LEFT, padx=4)
 
             play_btn = tk.Button(
                 player_frame,
                 text="▶",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors["accent"],
                 fg=self.colors["accent_fg"],
                 relief=tk.FLAT,
@@ -2519,7 +2519,7 @@ class ChatWindowBase(ABC):
             open_btn = tk.Button(
                 player_frame,
                 text="📂",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors["surface0"],
                 fg=self.colors["fg"],
                 relief=tk.FLAT,
@@ -2806,7 +2806,7 @@ class ChatWindowBase(ABC):
                     thumb_label.pack(side=tk.LEFT, padx=4, pady=4)
                 else:
                     tk.Label(
-                        item_frame, text="📄", font=("Segoe UI", 16), bg=self.colors["surface0"], fg=self.colors["fg"]
+                        item_frame, text="📄", font=get_tk_font(16), bg=self.colors["surface0"], fg=self.colors["fg"]
                     ).pack(side=tk.LEFT, padx=4, pady=4)
 
                 # Filename
@@ -2814,14 +2814,14 @@ class ChatWindowBase(ABC):
                 if len(attach.get("filename", "")) > 20:
                     name += "..."
                 tk.Label(
-                    item_frame, text=name, font=("Segoe UI", 9), bg=self.colors["surface0"], fg=self.colors["fg"]
+                    item_frame, text=name, font=get_tk_font(9), bg=self.colors["surface0"], fg=self.colors["fg"]
                 ).pack(side=tk.LEFT, padx=2)
 
                 # Remove button
                 remove_btn = tk.Button(
                     item_frame,
                     text="×",
-                    font=("Segoe UI", 10),
+                    font=get_tk_font(10),
                     bg=self.colors["surface0"],
                     fg=self.colors["fg"],
                     relief=tk.FLAT,
@@ -3137,7 +3137,7 @@ class ChatWindowBase(ABC):
             activeforeground=self.colors.get("bg", "#1e1e2e"),
             relief=tk.FLAT,
             borderwidth=1,
-            font=("Segoe UI", 10),
+            font=get_tk_font(10),
         )
 
         label_edit = "Edit Message" if is_user else "Edit Response"
@@ -3390,13 +3390,13 @@ class ChatWindowBase(ABC):
             ).pack(side="right")
         else:
             tk.Label(
-                dialog, text="Session Title:", font=("Segoe UI", 10), bg=self.colors["bg"], fg=self.colors["fg"]
+                dialog, text="Session Title:", font=get_tk_font(10), bg=self.colors["bg"], fg=self.colors["fg"]
             ).pack(anchor="w", padx=20, pady=(15, 5))
 
             entry = tk.Entry(
                 dialog,
                 textvariable=title_var,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.get("input_bg", self.colors["text_bg"]),
                 fg=self.colors["fg"],
                 insertbackground=self.colors["fg"],
@@ -3412,7 +3412,7 @@ class ChatWindowBase(ABC):
             tk.Button(
                 btn_frame,
                 text="Save",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors["accent"],
                 fg=self.colors["accent_fg"],
                 relief=tk.FLAT,
@@ -3425,7 +3425,7 @@ class ChatWindowBase(ABC):
             tk.Button(
                 btn_frame,
                 text="Cancel",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors["button_bg"],
                 fg=self.colors["fg"],
                 relief=tk.FLAT,
@@ -3566,7 +3566,7 @@ class _EditMessageDialog:
                 self.dialog, text=title, font=get_ctk_font(size=14, weight="bold"), text_color=theme.accent
             ).grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
         else:
-            tk.Label(self.dialog, text=title, font=("Segoe UI", 12, "bold"), bg=colors["bg"], fg=colors["accent"]).grid(
+            tk.Label(self.dialog, text=title, font=get_tk_font(12, "bold"), bg=colors["bg"], fg=colors["accent"]).grid(
                 row=0, column=0, padx=15, pady=(15, 5), sticky="w"
             )
 
@@ -3581,7 +3581,7 @@ class _EditMessageDialog:
         else:
             self.text_area = tk.Text(
                 self.dialog,
-                font=("Segoe UI", 11),
+                font=get_tk_font(11),
                 wrap=tk.WORD,
                 bg=colors.get("input_bg", colors["text_bg"]),
                 fg=colors["fg"],
@@ -3640,7 +3640,7 @@ class _EditMessageDialog:
             tk.Button(
                 btn_frame,
                 text="Save & Rerun",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=colors.get("accent_yellow", "#f9e2af"),
                 fg=colors["bg"],
                 relief=tk.FLAT,
@@ -3653,7 +3653,7 @@ class _EditMessageDialog:
             tk.Button(
                 btn_frame,
                 text="Save",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=colors["accent"],
                 fg=colors["accent_fg"],
                 relief=tk.FLAT,
@@ -3666,7 +3666,7 @@ class _EditMessageDialog:
             tk.Button(
                 btn_frame,
                 text="Cancel",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=colors["button_bg"],
                 fg=colors["fg"],
                 relief=tk.FLAT,

@@ -10,7 +10,7 @@ import queue
 import tkinter as tk
 
 from ...platform import HAVE_CTK, ctk
-from ...themes import get_ctk_button_colors, get_ctk_font, get_ctk_textbox_colors
+from ...themes import get_ctk_button_colors, get_ctk_font, get_ctk_textbox_colors, get_tk_font
 from ..utils import set_window_icon
 
 # Import emoji renderer for CTkImage support (Windows color emoji fix)
@@ -88,7 +88,7 @@ class TestResultDialog(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             tk.Button(
                 self.main_frame,
                 text="Close",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=colors.accent,
                 fg=colors.accent_fg,
                 command=self.destroy,

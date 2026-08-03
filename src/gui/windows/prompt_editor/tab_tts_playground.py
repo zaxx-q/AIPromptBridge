@@ -21,6 +21,7 @@ from ...themes import (
     get_ctk_font,
     get_ctk_label_colors,
     get_ctk_textbox_colors,
+    get_tk_font,
 )
 
 
@@ -65,7 +66,7 @@ class TTSPlaygroundMixin:
                 text="Direct Speech",
                 variable=self.tts_pg_mode_var,
                 value="direct",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 command=self._on_tts_mode_toggle,
@@ -75,7 +76,7 @@ class TTSPlaygroundMixin:
                 text="AI Director",
                 variable=self.tts_pg_mode_var,
                 value="director",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 command=self._on_tts_mode_toggle,
@@ -108,7 +109,7 @@ class TTSPlaygroundMixin:
                 **get_ctk_combobox_colors(self.colors),
             ).pack(side="left", padx=(8, 0), fill="x", expand=True)
         else:
-            tk.Label(model_frame, text="TTS Model:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(
+            tk.Label(model_frame, text="TTS Model:", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg).pack(
                 side="left"
             )
             self.tts_pg_model_var = tk.StringVar(value=TTS_MODELS[0])
@@ -147,7 +148,7 @@ class TTSPlaygroundMixin:
                 **get_ctk_combobox_colors(self.colors),
             ).pack(side="left", padx=(8, 0), fill="x", expand=True)
         else:
-            tk.Label(voice_frame, text="Voice:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(
+            tk.Label(voice_frame, text="Voice:", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg).pack(
                 side="left"
             )
             self.tts_pg_voice_var = tk.StringVar(value=voice_list[0] if voice_list else "")
@@ -166,7 +167,7 @@ class TTSPlaygroundMixin:
             )
         else:
             self.tts_pg_input_text = tk.Text(
-                parent, height=5, font=("Segoe UI", 10), bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
+                parent, height=5, font=get_tk_font(10), bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
             )
         self.tts_pg_input_text.pack(fill="x", pady=(0, 10))
         self.tts_pg_input_text.bind("<KeyRelease>", lambda e: self._update_tts_playground_preview())
@@ -199,7 +200,7 @@ class TTSPlaygroundMixin:
             )
         else:
             self.tts_pg_director_status = tk.Label(
-                dir_btn_frame, text="", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote
+                dir_btn_frame, text="", font=get_tk_font(9), bg=self.colors.bg, fg=self.colors.blockquote
             )
         self.tts_pg_director_status.pack(side="left", padx=(10, 0))
 
@@ -212,7 +213,7 @@ class TTSPlaygroundMixin:
             self.tts_pg_director_output = tk.Text(
                 self.tts_pg_director_frame,
                 height=5,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.input_bg,
                 fg=self.colors.fg,
                 wrap="word",
@@ -236,7 +237,7 @@ class TTSPlaygroundMixin:
             )
         else:
             self.tts_pg_gen_status = tk.Label(
-                gen_frame, text="", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.blockquote
+                gen_frame, text="", font=get_tk_font(9), bg=self.colors.bg, fg=self.colors.blockquote
             )
         self.tts_pg_gen_status.pack(side="left", padx=(10, 0))
 
@@ -261,7 +262,7 @@ class TTSPlaygroundMixin:
             self.tts_pg_position_label = tk.Label(
                 playback_frame,
                 text="00:00 / 00:00",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.blockquote,
             )

@@ -25,6 +25,7 @@ from ...themes import (
     get_ctk_font,
     get_ctk_label_colors,
     get_ctk_textbox_colors,
+    get_tk_font,
 )
 from .dialogs import TestResultDialog
 
@@ -121,7 +122,7 @@ class PlaygroundTabMixin:
                 text="Text Action",
                 variable=self.playground_mode_var,
                 value="action_text",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 command=self._on_playground_mode_change,
@@ -131,7 +132,7 @@ class PlaygroundTabMixin:
                 text="Snip Action",
                 variable=self.playground_mode_var,
                 value="action_snip",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 command=self._on_playground_mode_change,
@@ -141,7 +142,7 @@ class PlaygroundTabMixin:
                 text="Audio Action",
                 variable=self.playground_mode_var,
                 value="action_audio",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 command=self._on_playground_mode_change,
@@ -151,7 +152,7 @@ class PlaygroundTabMixin:
                 text="🔊 TTS",
                 variable=self.playground_mode_var,
                 value="tts",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 command=self._on_playground_mode_change,
@@ -176,7 +177,7 @@ class PlaygroundTabMixin:
             tk.Label(
                 self.action_config_frame,
                 text="Select Action:",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
             ).pack(anchor="w", pady=(0, 5))
@@ -234,7 +235,7 @@ class PlaygroundTabMixin:
             tk.Label(
                 self.custom_input_frame,
                 text="Custom Prompt:",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
             ).pack(anchor="w", pady=(0, 2))
@@ -242,7 +243,7 @@ class PlaygroundTabMixin:
             self.playground_custom_entry = tk.Entry(
                 self.custom_input_frame,
                 textvariable=self.playground_custom_var,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.input_bg,
                 fg=self.colors.fg,
             )
@@ -270,7 +271,7 @@ class PlaygroundTabMixin:
             tk.Label(
                 self.action_config_frame,
                 text="🎛️ Modifiers:",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
             ).pack(anchor="w", pady=(8, 5))
@@ -307,7 +308,7 @@ class PlaygroundTabMixin:
                         mod_scroll_target,
                         text=label,
                         variable=var,
-                        font=("Segoe UI", 10),
+                        font=get_tk_font(10),
                         bg=self.colors.bg,
                         fg=self.colors.fg,
                         selectcolor=self.colors.input_bg,
@@ -339,7 +340,7 @@ class PlaygroundTabMixin:
             tk.Label(
                 self.snip_image_frame,
                 text="🖼️ Image for Snip Test:",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
             ).pack(anchor="w", pady=(5, 5))
@@ -380,7 +381,7 @@ class PlaygroundTabMixin:
             self.image_drop_zone = tk.Label(
                 self.image_container_frame,
                 text="📷 No image selected",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.surface0,
                 fg=self.colors.blockquote,
             )
@@ -432,7 +433,7 @@ class PlaygroundTabMixin:
             tk.Label(
                 self.audio_record_frame,
                 text="🎙️ Audio Recording:",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
             ).pack(anchor="w", pady=(5, 5))
@@ -477,7 +478,7 @@ class PlaygroundTabMixin:
                 command=self._refresh_audio_devices,
             ).pack(side="left")
         else:
-            tk.Label(device_row, text="Device:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(
+            tk.Label(device_row, text="Device:", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg).pack(
                 side="left"
             )
             self.playground_audio_device_var = tk.StringVar()
@@ -519,7 +520,7 @@ class PlaygroundTabMixin:
             )
         else:
             self.playground_audio_duration = tk.Label(
-                record_row, text="00:00", font=("Segoe UI", 12, "bold"), bg=self.colors.bg, fg=self.colors.fg
+                record_row, text="00:00", font=get_tk_font(12, "bold"), bg=self.colors.bg, fg=self.colors.fg
             )
         self.playground_audio_duration.pack(side="left", padx=(0, 15))
 
@@ -541,7 +542,7 @@ class PlaygroundTabMixin:
             self.playground_audio_status = tk.Label(
                 self.audio_record_frame,
                 text="No audio recorded",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.blockquote,
             )
@@ -584,14 +585,14 @@ class PlaygroundTabMixin:
             tk.Label(
                 self.sample_text_container,
                 text="📄 Sample Text:",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
             ).pack(anchor="w", pady=(10, 5))
             self.playground_sample_text = tk.Text(
                 self.sample_text_container,
                 height=5,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.input_bg,
                 fg=self.colors.fg,
                 wrap="word",
@@ -644,7 +645,7 @@ class PlaygroundTabMixin:
                 toggle_frame,
                 text="Manual Connection Settings",
                 variable=self.playground_manual_mode_var,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 selectcolor=self.colors.input_bg,
@@ -678,7 +679,7 @@ class PlaygroundTabMixin:
             ).pack(side="left")
         else:
             tk.Label(
-                self.api_profile_frame, text="Profile:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg
+                self.api_profile_frame, text="Profile:", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg
             ).pack(side="left")
 
         self.playground_profile_var = tk.StringVar()
@@ -727,7 +728,7 @@ class PlaygroundTabMixin:
             tk.Button(
                 self.api_profile_frame,
                 text="Manage...",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors.surface1,
                 fg=self.colors.fg,
                 command=self._open_profile_manager,
@@ -792,7 +793,7 @@ class PlaygroundTabMixin:
             from tkinter import ttk
 
             tk.Label(
-                self.api_manual_frame, text="Provider:", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.fg
+                self.api_manual_frame, text="Provider:", font=get_tk_font(9), bg=self.colors.bg, fg=self.colors.fg
             ).pack(side="left")
             self.playground_provider_var = tk.StringVar(value="google")
             self.playground_provider_combo = ttk.Combobox(
@@ -806,7 +807,7 @@ class PlaygroundTabMixin:
             self.playground_provider_combo.bind("<<ComboboxSelected>>", self._on_playground_provider_change)
 
             tk.Label(
-                self.api_manual_frame, text="Model:", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.fg
+                self.api_manual_frame, text="Model:", font=get_tk_font(9), bg=self.colors.bg, fg=self.colors.fg
             ).pack(side="left")
             self.playground_model_var = tk.StringVar()
             self.playground_model_combo = ttk.Combobox(
@@ -869,13 +870,13 @@ class PlaygroundTabMixin:
             tk.Button(
                 btn_frame,
                 text="🧪 Test with API",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.accent,
                 fg=self.colors.accent_fg,
                 command=self._test_playground_with_api,
             ).pack(side="left", padx=(0, 10))
             self.playground_test_status = tk.Label(
-                btn_frame, text="", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.fg
+                btn_frame, text="", font=get_tk_font(9), bg=self.colors.bg, fg=self.colors.fg
             )
         self.playground_test_status.pack(side="left")
 
@@ -943,12 +944,12 @@ class PlaygroundTabMixin:
             tk.Label(
                 sys_header,
                 text="📝 System Prompt Preview",
-                font=("Segoe UI", 11, "bold"),
+                font=get_tk_font(11, "bold"),
                 bg=self.colors.bg,
                 fg=self.colors.accent,
             ).pack(side="left")
             tk.Button(
-                sys_header, text="📋 Copy", font=("Segoe UI", 8), command=lambda: self._copy_preview("system")
+                sys_header, text="📋 Copy", font=get_tk_font(8), command=lambda: self._copy_preview("system")
             ).pack(side="right")
             self.playground_system_preview = tk.Text(
                 right_panel,
@@ -999,12 +1000,12 @@ class PlaygroundTabMixin:
             tk.Label(
                 user_header,
                 text="💬 User Message Preview",
-                font=("Segoe UI", 11, "bold"),
+                font=get_tk_font(11, "bold"),
                 bg=self.colors.bg,
                 fg=self.colors.accent,
             ).pack(side="left")
             tk.Button(
-                user_header, text="📋 Copy", font=("Segoe UI", 8), command=lambda: self._copy_preview("user")
+                user_header, text="📋 Copy", font=get_tk_font(8), command=lambda: self._copy_preview("user")
             ).pack(side="right")
             self.playground_user_preview = tk.Text(
                 right_panel,
@@ -1042,7 +1043,7 @@ class PlaygroundTabMixin:
             self.playground_meta_label = tk.Label(
                 meta_frame,
                 text="📊 Tokens: ~0 | Type: edit | Mode: Replace",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors.bg,
                 fg=self.colors.blockquote,
             )

@@ -15,7 +15,7 @@ from src.platform.detect import is_linux
 
 from ...custom_widgets import create_section_header
 from ...platform import HAVE_CTK, ctk
-from ...themes import get_ctk_font, get_ctk_label_colors
+from ...themes import get_ctk_font, get_ctk_label_colors, get_tk_font
 
 
 class ToolsTabMixin:
@@ -157,7 +157,7 @@ class ToolsTabMixin:
             tk.Label(
                 content,
                 text="Controls typing speed when streaming AI responses into other applications via replace mode.\n0 = no limit (as fast as the server streams). Increase if apps get overwhelmed.",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 justify="left",
                 bg=self.colors.bg,
                 fg=self.colors.blockquote,
@@ -194,7 +194,7 @@ class ToolsTabMixin:
             tk.Label(
                 parent,
                 text=intro,
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 justify="left",
                 wraplength=560,
                 bg=self.colors.bg,
@@ -267,7 +267,7 @@ class ToolsTabMixin:
             tk.Label(
                 row,
                 text=text,
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors.bg,
                 fg=self.colors.blockquote,
             ).pack(side="left")

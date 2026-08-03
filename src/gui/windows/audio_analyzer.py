@@ -35,6 +35,7 @@ from ..themes import (
     get_ctk_button_colors,
     get_ctk_combobox_colors,
     get_ctk_font,
+    get_tk_font,
     sync_ctk_appearance,
 )
 from .utils import set_window_icon
@@ -819,7 +820,7 @@ class AudioAnalyzerWindow:
         self.result_text_widget = tk.Text(
             text_frame,
             wrap=tk.WORD,
-            font=("Segoe UI", 11),
+            font=get_tk_font(11),
             bg=self.colors.text_bg,
             fg=self.colors.text,
             insertbackground=self.colors.text,

@@ -9,7 +9,7 @@ import tkinter as tk
 
 from ...custom_widgets import TkScrollableFrame, create_section_header
 from ...platform import HAVE_CTK, ctk
-from ...themes import get_ctk_entry_colors, get_ctk_font, get_ctk_label_colors, get_ctk_textbox_colors
+from ...themes import get_ctk_entry_colors, get_ctk_font, get_ctk_label_colors, get_ctk_textbox_colors, get_tk_font
 
 
 class SettingsTabMixin:
@@ -41,7 +41,7 @@ class SettingsTabMixin:
                     anchor="w"
                 )
             else:
-                tk.Label(row, text=f"{label}:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(
+                tk.Label(row, text=f"{label}:", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg).pack(
                     anchor="w"
                 )
 
@@ -88,7 +88,7 @@ class SettingsTabMixin:
                     )
                 else:
                     widget = tk.Entry(
-                        row, textvariable=var, font=("Segoe UI", 10), bg=self.colors.input_bg, fg=self.colors.fg
+                        row, textvariable=var, font=get_tk_font(10), bg=self.colors.input_bg, fg=self.colors.fg
                     )
                 widget.pack(fill="x", pady=(2, 0))
                 self.settings_widgets[widget_key] = ("entry", var)
@@ -133,9 +133,9 @@ class SettingsTabMixin:
                 row, text="Popup Layout:", font=get_ctk_font(12, "bold"), **get_ctk_label_colors(self.colors)
             ).pack(anchor="w")
         else:
-            tk.Label(
-                row, text="Popup Layout:", font=("Segoe UI", 9, "bold"), bg=self.colors.bg, fg=self.colors.fg
-            ).pack(anchor="w")
+            tk.Label(row, text="Popup Layout:", font=get_tk_font(9, "bold"), bg=self.colors.bg, fg=self.colors.fg).pack(
+                anchor="w"
+            )
 
         # Items per page
         row = (
@@ -149,7 +149,7 @@ class SettingsTabMixin:
                 side="left"
             )
         else:
-            tk.Label(row, text="Items per page:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(
+            tk.Label(row, text="Items per page:", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg).pack(
                 side="left"
             )
 
@@ -172,7 +172,7 @@ class SettingsTabMixin:
             tk.Label(
                 row,
                 text="(only if groups disabled)",
-                font=("Segoe UI", 8),
+                font=get_tk_font(8),
                 bg=self.colors.bg,
                 fg=self.colors.blockquote,
             ).pack(side="left")
@@ -260,9 +260,9 @@ class SettingsTabMixin:
                 row, text="Popup Layout:", font=get_ctk_font(12, "bold"), **get_ctk_label_colors(self.colors)
             ).pack(anchor="w")
         else:
-            tk.Label(
-                row, text="Popup Layout:", font=("Segoe UI", 9, "bold"), bg=self.colors.bg, fg=self.colors.fg
-            ).pack(anchor="w")
+            tk.Label(row, text="Popup Layout:", font=get_tk_font(9, "bold"), bg=self.colors.bg, fg=self.colors.fg).pack(
+                anchor="w"
+            )
 
         # Items per page
         row = (
@@ -276,7 +276,7 @@ class SettingsTabMixin:
                 side="left"
             )
         else:
-            tk.Label(row, text="Items per page:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(
+            tk.Label(row, text="Items per page:", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg).pack(
                 side="left"
             )
 
@@ -299,7 +299,7 @@ class SettingsTabMixin:
             tk.Label(
                 row,
                 text="(only if groups disabled)",
-                font=("Segoe UI", 8),
+                font=get_tk_font(8),
                 bg=self.colors.bg,
                 fg=self.colors.blockquote,
             ).pack(side="left")
@@ -361,9 +361,9 @@ class SettingsTabMixin:
                 row, text="Popup Layout:", font=get_ctk_font(12, "bold"), **get_ctk_label_colors(self.colors)
             ).pack(anchor="w")
         else:
-            tk.Label(
-                row, text="Popup Layout:", font=("Segoe UI", 9, "bold"), bg=self.colors.bg, fg=self.colors.fg
-            ).pack(anchor="w")
+            tk.Label(row, text="Popup Layout:", font=get_tk_font(9, "bold"), bg=self.colors.bg, fg=self.colors.fg).pack(
+                anchor="w"
+            )
 
         # Items per page
         row = (
@@ -377,7 +377,7 @@ class SettingsTabMixin:
                 side="left"
             )
         else:
-            tk.Label(row, text="Items per page:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg).pack(
+            tk.Label(row, text="Items per page:", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg).pack(
                 side="left"
             )
 
@@ -400,7 +400,7 @@ class SettingsTabMixin:
             tk.Label(
                 row,
                 text="(only if groups disabled)",
-                font=("Segoe UI", 8),
+                font=get_tk_font(8),
                 bg=self.colors.bg,
                 fg=self.colors.blockquote,
             ).pack(side="left")

@@ -25,6 +25,7 @@ from ...themes import (
     get_ctk_font,
     get_ctk_label_colors,
     get_ctk_textbox_colors,
+    get_tk_font,
 )
 
 try:
@@ -75,7 +76,7 @@ class ActionsTabMixin:
                 lbl = tk.Label(
                     header_frame,
                     text="⚡ Actions",
-                    font=("Segoe UI", 11, "bold"),
+                    font=get_tk_font(11, "bold"),
                     bg=self.colors.bg,
                     fg=self.colors.accent,
                 )
@@ -102,7 +103,7 @@ class ActionsTabMixin:
                 header_frame,
                 text="Show Hidden",
                 variable=self.show_hidden_var,
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 selectcolor=self.colors.input_bg,
@@ -243,7 +244,7 @@ class ActionsTabMixin:
             tk.Label(
                 row_frame,
                 text="Name:",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=12,
                 anchor="w",
                 bg=self.colors.bg,
@@ -252,7 +253,7 @@ class ActionsTabMixin:
             self.editor_widgets["name"] = tk.Label(
                 row_frame,
                 text="(select an action)",
-                font=("Segoe UI", 10, "bold"),
+                font=get_tk_font(10, "bold"),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
             )
@@ -293,7 +294,7 @@ class ActionsTabMixin:
             tk.Label(
                 row_frame,
                 text="Icon:",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=12,
                 anchor="w",
                 bg=self.colors.bg,
@@ -303,7 +304,7 @@ class ActionsTabMixin:
             self.editor_widgets["icon_entry"] = tk.Entry(
                 row_frame,
                 textvariable=self.editor_widgets["icon_var"],
-                font=("Segoe UI", 12),
+                font=get_tk_font(12),
                 width=5,
                 bg=self.colors.input_bg,
                 fg=self.colors.fg,
@@ -312,7 +313,7 @@ class ActionsTabMixin:
             tk.Label(
                 row_frame,
                 text="(paste emoji here — Ctrl+V)",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors.bg,
                 fg=self.colors.surface2,
             ).pack(side="left", padx=(4, 0))
@@ -352,7 +353,7 @@ class ActionsTabMixin:
             tk.Label(
                 self.prompt_type_frame,
                 text="Type:",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=12,
                 anchor="w",
                 bg=self.colors.bg,
@@ -385,9 +386,9 @@ class ActionsTabMixin:
             )
             self.editor_widgets["system_prompt"].pack(fill="x", pady=(8, 0))
         else:
-            tk.Label(
-                row_frame, text="System Prompt:", font=("Segoe UI", 10), bg=self.colors.bg, fg=self.colors.fg
-            ).pack(anchor="w")
+            tk.Label(row_frame, text="System Prompt:", font=get_tk_font(10), bg=self.colors.bg, fg=self.colors.fg).pack(
+                anchor="w"
+            )
             self.editor_widgets["system_prompt"] = tk.Text(
                 row_frame, font=("Consolas", 10), height=6, bg=self.colors.input_bg, fg=self.colors.fg, wrap="word"
             )
@@ -423,7 +424,7 @@ class ActionsTabMixin:
             tk.Label(
                 row_frame,
                 text="Task:",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=12,
                 anchor="w",
                 bg=self.colors.bg,
@@ -433,7 +434,7 @@ class ActionsTabMixin:
             self.editor_widgets["task"] = tk.Entry(
                 row_frame,
                 textvariable=self.editor_widgets["task_var"],
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.input_bg,
                 fg=self.colors.fg,
             )
@@ -462,7 +463,7 @@ class ActionsTabMixin:
                 self.show_chat_frame,
                 text="Show response in chat window instead of typing/replacing text",
                 variable=self.editor_widgets["show_chat_var"],
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 selectcolor=self.colors.input_bg,
@@ -492,7 +493,7 @@ class ActionsTabMixin:
                 self.compare_prompts_frame,
                 text="Compare mode",
                 variable=self.editor_widgets["compare_prompts_var"],
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
                 selectcolor=self.colors.input_bg,
@@ -523,7 +524,7 @@ class ActionsTabMixin:
             tk.Label(
                 self.profile_frame,
                 text="Connection Profile:",
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=12,
                 anchor="w",
                 bg=self.colors.bg,
@@ -574,7 +575,7 @@ class ActionsTabMixin:
             tk.Button(
                 self.profile_frame,
                 text="Manage...",
-                font=("Segoe UI", 9),
+                font=get_tk_font(9),
                 bg=self.colors.surface1,
                 fg=self.colors.fg,
                 command=self._open_profile_manager,
@@ -605,7 +606,7 @@ class ActionsTabMixin:
             )
         else:
             self.editor_widgets["save_status"] = tk.Label(
-                btn_frame, text="", font=("Segoe UI", 9), bg=self.colors.bg, fg=self.colors.accent_green
+                btn_frame, text="", font=get_tk_font(9), bg=self.colors.bg, fg=self.colors.accent_green
             )
         self.editor_widgets["save_status"].pack(side="left", padx=15)
 

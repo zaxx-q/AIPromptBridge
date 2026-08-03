@@ -20,7 +20,7 @@ from tkinter import simpledialog
 
 from ...custom_widgets import ScrollableButtonList, create_emoji_button, create_section_header
 from ...platform import HAVE_CTK, ctk
-from ...themes import get_ctk_entry_colors, get_ctk_font, get_ctk_label_colors
+from ...themes import get_ctk_entry_colors, get_ctk_font, get_ctk_label_colors, get_tk_font
 
 
 class KeysTabMixin:
@@ -111,7 +111,7 @@ class KeysTabMixin:
             self._keys_header_label = tk.Label(
                 header_row,
                 textvariable=self._keys_header_var,
-                font=("Segoe UI", 11, "bold"),
+                font=get_tk_font(11, "bold"),
                 bg=self.colors.bg,
                 fg=self.colors.fg,
             )
@@ -197,7 +197,7 @@ class KeysTabMixin:
             name_entry = tk.Entry(
                 input_frame,
                 textvariable=name_var,
-                font=("Segoe UI", 10),
+                font=get_tk_font(10),
                 width=14,
                 bg=self.colors.input_bg,
                 fg=self.colors.fg,

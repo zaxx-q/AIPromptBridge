@@ -262,6 +262,45 @@ def copy_bytes(data: bytes, mime: str, *, primary: bool = False) -> bool:
         return False
 
 
+def copy_rich_text(html: str, plain: str, *, primary: bool = False) -> bool:
+    """Copy HTML for rich-text Wayland paste targets.
+
+    ``wl-copy`` can advertise only one payload; repeated ``--type`` options
+    would serve the *same* bytes for every MIME type.  Therefore it cannot
+    provide distinct ``text/html`` and ``text/plain`` payloads like a native
+    Wayland data source can.  This helper intentionally publishes ``text/html``
+    so browsers, mail composers, and office suites retain formatting.  The
+    ``plain`` argument documents the paired fallback supplied by callers and
+    keeps the API ready for a future native multi-MIME data source; callers use
+    it themselves when this function returns ``False``.
+
+    Plain-text-only targets should use the application's Markdown/plain copy
+    actions.  Returns ``False`` on failure, non-Linux systems, or when
+    ``wl-clipboard`` is unavailable.
+    """
+    del plain  # wl-copy cannot serve a distinct text/plain payload.
+
+    if not is_linux() or not html:
+        return False
+    if not is_wl_clipboard_available():
+        return False
+    try:
+        args = _wl_args([_wl_copy_path or "wl-copy"], primary=primary, mime="text/html")
+        result = _run_copy(args, input_data=html.encode("utf-8"), timeout=_DEFAULT_TIMEOUT)
+        if result.returncode != 0:
+            logger.debug("wl-copy (text/html) failed (rc=%s)", result.returncode)
+            return False
+        return True
+    except subprocess.TimeoutExpired:
+        logger.warning("wl-copy (text/html) timed out after %ss", _DEFAULT_TIMEOUT)
+        return False
+    except FileNotFoundError:
+        return False
+    except Exception as e:
+        logger.debug("copy_rich_text failed: %s", e)
+        return False
+
+
 def get_selected_text_wayland(*, include_clipboard: bool = True) -> str:
     """
     Read currently selected text on Wayland.

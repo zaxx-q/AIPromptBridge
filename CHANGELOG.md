@@ -1,5 +1,30 @@
 # Changelog
 
+## [Unreleased] - Linux Wayland Support
+
+### Added
+
+- **Linux Wayland support** — full platform layer for wlroots compositors (niri, Sway, Hyprland)
+- **IPC trigger system** — fast `--trigger` client for compositor keybindings (~40ms latency)
+- **Wayland clipboard** — `wl-clipboard` integration with primary selection, hybrid Ctrl+C capture, and rich HTML copy
+- **Virtual keyboard** — `wlrctl` text typing, paste, and key chord injection
+- **Screen capture** — `grim` + `slurp` region snipping for SnipTool
+- **System audio recording** — PipeWire/Pulse monitor sources via `pactl` + `ffmpeg`
+- **StatusNotifier tray** — D-Bus `org.kde.StatusNotifierItem` (jeepney) with pystray fallback
+- **XDG autostart** — `.desktop` entry for Launch at Login on Linux
+- **Sound feedback** — `paplay` / `pw-play` / `ffplay` for notification sounds
+- **Cross-platform console input** — `termios` cbreak single-key polling (replaces Windows `msvcrt`)
+- **CustomTkinter bootstrap** — automatic `circle_shapes` fallback + font installation for no-xft Tk
+- **Linux self-update** — in-place `bin/` swap + `os.execv` relaunch for compiled installs
+- **Nuitka Linux packaging** — GitHub Actions workflow for x86_64 tarball releases
+
+### Changed
+
+- Platform-abstracted all OS I/O into `src/platform/` (clipboard, input, screenshot, IPC, console)
+- Audio backend dispatch: PyAudioWPatch on Windows, stock PyAudio on Linux
+- Tray: `infi.systray` on Windows, StatusNotifier/pystray on Linux
+- Font resolution: `get_tk_font()` / `get_ctk_font()` with per-platform family detection
+
 ## [7.2.0] - 2026-06-23
 
 ### New Features

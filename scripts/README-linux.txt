@@ -47,8 +47,8 @@ need a newer glibc or a source install instead.
 
 Self-update
 -----------
-  Compiled Linux builds currently notify when a new release exists;
-  download and extract the new tarball manually. Windows compiled
-  builds support in-place self-update.
+  Compiled Linux builds support in-place self-update: download, extract,
+  swap bin/ and root files, then relaunch. Source installs are
+  notification-only.
 
 More detail: docs/LINUX.md in the source repository.
