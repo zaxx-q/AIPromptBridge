@@ -79,11 +79,6 @@ install -m 755 "${ROOT}/scripts/linux_launcher.sh" "${STAGE}/AIPromptBridge"
 install -m 755 "${ROOT}/scripts/aipb_trigger.py" "${STAGE}/aipb_trigger.py"
 install -m 644 "${ROOT}/scripts/README-linux.txt" "${STAGE}/README-linux.txt"
 
-# Optional icon at root for convenience
-if [[ -f "${ROOT}/icon.ico" ]]; then
-  cp -f "${ROOT}/icon.ico" "${STAGE}/icon.ico" || true
-fi
-
 TARBALL="${OUT_DIR}/${STAGE_NAME}.tar.gz"
 echo "→ Creating ${TARBALL}"
 tar -C "${OUT_DIR}" -czf "${TARBALL}" "${STAGE_NAME}"

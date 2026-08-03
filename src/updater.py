@@ -693,7 +693,6 @@ _LINUX_ROOT_UPDATE_FILES = [
     "AIPromptBridge",  # outer shell launcher
     "aipb_trigger.py",  # fast IPC client
     "README-linux.txt",  # readme
-    "icon.ico",  # icon (if present)
 ]
 
 

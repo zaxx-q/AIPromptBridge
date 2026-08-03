@@ -481,7 +481,9 @@ class TrayApp:
             if not icon_path.exists():
                 # Fallback: try current directory/assets (for fallback)
                 cwd = Path.cwd()
-                if (cwd / "icon.ico").exists():
+                if (cwd / "bin" / "icon.ico").exists():
+                    icon_path = cwd / "bin" / "icon.ico"
+                elif (cwd / "icon.ico").exists():
                     icon_path = cwd / "icon.ico"
                 else:
                     icon_path = Path("icon.ico")

@@ -58,7 +58,12 @@ def get_project_root() -> Path:
         if exe_path.parent.name.lower() == "bin":
             return exe_path.parent.parent
         cwd = Path.cwd()
-        if (cwd / "config.ini").is_file() or (cwd / "icon.ico").is_file() or (cwd / "main.py").is_file():
+        if (
+            (cwd / "config.ini").is_file()
+            or (cwd / "bin" / "icon.ico").is_file()
+            or (cwd / "icon.ico").is_file()
+            or (cwd / "main.py").is_file()
+        ):
             return cwd.resolve()
         return exe_path.parent
 
@@ -372,7 +377,9 @@ def _build_desktop_entry() -> Tuple[Optional[str], Optional[str]]:
         "X-GNOME-Autostart-enabled=true",
     ]
 
-    icon = root / "icon.ico"
+    icon = root / "bin" / "icon.ico"
+    if not icon.is_file():
+        icon = root / "icon.ico"
     if icon.is_file():
         lines.append(f"Icon={icon.resolve()}")
 
