@@ -6,6 +6,80 @@ Utility functions for text processing and error detection
 import os
 import re
 import sys
+from pathlib import Path
+from typing import Optional, Union
+
+
+def normalize_path_str(path_input: Union[str, Path, None]) -> Optional[str]:
+    """
+    Normalize a path representation to a POSIX-style string (forward slashes).
+    Returns None if input is None, empty string if input is empty string.
+    Useful for consistent JSON serialization across Windows and POSIX.
+    """
+    if path_input is None:
+        return None
+    if isinstance(path_input, Path):
+        return path_input.as_posix()
+    return str(path_input).replace("\\", "/")
+
+
+def resolve_file_path(file_path: Union[str, Path, None], anchor_dir: Optional[str] = None) -> Path:
+    """
+    Resolve a file path robustly across operating systems and path styles.
+
+    Handles:
+    - Backslashes vs forward slashes (e.g. Windows paths loaded on Linux)
+    - Absolute paths from other machines containing an anchor folder (e.g. 'session_attachments')
+    - String paths and Path objects
+    - Path traversal protection (ensures resolved path stays within workspace CWD)
+
+    Args:
+        file_path: Relative or absolute path to resolve
+        anchor_dir: Optional directory name to slice relative paths from (e.g. 'session_attachments')
+
+    Returns:
+        Resolved Path object
+    """
+    if not file_path:
+        return Path("")
+
+    raw_str = str(file_path)
+    path = Path(raw_str)
+
+    def is_safe(target_path: Path) -> bool:
+        """Verify that resolved target path stays within current working directory."""
+        try:
+            cwd = Path.cwd().resolve()
+            resolved = target_path.resolve()
+            return cwd in resolved.parents or resolved == cwd
+        except Exception:
+            return False
+
+    # 1. Direct check
+    if path.exists() and is_safe(path):
+        return path
+
+    # 2. Convert backslashes to forward slashes
+    norm_str = raw_str.replace("\\", "/")
+    norm_path = Path(norm_str)
+    if norm_path.exists() and is_safe(norm_path):
+        return norm_path
+
+    # 3. Check for anchor directory (e.g. cross-machine absolute paths)
+    anchors = [anchor_dir] if anchor_dir else ["session_attachments"]
+    for anchor in anchors:
+        if anchor:
+            anchor_prefix = f"{anchor.rstrip('/')}/"
+            # Search from the right (rfind) to use the last occurrence if duplicated
+            idx = norm_str.rfind(anchor_prefix)
+            if idx != -1:
+                rel_str = norm_str[idx:]
+                rel_path = Path(rel_str)
+                if rel_path.exists() and is_safe(rel_path) and anchor in rel_path.resolve().parts:
+                    return rel_path
+
+    # Fallback to normalized Path
+    return norm_path
 
 
 def is_compiled() -> bool:

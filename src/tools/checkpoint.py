@@ -16,6 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.utils import normalize_path_str
+
 
 @dataclass
 class FileProcessorCheckpoint:
@@ -135,8 +137,25 @@ class FileProcessorCheckpoint:
         """Create from dictionary (filters out unknown arguments for compatibility)"""
         import inspect
 
+        data_copy = dict(data)
+        if data_copy.get("input_path") is not None:
+            data_copy["input_path"] = normalize_path_str(data_copy["input_path"])
+        if data_copy.get("output_path") is not None:
+            data_copy["output_path"] = normalize_path_str(data_copy["output_path"])
+        if "input_files" in data_copy and isinstance(data_copy["input_files"], list):
+            data_copy["input_files"] = [normalize_path_str(f) for f in data_copy["input_files"]]
+        if "completed_files" in data_copy and isinstance(data_copy["completed_files"], list):
+            data_copy["completed_files"] = [normalize_path_str(f) for f in data_copy["completed_files"]]
+        if "failed_files" in data_copy and isinstance(data_copy["failed_files"], list):
+            data_copy["failed_files"] = [
+                {"path": normalize_path_str(item["path"]), **{k: v for k, v in item.items() if k != "path"}}
+                if isinstance(item, dict) and "path" in item
+                else item
+                for item in data_copy["failed_files"]
+            ]
+
         sig = inspect.signature(cls)
-        valid_args = {k: v for k, v in data.items() if k in sig.parameters}
+        valid_args = {k: v for k, v in data_copy.items() if k in sig.parameters}
         return cls(**valid_args)
 
     def get_summary(self) -> Dict[str, Any]:
@@ -624,8 +643,14 @@ class TTSCheckpoint:
     def from_dict(cls, data: Dict[str, Any]) -> "TTSCheckpoint":
         import inspect
 
+        data_copy = dict(data)
+        if data_copy.get("input_path") is not None:
+            data_copy["input_path"] = normalize_path_str(data_copy["input_path"])
+        if data_copy.get("output_path") is not None:
+            data_copy["output_path"] = normalize_path_str(data_copy["output_path"])
+
         sig = inspect.signature(cls)
-        valid_args = {k: v for k, v in data.items() if k in sig.parameters}
+        valid_args = {k: v for k, v in data_copy.items() if k in sig.parameters}
         return cls(**valid_args)
 
     def get_summary(self) -> Dict[str, Any]:

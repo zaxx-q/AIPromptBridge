@@ -2538,12 +2538,16 @@ class ChatWindowBase(ABC):
         """Toggle audio playback - play if stopped, stop if playing."""
         import os
 
-        if not os.path.exists(file_path):
+        from ...attachment_manager import AttachmentManager
+
+        resolved_path = str(AttachmentManager.resolve_path(file_path))
+
+        if not os.path.exists(resolved_path):
             self._update_status("Audio file not found")
             return
 
         # Check if this file is currently playing
-        if self._audio_playing_path == file_path:
+        if self._audio_playing_path in (file_path, resolved_path):
             # Stop playback
             self._stop_audio()
             return
@@ -2560,26 +2564,26 @@ class ChatWindowBase(ABC):
                 self._audio_recorder = AudioRecorder()
 
             # Read the audio file
-            with open(file_path, "rb") as f:
+            with open(resolved_path, "rb") as f:
                 audio_data = f.read()
 
             self._audio_recorder.play(audio_data)
-            self._audio_playing_path = file_path
+            self._audio_playing_path = resolved_path
 
-            # Update button to show stop icon
-            btn = self._audio_play_buttons.get(file_path)
+            # Update button to show stop icon (check both original and resolved path)
+            btn = self._audio_play_buttons.get(file_path) or self._audio_play_buttons.get(resolved_path)
             if btn:
                 if HAVE_CTK:
                     btn.configure(text="■", fg_color=self.theme.accent_red)
                 else:
                     btn.configure(text="■", bg=self.colors.get("accent_red", "#f38ba8"))
 
-            self._update_status(f"Playing: {os.path.basename(file_path)}")
+            self._update_status(f"Playing: {os.path.basename(resolved_path)}")
 
         except Exception as e:
             print(f"[ChatWindow] AudioRecorder playback failed: {e}")
             # Fallback to system player
-            self._open_file_external(file_path)
+            self._open_file_external(resolved_path)
 
     def _stop_audio(self):
         """Stop current audio playback and reset button state."""
@@ -2603,27 +2607,37 @@ class ChatWindowBase(ABC):
         self._update_status("Playback stopped")
         self._audio_playing_path = None
 
-    def _open_file_external(self, file_path: str):
-        """Open file in system default application."""
+    def _resolve_and_open_external(self, file_path: str, status_label: str = "File") -> bool:
+        """Resolve attachment path and open in system default application."""
         import os
         import subprocess
         import sys
 
-        if not os.path.exists(file_path):
-            self._update_status("File not found")
-            return
+        from ...attachment_manager import AttachmentManager
+
+        resolved_path = str(AttachmentManager.resolve_path(file_path))
+
+        if not os.path.exists(resolved_path):
+            self._update_status(f"{status_label} not found")
+            return False
 
         try:
             if sys.platform == "win32":
-                os.startfile(file_path)
+                os.startfile(resolved_path)
             elif sys.platform == "darwin":
-                subprocess.run(["open", file_path])
+                subprocess.run(["open", resolved_path], check=False)
             else:
-                subprocess.run(["xdg-open", file_path])
-            self._update_status(f"Opened: {os.path.basename(file_path)}")
+                subprocess.run(["xdg-open", resolved_path], check=False)
+            self._update_status(f"Opened: {os.path.basename(resolved_path)}")
+            return True
         except Exception as e:
-            print(f"[ChatWindow] Failed to open file: {e}")
-            self._update_status("Failed to open file")
+            print(f"[ChatWindow] Failed to open {file_path}: {e}")
+            self._update_status(f"Failed to open {status_label.lower()}")
+            return False
+
+    def _open_file_external(self, file_path: str):
+        """Open file in system default application."""
+        self._resolve_and_open_external(file_path, status_label="File")
 
     def _on_image_left_click(self, event, file_path: str):
         """Show enlarged image in a modal window on left click."""
@@ -2708,25 +2722,7 @@ class ChatWindowBase(ABC):
 
     def _on_image_right_click(self, event, file_path: str):
         """Open image in system default viewer on right click."""
-        import os
-        import subprocess
-        import sys
-
-        if not os.path.exists(file_path):
-            self._update_status("Image file not found")
-            return
-
-        try:
-            if sys.platform == "win32":
-                os.startfile(file_path)
-            elif sys.platform == "darwin":
-                subprocess.run(["open", file_path])
-            else:
-                subprocess.run(["xdg-open", file_path])
-            self._update_status("Opened in external viewer")
-        except Exception as e:
-            print(f"[ChatWindow] Failed to open image: {e}")
-            self._update_status("Failed to open image")
+        self._resolve_and_open_external(file_path, status_label="Image file")
 
     def _update_attachments_display(self):
         """Update the attachments preview frame."""

@@ -15,6 +15,7 @@
 
 - **Linux Dropdown & Menu Behavior**: Fixed mousewheel scrolling in dropdown combo boxes and ensured popup menus (such as split button menus and message context menus) dismiss properly when clicking outside of them on Linux.
 - **Linux Terminal Output on Restart**: Fixed restarting the compiled Linux application from the system tray to ensure console output remains attached to the terminal emulator instead of detaching into a new background session.
+- **Cross-Platform Paths**: Fixed an issue where chat attachments (such as images and audio clips) could fail to open, play back, or load when sharing or transferring sessions between Windows and Linux due to platform path differences.
 
 ## [8.0.0] - Linux Wayland Support
 

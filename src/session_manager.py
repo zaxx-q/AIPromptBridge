@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import SESSIONS_FILE
+from .utils import normalize_path_str
 
 # Global session storage
 CHAT_SESSIONS = OrderedDict()
@@ -64,6 +65,9 @@ class ChatSession:
         """
         message = {"role": role, "content": content, "timestamp": datetime.now().isoformat()}
         if attachments:
+            for attach in attachments:
+                if isinstance(attach, dict) and "path" in attach:
+                    attach["path"] = normalize_path_str(attach["path"])
             message["attachments"] = attachments
         if gemini_parts:
             message["gemini_parts"] = gemini_parts
@@ -191,6 +195,12 @@ class ChatSession:
         session.updated_at = data.get("updated_at", session.created_at)
         session.title = data.get("title")
         session.messages = data.get("messages", [])
+        # Normalize attachment paths for cross-platform compatibility
+        for msg in session.messages:
+            if isinstance(msg, dict) and "attachments" in msg:
+                for attach in msg.get("attachments", []):
+                    if isinstance(attach, dict) and "path" in attach:
+                        attach["path"] = normalize_path_str(attach["path"])
         session.model_override = data.get("model_override", None)
         session.profile_override = data.get("profile_override", None)
         session.manual_mode = data.get("manual_mode", False)

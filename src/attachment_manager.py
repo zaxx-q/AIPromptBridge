@@ -27,7 +27,9 @@ import shutil
 import threading
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import ClassVar, Dict, List, Optional, Set, Tuple, Union
+
+from .utils import normalize_path_str, resolve_file_path
 
 # Optional PIL import for image processing
 try:
@@ -53,8 +55,6 @@ class AttachmentManager:
     All methods are class methods for easy access without instantiation.
     Thread-safe for concurrent access from multiple windows/threads.
     """
-
-    from typing import ClassVar, Dict, Set, Tuple
 
     # Supported image formats with their MIME types
     FORMAT_MIME_MAP: ClassVar[Dict[str, str]] = {
@@ -137,6 +137,15 @@ class AttachmentManager:
         except Exception as e:
             logging.debug(f"[AttachmentManager] Config load failed: {e}, using defaults")
             return cls.DEFAULT_FORMAT, cls.DEFAULT_QUALITY
+
+    @classmethod
+    def resolve_path(cls, file_path: Union[str, Path]) -> Path:
+        """
+        Resolve an attachment file path robustly across platforms and path styles.
+
+        Delegates to `src.utils.resolve_file_path` with ATTACHMENTS_DIR anchor.
+        """
+        return resolve_file_path(file_path, anchor_dir=ATTACHMENTS_DIR)
 
     @classmethod
     def _get_session_dir(cls, session_id: int) -> Path:
@@ -235,7 +244,7 @@ class AttachmentManager:
                     else:
                         img.save(file_path)
 
-            relative_path = str(file_path)
+            relative_path = file_path.as_posix()
             logging.debug(f"[AttachmentManager] Saved image: {relative_path}")
             return relative_path
 
@@ -289,7 +298,7 @@ class AttachmentManager:
                 with open(file_path, "wb") as f:
                     f.write(audio_data)
 
-            relative_path = str(file_path)
+            relative_path = file_path.as_posix()
             logging.debug(f"[AttachmentManager] Saved audio: {relative_path}")
             return relative_path
 
@@ -622,3 +631,8 @@ def load_session_image(file_path: str) -> Tuple[str, str]:
 def delete_session_attachments(session_id: int) -> bool:
     """Delete all attachments for a session."""
     return AttachmentManager.delete_session_attachments(session_id)
+
+
+def resolve_attachment_path(file_path: Union[str, Path]) -> Path:
+    """Resolve attachment path robustly across platforms."""
+    return AttachmentManager.resolve_path(file_path)
