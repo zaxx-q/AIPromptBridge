@@ -77,6 +77,7 @@ class OnboardingWizard:
         "Refine",
         "Translate to English",
         "Answer",
+        "Humanize",
     }
     WIZARD_MINIMAL_SNIP: ClassVar[set[str]] = {
         "Quick Extract",
