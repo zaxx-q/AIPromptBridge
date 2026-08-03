@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - Linux Wayland Support
+## [8.0.0] - Linux Wayland Support
 
 ### Added
 
@@ -24,6 +24,8 @@
 - Audio backend dispatch: PyAudioWPatch on Windows, stock PyAudio on Linux
 - Tray: `infi.systray` on Windows, StatusNotifier/pystray on Linux
 - Font resolution: `get_tk_font()` / `get_ctk_font()` with per-platform family detection
+
+Other desktop environments (GNOME, KDE, XFCE, Cinnamon, MATE, LXQt) are yet to be tested and likely won't work. If you encounter any issues, please open an issue.
 
 ## [7.2.0] - 2026-06-23
 

@@ -23,6 +23,12 @@ from .hotkey import HotkeyListener
 from .prompts import get_prompts_config
 from .text_handler import TextHandler
 
+# Minimum characters to buffer before typing during streaming.
+# Linux uses a larger buffer to reduce wlrctl subprocess overhead
+# (each buffer flush spawns a subprocess). Windows types per-character
+# via pynput so a smaller buffer is fine.
+_STREAM_BUFFER_CHARS = 80 if is_linux() else 20
+
 
 class TextEditToolApp:
     """
@@ -625,18 +631,24 @@ class TextEditToolApp:
         """
         if is_linux():
             try:
-                # delay_ms is approximate on Linux (applied between wlrctl chunks).
-                # Abort is honored between internal type units (chunks / newlines).
-                return platform_type_text(
+                # delay_ms handles inter-chunk delay within a single type_text() call.
+                # For streaming, each call typically has just one chunk (~80 chars),
+                # so we also add a proportional post-typing delay to throttle the
+                # rate of wlrctl invocations.
+                ok = platform_type_text(
                     text,
                     delay_ms=int(self.typing_delay_ms or 0),
                     abort_check=lambda: self.streaming_aborted,
                 )
+                if ok and (self.typing_delay_ms or 0) > 0 and not self.streaming_aborted:
+                    # Proportional delay: (characters typed) × (ms per character)
+                    # This mirrors Windows per-character delay behavior.
+                    delay_s = (len(text) * float(self.typing_delay_ms)) / 1000.0
+                    time.sleep(delay_s)
+                return ok
             except Exception as e:
                 logging.error(f"Error typing text chunk (Linux/wlrctl): {e}")
                 return False
-
-        import time
 
         from pynput import keyboard as pykeyboard
 
@@ -978,7 +990,7 @@ class TextEditToolApp:
                     # Buffer to accumulate chunks before typing (helps with Unicode)
                     chunk_buffer = []
                     buffer_size = 0
-                    MIN_BUFFER_CHARS = 20  # Accumulate at least 20 chars before typing
+                    MIN_BUFFER_CHARS = _STREAM_BUFFER_CHARS
                     typing_aborted = False
 
                     def type_chunk(chunk):

@@ -27,6 +27,7 @@ AIPromptBridge — Windows-first Python desktop app (Linux Wayland / niri suppor
 ## Critical Architectural Constraints & Gotchas
 
 ### 1. GUI Threading & Dual-UI System (CRITICAL)
+
 - **Central Authority**: All GUI modules MUST import `ctk`, `CTkImage`, `HAVE_CTK` from `src/gui/platform.py`.
 - **Linux CTk bootstrap**: `configure_ctk_rendering()` in `src/gui/ctk_bootstrap.py` runs on CTk import (best-effort) and again from `GUICoordinator` with the live root. Do not set `DrawEngine.preferred_drawing_method` ad hoc in individual windows.
 - **Single Root**: Managed by `GUICoordinator` in `src/gui/core.py` (main thread only). **DO NOT create new `ctk.CTk()` or `tk.Tk()` instances**.
@@ -42,6 +43,7 @@ AIPromptBridge — Windows-first Python desktop app (Linux Wayland / niri suppor
 ### 2. Provider System (MANDATORY)
 
 All API calls MUST flow through `src/providers/` — resolve/instantiate providers via `create_provider()` in `src/providers/registry.py`, not direct subclass initialization:
+
 - `GeminiNativeProvider`: Native Gemini API (pure generation pipeline). Large file uploads and other side operations are delegated to `gemini_services.py`.
 - `AnthropicProvider`: Native Anthropic Claude Messages API (streaming, adaptive thinking configuration).
 - `OpenAICompatibleProvider`: Multi-tenant handler for OpenAI, OpenRouter, xAI (Grok), Mistral, Cohere, and Custom OpenAI-compatible endpoints.
@@ -52,6 +54,7 @@ All API calls MUST flow through `src/providers/` — resolve/instantiate provide
 ### 3. Request Pipeline (OBSERVABILITY)
 
 Always use `RequestPipeline` from `src/request_pipeline.py` for API calls:
+
 - Consistent logging and token tracking
 - Origin tracking (CHAT_WINDOW, POPUP_INPUT, SNIP_TOOL, AUDIO_TOOL, TTS_TOOL, ENDPOINT, etc.)
 - Automatic token usage logging to console
@@ -59,11 +62,13 @@ Always use `RequestPipeline` from `src/request_pipeline.py` for API calls:
 ### 4. Message Factory (Centralized Payloads)
 
 All multimodal API message construction MUST use `src/messages.py`:
+
 - **Factory**: Methods like `build_text_message`, `build_audio_message` (`inline_data`), `build_image_message` (`image_url`), `build_file_message` (Files API).
 - **Compatibility**: Standardized formats (`inline_data` for audio/small files) that providers adapt.
 - **Usage**: GUI tools (`AudioTool`, `SnipTool`) and CLI tools (`FileProcessor`) delegate here instead of manual dict construction.
 
 ### 5. Audio Subsystem (Queue-Based Stream)
+
 - Import via `src/audio/backend.py`: **PyAudioWPatch** (Windows WASAPI loopback) / stock **PyAudio** (Linux mics).
 - Linux **system audio**: `src/audio/pulse_monitors.py` (`pactl`) + `ffmpeg -f pulse` in `AudioRecorder` (PortAudio often lacks Pulse host API / `*.monitor` names).
 - `AudioRecorder` **Unified Stream**: open once for level meter; record via flag + `Queue` (don't stop stream at boundaries).
@@ -71,6 +76,7 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **Export**: `src/audio/export.py` for all saved audio (Opus/MP3/AAC, metadata, safe names).
 
 ### 6. Session Management & Origin Tracking
+
 - Sessions do NOT store provider info (read dynamically for hot-switching).
 - **Per-Session Model Override**: `session.model_override` — each chat window selects model independently. `None` = global config model. Chat dropdown shows `"(Use Global: <model>)"` sentinel, updates via `subscribe_config_change()`.
 - **Origin Field**: Sessions track creation source (e.g., `textedit:Explain`, `snip:Extract Text`).
@@ -78,6 +84,7 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **Attachment Storage**: Media NOT stored as base64 in session JSON. Stored externally via `AttachmentManager` in `session_attachments/`.
 
 ### 7. API Key Management & Rotation
+
 - **KeyStore** (`src/key_store.py`): Singleton, pool-based storage in `keys.json`. Keys XOR-obfuscated at rest. All key access MUST go through `KeyStore.get_instance()`, never direct file reads.
 - Keys grouped into named **pools** (`google`, `anthropic`, `openai`, `openrouter`, `xai`, `mistral`, `cohere`, `custom` built-in). Providers map to pools via `provider_pool_map`; users create custom pools and reassign dynamically.
 - **Migration**: First launch without `keys.json` → auto-migrate from `config.ini` + env vars. After that, `config.ini` key sections ignored.
@@ -85,11 +92,13 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **KeyManager** (`src/key_manager.py`): Built by `KeyStore.build_key_managers()`. 429/401/403 → immediate key rotation; 5xx/empty → delay + retry same key.
 
 ### 8. Streaming & Keyboard Injection
+
 - **Windows**: pynput / SendInput; streaming type uses ~20-char buffer (`MIN_BUFFER_CHARS`) + small per-char delay.
-- **Linux**: `src/platform/input.py` (`wlrctl`) for type/paste; chunked type (no per-char subprocess spam). Selection: primary first, hybrid Ctrl+C via wlrctl if empty (`clipboard.py`).
+- **Linux**: `src/platform/input.py` (`wlrctl`) for type/paste; chunked type with ~80-char buffer (`_STREAM_BUFFER_CHARS`) + proportional delay. Typing speed cap applied after each wlrctl invocation proportional to chunk length. Selection: primary first, hybrid Ctrl+C via wlrctl if empty (`clipboard.py`).
 - **Typing Indicator**: `TypingIndicator` tooltip during streaming with abort hotkey.
 
 ### 9. Specific Provider Quirks
+
 - **Gemini Safety**: Use `BLOCK_NONE` threshold, not `OFF`.
 - **Thinking Config**: Dynamic per provider:
   - OpenAI-compatible: `reasoning_effort` (low/medium/high)
@@ -98,6 +107,7 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **Large Files (>15MB)**: Gemini Native auto-routes through Google **Files API** (`upload_file`) instead of inline Base64.
 
 ### 10. Tool Architectures
+
 - **TextEditTool**: Dual input (Edit/Ask), Compare Mode, ModifierBar. Linux invoke: `--trigger textedit` (no pynput hotkeys).
 - **SnipTool**: Windows `ScreenSnipOverlay`+ImageGrab; Linux `grim`/`slurp` → same `CaptureResult` → `SnipPopup` → API.
 - **AudioTool**: Controller + `AudioAnalyzerWindow` (mic / loopback-or-monitor).
@@ -106,6 +116,7 @@ All multimodal API message construction MUST use `src/messages.py`:
 ### 11. Batch Tools System (Sync/Async)
 
 `src/tools/` handles batch processing:
+
 - **Audio**: `ffmpeg` for optimization (Mono/16kHz) and chunking. FFmpeg binary detection centralized in `src/audio/ffmpeg_utils.py` (cached `shutil.which`). Import `is_ffmpeg_available()` from there or `src/audio`.
 - **Batch API**: `GeminiNativeProvider` supports `create_batch()` for async large jobs.
 - **Checkpoints**: `CheckpointManager` saves progress. **Failure Checkpoints** (`create_failed_checkpoint`) retry only failed files.
@@ -113,6 +124,7 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **Debug Tool**: `python -m src.tools` for interactive file processing without full server.
 
 ### 12. Configuration & Hot-Reloading
+
 - **config.ini**: Custom INI parser in `src/config.py` (multiline values, inline comments).
   - `SettingsWindow` edits `config.ini`;
   - **Change Notification**: `subscribe_config_change(cb)` / `notify_config_change(key, value)` — thread-safe pub/sub fired by `save_config_value()` and `SettingsWindow` bulk save. Listeners must marshal to GUI thread themselves.
@@ -124,9 +136,11 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **Config Preservation (prompts.json)**: Default actions carry `_is_default: true`. On load, `_ensure_sections()` deep-merges new defaults without overwriting user-modified actions (`_is_default: false`). Deleted defaults tracked in `_settings.deleted_defaults` to prevent re-insertion. String settings use `_settings.modified_settings` to protect user overrides. `popup_groups` deep-merged with `deleted_groups`/`deleted_group_items` exclusion lists.
 
 ### 13. LaTeX Rendering
-- No heavy math libraries. `src/gui/latex_renderer.py` converts LaTeX strings to standard Unicode (e.g., `\alpha` → `α`) *before* markdown parsing.
+
+- No heavy math libraries. `src/gui/latex_renderer.py` converts LaTeX strings to standard Unicode (e.g., `\alpha` → `α`) _before_ markdown parsing.
 
 ### 14. Emoji Support (Windows Fix)
+
 - Windows Tkinter can't render color emojis in Text widgets natively.
 - **Text Widgets**: Use `insert_with_emojis(text_widget, text, tags)` from `src/gui/emoji_renderer.py`.
 - **CTk Widgets**: Use `prepare_emoji_content(text, size)` — returns kwargs (`text`, `image`, `compound`) for `CTkButton` or `CTkLabel`.
@@ -134,12 +148,14 @@ All multimodal API message construction MUST use `src/messages.py`:
 ### 15. Custom Widgets
 
 `src/gui/custom_widgets.py` provides standardized high-level widgets:
+
 - **Button Factory**: `create_emoji_button(parent, text, icon, colors, variant="primary", ...)` — fully styled button (CTk or Tk). Use for standard action buttons, ensures consistent theming.
 - **Scrollable Lists**: `ScrollableButtonList` replaces native listboxes with rich button-based selection.
 - **Components**: `ScrollableComboBox`, `create_section_header`, `upgrade_tabview_with_icons`.
 - **Dialogs**: Use `ask_themed_string(parent, title, prompt, colors)` or `ThemedInputDialog` instead of `simpledialog.askstring` for UI consistency.
 
 ### 16. Workspace Management (Split Build)
+
 - Split structure (Windows AV-friendly layout; Linux matches the same CWD rules):
   - **Root**: Windows `AIPromptBridge.exe` / `AIPromptBridge-NoConsole.exe` (cx_Freeze); Linux `AIPromptBridge` (shell wrapper in `scripts/linux_launcher.sh`).
   - **Bin**: `bin/AIPromptBridge_Internal[.exe]` (Nuitka standalone).
@@ -148,15 +164,18 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **CI packaging**: `.github/workflows/release.yml` builds Windows zip + Linux tar.gz; Linux freezes with **Xft system Tk** (deadsnakes `python3.13-tk`). Assemble via `scripts/assemble_linux_package.sh`. Details: `docs/BUILD_PROCESS.md`.
 
 ### 17. Console Output
+
 - Do NOT use `print()`. Use `src/console.py`: `print_success()`, `print_error()`, `print_warning()`, `print_info()`, `print_panel()`.
 
 ### 18. Self-Update System
+
 - **Two-phase**: `src/updater.py` downloads & extracts to `_update_staging/`. File replacement handled by launcher (can't overwrite running exe).
 - **Signal**: Console mode exits code **42** for launcher apply. GUI mode spawns `AIPromptBridge.exe --apply-update <PID>`.
 - **Recovery**: `startup_recovery()` runs early in `main()` — rollback or cleanup of interrupted updates (`_bin_old/`, stale manifests).
 - **Source installs**: Notification-only (no auto-apply).
 
 ### 19. Connection Profiles
+
 - **ProfileStore** (`src/connection_profiles.py`): Singleton, thread-safe load/save of `profiles.json`. `ConnectionProfile` dataclass — every field always populated (no sparse fallbacks).
 - **Storage**: Dedicated `profiles.json`. Auto-created with "Default" profile on first load.
 - **Resolution** (`src/profile_resolver.py`): Per-session profile override → Action's `connection_profile` → Active global profile → Hard-coded defaults.
@@ -165,6 +184,7 @@ All multimodal API message construction MUST use `src/messages.py`:
 - **Fields**: `provider`, `model`, `streaming`, `thinking`, `thinking_budget`, `thinking_level`, `reasoning_effort`, `temperature`, `max_tokens`, `request_timeout`, `base_url`, `api_key_name`, `api_key_pool`.
 
 ### 20. Platform layer (Linux / dual-OS)
+
 - Put OS I/O in `src/platform/` (no GUI imports): IPC, clipboard, input, screenshot, single-instance.
 - Windows: keep Win32/pynput/WPatch paths behind `is_windows()`; do not force Linux CLIs on Windows.
 - Linux system tools are **external** (`wl-clipboard`, `wlrctl`, `grim`, `slurp`, …) — detect with `shutil.which`, degrade gracefully. Full guide: `docs/LINUX.md`.

@@ -169,7 +169,7 @@ class ToolsTabMixin:
             "Typing speed cap (ms):",
             self.config_data.config.get("streaming_typing_delay", 0),
             0,
-            100,
+            500,
             hint="Delay per character. 0 = no limit. Useful if apps get overwhelmed by fast input.",
         )
 

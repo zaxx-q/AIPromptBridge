@@ -17,9 +17,13 @@ import logging
 import threading
 from typing import Any, Dict, List, Optional
 
+from ..platform import is_linux
 from .hotkey import HotkeyListener
 from .prompts import PromptsConfig
 from .screen_snip import CaptureResult
+
+# Minimum characters to buffer before typing during streaming (matches text_edit_tool).
+_STREAM_BUFFER_CHARS = 80 if is_linux() else 20
 
 
 class SnipToolApp:
@@ -560,7 +564,7 @@ class SnipToolApp:
             # Buffer to accumulate chunks before typing (helps with Unicode)
             chunk_buffer = []
             buffer_size = 0
-            MIN_BUFFER_CHARS = 20
+            MIN_BUFFER_CHARS = _STREAM_BUFFER_CHARS
             typing_aborted = False
 
             def type_chunk(chunk):
