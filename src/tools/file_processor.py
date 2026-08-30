@@ -11,6 +11,7 @@ Provides:
 - Large file handling (Files API or FFmpeg chunking)
 """
 
+import contextlib
 import sys
 import threading
 import time
@@ -1735,44 +1736,45 @@ class FileProcessor(BaseTool):
             - "SKIP_ALL": User wants to skip all remaining prompts
             - None: User cancelled
         """
-        print(f"\n[{file_index + 1}/{total_files}] About to process: {filepath.name}")
-        print("\n📝 Add instructions for this file?")
-        print("   [Y] Yes, add instructions")
-        print("   [N] No, use batch instructions only")
-        print("   [A] Apply to All remaining - skip this prompt for rest")
-        print("   [Q] Quit and save progress")
+        with self._interactive_prompt():
+            print(f"\n[{file_index + 1}/{total_files}] About to process: {filepath.name}")
+            print("\n📝 Add instructions for this file?")
+            print("   [Y] Yes, add instructions")
+            print("   [N] No, use batch instructions only")
+            print("   [A] Apply to All remaining - skip this prompt for rest")
+            print("   [Q] Quit and save progress")
 
-        try:
-            choice = input("\nChoice [N]: ").strip().lower() or "n"
-        except (EOFError, KeyboardInterrupt):
-            return None
-
-        if choice == "q":
-            return None
-
-        if choice == "a":
-            return "SKIP_ALL"
-
-        if choice == "y":
-            print("\nEnter file-specific instructions (end with empty line):")
-            lines = []
             try:
-                while True:
-                    line = input()
-                    if not line:
-                        break
-                    lines.append(line)
+                choice = input("\nChoice [N]: ").strip().lower() or "n"
             except (EOFError, KeyboardInterrupt):
                 return None
 
-            if lines:
+            if choice == "q":
+                return None
+
+            if choice == "a":
+                return "SKIP_ALL"
+
+            if choice == "y":
+                print("\nEnter file-specific instructions (end with empty line):")
+                lines = []
+                try:
+                    while True:
+                        line = input()
+                        if not line:
+                            break
+                        lines.append(line)
+                except (EOFError, KeyboardInterrupt):
+                    return None
+
                 instructions = "\n".join(lines)
+                if not instructions:
+                    return ""
+
                 print("✅ Instructions saved for this file")
                 return instructions
-            else:
-                return ""
 
-        return ""
+            return ""
 
     def _build_final_prompt(
         self, base_prompt: str, batch_instructions: Optional[str], per_file_instructions: Optional[str]
@@ -2023,14 +2025,20 @@ class FileProcessor(BaseTool):
         if not is_console_input_available():
             return None
 
+        # Stop any existing listener first
+        self._stop_keyboard_listener()
+
         self._keyboard_stop_event = threading.Event()
         self._stop_requested = False  # Track if stop (vs pause) was requested
 
         def keyboard_listener():
             """Listen for keyboard input in background (Windows msvcrt / Linux termios)."""
+            event = self._keyboard_stop_event
+            if event is None:
+                return
             # Hold cbreak for the listener lifetime so Linux keys work without Enter.
             with RawConsole():
-                while not self._keyboard_stop_event.is_set():
+                while not event.is_set():
                     try:
                         key = get_key(timeout=0.05)
                         if key == "p":
@@ -2043,14 +2051,36 @@ class FileProcessor(BaseTool):
                     except Exception:
                         break
 
-        thread = threading.Thread(target=keyboard_listener, daemon=True)
+        thread = threading.Thread(target=keyboard_listener, daemon=True, name="file_keyboard_listener")
+        self._keyboard_thread = thread
         thread.start()
         return thread
 
     def _stop_keyboard_listener(self):
-        """Stop the keyboard listener thread"""
-        if hasattr(self, "_keyboard_stop_event"):
-            self._keyboard_stop_event.set()
+        """Stop the keyboard listener thread and wait for it to release raw mode."""
+        stop_event = getattr(self, "_keyboard_stop_event", None)
+        if stop_event:
+            stop_event.set()
+
+        listener_thread = getattr(self, "_keyboard_thread", None)
+        if listener_thread:
+            if listener_thread.is_alive() and threading.current_thread() != listener_thread:
+                listener_thread.join(timeout=0.3)
+            self._keyboard_thread = None
+        self._keyboard_stop_event = None
+
+    @contextlib.contextmanager
+    def _interactive_prompt(self, interactive: bool = True):
+        """Temporarily suspend keyboard listener during interactive prompts."""
+        stop_event = getattr(self, "_keyboard_stop_event", None)
+        was_listening = stop_event is not None and not stop_event.is_set()
+        if was_listening:
+            self._stop_keyboard_listener()
+        try:
+            yield
+        finally:
+            if was_listening and interactive and is_console_input_available() and not self.is_paused:
+                self._start_keyboard_listener()
 
     def _execute_processing(self, interactive: bool = True) -> ToolResult:
         """
@@ -2623,42 +2653,41 @@ class FileProcessor(BaseTool):
             # Non-interactive: default to Files API
             return LARGE_FILE_MODE_FILES_API
 
-        print(f"\n   Large file detected: {filepath.name}")
-        print("   Options:")
-        print("   [1] Upload via Files API (recommended)")
+        with self._interactive_prompt(interactive):
+            print(f"\n   Large file detected: {filepath.name}")
+            print("   Options:")
+            print("   [1] Upload via Files API (recommended)")
 
-        if is_audio and self.audio_processor.is_available():
-            print("   [2] Split into chunks with FFmpeg (local processing)")
-            print("   [3] Skip this file")
-        else:
-            if is_audio and not self.audio_processor.is_available():
+            audio_chunking_available = is_audio and self.audio_processor.is_available()
+            if audio_chunking_available:
+                print("   [2] Split into chunks with FFmpeg (local processing)")
+                print("   [3] Skip this file")
+            elif is_audio:
                 print("   [2] Skip this file (FFmpeg not available for chunking)")
             else:
                 print("   [2] Skip this file")
 
-        try:
-            choice = input("   Choice [1]: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            return LARGE_FILE_MODE_SKIP
+            try:
+                choice = input("   Choice [1]: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                return LARGE_FILE_MODE_SKIP
 
-        if choice == "2" and is_audio and self.audio_processor.is_available():
-            mode = LARGE_FILE_MODE_CHUNKING
-        elif choice == "2" or choice == "3":
-            mode = LARGE_FILE_MODE_SKIP
-        else:
-            mode = LARGE_FILE_MODE_FILES_API
+            if choice == "2" and audio_chunking_available:
+                mode = LARGE_FILE_MODE_CHUNKING
+            elif choice in ("2", "3"):
+                mode = LARGE_FILE_MODE_SKIP
+            else:
+                mode = LARGE_FILE_MODE_FILES_API
 
-        # Ask about applying to all similar files
-        try:
-            apply_all = input("   Apply to all large files? [y/N]: ").strip().lower()
-            if apply_all == "y":
-                # Cache for all large files
-                self._large_file_mode["_default"] = mode
-        except (EOFError, KeyboardInterrupt):
-            pass
+            try:
+                apply_all = input("   Apply to all large files? [y/N]: ").strip().lower()
+                if apply_all == "y":
+                    self._large_file_mode["_default"] = mode
+            except (EOFError, KeyboardInterrupt):
+                pass
 
-        self._large_file_mode[str(filepath)] = mode
-        return mode
+            self._large_file_mode[str(filepath)] = mode
+            return mode
 
     def _process_file_inline(
         self,

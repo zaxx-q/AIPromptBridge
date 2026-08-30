@@ -646,6 +646,7 @@ class TTSProcessor(BaseTool):
                     result.message = "Stopped by user"
                     return
                 # Paused — wait for user
+                self._stop_keyboard_listener()
                 print("\n⏸️  Paused. Press Enter to resume, 'q' to stop...")
                 try:
                     resume_input = input().strip().lower()
@@ -933,13 +934,21 @@ class TTSProcessor(BaseTool):
                         break
 
         t = threading.Thread(target=_listener, daemon=True, name="tts_keyboard_listener")
+        self._keyboard_thread = t
         t.start()
 
     def _stop_keyboard_listener(self):
-        """Signal the keyboard listener thread to stop."""
-        if self._keyboard_stop_event is not None:
-            self._keyboard_stop_event.set()
-            self._keyboard_stop_event = None
+        """Signal the keyboard listener thread to stop and wait for it to release raw mode."""
+        stop_event = getattr(self, "_keyboard_stop_event", None)
+        if stop_event:
+            stop_event.set()
+
+        listener_thread = getattr(self, "_keyboard_thread", None)
+        if listener_thread:
+            if listener_thread.is_alive() and threading.current_thread() != listener_thread:
+                listener_thread.join(timeout=0.3)
+            self._keyboard_thread = None
+        self._keyboard_stop_event = None
 
     # ── Utilities ─────────────────────────────────────────────────────────────
 
