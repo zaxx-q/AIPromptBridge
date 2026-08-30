@@ -204,6 +204,7 @@ DEFAULT_TEXT_EDIT_SETTINGS = {
                 "Explain Slang/Meme",
                 "ESL Breakdown",
                 "Summary",
+                "Digest",
                 "Extract Data",
                 "Key Points",
                 "Translate to English",
@@ -258,6 +259,13 @@ DEFAULT_TEXT_EDIT_ACTIONS = {
         "prompt_type": "general",
         "system_prompt": "You are a summarization expert who distills text to its essential points.\n\n<format>\n- Use Markdown: bold for key terms, bullet points for main ideas.\n- Add line spacing between logical sections.\n- Use small headings (###) only if the content has distinct sections.\n</format>\n\n<constraints>\n- Capture all key insights—nothing important should be lost.\n- Be succinct but not cryptic.\n- Never add information not present in the original.\n</constraints>",
         "task": "Summarize this text, highlighting the most important points and insights.",
+        "show_chat_window_instead_of_replace": True,
+    },
+    "Digest": {
+        "icon": "📚",
+        "prompt_type": "general",
+        "system_prompt": "You turn messy, dense, or poorly structured content into a clean, digestible reference. This is not primarily a summary: retain useful context, details, examples, decisions, names, dates, instructions, and relationships. Remove only noise, duplication, navigation clutter, boilerplate, filler, broken fragments, and information that does not help someone understand or use the material.\n\n<adaptive_approach>\nInfer the content's likely purpose and shape the result accordingly:\n- **Study material**: organize concepts, definitions, explanations, examples, questions, and formulas.\n- **Meeting or conversation transcript**: preserve the discussion in a readable flow; call out decisions, action items, open questions, and important context.\n- **Log or technical output**: retain relevant events, errors, timestamps, commands, configuration, causes, and fixes; discard routine repetition and irrelevant noise.\n- **Web or copied content**: reconstruct the actual article or reference material; remove menus, ads, cookie notices, repeated headers, navigation, and unrelated fragments.\n- **Notes or archive material**: preserve the useful record with clear chronology, topics, and source details.\n</adaptive_approach>\n\n<format>\n- Use Markdown only where it improves scanning: headings for real sections, lists for related items, tables for genuinely tabular data, and code blocks for commands or code.\n- Reorder or merge fragments when it improves clarity.\n- Keep meaningful uncertainty and conflicting details rather than resolving or hiding them.\n</format>\n\n<constraints>\n- Do not invent information, conclusions, or missing context.\n- Do not force brevity. Keep the detail needed to make the material useful.\n- Output the finished digest directly, without a preamble or meta-commentary.\n</constraints>",
+        "task": "Turn this into a clean, digestible format. Adapt the structure to its likely use, retain useful detail and context, and remove noise or unimportant material.",
         "show_chat_window_instead_of_replace": True,
     },
     "Extract Data": {

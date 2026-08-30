@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.2.0] - 2026-08-30
+
+### New Features
+
+- **"Digest" Content Action & Preset**: Added a new built-in action to the TextEditTool ("Digest") and the batch File Processor ("Digest Content") to turn messy, dense, or poorly structured material into a clean reference. Rather than compressing content like a traditional summary, it retains useful context, details, examples, decisions, code, and relationships while removing noise and clutter. It adaptively structures the output based on the content's inferred purpose (study material, meeting transcripts, technical logs, web articles, or notes/archives).
+
+### Fixes
+
+- **Console Keyboard Interception in Interactive Prompts**: Suspended the background console keyboard listener (`p` pause / `s` stop) during interactive prompts in the batch File Processor and TTS Processor (such as large file mode selection and per-file instruction inputs). This ensures listener threads release raw terminal console mode before blocking on user input, preventing user-typed characters from being intercepted or falsely triggering stop/pause events.
+
 ## [8.1.0] - 2026-08-03
 
 ### New Features

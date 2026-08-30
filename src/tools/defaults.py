@@ -98,6 +98,15 @@ DEFAULT_TOOLS_CONFIG = {
                 "output_extension": ".md",
                 "default_naming": "{filename}_summary",
             },
+            "Digest Content": {
+                "_is_default": True,
+                "icon": "📚",
+                "description": "Clean up and organize content while retaining useful detail",
+                "input_types": ["image", "text"],
+                "prompt": "Turn this content into a clean, digestible reference. This is NOT primarily a summary: retain useful context, details, examples, decisions, names, dates, instructions, and relationships. Remove only noise, duplication, navigation clutter, boilerplate, filler, broken fragments, and information that does not help someone understand or use the material.\n\nFirst infer the content's likely purpose and adapt the result to it:\n- **Study material**: organize concepts, explanations, examples, definitions, and any questions or formulas.\n- **Meeting or conversation transcript**: preserve the discussion in a readable flow; clearly identify decisions, action items, open questions, and important context.\n- **Log or technical output**: retain relevant events, errors, timestamps, commands, configuration, causes, and fixes; remove routine repetition and irrelevant noise.\n- **Web or copied content**: reconstruct the actual article or reference material; remove menus, ads, cookie notices, repeated headers, navigation, and unrelated page fragments.\n- **Notes or archive material**: preserve the useful record with clear chronology, topics, and source details.\n\nUse Markdown only where it improves scanning: headings for real sections, lists for related items, tables for genuinely tabular comparisons or data, and code blocks for commands or code. Reorder or merge fragments when that makes the material easier to follow, but do not invent information, conclusions, or missing context. Preserve uncertainty and conflicting details when present.\n\nOutput only the finished digestible content, with no preamble or commentary.",
+                "output_extension": ".md",
+                "default_naming": "{filename}_digest",
+            },
             "Extract Data": {
                 "_is_default": True,
                 "icon": "📊",
