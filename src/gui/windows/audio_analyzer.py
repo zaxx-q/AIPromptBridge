@@ -2057,10 +2057,35 @@ class AudioAnalyzerWindow:
     def _prepare_and_send_audio(self, action_key: str, custom_text: Optional[str] = None):
         """Compress audio then process."""
         try:
-            if not self.compressed_audio:
-                self.compressed_audio = self.recorder.compress_audio(self.recorded_wav, self.compression_preset)
+            # Check if transcription profile is active — use preserve_audio preset
+            # to avoid silence removal stripping speech content
+            is_transcription = False
+            compression_preset = self.compression_preset
+            if self._use_profile_mode and self.selected_profile:
+                try:
+                    from ...connection_profiles import ProfileStore
 
-            audio_data = self.compressed_audio or self.recorded_wav
+                    profile = ProfileStore.get_instance().get_profile(self.selected_profile)
+                    if profile and profile.provider == "transcription":
+                        is_transcription = True
+                        compression_preset = "preserve_audio"
+                except Exception:
+                    pass
+
+            if is_transcription or self.compressed_audio is None:
+                # For transcription, always re-compress with preserve_audio preset
+                # For normal, use cached compressed audio if available
+                if is_transcription:
+                    compressed = self.recorder.compress_audio(self.recorded_wav, compression_preset)
+                else:
+                    compressed = self.compressed_audio or self.recorder.compress_audio(
+                        self.recorded_wav, compression_preset
+                    )
+                    self.compressed_audio = compressed
+            else:
+                compressed = self.compressed_audio
+
+            audio_data = compressed or self.recorded_wav
 
             from ...audio.recorder import COMPRESSION_PRESETS
 
