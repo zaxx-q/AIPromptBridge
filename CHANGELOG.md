@@ -15,6 +15,7 @@
 
 ### Fixes
 
+- **Linux Tcl 9 Console Crash**: Fixed an `epoll_ctl: Invalid argument` crash when opening interactive console menus (such as the `P` connection profile menu) while running from source on Linux distributions using Tcl 9.
 - **Console Keyboard Interception in Interactive Prompts**: Suspended the background console keyboard listener (`p` pause / `s` stop) during interactive prompts in the batch File Processor and TTS Processor (such as large file mode selection and per-file instruction inputs). This ensures listener threads release raw terminal console mode before blocking on user input, preventing user-typed characters from being intercepted or falsely triggering stop/pause events.
 
 ## [8.1.0] - 2026-08-03
