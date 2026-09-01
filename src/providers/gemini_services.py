@@ -562,30 +562,45 @@ def generate_transcription(
         try:
             candidates = data.get("candidates", [])
             if not candidates:
+                prompt_feedback = data.get("promptFeedback", {})
+                block_reason = prompt_feedback.get("blockReason")
+                if block_reason:
+                    return None, f"Transcription blocked: {block_reason}"
                 return None, "No candidates in transcription response"
 
-            content = candidates[0].get("content", {})
-            parts = content.get("parts", [])
+            candidate = candidates[0]
+            finish_reason = candidate.get("finishReason", "")
+
+            if finish_reason in ("SAFETY", "BLOCKED"):
+                return None, f"Transcription blocked: {finish_reason}"
+
+            content = candidate.get("content", {})
+            parts = content.get("parts", []) if isinstance(content, dict) else []
 
             # Collect text from parts (plain text or audioTranscription annotations)
             text_parts = []
             for part in parts:
-                if "text" in part:
+                if not isinstance(part, dict):
+                    continue
+                if part.get("text"):
                     text_parts.append(part["text"])
                 elif "audioTranscription" in part or "audio_transcription" in part:
                     transcription = part.get("audioTranscription") or part.get("audio_transcription")
-                    if transcription:
+                    if isinstance(transcription, dict):
                         speaker = transcription.get("speakerLabel") or transcription.get("speaker_label", "")
                         words = transcription.get("words", [])
                         word_strs = []
                         for w in words:
-                            word_text = w.get("word", "")
-                            start = w.get("startOffset") or w.get("start_offset")
-                            end = w.get("endOffset") or w.get("end_offset")
-                            if start and end and transcribe_config.get("word_timestamp"):
-                                word_strs.append(f"({start}->{end}) {word_text}")
-                            else:
-                                word_strs.append(word_text)
+                            if isinstance(w, dict):
+                                word_text = w.get("word", "")
+                                start = w.get("startOffset") or w.get("start_offset")
+                                end = w.get("endOffset") or w.get("end_offset")
+                                if start and end and transcribe_config.get("word_timestamp"):
+                                    word_strs.append(f"({start}->{end}) {word_text}")
+                                else:
+                                    word_strs.append(word_text)
+                            elif isinstance(w, str):
+                                word_strs.append(w)
                         segment_text = " ".join(word_strs)
                         if speaker:
                             segment_text = f"[{speaker}] {segment_text}"
@@ -594,19 +609,28 @@ def generate_transcription(
 
             transcript = "\n".join(text_parts) if text_parts else ""
 
+            # Check top-level text if parts were empty
+            if not transcript.strip() and "text" in candidate and candidate["text"]:
+                transcript = candidate["text"]
+
             if not transcript.strip():
-                # Check for blocked/safety
-                finish_reason = candidates[0].get("finishReason", "")
-                if finish_reason in ("SAFETY", "BLOCKED"):
-                    return None, f"Transcription blocked: {finish_reason}"
+                if finish_reason == "STOP":
+                    # Model completed successfully; no audible speech was recognized
+                    provider.log("info", "[Transcribe] No speech detected in audio (finishReason: STOP)")
+                    return "(No speech detected)", None
 
                 if provider.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
                     delay = provider.get_retry_delay(RetryReason.EMPTY_RESPONSE)
-                    provider.log_retry(RetryReason.EMPTY_RESPONSE, retry_count + 1, delay, "empty transcript")
+                    provider.log_retry(
+                        RetryReason.EMPTY_RESPONSE,
+                        retry_count + 1,
+                        delay,
+                        f"empty response (finishReason: {finish_reason})",
+                    )
                     if delay > 0:
                         time.sleep(delay)
                     return generate_transcription(provider, file_uri, mime_type, transcribe_config, retry_count + 1)
-                return None, "Empty transcription response"
+                return "(No speech detected)", None
 
         except (KeyError, IndexError) as e:
             return None, f"Failed to parse transcription response: {e}"

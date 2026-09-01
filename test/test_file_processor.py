@@ -319,6 +319,48 @@ def test_gemini_generate_transcription_with_diarization_and_timestamps():
         assert "[spk_2] (1.000s->1.300s) Hi" in transcript
 
 
+def test_gemini_generate_transcription_no_speech_detected():
+    from unittest.mock import MagicMock
+
+    from src.providers.gemini_native import GeminiNativeProvider
+
+    mock_key_mgr = MagicMock()
+    mock_key_mgr.has_keys.return_value = True
+    mock_key_mgr.get_current_key.return_value = "fake_gemini_key"
+    mock_key_mgr.get_key_label.return_value = "Key-1"
+
+    provider = GeminiNativeProvider(key_manager=mock_key_mgr)
+
+    # API returns STOP with empty parts when no words are detected
+    mock_response_data = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [],
+                },
+                "finishReason": "STOP",
+            }
+        ]
+    }
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = mock_response_data
+
+    with patch("requests.post", return_value=mock_resp):
+        transcript, error = provider.generate_transcription(
+            file_uri="https://generativelanguage.googleapis.com/v1beta/files/test123",
+            mime_type="audio/ogg",
+            transcribe_config={
+                "model": "gemini-3.5-transcribe",
+                "mode": "SMART",
+            },
+        )
+
+        assert error is None
+        assert transcript == "(No speech detected)"
+
+
 def test_even_chunk_distribution_calculation():
     from unittest.mock import MagicMock
 
