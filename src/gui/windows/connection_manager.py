@@ -52,7 +52,7 @@ PROFILE_FIELDS = [
         "provider",
         "Provider",
         "combobox",
-        ["google", "anthropic", "openai", "openrouter", "xai", "mistral", "cohere", "custom"],
+        ["google", "anthropic", "openai", "openrouter", "xai", "mistral", "cohere", "custom", "transcription"],
     ),
     ("model", "Model", "model_dropdown", None),
     ("enabled", "Enabled", "toggle", None),
@@ -65,14 +65,34 @@ PROFILE_FIELDS = [
     ("max_tokens", "Max Tokens", "entry", None),
     ("request_timeout", "Request Timeout (s)", "entry", None),
     ("base_url", "Base URL", "entry", None),
+    ("transcribe_mode", "Transcription Mode", "combobox", ["VERBATIM", "SMART"]),
+    ("transcribe_diarization", "Speaker Diarization", "toggle", None),
+    ("transcribe_timestamps", "Word Timestamps", "toggle", None),
+    ("transcribe_language", "Language Hint", "entry", None),
+    ("transcribe_vocabulary", "Custom Vocabulary", "entry", None),
     ("api_key_name", "API Key Name", "key_name_dropdown", None),
     ("api_key_pool", "API Key Pool", "combobox", None),
 ]
+
+_ALL_NON_TRANSCRIPTION = {"google", "anthropic", "openai", "openrouter", "xai", "mistral", "cohere", "custom"}
 
 PROVIDER_FIELD_VISIBILITY = {
     "thinking_budget": {"google"},
     "thinking_level": {"google"},
     "reasoning_effort": {"openai", "openrouter", "xai", "mistral", "cohere", "custom"},
+    # Hide from transcription provider (show for all others):
+    "streaming": _ALL_NON_TRANSCRIPTION,
+    "thinking": _ALL_NON_TRANSCRIPTION,
+    "temperature": _ALL_NON_TRANSCRIPTION,
+    "max_tokens": _ALL_NON_TRANSCRIPTION,
+    "request_timeout": _ALL_NON_TRANSCRIPTION,
+    "base_url": _ALL_NON_TRANSCRIPTION,
+    # Transcription-specific fields:
+    "transcribe_mode": {"transcription"},
+    "transcribe_diarization": {"transcription"},
+    "transcribe_timestamps": {"transcription"},
+    "transcribe_language": {"transcription"},
+    "transcribe_vocabulary": {"transcription"},
 }
 
 # Thinking sub-fields that require thinking toggle to be ON
@@ -98,6 +118,11 @@ FIELD_HELP = {
     "max_tokens": "Maximum output tokens. Leave empty to use model default.",
     "request_timeout": "Request timeout in seconds. Leave empty to use the global timeout from settings.",
     "base_url": "Custom base URL for the API endpoint. Leave empty to use the provider's default URL.",
+    "transcribe_mode": "VERBATIM: exact word-for-word transcript. SMART: removes filler words, applies formatting. Smart mode is incompatible with diarization and timestamps.",
+    "transcribe_diarization": "Identify and label distinct speakers (spk_1, spk_2, etc.). Supports up to 8 speakers. Only available in VERBATIM mode.",
+    "transcribe_timestamps": "Include word-level start/end timestamps. May slightly reduce accuracy. Only available in VERBATIM mode.",
+    "transcribe_language": "BCP-47 language code (e.g., 'en-US', 'es-ES', 'ja-JP'). Leave empty for auto-detection with code-switching support.",
+    "transcribe_vocabulary": "Comma-separated domain terms, acronyms, or proper names to improve recognition (up to 1000 terms). Example: Kubernetes, BigQuery, gRPC",
     "api_key_name": "Use a specific named key from the pool. When set, key rotation is disabled and only this key will be used. Leave empty to use pool rotation.",
     "api_key_pool": "Override which key pool this profile uses. Leave empty to use provider default.",
 }
@@ -116,6 +141,11 @@ SUMMARY_ICONS = {
     "thinking_budget": "🧠",
     "thinking_level": "💡",
     "reasoning_effort": "🔬",
+    "transcribe_mode": "📝",
+    "transcribe_diarization": "👥",
+    "transcribe_timestamps": "⏱️",
+    "transcribe_language": "🌐",
+    "transcribe_vocabulary": "📖",
     "api_key_name": "🔑",
     "api_key_pool": "🗝️",
 }
@@ -573,7 +603,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
     def _build_combobox_field(self, row, key: str, label: str, options: list, c: ThemeColors):
         """Build a combobox/dropdown field."""
         var = tk.StringVar()
-        command = self._on_provider_change if key == "provider" else None
+        command = self._on_provider_change if key in ("provider", "transcribe_mode") else None
         is_required = key in REQUIRED_FIELDS
 
         if self.use_ctk:
@@ -702,6 +732,17 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
             if provider_ok and thinking_ok:
                 row.pack(fill="x", pady=3)
+
+        # Transcription provider SMART mode constraints
+        if provider == "transcription":
+            mode_info = self.field_widgets.get("transcribe_mode")
+            mode = mode_info["var"].get() if mode_info else "VERBATIM"
+            if mode == "SMART":
+                # Hide diarization and timestamps (incompatible with SMART mode)
+                for key in ("transcribe_diarization", "transcribe_timestamps"):
+                    row = self.field_rows.get(key)
+                    if row:
+                        row.pack_forget()
 
         # Dynamic bold for base_url label when provider is custom
         if self._custom_url_label:
@@ -1037,6 +1078,11 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 # Thinking sub-fields visibility
                 elif key_field in THINKING_FIELDS and not thinking_enabled:
                     visible = False
+                # Transcription SMART mode visibility constraints
+                elif provider == "transcription" and key_field in ("transcribe_diarization", "transcribe_timestamps"):
+                    mode_info = self.field_widgets.get("transcribe_mode")
+                    if mode_info and mode_info["var"].get() == "SMART":
+                        visible = False
 
             # Get display value
             val = ""

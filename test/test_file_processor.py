@@ -357,3 +357,62 @@ def test_even_chunk_distribution_calculation():
         assert result.chunks[0].duration == pytest.approx(990.0)
         assert result.chunks[1].duration == pytest.approx(990.0)
         result.cleanup()
+
+
+def test_audio_tool_process_transcription():
+    from unittest.mock import MagicMock
+
+    from src.connection_profiles import ConnectionProfile, ProfileStore
+    from src.gui.audio_tool import AudioToolApp
+
+    ProfileStore.reset_instance()
+    store = ProfileStore.get_instance()
+    profile = ConnectionProfile(
+        provider="transcription",
+        model="gemini-3.5-transcribe",
+        transcribe_mode="VERBATIM",
+        transcribe_diarization=True,
+    )
+    store._profiles["TranscriptionProf"] = profile.to_dict()
+
+    mock_google_km = MagicMock()
+    app = AudioToolApp(config={}, ai_params={}, key_managers={"google": mock_google_km})
+
+    mock_resolved = MagicMock()
+    mock_resolved.model = "gemini-3.5-transcribe"
+    mock_resolved.key_managers = {"google": mock_google_km}
+    mock_resolved.config = {}
+
+    mock_uploaded = MagicMock()
+    mock_uploaded.uri = "https://files.example.com/audio1"
+    mock_uploaded.name = "audio1"
+    mock_uploaded.mime_type = "audio/wav"
+
+    mock_provider = MagicMock()
+    mock_provider.upload_file.return_value = (mock_uploaded, None)
+    mock_provider.generate_transcription.return_value = ("[spk_1] Hello world", None)
+
+    progress_calls = []
+    success_calls = []
+    error_calls = []
+
+    with (
+        patch("src.gui.audio_tool.create_provider", return_value=mock_provider),
+        patch("os.path.exists", return_value=False),
+    ):
+        app._process_transcription(
+            audio_data=b"fake_wav_bytes",
+            mime_type="audio/wav",
+            resolved=mock_resolved,
+            profile_name="TranscriptionProf",
+            callback_progress=lambda msg: progress_calls.append(msg),
+            callback_success=lambda text, tokens: success_calls.append((text, tokens)),
+            callback_error=lambda err: error_calls.append(err),
+        )
+
+        assert len(error_calls) == 0
+        assert len(success_calls) == 1
+        assert success_calls[0][0] == "[spk_1] Hello world"
+        assert mock_provider.upload_file.called
+        assert mock_provider.generate_transcription.called
+        assert mock_provider.delete_file.called

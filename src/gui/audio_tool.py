@@ -260,6 +260,19 @@ class AudioToolApp:
                 req_provider = provider or resolved.provider
                 req_model = model or resolved.model
 
+                # Check for transcription virtual provider
+                if req_provider == "transcription":
+                    self._process_transcription(
+                        audio_data=audio_data,
+                        mime_type=mime_type,
+                        resolved=resolved,
+                        profile_name=profile_name,
+                        callback_progress=callback_progress,
+                        callback_success=callback_success,
+                        callback_error=callback_error,
+                    )
+                    return
+
                 # Check for large file support (Gemini only)
                 # Upload if > 15MB
                 is_large_file = len(audio_data) > 15 * 1024 * 1024
@@ -332,6 +345,121 @@ class AudioToolApp:
                     callback_error(str(e))
 
         threading.Thread(target=_target, daemon=True).start()
+
+    def _process_transcription(
+        self,
+        audio_data: bytes,
+        mime_type: str,
+        resolved: Any,
+        profile_name: Optional[str],
+        callback_progress: Optional[Callable[[str], None]],
+        callback_success: Optional[Callable[[str, int], None]],
+        callback_error: Optional[Callable[[str], None]],
+    ):
+        """Process audio using the dedicated transcription API (gemini-3.5-transcribe)."""
+        temp_file_path = None
+        try:
+            if callback_progress:
+                callback_progress("Preparing transcription...")
+
+            # Get transcription config from the profile
+            from ..connection_profiles import ProfileStore
+
+            transcribe_config = None
+            if profile_name:
+                store = ProfileStore.get_instance()
+                profile = store.get_profile(profile_name)
+                if profile and profile.provider == "transcription":
+                    transcribe_config = profile.to_transcribe_config()
+
+            if not transcribe_config:
+                transcribe_config = {
+                    "model": resolved.model or "gemini-3.5-transcribe",
+                    "mode": "VERBATIM",
+                    "diarization": False,
+                    "word_timestamp": False,
+                    "language_codes": [],
+                    "custom_vocabulary": [],
+                }
+
+            # Get google key manager (transcription uses Google API)
+            key_manager = resolved.key_managers.get("google") or resolved.key_managers.get("transcription")
+            if not key_manager:
+                if callback_error:
+                    callback_error("No Google API key available (required for transcription)")
+                return
+
+            # Create Google provider instance
+            provider_config = {
+                "request_timeout": resolved.config.get("request_timeout", 120),
+                "max_retries": resolved.config.get("max_retries", 3),
+                "retry_delay": resolved.config.get("retry_delay", 5),
+                "base_url": resolved.config.get("base_url"),
+            }
+            prov_instance = create_provider("google", key_manager, provider_config)
+
+            # Determine file extension for temp file
+            ext = ".wav"
+            if "ogg" in mime_type:
+                ext = ".ogg"
+            elif "mpeg" in mime_type or "mp3" in mime_type:
+                ext = ".mp3"
+
+            # Write audio to temp file for upload
+            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as f:
+                f.write(audio_data)
+                temp_file_path = f.name
+
+            # Upload via Files API
+            if callback_progress:
+                callback_progress("Uploading audio...")
+
+            uploaded_file, error = prov_instance.upload_file(Path(temp_file_path))
+            if error:
+                if callback_error:
+                    callback_error(f"Upload failed: {error}")
+                return
+
+            try:
+                if callback_progress:
+                    mode = transcribe_config.get("mode", "VERBATIM")
+                    extras = []
+                    if transcribe_config.get("diarization"):
+                        extras.append("diarization")
+                    if transcribe_config.get("word_timestamp"):
+                        extras.append("timestamps")
+                    extra_str = f" + {', '.join(extras)}" if extras else ""
+                    callback_progress(f"Transcribing ({mode}{extra_str})...")
+
+                # Call transcription API
+                transcript, error = prov_instance.generate_transcription(
+                    file_uri=uploaded_file.uri,
+                    mime_type=uploaded_file.mime_type,
+                    transcribe_config=transcribe_config,
+                )
+
+                if error:
+                    if callback_error:
+                        callback_error(f"Transcription failed: {error}")
+                    return
+
+                if callback_success:
+                    callback_success(transcript, len(transcript.split()))
+
+            finally:
+                # Cleanup uploaded file
+                prov_instance.delete_file(uploaded_file.name)
+
+        except Exception as e:
+            logging.error(f"[AudioTool] Transcription error: {e}")
+            if callback_error:
+                callback_error(str(e))
+        finally:
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                except Exception:
+                    pass
 
     def _process_action(
         self,

@@ -169,6 +169,28 @@ def resolve_profile(
         merged_ai_params.pop("temperature", None)
         merged_ai_params.pop("max_tokens", None)
 
+    # For transcription provider, resolve key manager from google pool and set model keys
+    if provider == "transcription":
+        merged_config["transcription_model"] = model
+        merged_config["google_model"] = model
+
+        if effective_profile and (effective_profile.api_key_pool or effective_profile.api_key_name):
+            resolved_km = _resolve_key_override(
+                effective_profile.api_key_pool,
+                effective_profile.api_key_name,
+                "google",
+                key_managers,
+            )
+            if resolved_km is not None:
+                effective_key_managers = dict(effective_key_managers)
+                effective_key_managers["transcription"] = resolved_km
+                effective_key_managers["google"] = resolved_km
+        else:
+            google_km = effective_key_managers.get("google")
+            if google_km:
+                effective_key_managers = dict(effective_key_managers)
+                effective_key_managers["transcription"] = google_km
+
     if not model and provider:
         model = merged_config.get(f"{provider}_model", "")
 

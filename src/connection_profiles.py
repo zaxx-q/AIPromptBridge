@@ -39,6 +39,12 @@ PROFILE_DEFAULTS: Dict[str, Any] = {
     "api_key_name": "",
     "api_key_pool": "",
     "enabled": True,
+    # Transcription-specific fields (only used when provider == "transcription")
+    "transcribe_mode": "VERBATIM",  # "VERBATIM" or "SMART"
+    "transcribe_diarization": False,  # Speaker diarization
+    "transcribe_timestamps": False,  # Word-level timestamps
+    "transcribe_language": "",  # BCP-47 language code (empty = auto-detect)
+    "transcribe_vocabulary": "",  # Comma-separated custom vocabulary terms
 }
 
 
@@ -61,9 +67,28 @@ class ConnectionProfile:
     api_key_name: str = ""
     api_key_pool: str = ""
     enabled: bool = True
+    # Transcription fields
+    transcribe_mode: str = "VERBATIM"
+    transcribe_diarization: bool = False
+    transcribe_timestamps: bool = False
+    transcribe_language: str = ""
+    transcribe_vocabulary: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+    def to_transcribe_config(self) -> Dict[str, Any]:
+        """Build transcribe_config dict for gemini_services.generate_transcription."""
+        return {
+            "model": self.model or "gemini-3.5-transcribe",
+            "mode": self.transcribe_mode or "VERBATIM",
+            "diarization": self.transcribe_diarization,
+            "word_timestamp": self.transcribe_timestamps,
+            "language_codes": [self.transcribe_language.strip()] if self.transcribe_language.strip() else [],
+            "custom_vocabulary": [v.strip() for v in self.transcribe_vocabulary.split(",") if v.strip()]
+            if self.transcribe_vocabulary.strip()
+            else [],
+        }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ConnectionProfile":
@@ -113,6 +138,10 @@ class ConnectionProfile:
                         val = None
                 else:
                     val = None
+            elif k in ("transcribe_diarization", "transcribe_timestamps"):
+                val = bool(val) if val is not None else default
+            elif k in ("transcribe_mode", "transcribe_language", "transcribe_vocabulary"):
+                val = str(val) if val is not None else default
 
             clean[k] = val
         return cls(**clean)

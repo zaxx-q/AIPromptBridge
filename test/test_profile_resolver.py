@@ -90,6 +90,44 @@ class TestProfileResolverOverrides(unittest.TestCase):
         self.assertEqual(resolved.model, "gpt-4o")
         self.assertEqual(resolved.ai_params.get("temperature"), 0.7)
 
+    def test_transcription_profile_resolution(self):
+        # Create a transcription profile
+        transcribe_profile = ConnectionProfile(
+            provider="transcription",
+            model="gemini-3.5-transcribe",
+            transcribe_mode="VERBATIM",
+            transcribe_diarization=True,
+            transcribe_timestamps=True,
+            transcribe_language="es-ES",
+            transcribe_vocabulary="Kubernetes, BigQuery",
+        )
+        self.store._profiles["TranscribeProf"] = transcribe_profile.to_dict()
+
+        # Mock key managers
+        from unittest.mock import MagicMock
+
+        google_km = MagicMock()
+        key_managers = {"google": google_km}
+
+        action = {"connection_profile": "TranscribeProf"}
+        resolved = resolve_profile(action, {}, {}, key_managers)
+
+        self.assertEqual(resolved.provider, "transcription")
+        self.assertEqual(resolved.model, "gemini-3.5-transcribe")
+        self.assertEqual(resolved.config.get("transcription_model"), "gemini-3.5-transcribe")
+        self.assertEqual(resolved.config.get("google_model"), "gemini-3.5-transcribe")
+        self.assertIn("transcription", resolved.key_managers)
+        self.assertEqual(resolved.key_managers["transcription"], google_km)
+
+        # Test to_transcribe_config helper
+        cfg = transcribe_profile.to_transcribe_config()
+        self.assertEqual(cfg["model"], "gemini-3.5-transcribe")
+        self.assertEqual(cfg["mode"], "VERBATIM")
+        self.assertTrue(cfg["diarization"])
+        self.assertTrue(cfg["word_timestamp"])
+        self.assertEqual(cfg["language_codes"], ["es-ES"])
+        self.assertEqual(cfg["custom_vocabulary"], ["Kubernetes", "BigQuery"])
+
 
 if __name__ == "__main__":
     unittest.main()

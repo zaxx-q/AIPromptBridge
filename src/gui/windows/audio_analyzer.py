@@ -1840,13 +1840,31 @@ class AudioAnalyzerWindow:
             # Profile mode
             if model == "(Default)":
                 self.selected_profile = None
+                self._update_transcription_indicator(False)
             elif model:
                 self.selected_profile = model
+                try:
+                    from ...connection_profiles import ProfileStore
+
+                    profile = ProfileStore.get_instance().get_profile(model)
+                    is_transcription = profile is not None and profile.provider == "transcription"
+                    self._update_transcription_indicator(is_transcription)
+                except Exception:
+                    self._update_transcription_indicator(False)
             return
 
         if model and model not in ("(loading...)", "(no models)", "(no audio models found)"):
             self.model = model
             # Ensure calling code knows about manually typed models
+
+    def _update_transcription_indicator(self, is_transcription: bool):
+        """Show/hide transcription mode indicator in status."""
+        if not self.status_label or self._destroyed:
+            return
+        if is_transcription:
+            self._update_status("🎙️ Native transcription mode — prompt selection ignored", self.colors.accent)
+        else:
+            self._update_status("Ready")
 
     def _on_device_changed(self, device_name: str):
         """Handle device dropdown change."""
@@ -2062,6 +2080,23 @@ class AudioAnalyzerWindow:
 
     def _process_or_callback(self, action_key, audio_data, mime_type, custom_text: Optional[str] = None):
         """Delegate to callback or process internally."""
+        # Check if transcription profile is active
+        is_transcription = False
+        if self._use_profile_mode and self.selected_profile:
+            try:
+                from ...connection_profiles import ProfileStore
+
+                profile = ProfileStore.get_instance().get_profile(self.selected_profile)
+                if profile and profile.provider == "transcription":
+                    is_transcription = True
+            except Exception:
+                pass
+
+        if is_transcription:
+            # Transcription always processes internally (result panel)
+            self._process_audio_internal(action_key, audio_data, mime_type, custom_text)
+            return
+
         # Check action config for show_chat_window preference
         actions = self.prompts.get_audio_actions()
         action = actions.get(action_key, {})

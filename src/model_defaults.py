@@ -86,6 +86,9 @@ FALLBACK_MODELS: dict[str, list[str]] = {
     "custom": [
         "local-model",
     ],
+    "transcription": [
+        "gemini-3.5-transcribe",
+    ],
 }
 
 
