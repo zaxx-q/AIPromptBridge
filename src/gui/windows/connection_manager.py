@@ -704,12 +704,11 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
 
     # ─── Provider-aware visibility ────────────────────────────────────────
 
-    def _on_provider_change(self, provider: str | None = None):
+    def _on_provider_change(self, *args):
         if hasattr(self, "_loading_profile") and self._loading_profile:
             return
-        if not provider:
-            provider_info = self.field_widgets.get("provider")
-            provider = provider_info["var"].get() if provider_info else ""
+        provider_info = self.field_widgets.get("provider")
+        provider = provider_info["var"].get() if provider_info else ""
 
         # Check thinking toggle state
         thinking_info = self.field_widgets.get("thinking")

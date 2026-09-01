@@ -128,6 +128,51 @@ class TestProfileResolverOverrides(unittest.TestCase):
         self.assertEqual(cfg["language_codes"], ["es-ES"])
         self.assertEqual(cfg["custom_vocabulary"], ["Kubernetes", "BigQuery"])
 
+    def test_connection_profile_manager_on_provider_change_transcribe_mode(self):
+        import tkinter as tk
+
+        try:
+            root = tk.Tk()
+            root.withdraw()
+        except tk.TclError:
+            self.skipTest("No Tk display available")
+
+        from src.gui.windows.connection_manager import ConnectionProfileManager
+
+        cpm = ConnectionProfileManager(root)
+        try:
+            # Set provider to transcription
+            cpm.field_widgets["provider"]["var"].set("transcription")
+            cpm._on_provider_change("transcription")
+
+            # Verify transcribe_mode row is packed (visible)
+            mode_row = cpm.field_rows.get("transcribe_mode")
+            self.assertTrue(bool(mode_row.winfo_manager()))
+
+            # Trigger _on_provider_change as if passed "SMART" from transcribe_mode combobox
+            cpm.field_widgets["transcribe_mode"]["var"].set("SMART")
+            cpm._on_provider_change("SMART")
+
+            # transcribe_mode, transcribe_language, transcribe_vocabulary must remain visible
+            self.assertTrue(bool(mode_row.winfo_manager()))
+            self.assertTrue(bool(cpm.field_rows["transcribe_language"].winfo_manager()))
+            self.assertTrue(bool(cpm.field_rows["transcribe_vocabulary"].winfo_manager()))
+
+            # Diarization and timestamps should be hidden in SMART mode
+            self.assertFalse(bool(cpm.field_rows["transcribe_diarization"].winfo_manager()))
+            self.assertFalse(bool(cpm.field_rows["transcribe_timestamps"].winfo_manager()))
+
+            # Switch back to VERBATIM mode
+            cpm.field_widgets["transcribe_mode"]["var"].set("VERBATIM")
+            cpm._on_provider_change("VERBATIM")
+
+            # Diarization and timestamps should be visible again
+            self.assertTrue(bool(cpm.field_rows["transcribe_diarization"].winfo_manager()))
+            self.assertTrue(bool(cpm.field_rows["transcribe_timestamps"].winfo_manager()))
+        finally:
+            cpm.destroy()
+            root.destroy()
+
 
 if __name__ == "__main__":
     unittest.main()
