@@ -1,10 +1,17 @@
 # Changelog
 
-## [8.2.0] - 2026-08-30
+## [8.2.0] - 2026-09-01
 
 ### New Features
 
 - **"Digest" Content Action & Preset**: Added a new built-in action to the TextEditTool ("Digest") and the batch File Processor ("Digest Content") to turn messy, dense, or poorly structured material into a clean reference. Rather than compressing content like a traditional summary, it retains useful context, details, examples, decisions, code, and relationships while removing noise and clutter. It adaptively structures the output based on the content's inferred purpose (study material, meeting transcripts, technical logs, web articles, or notes/archives).
+- **Gemini Native Transcription**: Added dedicated support for Gemini's `gemini-3.5-transcribe` model. The File Processor includes two new built-in prompts — "Transcribe (Native Verbatim)" and "Transcribe (Native Smart)" — with interactive options for speaker diarization, word-level timestamps, language hints, and custom vocabulary. Transcription settings are stored in checkpoints so batch jobs can resume without re-prompting.
+- **Transcription Connection Profiles**: Added a virtual "transcription" provider to Connection Profiles, exposing transcription-specific fields (mode, diarization, timestamps, language hint, custom vocabulary) instead of generation settings. Selecting a transcription profile in the Audio Analyzer runs native transcription instead of prompt-based analysis, and uses the Google API key pool automatically.
+- **File Processor Audio Controls**: Added a "Force send entire file (no chunking)" toggle in audio preprocessing so large recordings can be uploaded as a single request, and a `disable_files_api` setting to skip Google Files API uploads (falling back to FFmpeg chunking or inline send).
+
+### Improvements
+
+- **Even Audio Chunk Splitting**: Large audio files are now split into evenly sized chunks instead of leaving a short leftover segment at the end.
 
 ### Fixes
 
