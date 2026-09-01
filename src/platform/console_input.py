@@ -181,10 +181,21 @@ def _disable_raw_unix() -> None:
             _sync_tty_mode()
 
 
+def _disable_pyos_input_hook() -> None:
+    """Clear PyOS_InputHook to prevent Tkinter/Tcl notifier panics on non-GUI threads."""
+    try:
+        import ctypes
+
+        ctypes.c_void_p.in_dll(ctypes.pythonapi, "PyOS_InputHook").value = None
+    except Exception:
+        pass
+
+
 @contextlib.contextmanager
 def _cooked_unix() -> Iterator[None]:
     """Temporarily prefer canonical mode while raw interest is held."""
     global _suspend_depth
+    _disable_pyos_input_hook()
     with _lock:
         _suspend_depth += 1
         _sync_tty_mode()

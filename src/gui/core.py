@@ -182,6 +182,16 @@ class GUICoordinator:
                 else:
                     self._root = tk.Tk()
 
+                # Disable PyOS_InputHook installed by Tkinter. In multi-threaded setups,
+                # Tk's input hook tries to run Tcl notifier/file handlers on non-GUI threads
+                # calling input(), triggering epoll_ctl EINVAL / Tcl_Panic on Linux.
+                try:
+                    import ctypes
+
+                    ctypes.c_void_p.in_dll(ctypes.pythonapi, "PyOS_InputHook").value = None
+                except Exception:
+                    pass
+
                 self._root.withdraw()  # Hidden root window
 
                 # Linux: probe Tk fonts + fix DrawEngine (no-xft / broken font_shapes).
