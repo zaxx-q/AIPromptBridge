@@ -410,6 +410,76 @@ class AudioToolApp:
                 f.write(audio_data)
                 temp_file_path = f.name
 
+            # Check if duration chunking is needed
+            from ..tools.audio_processor import (
+                AudioProcessor,
+                adjust_transcript_timestamps,
+                get_transcribe_max_duration,
+                merge_transcribe_transcripts,
+            )
+
+            audio_proc = AudioProcessor()
+            max_duration = get_transcribe_max_duration(transcribe_config)
+            audio_info = audio_proc.get_audio_info(Path(temp_file_path)) if audio_proc.is_available() else None
+
+            if audio_info and audio_info.duration_seconds > max_duration:
+                if callback_progress:
+                    dur_min = audio_info.duration_seconds / 60.0
+                    limit_min = max_duration / 60.0
+                    callback_progress(f"Splitting audio ({dur_min:.1f}m > {limit_min:.0f}m limit)...")
+
+                split_res = audio_proc.split_audio_by_duration(Path(temp_file_path), max_duration_seconds=max_duration)
+                if not split_res.success:
+                    if callback_error:
+                        callback_error(f"Failed to split audio: {split_res.error}")
+                    return
+
+                try:
+                    chunk_outputs = []
+                    num_chunks = len(split_res.chunks)
+                    for i, chunk in enumerate(split_res.chunks):
+                        if callback_progress:
+                            mode = transcribe_config.get("mode", "VERBATIM")
+                            extras = []
+                            if transcribe_config.get("diarization"):
+                                extras.append("diarization")
+                            if transcribe_config.get("word_timestamp"):
+                                extras.append("timestamps")
+                            extra_str = f" + {', '.join(extras)}" if extras else ""
+                            callback_progress(
+                                f"Transcribing [{i + 1}/{num_chunks}] ({chunk.time_range_str}){extra_str}..."
+                            )
+
+                        uploaded_chunk, err = prov_instance.upload_file(chunk.path)
+                        if err:
+                            if callback_error:
+                                callback_error(f"Upload failed for chunk {i + 1}: {err}")
+                            return
+
+                        try:
+                            chunk_text, err = prov_instance.generate_transcription(
+                                file_uri=uploaded_chunk.uri,
+                                mime_type=uploaded_chunk.mime_type,
+                                transcribe_config=transcribe_config,
+                            )
+                            if err:
+                                if callback_error:
+                                    callback_error(f"Transcription failed for chunk {i + 1}: {err}")
+                                return
+
+                            if chunk_text:
+                                adjusted = adjust_transcript_timestamps(chunk_text, chunk.start_time)
+                                chunk_outputs.append((chunk, adjusted))
+                        finally:
+                            prov_instance.delete_file(uploaded_chunk.name)
+
+                    merged = merge_transcribe_transcripts(chunk_outputs)
+                    if callback_success:
+                        callback_success(merged, len(merged.split()))
+                    return
+                finally:
+                    split_res.cleanup()
+
             # Upload via Files API
             if callback_progress:
                 callback_progress("Uploading audio...")

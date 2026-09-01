@@ -15,6 +15,7 @@ Handles:
 import contextlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -45,6 +46,10 @@ from src.console import console, print_error, print_info, print_success, print_w
 
 # Target chunk size in bytes (~14.5 MB to stay safely under 15 MB limit after base64)
 TARGET_CHUNK_SIZE_BYTES = 14.5 * 1024 * 1024
+
+# Gemini Transcribe duration thresholds in seconds
+TRANSCRIBE_STANDARD_MAX_DURATION = 3000.0  # 50 minutes (safe margin under 60m limit)
+TRANSCRIBE_ADVANCED_MAX_DURATION = 1500.0  # 25 minutes (safe margin under 30m limit for diarization/timestamps)
 
 # Supported audio formats
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".aiff", ".aac", ".ogg", ".flac", ".m4a", ".wma"}
@@ -1433,6 +1438,142 @@ class AudioProcessor:
             shutil.rmtree(temp_dir, ignore_errors=True)
             return ChunkingResult(success=False, error=str(e))
 
+    def split_audio_by_duration(
+        self,
+        filepath: Path,
+        max_duration_seconds: float,
+        output_format: Optional[str] = None,
+    ) -> ChunkingResult:
+        """
+        Split audio file into even chunks where each chunk's duration <= max_duration_seconds.
+
+        Args:
+            filepath: Path to audio file
+            max_duration_seconds: Maximum allowed duration per chunk in seconds
+            output_format: Output format for chunks (default: follows input or mp3)
+
+        Returns:
+            ChunkingResult with list of AudioChunk objects
+        """
+        if not self.is_available():
+            return ChunkingResult(success=False, error="FFmpeg not available on PATH")
+
+        audio_info = self.get_audio_info(filepath)
+        if not audio_info:
+            return ChunkingResult(success=False, error=f"Could not analyze audio file: {filepath}")
+
+        if output_format is None:
+            output_format = filepath.suffix.lstrip(".").lower()
+            if not output_format:
+                output_format = "mp3"
+
+        total_duration = audio_info.duration_seconds
+
+        # If audio is already within limit, return single chunk without splitting
+        if total_duration <= max_duration_seconds:
+            return ChunkingResult(
+                success=True,
+                chunks=[
+                    AudioChunk(
+                        path=filepath,
+                        index=0,
+                        start_time=0.0,
+                        end_time=total_duration,
+                        duration=total_duration,
+                        size_bytes=audio_info.size_bytes,
+                    )
+                ],
+                original_info=audio_info,
+            )
+
+        # Create temp directory for chunks
+        temp_dir = Path(tempfile.mkdtemp(prefix="transcribe_chunks_"))
+        chunks = []
+
+        try:
+            # Even distribution: divide evenly under the threshold
+            num_chunks = max(2, -(-int(total_duration) // int(max_duration_seconds)))
+            even_duration = total_duration / num_chunks
+
+            while even_duration > max_duration_seconds and num_chunks < 200:
+                num_chunks += 1
+                even_duration = total_duration / num_chunks
+
+            chunk_duration = even_duration
+            print_info(
+                f"Splitting {total_duration / 60:.1f}m audio into {num_chunks} chunks (~{chunk_duration / 60:.1f}m each)"
+            )
+
+            current_time = 0.0
+            chunk_index = 0
+
+            while current_time < total_duration:
+                end_time = min(current_time + chunk_duration, total_duration)
+                chunk_path = temp_dir / f"chunk_{chunk_index:03d}.{output_format}"
+
+                cmd = [
+                    get_ffmpeg_path(),
+                    "-y",
+                    "-i",
+                    str(filepath),
+                    "-ss",
+                    str(current_time),
+                    "-t",
+                    str(end_time - current_time),
+                    "-vn",
+                ]
+
+                if filepath.suffix.lstrip(".").lower() == output_format:
+                    cmd.extend(["-c:a", "copy"])
+
+                cmd.append(str(chunk_path))
+
+                result = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=600, creationflags=get_creation_flags()
+                )
+
+                if result.returncode != 0:
+                    # Retry without -c:a copy if copy failed
+                    cmd_fallback = [
+                        get_ffmpeg_path(),
+                        "-y",
+                        "-i",
+                        str(filepath),
+                        "-ss",
+                        str(current_time),
+                        "-t",
+                        str(end_time - current_time),
+                        "-vn",
+                        str(chunk_path),
+                    ]
+                    result = subprocess.run(
+                        cmd_fallback, capture_output=True, text=True, timeout=600, creationflags=get_creation_flags()
+                    )
+                    if result.returncode != 0:
+                        raise RuntimeError(f"FFmpeg splitting failed: {result.stderr[:500]}")
+
+                chunk_size = chunk_path.stat().st_size
+                chunks.append(
+                    AudioChunk(
+                        path=chunk_path,
+                        index=chunk_index,
+                        start_time=current_time,
+                        end_time=end_time,
+                        duration=end_time - current_time,
+                        size_bytes=chunk_size,
+                    )
+                )
+
+                current_time = end_time
+                chunk_index += 1
+
+            print_info(f"Created {len(chunks)} duration chunks in {temp_dir}")
+            return ChunkingResult(success=True, chunks=chunks, temp_dir=temp_dir, original_info=audio_info)
+
+        except Exception as e:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            return ChunkingResult(success=False, error=str(e))
+
     @staticmethod
     def merge_transcripts(chunk_outputs: List[Tuple[AudioChunk, str]], include_timestamps: bool = True) -> str:
         """
@@ -1459,6 +1600,183 @@ class AudioProcessor:
                 parts.append(text.strip())
 
         return "\n\n".join(parts)
+
+    @staticmethod
+    def merge_transcribe_transcripts(chunk_outputs: List[Tuple[AudioChunk, str]]) -> str:
+        """
+        Merge transcription outputs from multiple chunks into a unified transcript.
+
+        Filters out '(No speech detected)' placeholders when other chunks contain speech.
+
+        Args:
+            chunk_outputs: List of (AudioChunk, transcript_text) tuples
+
+        Returns:
+            Merged transcript string
+        """
+        return merge_transcribe_transcripts(chunk_outputs)
+
+    @staticmethod
+    def adjust_transcript_timestamps(transcript: str, offset_seconds: float) -> str:
+        """
+        Adjust word-level and range timestamps in transcript text by adding offset_seconds.
+
+        Args:
+            transcript: Transcript text containing timestamp patterns
+            offset_seconds: Offset in seconds to add to all timestamps
+
+        Returns:
+            Transcript text with shifted timestamps
+        """
+        return adjust_transcript_timestamps(transcript, offset_seconds)
+
+
+def get_transcribe_max_duration(transcribe_config: Optional[Dict[str, Any]]) -> float:
+    """
+    Get the maximum safe chunk duration (in seconds) for Gemini Transcribe.
+
+    Returns:
+        1500.0 (25 min) if diarization or word_timestamp is enabled,
+        3000.0 (50 min) otherwise.
+    """
+    if not transcribe_config:
+        return TRANSCRIBE_STANDARD_MAX_DURATION
+    if transcribe_config.get("diarization") or transcribe_config.get("word_timestamp"):
+        return TRANSCRIBE_ADVANCED_MAX_DURATION
+    return TRANSCRIBE_STANDARD_MAX_DURATION
+
+
+def _parse_time_str(s: str) -> Optional[Tuple[float, str]]:
+    """Parse time string like '0.100s', '12.5', '01:23', '01:02:03.400'."""
+    s = s.strip()
+    if ":" in s:
+        parts = s.split(":")
+        try:
+            if len(parts) == 2:
+                mins = float(parts[0])
+                secs = float(parts[1])
+                has_ms = "." in parts[1]
+                return mins * 60 + secs, "timecode_m_ms" if has_ms else "timecode_m"
+            elif len(parts) == 3:
+                hrs = float(parts[0])
+                mins = float(parts[1])
+                secs = float(parts[2])
+                has_ms = "." in parts[2]
+                return hrs * 3600 + mins * 60 + secs, "timecode_h_ms" if has_ms else "timecode_h"
+        except ValueError:
+            return None
+    has_s = s.lower().endswith("s")
+    clean_s = s[:-1].strip() if has_s else s
+    try:
+        val = float(clean_s)
+        return val, "seconds_s" if has_s else "seconds"
+    except ValueError:
+        return None
+
+
+def _format_time_str(val: float, fmt_type: str, original_s: str) -> str:
+    """Format seconds value back according to format_type, matching original style."""
+    orig_clean = original_s.strip()
+    if fmt_type in ("seconds_s", "seconds"):
+        has_s = fmt_type == "seconds_s"
+        num_str = orig_clean[:-1] if has_s else orig_clean
+        if "." in num_str:
+            decimals = len(num_str.split(".")[1])
+            res = f"{val:.{decimals}f}"
+        else:
+            res = f"{val:.3f}".rstrip("0").rstrip(".") if not val.is_integer() else f"{int(val)}"
+        return f"{res}s" if has_s else res
+    elif fmt_type.startswith("timecode"):
+        hrs = int(val // 3600)
+        mins = int((val % 3600) // 60)
+        secs = val % 60
+        has_ms = "_ms" in fmt_type
+        if hrs > 0 or "timecode_h" in fmt_type:
+            if has_ms:
+                return f"{hrs:02d}:{mins:02d}:{secs:06.3f}"
+            return f"{hrs:02d}:{mins:02d}:{int(secs):02d}"
+        else:
+            if has_ms:
+                return f"{mins:02d}:{secs:06.3f}"
+            return f"{mins:02d}:{int(secs):02d}"
+    return f"{val:.3f}s"
+
+
+def adjust_transcript_timestamps(transcript: str, offset_seconds: float) -> str:
+    """
+    Adjust word-level and range timestamps in transcript text by adding offset_seconds.
+
+    Handles formats such as:
+    - (0.100s->0.450s) or (0.100s -> 0.450s)
+    - (0.100->0.450)
+    - (00:10->00:15) or (00:10 -> 00:15)
+    - [00:10 - 00:15]
+
+    Args:
+        transcript: Transcript text containing timestamp patterns
+        offset_seconds: Offset in seconds to add to all timestamps
+
+    Returns:
+        Transcript text with shifted timestamps
+    """
+    if offset_seconds <= 0 or not transcript:
+        return transcript
+
+    def _replace_ts(match: re.Match) -> str:
+        open_delim = match.group(1)
+        start_str = match.group(2)
+        sep = match.group(3)
+        end_str = match.group(4)
+        close_delim = match.group(5)
+
+        parsed_start = _parse_time_str(start_str)
+        parsed_end = _parse_time_str(end_str)
+
+        if not parsed_start or not parsed_end:
+            return match.group(0)
+
+        start_val, start_type = parsed_start
+        end_val, end_type = parsed_end
+
+        new_start = _format_time_str(start_val + offset_seconds, start_type, start_str)
+        new_end = _format_time_str(end_val + offset_seconds, end_type, end_str)
+
+        return f"{open_delim}{new_start}{sep}{new_end}{close_delim}"
+
+    pattern = re.compile(r"([\(\[])\s*([0-9a-zA-Z:.]+?)(\s*(?:->|–>|—>|to|-)\s*)([0-9a-zA-Z:.]+?)\s*([\)\]])")
+    return pattern.sub(_replace_ts, transcript)
+
+
+def merge_transcribe_transcripts(chunk_outputs: List[Tuple[AudioChunk, str]]) -> str:
+    """
+    Merge transcription outputs from multiple chunks into a unified transcript.
+
+    Filters out '(No speech detected)' placeholders when other chunks contain speech.
+
+    Args:
+        chunk_outputs: List of (AudioChunk, transcript_text) tuples
+
+    Returns:
+        Merged transcript string
+    """
+    if not chunk_outputs:
+        return ""
+
+    if len(chunk_outputs) == 1:
+        return chunk_outputs[0][1]
+
+    sorted_chunks = sorted(chunk_outputs, key=lambda x: x[0].index)
+
+    valid_texts = []
+    for _chunk, text in sorted_chunks:
+        t = text.strip()
+        if t and t != "(No speech detected)":
+            valid_texts.append(t)
+
+    if not valid_texts:
+        return "(No speech detected)"
+
+    return "\n\n".join(valid_texts)
 
 
 def check_ffmpeg_available() -> Tuple[bool, Optional[str]]:

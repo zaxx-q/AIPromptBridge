@@ -38,6 +38,7 @@ from .audio_processor import (
     BITRATE_OPTIONS,
     SAMPLE_RATE_OPTIONS,
     TARGET_CHUNK_SIZE_BYTES,
+    AudioChunk,
     AudioEffect,
     AudioInfo,
     AudioPreset,
@@ -45,11 +46,14 @@ from .audio_processor import (
     Intensity,
     OutputOptimization,
     ProcessingResult,
+    adjust_transcript_timestamps,
     check_ffmpeg_available,
     get_all_presets,
     get_preset,
     get_presets_by_category,
+    get_transcribe_max_duration,
     is_audio_file,
+    merge_transcribe_transcripts,
     needs_chunking,
 )
 from .base import BaseTool, ToolResult, ToolStatus
@@ -3015,6 +3019,7 @@ class FileProcessor(BaseTool):
         Process audio file using gemini-3.5-transcribe.
 
         Always uploads via Files API (recommended by Google docs).
+        Splits audio if duration exceeds model limit (30m with diarization/timestamps, 60m standard).
 
         Args:
             filepath: Path to audio file
@@ -3025,6 +3030,31 @@ class FileProcessor(BaseTool):
         Returns:
             Transcript text or None on failure
         """
+        # Check force no-chunking
+        force_no_chunk = False
+        if self._audio_preprocessing:
+            force_no_chunk = self._audio_preprocessing.get("force_no_chunking", False)
+
+        max_duration = get_transcribe_max_duration(transcribe_config)
+        audio_info = self.audio_processor.get_audio_info(filepath) if self.audio_processor.is_available() else None
+
+        if audio_info and audio_info.duration_seconds > max_duration:
+            if force_no_chunk:
+                if interactive:
+                    print(
+                        f"   ⚠️ Audio duration ({audio_info.duration_seconds / 60:.1f}m) exceeds limit "
+                        f"({max_duration / 60:.0f}m), but force_no_chunking is enabled. Attempting single request..."
+                    )
+            else:
+                if interactive:
+                    print(
+                        f"   ⚠️ Audio duration ({audio_info.duration_seconds / 60:.1f}m) exceeds transcribe limit "
+                        f"({max_duration / 60:.0f}m)"
+                    )
+                return self._process_transcribe_with_chunking(
+                    filepath, transcribe_config, checkpoint, interactive, max_duration
+                )
+
         from src.providers import create_provider
 
         # Check if disable_files_api is set and warn user if so
@@ -3093,6 +3123,141 @@ class FileProcessor(BaseTool):
             if interactive:
                 print("   🗑️ Cleaning up uploaded file...")
             provider.delete_file(uploaded.name)
+
+    def _process_transcribe_with_chunking(
+        self,
+        filepath: Path,
+        transcribe_config: Dict[str, Any],
+        checkpoint: FileProcessorCheckpoint,
+        interactive: bool,
+        max_duration_seconds: float,
+    ) -> Optional[str]:
+        """
+        Process a long audio file by splitting into chunks under the transcribe duration limit.
+
+        Args:
+            filepath: Path to audio file
+            transcribe_config: Transcription configuration
+            checkpoint: Current checkpoint
+            interactive: Show progress
+            max_duration_seconds: Maximum chunk duration in seconds
+
+        Returns:
+            Merged transcript text or None on failure
+        """
+        from src.providers import create_provider
+
+        # Check if disable_files_api is set and warn user if so
+        disable_files_api = get_setting(self.tools_config, "disable_files_api", False)
+        if disable_files_api and interactive:
+            print_warning("⚠️  Files API is disabled in settings, but the transcribe model requires Files API upload.")
+            print("  The chunks will be uploaded via Files API for transcription despite the setting.")
+
+        # Resolve settings
+        provider_name, _model_override, resolved = self._resolve_execution_settings(checkpoint)
+
+        key_manager = resolved.key_managers.get("google")
+        if not key_manager:
+            key_manager = resolved.key_managers.get(provider_name.lower())
+
+        if not key_manager:
+            raise Exception("Google/Gemini key manager not found (required for transcribe model)")
+
+        provider_config = {
+            "request_timeout": resolved.config.get("request_timeout", 120),
+            "max_retries": resolved.config.get("max_retries", 3),
+            "retry_delay": resolved.config.get("retry_delay", 5),
+            "base_url": resolved.config.get("base_url"),
+        }
+
+        provider = create_provider("google", key_manager, provider_config)
+
+        if interactive:
+            if transcribe_config.get("diarization"):
+                print("   ℹ️ Speaker diarization will be tracked per chunk segment")
+            print("   ✂️ Splitting audio with FFmpeg into duration-compliant chunks...")
+
+        split_result = self.audio_processor.split_audio_by_duration(filepath, max_duration_seconds=max_duration_seconds)
+        if not split_result.success:
+            raise Exception(f"Chunking failed: {split_result.error}")
+
+        if interactive:
+            print(f"   📊 Created {len(split_result.chunks)} chunks")
+
+        try:
+            chunk_outputs: List[Tuple[AudioChunk, str]] = []
+            chunk_errors: List[str] = []
+
+            for i, chunk in enumerate(split_result.chunks):
+                if interactive:
+                    print(f"   [{i + 1}/{len(split_result.chunks)}] Uploading {chunk.time_range_str}...")
+
+                uploaded, error = provider.upload_file(chunk.path)
+                if error:
+                    chunk_errors.append(f"Chunk {i + 1} upload: {error}")
+                    if interactive:
+                        print(f"      ⚠️ Upload error: {error[:50]}")
+                    continue
+
+                try:
+                    if interactive:
+                        mode = transcribe_config.get("mode", "VERBATIM")
+                        extras = []
+                        if transcribe_config.get("diarization"):
+                            extras.append("diarization")
+                        if transcribe_config.get("word_timestamp"):
+                            extras.append("timestamps")
+                        extra_str = f" ({', '.join(extras)})" if extras else ""
+                        print(f"      🎙️ Transcribing ({mode}{extra_str})...")
+
+                    transcript, error = provider.generate_transcription(
+                        file_uri=uploaded.uri,
+                        mime_type=uploaded.mime_type,
+                        transcribe_config=transcribe_config,
+                    )
+
+                    if error:
+                        chunk_errors.append(f"Chunk {i + 1} transcribe: {error}")
+                        if interactive:
+                            print(f"      ⚠️ Transcribe error: {error[:50]}")
+                        continue
+
+                    if transcript:
+                        # Adjust timestamps if chunk start_time > 0
+                        adjusted_transcript = adjust_transcript_timestamps(transcript, chunk.start_time)
+                        chunk_outputs.append((chunk, adjusted_transcript))
+                        if interactive:
+                            print("      ✅ Done")
+                    else:
+                        chunk_errors.append(f"Chunk {i + 1}: Empty response")
+
+                finally:
+                    # Clean up uploaded file for this chunk
+                    provider.delete_file(uploaded.name)
+
+                # Delay between chunks if configured
+                if i < len(split_result.chunks) - 1 and checkpoint.delay_between_requests > 0:
+                    time.sleep(checkpoint.delay_between_requests)
+
+            if chunk_errors:
+                unique_errors = list(dict.fromkeys(chunk_errors))[:3]
+                error_summary = "; ".join(unique_errors)
+                if len(chunk_errors) > 3:
+                    error_summary += f" (+{len(chunk_errors) - 3} more)"
+                raise Exception(f"{len(chunk_errors)}/{len(split_result.chunks)} chunks failed: {error_summary}")
+
+            if not chunk_outputs:
+                raise Exception("All chunks failed to process (no response)")
+
+            if interactive:
+                print(f"   📝 Merging {len(chunk_outputs)} chunk transcripts...")
+
+            return merge_transcribe_transcripts(chunk_outputs)
+
+        finally:
+            split_result.cleanup()
+            if interactive:
+                print("   🗑️ Cleaned up temporary files")
 
     def _preprocess_audio_if_needed(
         self, filepath: Path, interactive: bool
