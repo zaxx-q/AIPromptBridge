@@ -127,6 +127,15 @@ class GeminiNativeProvider(BaseProvider):
     ) -> Tuple[Optional[bytes], Optional[str]]:
         return gemini_services.generate_tts(self, text, model, voice_name, multi_speaker_config, retry_count)
 
+    def generate_transcription(
+        self,
+        file_uri: str,
+        mime_type: str,
+        transcribe_config: Dict[str, Any],
+        retry_count: int = 0,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        return gemini_services.generate_transcription(self, file_uri, mime_type, transcribe_config, retry_count)
+
     # =========================================================================
     # CORE GENERATION PIPELINE (TEMPLATE METHOD IMPLEMENTATIONS)
     # =========================================================================

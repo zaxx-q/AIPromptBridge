@@ -1349,6 +1349,20 @@ class AudioProcessor:
             chunk_duration = self.estimate_chunk_duration(audio_info, target_kbps)
             total_duration = audio_info.duration_seconds
 
+            # Even distribution: if we need multiple chunks, divide evenly
+            # instead of having a short final chunk
+            if total_duration > chunk_duration:
+                num_chunks = max(2, -(-int(total_duration) // int(chunk_duration)))  # ceil division
+                # But also check that each chunk stays under the target size
+                even_duration = total_duration / num_chunks
+
+                # If even_duration exceeds our estimated safe chunk duration, add more chunks
+                while even_duration > chunk_duration and num_chunks < 100:
+                    num_chunks += 1
+                    even_duration = total_duration / num_chunks
+
+                chunk_duration = even_duration
+
             print_info(f"Splitting {audio_info.size_mb:.1f} MB audio into ~{chunk_duration:.0f}s chunks")
 
             current_time = 0.0

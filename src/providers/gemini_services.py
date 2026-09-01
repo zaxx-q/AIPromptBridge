@@ -441,3 +441,214 @@ def _build_tts_request_body(text: str, voice_name: str, multi_speaker_config: Op
     }
 
     return body
+
+
+def generate_transcription(
+    provider,
+    file_uri: str,
+    mime_type: str,
+    transcribe_config: Dict[str, Any],
+    retry_count: int = 0,
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Generate transcription using gemini-3.5-transcribe.
+
+    Uses audio_transcription_config instead of regular prompts.
+
+    Args:
+        provider: GeminiNativeProvider instance
+        file_uri: URI of uploaded file (from Files API)
+        mime_type: MIME type of the audio
+        transcribe_config: Dict with keys: model, mode, diarization,
+                          word_timestamp, language_codes, custom_vocabulary
+        retry_count: Current retry attempt count
+
+    Returns:
+        (transcript_text, error) tuple
+    """
+    if not provider.key_manager or not provider.key_manager.has_keys():
+        return None, "No API keys configured for Gemini"
+
+    current_key = provider.key_manager.get_current_key()
+    if not current_key:
+        return None, "No API key available"
+
+    model = transcribe_config.get("model", "gemini-3.5-transcribe")
+    timeout = provider.config.get("request_timeout", 120)
+
+    url = f"{provider.base_url}/models/{model}:generateContent"
+    headers = {"Content-Type": "application/json", "x-goog-api-key": current_key}
+
+    # Build audio_transcription_config
+    audio_config: Dict[str, Any] = {}
+
+    mode = transcribe_config.get("mode", "VERBATIM")
+    if mode:
+        audio_config["mode"] = mode
+
+    if transcribe_config.get("diarization"):
+        audio_config["diarization"] = True
+
+    if transcribe_config.get("word_timestamp"):
+        audio_config["wordTimestamp"] = True
+
+    language_codes = transcribe_config.get("language_codes", [])
+    if language_codes:
+        audio_config["languageCodes"] = language_codes
+
+    custom_vocabulary = transcribe_config.get("custom_vocabulary", [])
+    if custom_vocabulary:
+        audio_config["customVocabulary"] = custom_vocabulary
+
+    # Build request body
+    body = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "fileData": {
+                            "fileUri": file_uri,
+                            "mimeType": mime_type,
+                        }
+                    }
+                ]
+            }
+        ],
+        "generationConfig": {
+            "audioTranscriptionConfig": audio_config,
+        },
+    }
+
+    key_label = provider.key_manager.get_key_label()
+    key_str = str(key_label)
+    if not key_str.startswith("#"):
+        key_str = f"'{key_str}'"
+
+    provider.log(
+        "info",
+        f"[Transcribe] Request: model={model}, mode={mode}, "
+        f"diarization={transcribe_config.get('diarization', False)}, "
+        f"key={key_str}, retry={retry_count}",
+    )
+
+    try:
+        response = requests.post(url, headers=headers, json=body, timeout=timeout)
+
+        if response.status_code != 200:
+            error_text = response.text[:500]
+            status_code = response.status_code
+
+            reason = provider.get_retry_reason(status_code, error_text)
+
+            if provider.should_retry(reason, retry_count):
+                delay = provider.get_retry_delay(reason)
+                error_brief = provider.sanitize_api_error(error_text, status_code)
+                provider.log_retry(reason, retry_count + 1, delay, error_brief)
+
+                if reason in (RetryReason.RATE_LIMITED, RetryReason.AUTH_ERROR):
+                    provider.rotate_key_if_possible(f"({reason.value})")
+
+                if delay > 0:
+                    time.sleep(delay)
+
+                return generate_transcription(provider, file_uri, mime_type, transcribe_config, retry_count + 1)
+
+            provider.log_error(f"[Transcribe] API error: {error_text}", status_code)
+            return None, f"Transcription error ({status_code}): {provider.sanitize_api_error(error_text, status_code)}"
+
+        data = response.json()
+
+        # Extract transcript text
+        try:
+            candidates = data.get("candidates", [])
+            if not candidates:
+                return None, "No candidates in transcription response"
+
+            content = candidates[0].get("content", {})
+            parts = content.get("parts", [])
+
+            # Collect text from parts (plain text or audioTranscription annotations)
+            text_parts = []
+            for part in parts:
+                if "text" in part:
+                    text_parts.append(part["text"])
+                elif "audioTranscription" in part or "audio_transcription" in part:
+                    transcription = part.get("audioTranscription") or part.get("audio_transcription")
+                    if transcription:
+                        speaker = transcription.get("speakerLabel") or transcription.get("speaker_label", "")
+                        words = transcription.get("words", [])
+                        word_strs = []
+                        for w in words:
+                            word_text = w.get("word", "")
+                            start = w.get("startOffset") or w.get("start_offset")
+                            end = w.get("endOffset") or w.get("end_offset")
+                            if start and end and transcribe_config.get("word_timestamp"):
+                                word_strs.append(f"({start}->{end}) {word_text}")
+                            else:
+                                word_strs.append(word_text)
+                        segment_text = " ".join(word_strs)
+                        if speaker:
+                            segment_text = f"[{speaker}] {segment_text}"
+                        if segment_text:
+                            text_parts.append(segment_text)
+
+            transcript = "\n".join(text_parts) if text_parts else ""
+
+            if not transcript.strip():
+                # Check for blocked/safety
+                finish_reason = candidates[0].get("finishReason", "")
+                if finish_reason in ("SAFETY", "BLOCKED"):
+                    return None, f"Transcription blocked: {finish_reason}"
+
+                if provider.should_retry(RetryReason.EMPTY_RESPONSE, retry_count):
+                    delay = provider.get_retry_delay(RetryReason.EMPTY_RESPONSE)
+                    provider.log_retry(RetryReason.EMPTY_RESPONSE, retry_count + 1, delay, "empty transcript")
+                    if delay > 0:
+                        time.sleep(delay)
+                    return generate_transcription(provider, file_uri, mime_type, transcribe_config, retry_count + 1)
+                return None, "Empty transcription response"
+
+        except (KeyError, IndexError) as e:
+            return None, f"Failed to parse transcription response: {e}"
+
+        usage_meta = data.get("usageMetadata", {})
+        prompt_tokens = usage_meta.get("promptTokenCount", 0)
+        total_tokens = usage_meta.get("totalTokenCount", 0)
+
+        provider.log(
+            "info",
+            f"[Transcribe] Success: {len(transcript)} chars, "
+            f"{prompt_tokens} prompt tokens, {total_tokens} total tokens",
+        )
+
+        return transcript, None
+
+    except requests.exceptions.Timeout:
+        provider.log_error(f"[Transcribe] Request timeout after {timeout}s")
+
+        if provider.should_retry(RetryReason.NETWORK_ERROR, retry_count):
+            delay = provider.get_retry_delay(RetryReason.NETWORK_ERROR)
+            provider.log_retry(RetryReason.NETWORK_ERROR, retry_count + 1, delay, f"timeout after {timeout}s")
+            provider.rotate_key_if_possible("(timeout)")
+            if delay > 0:
+                time.sleep(delay)
+            return generate_transcription(provider, file_uri, mime_type, transcribe_config, retry_count + 1)
+        return None, f"Transcription timeout after {timeout}s"
+
+    except requests.exceptions.RequestException as e:
+        error_msg = str(e)
+        provider.log_error(f"[Transcribe] Network error: {error_msg}")
+
+        if provider.should_retry(RetryReason.NETWORK_ERROR, retry_count):
+            delay = provider.get_retry_delay(RetryReason.NETWORK_ERROR)
+            provider.log_retry(RetryReason.NETWORK_ERROR, retry_count + 1, delay, error_msg[:100])
+            provider.rotate_key_if_possible("(network error)")
+            if delay > 0:
+                time.sleep(delay)
+            return generate_transcription(provider, file_uri, mime_type, transcribe_config, retry_count + 1)
+        return None, f"Transcription network error: {error_msg}"
+
+    except Exception as e:
+        error_msg = str(e)
+        provider.log_error(f"[Transcribe] Unexpected error: {error_msg}")
+        return None, f"Transcription unexpected error: {error_msg}"

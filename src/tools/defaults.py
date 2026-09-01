@@ -14,6 +14,7 @@ DEFAULT_TOOLS_CONFIG = {
         "checkpoint_file": ".file_processor_checkpoint.json",
         "warn_on_mixed_file_types": True,
         "allow_mixed_file_types": False,
+        "disable_files_api": False,
     },
     "file_processor": {
         "prompts": {
@@ -70,6 +71,28 @@ DEFAULT_TOOLS_CONFIG = {
                 "prompt": "You are tasked with performing high-fidelity audio transcription with intelligent Markdown formatting. Generate an accurate transcript formatted as clean, well-structured Markdown.\n\nTRANSCRIPTION GUIDELINES:\n1. **Accuracy**:\n   - Transcribe speech exactly as spoken\n   - Use contextual understanding to resolve ambiguous words\n   - Maintain fidelity to the original content\n\n2. **Speaker Handling**:\n   - Use **bold** for speaker labels: **Speaker 1:** or **John:**\n   - Create clear visual separation between speakers\n   - Use blockquotes for notable statements\n\n3. **Non-Speech Elements**:\n   - Use *italics* for annotations: *[laughter]*, *[music playing]*\n   - Mark unclear sections: *[inaudible]* or *[unclear: guess]*\n   - Note significant audio events in italics\n\nMARKDOWN FORMATTING:\n1. **Document Structure**:\n   - Use # for title (if audio has a clear title/topic)\n   - Use ## for major sections or topic changes\n   - Use --- for significant breaks or scene changes\n\n2. **Content Formatting**:\n   - Natural paragraph breaks at topic transitions\n   - > blockquotes for emphasized or quoted statements\n   - Bulleted lists if content includes enumerated points\n   - `code formatting` for technical terms or specific terminology\n\n3. **Timestamps**:\n   - Include timestamps as subheadings: ### [00:00] Introduction\n   - Or inline: **[02:30]** if marking specific moments\n\n4. **Special Content**:\n   - Tables for any discussed data or comparisons\n   - Numbered lists for sequential instructions\n   - Links if URLs are mentioned: [text](url)\n\nOUTPUT FORMAT:\n- Provide ONLY the formatted Markdown transcript\n- No preamble, explanations, or commentary\n- Match the language of the input\n- Begin directly with the content\n- Produce a document ready for immediate use",
                 "output_extension": ".md",
                 "default_naming": "{filename}_transcript",
+            },
+            "Transcribe (Native Verbatim)": {
+                "_is_default": True,
+                "icon": "🎙️",
+                "description": "Transcribe audio using Gemini's dedicated transcription model (verbatim)",
+                "input_types": ["audio"],
+                "prompt": "",  # Not used - transcription uses audio_transcription_config
+                "output_extension": ".txt",
+                "default_naming": "{filename}_transcript",
+                "transcribe_model": True,  # Flag to trigger transcribe path
+                "transcribe_mode": "VERBATIM",
+            },
+            "Transcribe (Native Smart)": {
+                "_is_default": True,
+                "icon": "✨",
+                "description": "Smart transcription with disfluency removal and formatting (Gemini native)",
+                "input_types": ["audio"],
+                "prompt": "",  # Not used
+                "output_extension": ".md",
+                "default_naming": "{filename}_transcript",
+                "transcribe_model": True,
+                "transcribe_mode": "SMART",
             },
             "Describe Audio": {
                 "_is_default": True,

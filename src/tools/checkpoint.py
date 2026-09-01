@@ -51,6 +51,7 @@ class FileProcessorCheckpoint:
 
     # Audio processing settings (for resume without re-prompting)
     audio_preprocessing: Optional[Dict[str, Any]] = None
+    transcribe_config: Optional[Dict[str, Any]] = None  # Transcription config for gemini-3.5-transcribe
 
     # Custom instructions (for additional user context)
     custom_instructions: Optional[str] = None  # Batch-wide instructions
@@ -248,6 +249,7 @@ class FileProcessorCheckpoint:
             use_batch=original.use_batch,
             profile_name=original.profile_name,
             audio_preprocessing=original.audio_preprocessing,  # Preserve audio settings
+            transcribe_config=original.transcribe_config,  # Preserve transcribe config
             custom_instructions=original.custom_instructions,  # Preserve batch instructions
             per_file_instructions=failed_per_file_instructions,  # Preserve per-file for failed files
             skip_per_file_prompts=original.skip_per_file_prompts,  # Preserve skip preference
@@ -435,6 +437,7 @@ class CheckpointManager:
         delay: float,
         use_batch: bool = False,
         audio_preprocessing: Optional[Dict[str, Any]] = None,
+        transcribe_config: Optional[Dict[str, Any]] = None,
         custom_instructions: Optional[str] = None,
         skip_per_file_prompts: bool = False,
         include_filename: bool = True,
@@ -488,6 +491,7 @@ class CheckpointManager:
             use_batch=use_batch,
             profile_name=profile_name,
             audio_preprocessing=audio_preprocessing,
+            transcribe_config=transcribe_config,
             custom_instructions=custom_instructions,
             per_file_instructions={},
             skip_per_file_prompts=skip_per_file_prompts,
