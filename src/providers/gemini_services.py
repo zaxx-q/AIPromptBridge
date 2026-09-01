@@ -587,6 +587,12 @@ def generate_transcription(
                 elif "audioTranscription" in part or "audio_transcription" in part:
                     transcription = part.get("audioTranscription") or part.get("audio_transcription")
                     if isinstance(transcription, dict):
+                        # Check for top-level text in audioTranscription (SMART mode returns this)
+                        at_text = transcription.get("text", "")
+                        if at_text:
+                            text_parts.append(at_text)
+                            continue
+
                         speaker = transcription.get("speakerLabel") or transcription.get("speaker_label", "")
                         words = transcription.get("words", [])
                         word_strs = []

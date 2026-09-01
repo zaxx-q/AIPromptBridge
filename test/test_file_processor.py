@@ -260,6 +260,52 @@ def test_gemini_generate_transcription():
         )
 
 
+def test_gemini_generate_transcription_smart_mode_audio_transcription_text():
+    from unittest.mock import MagicMock
+
+    from src.providers.gemini_native import GeminiNativeProvider
+
+    mock_key_mgr = MagicMock()
+    mock_key_mgr.has_keys.return_value = True
+    mock_key_mgr.get_current_key.return_value = "fake_gemini_key"
+    mock_key_mgr.get_key_label.return_value = "Key-1"
+
+    provider = GeminiNativeProvider(key_manager=mock_key_mgr, config={"request_timeout": 60})
+
+    # In SMART mode, the API returns audioTranscription.text inside parts
+    mock_response_data = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {"audioTranscription": {"text": "Heaven calls my name. I lay down, I close my eyes at night."}}
+                    ],
+                    "role": "model",
+                },
+                "finishReason": "STOP",
+            }
+        ],
+        "usageMetadata": {"promptTokenCount": 376, "totalTokenCount": 376},
+    }
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = mock_response_data
+
+    with patch("requests.post", return_value=mock_resp):
+        transcript, error = provider.generate_transcription(
+            file_uri="https://generativelanguage.googleapis.com/v1beta/files/test123",
+            mime_type="audio/ogg",
+            transcribe_config={
+                "model": "gemini-3.5-transcribe",
+                "mode": "SMART",
+            },
+        )
+
+        assert error is None
+        assert transcript == "Heaven calls my name. I lay down, I close my eyes at night."
+
+
 def test_gemini_generate_transcription_with_diarization_and_timestamps():
     from unittest.mock import MagicMock
 
