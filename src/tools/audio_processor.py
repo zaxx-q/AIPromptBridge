@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.audio.ffmpeg_utils import (
+    format_ffmpeg_error,
     get_creation_flags,
     get_ffmpeg_path,
     get_ffplay_path,
@@ -816,7 +817,7 @@ class AudioProcessor:
             if result.returncode != 0:
                 if temp_file:
                     output_path.unlink(missing_ok=True)
-                return ProcessingResult(success=False, error=f"FFmpeg failed: {result.stderr[:500]}")
+                return ProcessingResult(success=False, error=f"FFmpeg failed: {format_ffmpeg_error(result.stderr)}")
 
             return ProcessingResult(
                 success=True, output_path=output_path, original_info=audio_info, temp_file=temp_file
@@ -971,7 +972,7 @@ class AudioProcessor:
             if result.returncode != 0:
                 if temp_file:
                     output_path.unlink(missing_ok=True)
-                return ProcessingResult(success=False, error=f"FFmpeg failed: {result.stderr[:500]}")
+                return ProcessingResult(success=False, error=f"FFmpeg failed: {format_ffmpeg_error(result.stderr)}")
 
             return ProcessingResult(
                 success=True, output_path=output_path, original_info=audio_info, temp_file=temp_file
@@ -1367,14 +1368,23 @@ class AudioProcessor:
                     even_duration = total_duration / num_chunks
 
                 chunk_duration = even_duration
+            else:
+                num_chunks = 1
+                chunk_duration = total_duration
 
-            print_info(f"Splitting {audio_info.size_mb:.1f} MB audio into ~{chunk_duration:.0f}s chunks")
+            print_info(
+                f"Splitting {audio_info.size_mb:.1f} MB audio into {num_chunks} chunks (~{chunk_duration:.0f}s each)"
+            )
 
-            current_time = 0.0
-            chunk_index = 0
+            for chunk_index in range(num_chunks):
+                start_time = chunk_index * total_duration / num_chunks
+                end_time = (
+                    total_duration if chunk_index == num_chunks - 1 else (chunk_index + 1) * total_duration / num_chunks
+                )
+                duration = end_time - start_time
+                if duration <= 0.001:
+                    continue
 
-            while current_time < total_duration:
-                end_time = min(current_time + chunk_duration, total_duration)
                 chunk_path = temp_dir / f"chunk_{chunk_index:03d}.{output_format}"
 
                 # Build FFmpeg command
@@ -1384,9 +1394,9 @@ class AudioProcessor:
                     "-i",
                     str(filepath),
                     "-ss",
-                    str(current_time),
+                    f"{start_time:.6f}",
                     "-t",
-                    str(end_time - current_time),
+                    f"{duration:.6f}",
                     "-vn",  # No video
                 ]
 
@@ -1410,7 +1420,29 @@ class AudioProcessor:
                 )
 
                 if result.returncode != 0:
-                    raise RuntimeError(f"FFmpeg failed: {result.stderr[:500]}")
+                    # Retry without -c:a copy if copy failed
+                    if "-c:a" in cmd and "copy" in cmd:
+                        cmd_fallback = [
+                            get_ffmpeg_path(),
+                            "-y",
+                            "-i",
+                            str(filepath),
+                            "-ss",
+                            f"{start_time:.6f}",
+                            "-t",
+                            f"{duration:.6f}",
+                            "-vn",
+                            str(chunk_path),
+                        ]
+                        result = subprocess.run(
+                            cmd_fallback,
+                            capture_output=True,
+                            text=True,
+                            timeout=300,
+                            creationflags=get_creation_flags(),
+                        )
+                    if result.returncode != 0:
+                        raise RuntimeError(f"FFmpeg failed: {format_ffmpeg_error(result.stderr)}")
 
                 # Get actual chunk size
                 chunk_size = chunk_path.stat().st_size
@@ -1419,15 +1451,12 @@ class AudioProcessor:
                     AudioChunk(
                         path=chunk_path,
                         index=chunk_index,
-                        start_time=current_time,
+                        start_time=start_time,
                         end_time=end_time,
-                        duration=end_time - current_time,
+                        duration=duration,
                         size_bytes=chunk_size,
                     )
                 )
-
-                current_time = end_time
-                chunk_index += 1
 
             print_info(f"Created {len(chunks)} chunks in {temp_dir}")
 
@@ -1504,11 +1533,15 @@ class AudioProcessor:
                 f"Splitting {total_duration / 60:.1f}m audio into {num_chunks} chunks (~{chunk_duration / 60:.1f}m each)"
             )
 
-            current_time = 0.0
-            chunk_index = 0
+            for chunk_index in range(num_chunks):
+                start_time = chunk_index * total_duration / num_chunks
+                end_time = (
+                    total_duration if chunk_index == num_chunks - 1 else (chunk_index + 1) * total_duration / num_chunks
+                )
+                duration = end_time - start_time
+                if duration <= 0.001:
+                    continue
 
-            while current_time < total_duration:
-                end_time = min(current_time + chunk_duration, total_duration)
                 chunk_path = temp_dir / f"chunk_{chunk_index:03d}.{output_format}"
 
                 cmd = [
@@ -1517,9 +1550,9 @@ class AudioProcessor:
                     "-i",
                     str(filepath),
                     "-ss",
-                    str(current_time),
+                    f"{start_time:.6f}",
                     "-t",
-                    str(end_time - current_time),
+                    f"{duration:.6f}",
                     "-vn",
                 ]
 
@@ -1540,9 +1573,9 @@ class AudioProcessor:
                         "-i",
                         str(filepath),
                         "-ss",
-                        str(current_time),
+                        f"{start_time:.6f}",
                         "-t",
-                        str(end_time - current_time),
+                        f"{duration:.6f}",
                         "-vn",
                         str(chunk_path),
                     ]
@@ -1550,22 +1583,19 @@ class AudioProcessor:
                         cmd_fallback, capture_output=True, text=True, timeout=600, creationflags=get_creation_flags()
                     )
                     if result.returncode != 0:
-                        raise RuntimeError(f"FFmpeg splitting failed: {result.stderr[:500]}")
+                        raise RuntimeError(f"FFmpeg splitting failed: {format_ffmpeg_error(result.stderr)}")
 
                 chunk_size = chunk_path.stat().st_size
                 chunks.append(
                     AudioChunk(
                         path=chunk_path,
                         index=chunk_index,
-                        start_time=current_time,
+                        start_time=start_time,
                         end_time=end_time,
-                        duration=end_time - current_time,
+                        duration=duration,
                         size_bytes=chunk_size,
                     )
                 )
-
-                current_time = end_time
-                chunk_index += 1
 
             print_info(f"Created {len(chunks)} duration chunks in {temp_dir}")
             return ChunkingResult(success=True, chunks=chunks, temp_dir=temp_dir, original_info=audio_info)

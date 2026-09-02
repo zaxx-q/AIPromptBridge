@@ -135,6 +135,41 @@ def get_creation_flags() -> int:
     return subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
 
 
+def format_ffmpeg_error(stderr: str, max_chars: int = 500) -> str:
+    """Extract a concise, useful error message from FFmpeg stderr output.
+
+    FFmpeg outputs banner headers and configuration at the start of stderr,
+    with the actual error messages at the end.
+    """
+    if not stderr:
+        return "Unknown error"
+
+    banner_prefixes = (
+        "ffmpeg version",
+        "built with",
+        "configuration:",
+        "libavutil",
+        "libavcodec",
+        "libavformat",
+        "libavdevice",
+        "libavfilter",
+        "libswscale",
+        "libswresample",
+        "libpostproc",
+    )
+    lines = [line.strip() for line in stderr.strip().splitlines() if line.strip()]
+    if not lines:
+        return "Unknown error"
+
+    filtered = [line for line in lines if not any(line.lower().startswith(p) for p in banner_prefixes)]
+    content_lines = filtered if filtered else lines
+
+    tail = "\n".join(content_lines[-10:])
+    if len(tail) > max_chars:
+        tail = tail[-max_chars:]
+    return tail
+
+
 # =============================================================================
 # Audio Duration
 # =============================================================================

@@ -30,6 +30,7 @@ from .export import (
     sanitize_filename,
 )
 from .ffmpeg_utils import (
+    format_ffmpeg_error,
     get_audio_duration,
     is_ffmpeg_available,
     is_ffplay_available,
@@ -46,6 +47,7 @@ __all__ = [
     "build_output_filename",
     "export_audio_file",
     "export_audio_from_file",
+    "format_ffmpeg_error",
     "get_audio_duration",
     "get_default_input_device",
     "get_default_loopback_device",

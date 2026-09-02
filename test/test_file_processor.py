@@ -893,3 +893,69 @@ def test_audio_tool_process_transcription_long_audio_chunking():
         assert mock_provider.upload_file.call_count == 2
         assert mock_provider.generate_transcription.call_count == 2
         assert mock_provider.delete_file.call_count == 2
+
+
+def test_format_ffmpeg_error():
+    from src.audio.ffmpeg_utils import format_ffmpeg_error
+
+    stderr_sample = """ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers
+built with gcc 16
+configuration: --prefix=/usr --enable-libmp3lame
+libavutil 60. 26.102 / 60. 26.102
+Input #0, mov,mp4,m4a, from 'file.m4a':
+Invalid duration for option t: 4.547473508864641e-13
+Error parsing options for output file chunk_003.m4a.
+Error opening output files: Invalid argument"""
+
+    err = format_ffmpeg_error(stderr_sample)
+    assert "Invalid duration for option t" in err
+    assert "Error opening output files: Invalid argument" in err
+    assert "ffmpeg version" not in err
+
+
+def test_split_audio_floating_point_bounds(tmp_path):
+    from unittest.mock import MagicMock
+
+    from src.tools.audio_processor import AudioInfo, AudioProcessor
+
+    ap = AudioProcessor()
+    fake_audio = tmp_path / "test.m4a"
+    fake_audio.write_bytes(b"dummy")
+
+    # Audio info with total_duration = 3871.659002 (which previously caused 4 chunks instead of 3 due to float drift)
+    audio_info = AudioInfo(
+        path=fake_audio,
+        duration_seconds=3871.659002,
+        bitrate_kbps=65.459,
+        size_bytes=31679799,
+        format="m4a",
+        sample_rate=22050,
+        channels=1,
+    )
+
+    executed_cmds = []
+
+    def mock_run(cmd, *args, **kwargs):
+        executed_cmds.append(cmd)
+        mock_res = MagicMock()
+        mock_res.returncode = 0
+        mock_res.stderr = ""
+        # Create dummy chunk file so stat().st_size works
+        out_file = Path(cmd[-1])
+        out_file.write_bytes(b"chunk_bytes")
+        return mock_res
+
+    with (
+        patch.object(ap, "is_available", return_value=True),
+        patch.object(ap, "get_audio_info", return_value=audio_info),
+        patch("subprocess.run", side_effect=mock_run),
+    ):
+        result = ap.split_audio(fake_audio)
+        assert result.success is True
+        # Must be exactly 3 chunks, not 4
+        assert len(result.chunks) == 3
+        # Check start and end times
+        assert result.chunks[0].start_time == 0.0
+        assert result.chunks[-1].end_time == 3871.659002
+        for chunk in result.chunks:
+            assert chunk.duration > 1000.0  # Safe duration, no 1e-13 leftover chunks
