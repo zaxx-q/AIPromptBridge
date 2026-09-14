@@ -19,8 +19,10 @@ from ..platform import is_linux, is_windows
 from ..platform.clipboard import capture_selection_for_textedit
 from ..platform.clipboard import copy_text as platform_copy_text
 from ..platform.clipboard import paste_text as platform_paste_text
+from ..platform.focused_window import is_focused_app_terminal
 from ..platform.input import (
     copy_via_clipboard_shortcut,
+    copy_via_clipboard_shortcut_shifted,
     paste_via_clipboard_shortcut,
 )
 
@@ -29,6 +31,7 @@ from ..platform.input import (
 _INPUT_KEYBOARD = 1
 _KEYEVENTF_KEYUP = 0x0002
 _VK_CONTROL = 0x11
+_VK_SHIFT = 0x10
 _VK_C = 0x43
 _VK_V = 0x56
 _WM_COPY = 0x0301
@@ -194,6 +197,77 @@ class TextHandler:
         return sent == n
 
     @staticmethod
+    def _send_copy_keystroke_shifted() -> bool:
+        """
+        Send a terminal-safe copy command (Ctrl+Shift+C).
+
+        Terminal emulators use Ctrl+Shift+C for clipboard copy;
+        plain Ctrl+C sends SIGINT to the foreground process.
+
+        **Linux:** ``wlrctl`` / ``wtype`` virtual-keyboard Ctrl+Shift+C.
+        **Windows:** Win32 SendInput Ctrl+Shift+C.
+
+        Returns:
+            True if the platform reported a successful inject (best-effort).
+        """
+        if is_linux():
+            ok = copy_via_clipboard_shortcut_shifted()
+            if not ok:
+                logging.debug("_send_copy_keystroke_shifted: wlrctl Ctrl+Shift+C failed or unavailable")
+            return ok
+
+        if not is_windows():
+            logging.debug("_send_copy_keystroke_shifted skipped (unsupported platform)")
+            return False
+
+        user32 = ctypes.windll.user32
+
+        # Full Ctrl+Shift+C sequence via SendInput
+        events = [
+            _make_key_event(_VK_CONTROL),
+            _make_key_event(_VK_SHIFT),
+            _make_key_event(_VK_C),
+            _make_key_event(_VK_C, up=True),
+            _make_key_event(_VK_SHIFT, up=True),
+            _make_key_event(_VK_CONTROL, up=True),
+        ]
+
+        n = len(events)
+        arr = (_INPUT * n)(*events)
+        sent = user32.SendInput(n, arr, ctypes.sizeof(_INPUT))
+
+        if sent != n:
+            logging.warning(f"SendInput shifted copy: only {sent}/{n} events were injected")
+
+        logging.debug(f"SendInput shifted copy: {sent}/{n} events sent")
+        return sent == n
+
+    def _resolve_terminal_copy_mode(self) -> str:
+        """Resolve terminal copy shortcut mode from config.
+
+        Returns:
+            'auto', 'always_ctrl_c', or 'always_ctrl_shift_c'
+        """
+        mode = self.config.get("text_edit_terminal_copy_shortcut", "auto")
+        if mode in ("always_ctrl_c", "always_ctrl_shift_c"):
+            return mode
+        return "auto"
+
+    def _should_use_shifted_copy(self) -> bool:
+        """Determine if Ctrl+Shift+C should be used based on config and focused app.
+
+        Returns:
+            True if Ctrl+Shift+C should be used instead of Ctrl+C.
+        """
+        mode = self._resolve_terminal_copy_mode()
+        if mode == "always_ctrl_c":
+            return False
+        if mode == "always_ctrl_shift_c":
+            return True
+        # auto: detect if focused app is a terminal
+        return is_focused_app_terminal()
+
+    @staticmethod
     def _send_paste_keystroke() -> bool:
         """
         Send a Ctrl+V paste command.
@@ -272,10 +346,15 @@ class TextHandler:
                     if hasattr(self, "config") and self.config
                     else False
                 )
+                # Choose terminal-safe copy shortcut based on focused window
+                copy_fn = (
+                    copy_via_clipboard_shortcut_shifted if self._should_use_shifted_copy() else None  # default Ctrl+C
+                )
                 return capture_selection_for_textedit(
                     timeout=max_wait,
                     allow_ctrl_c=True,
                     allow_primary=allow_primary,
+                    copy_fn=copy_fn,
                 )
             except Exception as e:
                 logging.error(f"Linux selection capture failed: {e}")
@@ -308,10 +387,14 @@ class TextHandler:
             self.is_copying = True
             self.last_copy_time = time.time()
             # Use Win32 SendInput instead of pynput to ensure a clean Ctrl+C
-            # even when modifier keys are still held from the hotkey combo
-            self._send_copy_keystroke()
+            # even when modifier keys are still held from the hotkey combo.
+            # For terminals, use Ctrl+Shift+C to avoid sending SIGINT.
+            if self._should_use_shifted_copy():
+                self._send_copy_keystroke_shifted()
+            else:
+                self._send_copy_keystroke()
         except Exception as e:
-            logging.error(f"Failed to simulate Ctrl+C: {e}")
+            logging.error(f"Failed to simulate copy keystroke: {e}")
             self.is_copying = False
             return ""
 
@@ -407,12 +490,17 @@ class TextHandler:
                     if hasattr(self, "config") and self.config
                     else False
                 )
+                # Use same terminal-safe copy function as fast path
+                copy_fn = (
+                    copy_via_clipboard_shortcut_shifted if self._should_use_shifted_copy() else None  # default Ctrl+C
+                )
                 return capture_selection_for_textedit(
                     timeout=1.2,
                     poll_interval=0.02,
                     allow_ctrl_c=True,
                     resend_after=0.4,
                     allow_primary=allow_primary,
+                    copy_fn=copy_fn,
                 )
             except Exception as e:
                 logging.error(f"Linux slow-app selection capture failed: {e}")
@@ -436,11 +524,13 @@ class TextHandler:
         # Longer pre-send delay — Electron needs time after focus change
         time.sleep(0.08)
 
-        # Send copy keystroke
+        # Send copy keystroke (terminal-safe when applicable)
+        _use_shifted = self._should_use_shifted_copy()
+        _copy_method = self._send_copy_keystroke_shifted if _use_shifted else self._send_copy_keystroke
         try:
             self.is_copying = True
             self.last_copy_time = time.time()
-            self._send_copy_keystroke()
+            _copy_method()
         except Exception as e:
             logging.error(f"Slow-app copy failed: {e}")
             self.is_copying = False
@@ -468,7 +558,7 @@ class TextHandler:
                 resent = True
                 logging.debug("Re-sending copy keystroke for slow app")
                 try:
-                    self._send_copy_keystroke()
+                    _copy_method()
                 except Exception:
                     pass
 

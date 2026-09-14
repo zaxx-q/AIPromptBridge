@@ -21,10 +21,16 @@ from .clipboard import (
 )
 from .console_input import RawConsole, get_key, is_console_input_available
 from .detect import is_linux, is_wayland, is_windows
+from .focused_window import (
+    get_focused_app_id,
+    is_focused_app_terminal,
+    set_user_terminal_ids,
+)
 from .input import (
     abort_typing,
     backend_supports_keystroke_delay,
     copy_via_clipboard_shortcut,
+    copy_via_clipboard_shortcut_shifted,
     get_keyboard_backend,
     is_keyboard_input_available,
     is_wlrctl_available,
@@ -82,10 +88,12 @@ __all__ = [
     "copy_rich_text",
     "copy_text",
     "copy_via_clipboard_shortcut",
+    "copy_via_clipboard_shortcut_shifted",
     "decode_message",
     "encode_reply_error",
     "encode_reply_ok",
     "encode_trigger",
+    "get_focused_app_id",
     "get_focused_output_geometry",
     "get_key",
     "get_keyboard_backend",
@@ -94,6 +102,7 @@ __all__ = [
     "get_socket_path",
     "has_primary_selection",
     "is_console_input_available",
+    "is_focused_app_terminal",
     "is_grim_slurp_available",
     "is_inside_tmux",
     "is_keyboard_input_available",
@@ -114,5 +123,6 @@ __all__ = [
     "press_chord",
     "send_trigger",
     "session_exists",
+    "set_user_terminal_ids",
     "type_text",
 ]

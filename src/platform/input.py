@@ -281,14 +281,42 @@ def press_chord(modifiers: list[str], key: str) -> bool:
     return False
 
 
+def _press_chord_prefer_wlrctl(modifiers: list[str], key: str) -> bool:
+    """Send a key chord preferring wlrctl over wtype.
+
+    wtype can emit a spurious Escape event when sending modifier chords like
+    Ctrl+C, which confuses some applications. wlrctl does not have this quirk,
+    so clipboard shortcuts (copy/paste) prefer wlrctl when available and only
+    fall back to wtype.
+    """
+    if not is_linux():
+        return False
+    if not key:
+        return False
+    _refresh_binary_cache()
+    if _wlrctl_path:
+        return _press_chord_wlrctl(modifiers, key)
+    if _wtype_path:
+        return _press_chord_wtype(modifiers, key)
+    return False
+
+
 def paste_via_clipboard_shortcut() -> bool:
     """Send Ctrl+V into the focused client (clipboard must already hold the text)."""
-    return press_chord(["CTRL"], "v")
+    return _press_chord_prefer_wlrctl(["CTRL"], "v")
 
 
 def copy_via_clipboard_shortcut() -> bool:
     """Send Ctrl+C into the focused client (optional hybrid capture helper)."""
-    return press_chord(["CTRL"], "c")
+    return _press_chord_prefer_wlrctl(["CTRL"], "c")
+
+
+def copy_via_clipboard_shortcut_shifted() -> bool:
+    """Send Ctrl+Shift+C into the focused client (terminal-safe copy).
+
+    Terminal emulators use Ctrl+Shift+C for copy (Ctrl+C sends SIGINT).
+    """
+    return _press_chord_prefer_wlrctl(["CTRL", "SHIFT"], "c")
 
 
 def _type_segment(segment: str, *, timeout: float = _TYPE_TIMEOUT) -> bool:

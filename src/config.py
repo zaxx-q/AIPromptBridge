@@ -44,6 +44,9 @@ DEFAULT_CONFIG = {
     "streaming_typing_delay": 0,
     # Enable slow application retry strategy for text capture (Obsidian, XMind, Anki, etc.)
     "text_edit_slow_app_retry": False,
+    # Terminal copy shortcut mode: auto (detect terminals), always_ctrl_c, always_ctrl_shift_c
+    # 'auto' detects if the focused app is a terminal and uses Ctrl+Shift+C to avoid SIGINT
+    "text_edit_terminal_copy_shortcut": "auto",
     # Screen Snipping Tool settings
     "screen_snip_enabled": True,
     "screen_snip_hotkey": "ctrl+alt+x",
@@ -419,6 +422,12 @@ streaming_typing_delay = 0
 # Enable this if you use slow Electron/JavaFX apps (Obsidian, XMind, Anki)
 # where capturing selected text fails. Adds latency when no text is selected.
 text_edit_slow_app_retry = false
+
+# Terminal copy shortcut mode
+# 'auto' = detect terminal apps and use Ctrl+Shift+C (avoids SIGINT)
+# 'always_ctrl_c' = always use Ctrl+C (may interrupt terminal processes)
+# 'always_ctrl_shift_c' = always use Ctrl+Shift+C
+text_edit_terminal_copy_shortcut = auto
 
 # ============================================================
 # SCREEN SNIPPING TOOL - Capture screen regions for AI analysis

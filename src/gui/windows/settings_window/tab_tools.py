@@ -69,6 +69,16 @@ class ToolsTabMixin:
             hint="Enable for Obsidian/Anki/XMind if text capture fails. Adds delay when no text is selected.",
         )
 
+        self._add_dropdown_field(
+            content,
+            "text_edit_terminal_copy_shortcut",
+            "Terminal copy shortcut:",
+            self.config_data.config.get("text_edit_terminal_copy_shortcut", "auto"),
+            options=["auto", "always_ctrl_c", "always_ctrl_shift_c"],
+            size="md",
+            hint="'auto' detects terminals and uses Ctrl+Shift+C to avoid SIGINT",
+        )
+
         # --- ScreenSnip ---
         create_section_header(content, "📸 ScreenSnip", self.colors, top_padding=20)
 

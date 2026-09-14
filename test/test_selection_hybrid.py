@@ -389,3 +389,83 @@ def test_clear_clipboard_calls_wl_copy_clear():
         args_primary = mock_run.call_args[0][0]
         assert "--clear" in args_primary
         assert "--primary" in args_primary
+
+
+# ── Terminal-safe copy_fn passthrough ────────────────────────────────────────
+
+
+def test_capture_via_ctrl_c_uses_custom_copy_fn():
+    """When copy_fn is provided, _capture_via_ctrl_c uses it instead of default Ctrl+C."""
+    custom_copy = MagicMock(return_value=True)
+    paste_calls = {"n": 0}
+
+    def fake_paste(*, primary: bool = False) -> str:
+        paste_calls["n"] += 1
+        if paste_calls["n"] == 1:
+            return ""  # backup
+        return "terminal-text"  # after copy
+
+    with (
+        patch.object(clipboard_mod, "is_linux", return_value=True),
+        patch.object(clipboard_mod, "paste_text", side_effect=fake_paste),
+        patch.object(clipboard_mod, "copy_text", return_value=True),
+        patch.object(clipboard_mod, "clear_clipboard", return_value=True),
+        patch("src.platform.input.is_wlrctl_available", return_value=True),
+        patch("src.platform.input.copy_via_clipboard_shortcut") as mock_default_copy,
+        patch.object(clipboard_mod.time, "sleep"),
+    ):
+        result = clipboard_mod._capture_via_ctrl_c(timeout=0.05, poll_interval=0.001, copy_fn=custom_copy)
+        assert result == "terminal-text"
+        custom_copy.assert_called()
+        mock_default_copy.assert_not_called()
+
+
+def test_capture_via_ctrl_c_default_copy_fn_when_none():
+    """When copy_fn is None, _capture_via_ctrl_c falls back to default copy_via_clipboard_shortcut."""
+    paste_calls = {"n": 0}
+
+    def fake_paste(*, primary: bool = False) -> str:
+        paste_calls["n"] += 1
+        if paste_calls["n"] == 1:
+            return ""  # backup
+        return "normal-text"
+
+    with (
+        patch.object(clipboard_mod, "is_linux", return_value=True),
+        patch.object(clipboard_mod, "paste_text", side_effect=fake_paste),
+        patch.object(clipboard_mod, "copy_text", return_value=True),
+        patch.object(clipboard_mod, "clear_clipboard", return_value=True),
+        patch("src.platform.input.is_wlrctl_available", return_value=True),
+        patch("src.platform.input.copy_via_clipboard_shortcut", return_value=True) as mock_default,
+        patch.object(clipboard_mod.time, "sleep"),
+    ):
+        result = clipboard_mod._capture_via_ctrl_c(timeout=0.05, poll_interval=0.001, copy_fn=None)
+        assert result == "normal-text"
+        mock_default.assert_called()
+
+
+def test_textedit_capture_threads_copy_fn():
+    """capture_selection_for_textedit passes copy_fn through to _capture_via_ctrl_c."""
+    custom_copy = MagicMock(return_value=True)
+
+    paste_calls = {"n": 0}
+
+    def fake_paste(*, primary: bool = False) -> str:
+        paste_calls["n"] += 1
+        if paste_calls["n"] == 1:
+            return ""
+        return "shifted-text"
+
+    with (
+        patch.object(clipboard_mod, "is_linux", return_value=True),
+        patch.object(clipboard_mod, "paste_text", side_effect=fake_paste),
+        patch.object(clipboard_mod, "copy_text", return_value=True),
+        patch.object(clipboard_mod, "clear_clipboard", return_value=True),
+        patch("src.platform.input.is_wlrctl_available", return_value=True),
+        patch("src.platform.input.copy_via_clipboard_shortcut") as mock_default,
+        patch.object(clipboard_mod.time, "sleep"),
+    ):
+        result = capture_selection_for_textedit(timeout=0.05, poll_interval=0.001, copy_fn=custom_copy)
+        assert result == "shifted-text"
+        custom_copy.assert_called()
+        mock_default.assert_not_called()

@@ -155,25 +155,32 @@ class TextEditToolApp:
         else:
             # Linux IPC path — surface capture capabilities once at start
             caps = "trigger via: --trigger textedit"
+            has_warning = False
             if is_linux():
                 try:
                     from ..platform.clipboard import is_wl_clipboard_available
-                    from ..platform.input import is_wlrctl_available
+                    from ..platform.input import get_keyboard_backend, is_wlrctl_available
 
                     parts = []
                     if is_wl_clipboard_available():
                         parts.append("primary/clipboard")
                     else:
                         parts.append("wl-clipboard missing")
+                        has_warning = True
                     if is_wlrctl_available():
-                        parts.append("hybrid Ctrl+C")
+                        backend = get_keyboard_backend()
+                        parts.append(f"hybrid Ctrl+C ({backend})")
                     else:
-                        parts.append("wlrctl missing (keyboard select limited)")
+                        parts.append("⚠ wtype/wlrctl missing — text selection capture will not work")
+                        has_warning = True
                     if parts:
                         caps = f"{'; '.join(parts)}; {caps}"
                 except Exception:
                     pass
-            print(f"  ✅ TextEditTool: Ready ({caps})")
+            if has_warning:
+                print(f"  ⚠️  TextEditTool: Ready ({caps})")
+            else:
+                print(f"  ✅ TextEditTool: Ready ({caps})")
 
     def stop(self):
         """Stop the TextEditTool application."""
@@ -319,10 +326,11 @@ class TextEditToolApp:
         Handle request for a second text selection (compare mode).
 
         Shows a toast notification instructing the user to select text and
-        press Ctrl+C. Listens for Ctrl+C via pynput, reads the clipboard
-        after a short delay, then invokes on_captured/on_cancelled on the
-        GUI thread (via GUICoordinator.run_on_gui_thread) to avoid the
-        "main thread is not in main loop" Tkinter error.
+        press Ctrl+C (or Ctrl+Shift+C in terminals). Listens for both key
+        combos via pynput, reads the clipboard after a short delay, then
+        invokes on_captured/on_cancelled on the GUI thread (via
+        GUICoordinator.run_on_gui_thread) to avoid the "main thread is not
+        in main loop" Tkinter error.
 
         Args:
             on_captured: Callable[[str], None] - called with the second text
@@ -335,17 +343,21 @@ class TextEditToolApp:
 
         TIMEOUT_SECS = 20
 
-        logging.debug("[TextEditTool] Compare mode: waiting for Ctrl+C with second text...")
+        logging.debug("[TextEditTool] Compare mode: waiting for copy shortcut with second text...")
 
         # Show user instruction via toast notification
         GUICoordinator.get_instance().request_toast_notification(
             title="Compare Mode — Select 2nd text",
-            message=f"Select text, press Ctrl+C to confirm  •  Esc to cancel  •  ({TIMEOUT_SECS}s timeout)",
+            message=(
+                f"Select text, press Ctrl+C (or Ctrl+Shift+C in terminals) to confirm"
+                f"  •  Esc to cancel  •  ({TIMEOUT_SECS}s timeout)"
+            ),
             timeout_ms=TIMEOUT_SECS * 1000,
         )
 
         captured = [False]
         ctrl_held = [False]
+        shift_held = [False]
         _listener_ref = [None]
 
         def _finish(text_or_none):
@@ -383,16 +395,24 @@ class TextEditToolApp:
                     ctrl_held[0] = True
                     return
 
+                if key in (pykeyboard.Key.shift_l, pykeyboard.Key.shift_r):
+                    shift_held[0] = True
+                    return
+
                 # Detect C key (char 'c' or control-char '\x03') while Ctrl held
+                # Accepts both Ctrl+C and Ctrl+Shift+C (terminal-safe copy)
                 is_c = False
                 try:
-                    if key.char in ("c", "\x03"):
+                    if key.char in ("c", "C", "\x03"):
                         is_c = True
                 except AttributeError:
                     pass
 
                 if is_c and ctrl_held[0]:
-                    # Ctrl+C detected — read clipboard after OS has updated it
+                    # Ctrl+C or Ctrl+Shift+C detected — read clipboard after OS has updated it
+                    combo = "Ctrl+Shift+C" if shift_held[0] else "Ctrl+C"
+                    logging.debug(f"[TextEditTool] Compare mode: {combo} detected")
+
                     def _delayed_read():
                         time.sleep(0.15)  # Give OS time to copy selection
                         try:
@@ -409,6 +429,8 @@ class TextEditToolApp:
         def _on_release(key):
             if key in (pykeyboard.Key.ctrl_l, pykeyboard.Key.ctrl_r):
                 ctrl_held[0] = False
+            if key in (pykeyboard.Key.shift_l, pykeyboard.Key.shift_r):
+                shift_held[0] = False
 
         listener = pykeyboard.Listener(on_press=_on_press, on_release=_on_release)
         _listener_ref[0] = listener

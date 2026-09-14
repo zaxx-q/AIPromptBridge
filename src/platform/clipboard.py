@@ -15,7 +15,10 @@ import shutil
 import subprocess
 import threading
 import time
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from .detect import is_linux
 
@@ -360,12 +363,19 @@ def _capture_via_ctrl_c(
     timeout: float = _HYBRID_DEFAULT_TIMEOUT,
     poll_interval: float = _HYBRID_POLL_INTERVAL,
     resend_after: Optional[float] = None,
+    copy_fn: Optional["Callable[[], bool]"] = None,
 ) -> str:
     """
-    Inject Ctrl+C, poll clipboard for new text, restore previous clipboard.
+    Inject a copy shortcut, poll clipboard for new text, restore previous clipboard.
 
     Always restores the pre-capture clipboard best-effort in ``finally``.
     Returns captured text or empty string. Does not re-check primary.
+
+    Args:
+        copy_fn: Optional override for the copy keystroke function.
+                 Defaults to ``copy_via_clipboard_shortcut`` (Ctrl+C).
+                 Pass ``copy_via_clipboard_shortcut_shifted`` for terminal-safe
+                 Ctrl+Shift+C.
     """
     # Local import avoids any risk of circular imports at module load.
     from .input import copy_via_clipboard_shortcut, is_wlrctl_available
@@ -380,6 +390,8 @@ def _capture_via_ctrl_c(
                 "for keyboard-selection capture (wlroots compositors such as niri)."
             )
         return ""
+
+    _copy = copy_fn or copy_via_clipboard_shortcut
 
     # Snapshot current clipboard so we can restore after hijacking it for capture.
     try:
@@ -398,11 +410,11 @@ def _capture_via_ctrl_c(
         # trigger bind are settled before sending Ctrl+C.
         time.sleep(0.01)
 
-        if not copy_via_clipboard_shortcut():
+        if not _copy():
             if not _hybrid_fail_warned:
                 _hybrid_fail_warned = True
                 logger.info(
-                    "No primary selection; Ctrl+C inject failed — install wlrctl "
+                    "No primary selection; copy shortcut inject failed — install wlrctl "
                     "and focus the target app for keyboard-selection capture."
                 )
             return ""
@@ -423,9 +435,9 @@ def _capture_via_ctrl_c(
 
             if resend_after is not None and not resent and (time.time() - start) >= resend_after:
                 resent = True
-                logger.debug("Hybrid capture: re-sending Ctrl+C for slow app")
+                logger.debug("Hybrid capture: re-sending copy shortcut for slow app")
                 try:
-                    copy_via_clipboard_shortcut()
+                    _copy()
                 except Exception:
                     pass
 
@@ -434,12 +446,12 @@ def _capture_via_ctrl_c(
         if not captured and not _hybrid_fail_warned:
             _hybrid_fail_warned = True
             logger.info(
-                "No primary selection; Ctrl+C inject produced no clipboard text — "
+                "No primary selection; copy shortcut inject produced no clipboard text — "
                 "focus the target app, or select text with the mouse (primary)."
             )
         return captured
     except Exception as e:
-        logger.debug("Hybrid Ctrl+C capture failed: %s", e)
+        logger.debug("Hybrid copy capture failed: %s", e)
         return ""
     finally:
         # Always restore best-effort so we do not leave the user's clipboard polluted.
@@ -458,6 +470,7 @@ def capture_selection_hybrid(
     resend_after: Optional[float] = None,
     prefer_ctrl_c: bool = False,
     allow_primary: bool = True,
+    copy_fn: Optional["Callable[[], bool]"] = None,
 ) -> str:
     """
     Capture selected text on Wayland with optional Ctrl+C hybrid fallback.
@@ -484,6 +497,10 @@ def capture_selection_hybrid(
             (slow-app retry). Only applies to the Ctrl+C path.
         prefer_ctrl_c: When True, query focused window via Ctrl+C before passive selection.
         allow_primary: Whether primary selection can be used as fallback when Ctrl+C yields nothing.
+        copy_fn: Optional override for the copy keystroke function.
+                 Defaults to ``copy_via_clipboard_shortcut`` (Ctrl+C).
+                 Pass ``copy_via_clipboard_shortcut_shifted`` for terminal-safe
+                 Ctrl+Shift+C.
 
     Returns:
         Captured text, or empty string.
@@ -499,11 +516,12 @@ def capture_selection_hybrid(
                 timeout=timeout,
                 poll_interval=poll_interval,
                 resend_after=resend_after,
+                copy_fn=copy_fn,
             )
             if captured and captured.strip():
                 return captured
 
-            # Ctrl+C yielded nothing. On Wayland, primary selection persists
+            # Copy shortcut yielded nothing. On Wayland, primary selection persists
             # indefinitely after any highlight, so only fall back to it if explicitly requested.
             if allow_primary:
                 primary = paste_text(primary=True)
@@ -535,6 +553,7 @@ def capture_selection_hybrid(
         timeout=timeout,
         poll_interval=poll_interval,
         resend_after=resend_after,
+        copy_fn=copy_fn,
     )
 
 
@@ -545,15 +564,22 @@ def capture_selection_for_textedit(
     allow_ctrl_c: bool = True,
     resend_after: Optional[float] = None,
     allow_primary: bool = False,
+    copy_fn: Optional["Callable[[], bool]"] = None,
 ) -> str:
     """Capture an active selection for TextEdit without trusting stale clipboard text.
 
-    Active query via Ctrl+C is used first to ask the currently focused window for
-    its selection (supports Google Docs, browser inputs, text editors, etc.).
+    Active query via Ctrl+C (or Ctrl+Shift+C for terminals) is used first to
+    ask the currently focused window for its selection (supports Google Docs,
+    browser inputs, text editors, terminals, etc.).
     On Wayland, primary selection persists indefinitely after mouse highlights and
     is never cleared on window change or deselect; therefore, ``allow_primary``
     defaults to False so that empty selections correctly open the input popup
     rather than using stale text from earlier activities.
+
+    Args:
+        copy_fn: Optional override for the copy keystroke. When the focused app
+                 is a terminal emulator, callers should pass
+                 ``copy_via_clipboard_shortcut_shifted`` to avoid sending SIGINT.
     """
     return capture_selection_hybrid(
         timeout=timeout,
@@ -563,6 +589,7 @@ def capture_selection_for_textedit(
         resend_after=resend_after,
         prefer_ctrl_c=True,
         allow_primary=allow_primary,
+        copy_fn=copy_fn,
     )
 
 
