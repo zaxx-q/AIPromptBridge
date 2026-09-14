@@ -1,5 +1,23 @@
 # Changelog
 
+## [8.4.0] - 2026-09-14
+
+### New Features
+
+- **Terminal-Safe Text Selection**: TextEdit now automatically detects when the focused application is a terminal emulator and uses Ctrl+Shift+C instead of Ctrl+C to avoid sending SIGINT to foreground processes. Terminal detection queries compositor IPC (`niri msg`, `swaymsg`, `hyprctl`) on Linux and process names on Windows, matching against ~50 known terminal app IDs with reverse-DNS last-segment matching (e.g. `com.mitchellh.ghostty`). Configure via `text_edit_terminal_copy_shortcut` in Settings (auto/always_ctrl_c/always_ctrl_shift_c). Compare Mode also accepts both Ctrl+C and Ctrl+Shift+C.
+
+### Improvements
+
+- **Clipboard Chord Reliability**: Clipboard shortcut injection (Ctrl+C, Ctrl+V) now prefers `wlrctl` over `wtype` on Linux, avoiding a `wtype` quirk that can emit a spurious Escape event during modifier key chords. `wtype` remains the preferred backend for text typing.
+- **Ctrl+A Select All in Inputs**: Added cross-platform Ctrl+A select-all support to popup input fields and `ScrollableComboBox` entry widgets, including native Tk entry bindings on Linux where the default Ctrl+A binding is absent.
+
+### Fixes
+
+- **Wayland Popup Positioning**: Popups on Wayland now center on the currently focused monitor instead of using stale Xwayland cursor coordinates, which could become trapped on inactive X11 windows (such as ONLYOFFICE). Focused output geometry is queried via compositor IPC across niri, Sway, and Hyprland.
+- **Wayland Popup Keyboard Focus**: Linux popups now use borderless managed splash window attributes instead of `overrideredirect`, ensuring the compositor maps them to the active workspace and grants proper keyboard input focus.
+- **Popup Dropdown Click-Through**: Fixed `ScrollableComboBox` dropdown items triggering controls underneath the dropdown on Wayland by switching item selection from mouse press to mouse release events.
+- **Popup Input Focus**: Added a delayed focus request to popup input fields, ensuring keyboard focus is reliably acquired after the window is mapped.
+
 ## [8.3.0] - 2026-09-08
 
 ### New Features
