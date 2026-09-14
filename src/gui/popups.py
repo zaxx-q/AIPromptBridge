@@ -265,6 +265,26 @@ def _make_draggable(root, frame):
     _bind_recursive(frame)
 
 
+def _bind_select_all(entry):
+    """Add cross-platform Ctrl+A support to a Tk or CustomTkinter entry."""
+
+    def select_all(_event):
+        try:
+            native_entry = getattr(entry, "_entry", entry)
+            native_entry.selection_range(0, tk.END)
+            native_entry.icursor(tk.END)
+        except tk.TclError:
+            pass
+        return "break"
+
+    # CTkEntry contains a native Tk Entry. Bind both because Linux sends keyboard
+    # events to the native control, which lacks Tk's Windows Ctrl+A default.
+    for widget in (entry, getattr(entry, "_entry", None)):
+        if widget is not None:
+            widget.bind("<Control-a>", select_all)
+            widget.bind("<Control-A>", select_all)
+
+
 # =============================================================================
 # Custom UI Components (CustomTkinter-based)
 # =============================================================================
@@ -1548,6 +1568,7 @@ class AttachedInputPopup:
             )
             self.input_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
             self.input_entry.bind("<Return>", lambda e: self._submit())
+            _bind_select_all(self.input_entry)
 
             send_btn = ctk.CTkButton(
                 input_frame,
@@ -1656,6 +1677,7 @@ class AttachedInputPopup:
             self.input_entry.bind("<FocusIn>", self._on_focus_in)
             self.input_entry.bind("<FocusOut>", self._on_focus_out)
             self.input_entry.bind("<Return>", lambda e: self._submit())
+            _bind_select_all(self.input_entry)
 
             # Send button
             send_btn = tk.Label(
@@ -2023,6 +2045,7 @@ class AttachedPromptPopup:
             )
             self.edit_input.pack(side="left", fill="x", expand=True, padx=(10, 0))
             self.edit_input.bind("<Return>", lambda e: self._on_custom_submit())
+            _bind_select_all(self.edit_input)
             Tooltip(edit_btn, "Edit text with custom instructions")
 
             # Ask input with split buttons (Ask + Compare)
@@ -2092,6 +2115,7 @@ class AttachedPromptPopup:
             )
             self.ask_input.pack(side="left", fill="x", expand=True, padx=(10, 0))
             self.ask_input.bind("<Return>", lambda e: self._on_ask_submit())
+            _bind_select_all(self.ask_input)
 
             # Action buttons
             self._create_carousel(content_frame)
@@ -2214,6 +2238,7 @@ class AttachedPromptPopup:
             self.edit_input.bind("<FocusIn>", lambda e: self._on_edit_focus_in())
             self.edit_input.bind("<FocusOut>", lambda e: self._on_edit_focus_out())
             self.edit_input.bind("<Return>", lambda e: self._on_custom_submit())
+            _bind_select_all(self.edit_input)
 
             # Ask input area with split buttons (Ask + Compare)
             ask_container = tk.Frame(
@@ -2274,6 +2299,7 @@ class AttachedPromptPopup:
             self.ask_input.bind("<FocusIn>", lambda e: self._on_ask_focus_in())
             self.ask_input.bind("<FocusOut>", lambda e: self._on_ask_focus_out())
             self.ask_input.bind("<Return>", lambda e: self._on_ask_submit())
+            _bind_select_all(self.ask_input)
 
             # Action buttons carousel
             self._create_carousel_tk(content_frame)

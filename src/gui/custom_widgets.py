@@ -768,6 +768,8 @@ class ScrollableComboBox:
 
             # Bind events
             self.entry.bind("<KeyRelease>", self._on_key_release)
+            self.entry.bind("<Control-a>", self._on_select_all)
+            self.entry.bind("<Control-A>", self._on_select_all)
             self.entry.bind("<Return>", self._on_enter)
             self.entry.bind("<Down>", self._on_arrow_down)
             self.entry.bind("<Escape>", lambda e: self._close_dropdown())
@@ -780,6 +782,10 @@ class ScrollableComboBox:
                 w.bind("<Button-5>", self._on_mousewheel)
 
             if hasattr(self.entry, "_entry"):
+                # Bind the native Tk entry too: on Linux it receives key events
+                # directly and does not inherit the platform Ctrl+A binding.
+                self.entry._entry.bind("<Control-a>", self._on_select_all)
+                self.entry._entry.bind("<Control-A>", self._on_select_all)
                 self.entry._entry.bind("<MouseWheel>", self._on_mousewheel)
                 self.entry._entry.bind("<Button-4>", self._on_mousewheel)
                 self.entry._entry.bind("<Button-5>", self._on_mousewheel)
@@ -822,6 +828,8 @@ class ScrollableComboBox:
 
             # Bind events
             self.entry.bind("<KeyRelease>", self._on_key_release)
+            self.entry.bind("<Control-a>", self._on_select_all)
+            self.entry.bind("<Control-A>", self._on_select_all)
             self.entry.bind("<Return>", self._on_enter)
             self.entry.bind("<Down>", self._on_arrow_down)
             self.entry.bind("<Escape>", lambda e: self._close_dropdown())
@@ -856,6 +864,16 @@ class ScrollableComboBox:
         if not self._dropdown_open and self.state != "disabled":
             self._compute_filtered_values()
             self._open_dropdown()
+
+    def _on_select_all(self, _event):
+        """Select all entry text consistently across Tk platforms."""
+        try:
+            entry = getattr(self.entry, "_entry", self.entry)
+            entry.selection_range(0, tk.END)
+            entry.icursor(tk.END)
+        except tk.TclError:
+            pass
+        return "break"
 
     def _on_arrow_click(self):
         """Handle click on arrow button - toggle dropdown."""
@@ -1044,7 +1062,10 @@ class ScrollableComboBox:
         self._text_widget.configure(state="disabled")
 
         # Bind events
-        self._text_widget.bind("<Button-1>", self._on_text_click)
+        # Select on release, not press.  Closing the toplevel on ButtonPress lets
+        # the matching ButtonRelease fall through to whichever popup control is
+        # underneath the dropdown (especially on Wayland).
+        self._text_widget.bind("<ButtonRelease-1>", self._on_text_release)
         self._text_widget.bind("<Motion>", self._on_text_motion)
         self._text_widget.bind("<Leave>", self._on_text_leave)
 
@@ -1139,17 +1160,20 @@ class ScrollableComboBox:
 
         return "break"
 
-    def _on_text_click(self, event):
-        """Handle click on text widget - select item."""
+    def _on_text_release(self, event):
+        """Select the released dropdown item without leaking its mouse-up event."""
         if not self._text_widget:
-            return
+            return "break"
 
-        # Get clicked line
+        # Get released line.  Waiting for ButtonRelease keeps the dropdown alive
+        # for the complete click, so its release cannot activate a control below it.
         index = self._text_widget.index(f"@{event.x},{event.y}")
         line = int(index.split(".")[0]) - 1
 
         if 0 <= line < len(self._filtered_values):
             self._select_value(self._filtered_values[line])
+
+        return "break"
 
     def _on_text_motion(self, event):
         """Handle mouse motion - highlight hovered item."""
