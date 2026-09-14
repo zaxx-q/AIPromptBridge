@@ -1,8 +1,9 @@
-"""Best-effort Wayland cursor position lookup.
+"""Best-effort Wayland cursor position and focused output lookup.
 
-Tk's X11 pointer query can be stale when an Xwayland window is not focused.
-Keep compositor-specific probing here so GUI code can safely fall back to Tk
-when a compositor provides no cursor-position IPC.
+Tk's X11 pointer query can be stale when an Xwayland window is not focused,
+or frozen on an inactive Xwayland window (such as ONLYOFFICE).
+Keep compositor-specific probing here so GUI code can safely position popups
+on the active output rather than querying stale Xwayland coordinates.
 """
 
 from __future__ import annotations
@@ -19,9 +20,9 @@ from .detect import is_linux, is_wayland
 
 logger = logging.getLogger(__name__)
 
-# Cursor lookup is strictly a visual enhancement. Never let a stuck compositor
-# command make popup creation feel slow.
-_COMMAND_TIMEOUT = 0.05
+# Output / cursor lookup is strictly a visual enhancement. Never let a stuck
+# compositor command make popup creation feel slow.
+_COMMAND_TIMEOUT = 0.1
 _COORDINATE_PATTERN = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$")
 
 
@@ -111,6 +112,111 @@ def _is_hyprland_session() -> bool:
 
 def _is_sway_session() -> bool:
     return bool(os.environ.get("SWAYSOCK")) or "sway" in _desktop_names()
+
+
+def _get_niri_focused_output() -> Optional[tuple[int, int, int, int]]:
+    if not shutil.which("niri"):
+        return None
+    output = _run_command(["niri", "msg", "-j", "focused-output"])
+    if not output:
+        return None
+    try:
+        data = json.loads(output)
+        logical = data.get("logical")
+        if isinstance(logical, dict):
+            w = int(logical.get("width", 0))
+            h = int(logical.get("height", 0))
+            if w > 0 and h > 0:
+                return int(logical.get("x", 0)), int(logical.get("y", 0)), w, h
+    except (json.JSONDecodeError, ValueError, TypeError):
+        logger.debug("niri focused-output query returned invalid data")
+    return None
+
+
+def _get_sway_focused_output() -> Optional[tuple[int, int, int, int]]:
+    if not shutil.which("swaymsg"):
+        return None
+    output = _run_command(["swaymsg", "-t", "get_outputs", "-r"])
+    if not output:
+        return None
+    try:
+        data = json.loads(output)
+        if isinstance(data, list):
+            focused_item = None
+            for item in data:
+                if isinstance(item, dict) and item.get("focused"):
+                    focused_item = item
+                    break
+            if not focused_item:
+                for item in data:
+                    if isinstance(item, dict) and item.get("active", True):
+                        focused_item = item
+                        break
+            if isinstance(focused_item, dict):
+                rect = focused_item.get("rect")
+                if isinstance(rect, dict):
+                    w = int(rect.get("width", 0))
+                    h = int(rect.get("height", 0))
+                    if w > 0 and h > 0:
+                        return int(rect.get("x", 0)), int(rect.get("y", 0)), w, h
+    except (json.JSONDecodeError, ValueError, TypeError):
+        logger.debug("Sway outputs query returned invalid data")
+    return None
+
+
+def _get_hyprland_focused_output() -> Optional[tuple[int, int, int, int]]:
+    if not shutil.which("hyprctl"):
+        return None
+    output = _run_command(["hyprctl", "monitors", "-j"])
+    if not output:
+        return None
+    try:
+        data = json.loads(output)
+        if isinstance(data, list):
+            focused_item = None
+            for item in data:
+                if isinstance(item, dict) and item.get("focused"):
+                    focused_item = item
+                    break
+            if not focused_item and data and isinstance(data[0], dict):
+                focused_item = data[0]
+            if isinstance(focused_item, dict):
+                w = int(focused_item.get("width", 0))
+                h = int(focused_item.get("height", 0))
+                if w > 0 and h > 0:
+                    return int(focused_item.get("x", 0)), int(focused_item.get("y", 0)), w, h
+    except (json.JSONDecodeError, ValueError, TypeError):
+        logger.debug("Hyprland monitors query returned invalid data")
+    return None
+
+
+def get_focused_output_geometry() -> Optional[tuple[int, int, int, int]]:
+    """Return (x, y, width, height) of the focused monitor under Wayland, or None.
+
+    Used to safely position popups on the active monitor when cursor position IPC
+    is not supported, preventing popups from being anchored to stale Xwayland coordinates.
+    """
+    if not is_linux() or not is_wayland():
+        return None
+
+    if _is_niri_session():
+        res = _get_niri_focused_output()
+        if res is not None:
+            return res
+    if _is_hyprland_session():
+        res = _get_hyprland_focused_output()
+        if res is not None:
+            return res
+    if _is_sway_session():
+        res = _get_sway_focused_output()
+        if res is not None:
+            return res
+
+    for detector in (_get_niri_focused_output, _get_hyprland_focused_output, _get_sway_focused_output):
+        res = detector()
+        if res is not None:
+            return res
+    return None
 
 
 def get_pointer_position() -> Optional[tuple[int, int]]:

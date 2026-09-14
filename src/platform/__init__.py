@@ -43,7 +43,7 @@ from .ipc import (
     parse_reply,
     send_trigger,
 )
-from .pointer import get_pointer_position
+from .pointer import get_focused_output_geometry, get_pointer_position
 from .screenshot import (
     capture_full_screen,
     capture_output,
@@ -86,6 +86,7 @@ __all__ = [
     "encode_reply_error",
     "encode_reply_ok",
     "encode_trigger",
+    "get_focused_output_geometry",
     "get_key",
     "get_keyboard_backend",
     "get_pointer_position",

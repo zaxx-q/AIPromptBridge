@@ -38,6 +38,7 @@ from .popups import (
     create_profile_dropdown_ctk,
     create_profile_dropdown_tk,
     get_profile_override_value,
+    setup_popup_window,
     setup_transparent_popup,
 )
 from .prompts import get_prompts_config
@@ -182,8 +183,7 @@ class AttachedSnipPopup:
         self.root.withdraw()
 
         self.root.title("Screen Snip")
-        self.root.overrideredirect(True)
-        self.root.attributes("-topmost", True)
+        setup_popup_window(self.root)
 
         # Transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
@@ -1103,8 +1103,11 @@ class AttachedSnipPopup:
             self.root.lift()
             self.root.focus_force()
 
-            if HAVE_CTK:
+            if HAVE_CTK and hasattr(self, "input_entry"):
                 self.input_entry.focus_set()
+                self.root.after(
+                    50, lambda: self.input_entry.focus_set() if self.root and hasattr(self, "input_entry") else None
+                )
         except tk.TclError:
             pass
 

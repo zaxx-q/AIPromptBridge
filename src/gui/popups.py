@@ -36,7 +36,8 @@ else:
     HAVE_WIN32 = False
 
 # Import CustomTkinter with fallback
-from ..platform.pointer import get_pointer_position
+from ..platform.detect import is_wayland
+from ..platform.pointer import get_focused_output_geometry, get_pointer_position
 from .custom_widgets import create_emoji_button
 from .platform import HAVE_CTK, ctk
 
@@ -88,9 +89,11 @@ def _get_popup_position(
 ) -> tuple[int, int]:
     """Choose popup coordinates, preferring a compositor cursor position.
 
-    Under pure Wayland, Tk may query an idle Xwayland cursor rather than the
-    visible Wayland cursor. Compositor IPC is tried first; unsupported
-    compositors deliberately retain the Tk fallback used on Windows and X11.
+    Under pure Wayland, Tk's winfo_pointerx/y queries an idle Xwayland cursor
+    rather than the visible Wayland cursor, freezing at whichever X11 window
+    was last active (e.g. ONLYOFFICE). When compositor cursor coordinates are
+    unavailable on Wayland, the popup is centered on the currently focused
+    output rather than using stale Xwayland pointer coordinates.
     """
     if x is not None and y is not None:
         return x, y
@@ -98,6 +101,24 @@ def _get_popup_position(
     position = get_pointer_position()
     if position is not None:
         return position[0] + offset_x, position[1] + offset_y
+
+    if is_wayland():
+        # Never query Tk's Xwayland pointer on Wayland. Center on focused monitor.
+        geometry = get_focused_output_geometry()
+        win_w = getattr(root, "winfo_reqwidth", lambda: 400)() or 400
+        win_h = getattr(root, "winfo_reqheight", lambda: 300)() or 300
+
+        if geometry is not None:
+            out_x, out_y, out_w, out_h = geometry
+            cx = out_x + max(0, (out_w - win_w) // 2)
+            cy = out_y + max(0, (out_h - win_h) // 3)
+            return cx, cy
+
+        screen_w = getattr(root, "winfo_screenwidth", lambda: 1920)() or 1920
+        screen_h = getattr(root, "winfo_screenheight", lambda: 1080)() or 1080
+        cx = max(0, (screen_w - win_w) // 2)
+        cy = max(0, (screen_h - win_h) // 3)
+        return cx, cy
 
     return root.winfo_pointerx() + offset_x, root.winfo_pointery() + offset_y
 
@@ -138,6 +159,27 @@ def setup_transparent_popup(window, colors: ThemeColors):
             window.configure(fg_color=colors.base)
         else:
             window.configure(bg=colors.base)
+
+
+def setup_popup_window(window):
+    """Configure a popup window to be borderless and properly focused across platforms.
+
+    On Windows, overrideredirect(True) produces clean borderless windows that
+    take global keyboard focus via SetForegroundWindow.
+    On Linux/Xwayland, overrideredirect(True) causes Xwayland to treat the window
+    as an unmanaged surface; if another X11 client (e.g. ONLYOFFICE) is open,
+    Xwayland pins the popup to that client and drops Wayland keyboard focus.
+    Using -type splash creates a borderless managed window that the compositor
+    maps to the active workspace and assigns proper keyboard focus.
+    """
+    if sys.platform == "win32":
+        window.overrideredirect(True)
+    else:
+        try:
+            window.attributes("-type", "splash")
+        except tk.TclError:
+            window.overrideredirect(True)
+    window.attributes("-topmost", True)
 
 
 def _make_draggable(root, frame):
@@ -1410,8 +1452,7 @@ class AttachedInputPopup:
         self.root.withdraw()
 
         self.root.title("AI Chat")
-        self.root.overrideredirect(True)
-        self.root.attributes("-topmost", True)
+        setup_popup_window(self.root)
 
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
@@ -1653,6 +1694,9 @@ class AttachedInputPopup:
             self.root.lift()
             self.root.focus_force()
             self.input_entry.focus_set()
+            self.root.after(
+                50, lambda: self.input_entry.focus_set() if self.root and hasattr(self, "input_entry") else None
+            )
         except tk.TclError:
             pass
 
@@ -1831,8 +1875,7 @@ class AttachedPromptPopup:
         self.root.withdraw()
 
         self.root.title("Text Edit Tool")
-        self.root.overrideredirect(True)
-        self.root.attributes("-topmost", True)
+        setup_popup_window(self.root)
 
         # Set up transparent corners on Windows
         setup_transparent_popup(self.root, self.colors)
@@ -2258,6 +2301,9 @@ class AttachedPromptPopup:
             self.root.focus_force()
             if HAVE_CTK:
                 self.edit_input.focus_set()
+                self.root.after(
+                    50, lambda: self.edit_input.focus_set() if self.root and hasattr(self, "edit_input") else None
+                )
         except tk.TclError:
             pass
 
