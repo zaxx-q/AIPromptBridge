@@ -12,12 +12,12 @@ Python: **3.13.x** (see `.python-version`). Install deps with `uv pip install -r
 cd /path/to/AIPromptBridge
 uv venv && source .venv/bin/activate   # if needed
 uv pip install -r requirements.txt
-uv run main.py --show-console
+uv run main.py --debug
 ```
 
 To keep the app in the current terminal rather than creating or attaching to
 the `aipromptbridge` tmux session, add `--no-tmux` (for example,
-`uv run main.py --no-tmux --show-console` or `./AIPromptBridge --no-tmux`).
+`uv run main.py --no-tmux --debug` or `./AIPromptBridge --no-tmux`).
 
 Trigger tools from another terminal or a window-manager bind (no in-process global hotkeys on pure Wayland). **Prefer the fast IPC client** so each keypress does not cold-start Nuitka or the full `main.py` import graph (~3–6 s → tens of ms):
 
@@ -157,7 +157,7 @@ Release assets include a Linux tarball alongside the Windows zip:
 ```bash
 tar -xzf AIPromptBridge-vX.Y.Z-linux-x86_64.tar.gz
 cd AIPromptBridge-vX.Y.Z-linux-x86_64
-./AIPromptBridge --show-console
+./AIPromptBridge --debug
 ./AIPromptBridge --trigger textedit   # needs a running instance
 ```
 
@@ -166,7 +166,7 @@ Optional PATH install — keep the full tree together and symlink only the outer
 ```bash
 # e.g. extract/move package to ~/.local/AIPromptBridge/
 ln -sf ~/.local/AIPromptBridge/AIPromptBridge ~/.local/bin/AIPromptBridge
-AIPromptBridge --show-console
+AIPromptBridge --debug
 ```
 
 Do **not** copy only `AIPromptBridge` into `~/.local/bin` without `bin/` beside the real script — config and the Nuitka tree stay at the deploy root.
@@ -208,7 +208,7 @@ OS-facing helpers live under **`src/platform/`** (no GUI imports):
 
 Audio import dispatch: `src/audio/backend.py` (WPatch on Windows, stock PyAudio on Linux). Device enumeration: `src/audio/devices.py`. Linux system-audio monitors: `src/audio/pulse_monitors.py` (`pactl list sources`) + ffmpeg pulse capture in `recorder.py`. Mic capture still uses PortAudio. Need `pactl` (pulseaudio-utils / PipeWire) and `ffmpeg` with pulse input for loopback when PortAudio is ALSA-only.
 
-Interactive console commands (`--show-console`) and batch Pause/Stop keys use `src/platform/console_input.py`: hold **cbreak** for single-key polls, restore **cooked** mode around `input()` line prompts.
+Interactive console commands and batch Pause/Stop keys use `src/platform/console_input.py`: hold **cbreak** for single-key polls, restore **cooked** mode around `input()` line prompts.
 
 ## Known limitations
 

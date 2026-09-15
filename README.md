@@ -169,7 +169,7 @@ git clone https://github.com/zaxx-q/AIPromptBridge.git
 cd AIPromptBridge
 # Python 3.13.x recommended (see .python-version)
 uv pip install -r requirements.txt   # or: pip install -r requirements.txt
-uv run main.py --show-console        # or: python main.py
+uv run main.py --debug               # or: python main.py
 ```
 
 **Linux (Wayland / niri):** install system tools (`wl-clipboard`, `wlrctl`, `grim`, `slurp`, PortAudio, `pactl`, `ffmpeg`) and use `uv run main.py --trigger snip` (etc.) from compositor binds. Prefer distro `python3.13` + `python3.13-tkinter` for full GUI fonts. Full guide: [docs/LINUX.md](docs/LINUX.md).
@@ -191,8 +191,8 @@ Right-click the tray icon for:
 - **Settings** - Open GUI settings editor
 - **Prompt Editor** - Customize prompts sent to AI, preview prompts in Playground
 - **Profiles** - Open Connection Profile Manager
-- **Edit config.ini** - Open configuration file (only visible with `--show-console` arg)
-- **Edit prompts.json** - Open prompts file (only visible with `--show-console` arg)
+- **Edit config.ini** - Open configuration file (only visible with `--debug` arg)
+- **Edit prompts.json** - Open prompts file (only visible with `--debug` arg)
 - **Check for Updates** - Check GitHub for new releases and install
 - **Restart** - Restart the application
 - **Quit** - Exit completely
@@ -362,7 +362,8 @@ but if you want to improve performance:
 ## 🔧 Command Line Options
 
 ```bash
-AIPromptBridge.exe --show-console     # Doesn't automatically hide console at startup, also enable debug logs
+AIPromptBridge.exe --show-console     # Windows: doesn't automatically hide the console at startup
+AIPromptBridge.exe --debug            # Enable debug logging
 AIPromptBridge.exe --no-wt            # Skip Windows Terminal detection and redirection (handled by launcher)
 ```
 

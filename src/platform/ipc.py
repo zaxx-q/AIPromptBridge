@@ -147,7 +147,7 @@ def send_trigger(
             return (
                 False,
                 "No running AIPromptBridge instance found. "
-                "Start the app first (e.g. uv run main.py --show-console), "
+                "Start the app first (e.g. uv run main.py), "
                 "then retry --trigger.",
             )
         except OSError as e:

@@ -5,7 +5,8 @@ Main entry point
 
 Usage:
     python main.py              # Start with tray (console hidden)
-    python main.py --show-console   # Start with tray + console visible
+    python main.py --show-console   # Windows: do not hide console after launch
+    python main.py --debug          # Enable debug logging
     python main.py --no-wt      # Skip Windows Terminal auto-detection
     python main.py --no-tmux    # Linux: run directly instead of inside tmux
     python main.py --trigger snip   # Linux: trigger tool on running instance
@@ -595,7 +596,8 @@ def parse_args():
         epilog="""
 Examples:
   python main.py                  Start application (console hidden by default)
-  python main.py --show-console   Start application with console visible
+  python main.py --show-console   Windows: do not hide console after launch
+  python main.py --debug          Enable debug logging
   python main.py --no-wt          Skip Windows Terminal auto-detection
   python main.py --no-tmux        Linux: run directly instead of inside tmux
   python main.py --trigger snip   Linux: invoke tool on the running instance
@@ -622,7 +624,12 @@ Linux Wayland (niri / wlroots) supported:
   if empty, falls back to hybrid wlrctl Ctrl+C + restore.
         """,
     )
-    parser.add_argument("--show-console", action="store_true", help="Start with console visible")
+    parser.add_argument(
+        "--show-console",
+        action="store_true",
+        help="Windows: do not hide the console after launch",
+    )
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument("--dummy", action="store_true", help="Dummy argument (does nothing)")
     parser.add_argument(
         "--no-tmux",
@@ -947,10 +954,10 @@ def configure_logging(debug_mode: bool = False):
     """
     Configure global logging with Rich handler if available.
 
-    By default (no --show-console), no logging configuration is done,
+    By default (no --debug), no logging configuration is done,
     keeping Python's default WARNING level for a clean console.
 
-    When debug_mode is True (--show-console), enables DEBUG level logging
+    When debug_mode is True (--debug), enables DEBUG level logging
     with Rich formatting for better visibility.
 
     Args:
@@ -997,7 +1004,7 @@ def configure_logging(debug_mode: bool = False):
         # Basic config without Rich
         logging.basicConfig(level=level, format="[%(levelname)s] %(name)s: %(message)s", force=True)
 
-    logging.debug("Debug logging enabled (--show-console)")
+    logging.debug("Debug logging enabled (--debug)")
 
 
 def main():
@@ -1044,7 +1051,8 @@ def main():
     # reused by the IPC trigger server.
     _INSTANCE_LOCK = acquire_single_instance()
     if _INSTANCE_LOCK is None:
-        if args.show_console:
+        keep_console_visible = is_windows() and args.show_console
+        if keep_console_visible:
             # If console is visible, we might want to alert
             pass
 
@@ -1055,7 +1063,7 @@ def main():
 
         # If console is hidden, just exit silently
         # User probably just double clicked the icon again
-        if not args.show_console:
+        if not keep_console_visible:
             sys.exit(0)
 
         import contextlib
@@ -1087,8 +1095,8 @@ def main():
                 print(f"⚠️  IPC trigger server failed to start: {e}")
             _TRIGGER_SERVER = None
 
-    # Configure global logging (DEBUG if --show-console, otherwise INFO)
-    configure_logging(debug_mode=args.show_console)
+    # Configure global logging only when explicitly requested.
+    configure_logging(debug_mode=args.debug)
 
     # Determine if we have a real console (for WT relaunch and console toggle)
     # - GUI mode: No console (skip WT, no toggle)
@@ -1192,9 +1200,9 @@ def main():
 
         allow_console_toggle = has_real_console
         tray = TrayApp(
-            on_exit_callback=cleanup, allow_console_toggle=allow_console_toggle, show_edit_file_items=args.show_console
+            on_exit_callback=cleanup, allow_console_toggle=allow_console_toggle, show_edit_file_items=args.debug
         )
-        hide_on_start = not args.show_console
+        hide_on_start = not (is_windows() and args.show_console)
 
         threading.Thread(target=lambda: tray.start(hide_console_on_start=hide_on_start), daemon=True).start()
 

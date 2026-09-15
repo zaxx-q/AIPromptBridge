@@ -13,9 +13,9 @@ Quick start
 -----------
   tar -xzf AIPromptBridge-*-linux-x86_64.tar.gz
   cd AIPromptBridge-*-linux-x86_64   # or the extracted folder name
-  ./AIPromptBridge --show-console
+  ./AIPromptBridge --debug
   # To run directly in this terminal instead of tmux:
-  ./AIPromptBridge --no-tmux --show-console
+  ./AIPromptBridge --no-tmux --debug
 
   # IPC triggers (requires a running instance), e.g. from niri binds.
   # --trigger uses aipb_trigger.py + system python3 (tens of ms), NOT the
@@ -30,7 +30,7 @@ Optional PATH install (symlink the outer launcher only — keep bin/ next to it)
   mkdir -p ~/.local/AIPromptBridge
   # move/extract the full package into ~/.local/AIPromptBridge/
   ln -sf ~/.local/AIPromptBridge/AIPromptBridge ~/.local/bin/AIPromptBridge
-  # Then: AIPromptBridge --show-console
+  # Then: AIPromptBridge --debug
 
 Config (config.ini, keys.json, prompts.json, sessions) lives in the deploy
 root (the folder that contains AIPromptBridge + bin/), not next to a PATH

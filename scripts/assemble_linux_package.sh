@@ -84,7 +84,7 @@ echo "→ Creating ${TARBALL}"
 tar -C "${OUT_DIR}" -czf "${TARBALL}" "${STAGE_NAME}"
 
 echo "✓ Linux package ready: ${TARBALL}"
-echo "  Extract and run: tar -xzf ${STAGE_NAME}.tar.gz && ./${STAGE_NAME}/AIPromptBridge --show-console"
+echo "  Extract and run: tar -xzf ${STAGE_NAME}.tar.gz && ./${STAGE_NAME}/AIPromptBridge"
 
 # Export path for CI
 if [[ -n "${GITHUB_ENV:-}" ]]; then
