@@ -54,6 +54,7 @@ class TextEditToolApp:
         # Get TextEditTool-specific config
         self.enabled = config.get("text_edit_tool_enabled", True)
         self.hotkey = config.get("text_edit_tool_hotkey", "ctrl+space")
+        self.clipboard_hotkey = config.get("text_edit_clipboard_hotkey", "ctrl+shift+space")
         self.abort_hotkey = config.get("text_edit_tool_abort_hotkey", "escape")
 
         # Typing speed settings (supports live hot-reload without restart)
@@ -69,6 +70,7 @@ class TextEditToolApp:
 
         # Initialize components
         self.hotkey_listener: Optional[HotkeyListener] = None
+        self.clipboard_hotkey_listener: Optional[HotkeyListener] = None
         self.text_handler = TextHandler(self.config)
 
         # Current state
@@ -146,15 +148,23 @@ class TextEditToolApp:
 
         logging.info(f"Starting TextEditTool with hotkey: {self.hotkey}")
 
-        # Create and start hotkey listener (no-op on Linux — use --trigger textedit / chat)
+        # Create and start hotkey listeners (no-op on Linux — use IPC triggers).
         self.hotkey_listener = HotkeyListener(shortcut=self.hotkey, callback=self._on_hotkey_pressed)
+        self.clipboard_hotkey_listener = HotkeyListener(
+            shortcut=self.clipboard_hotkey,
+            callback=self._on_clipboard_hotkey_pressed,
+        )
         self.hotkey_listener.start()
+        self.clipboard_hotkey_listener.start()
 
-        if self.hotkey_listener.is_running():
-            print(f"  ✅ TextEditTool: Hotkey '{self.hotkey}' registered")
+        if self.hotkey_listener.is_running() or self.clipboard_hotkey_listener.is_running():
+            print(
+                f"  ✅ TextEditTool: Hotkeys '{self.hotkey}' (selection) / "
+                f"'{self.clipboard_hotkey}' (clipboard) registered"
+            )
         else:
             # Linux IPC path — surface capture capabilities once at start
-            caps = "trigger via: --trigger textedit"
+            caps = "triggers via: --trigger textedit | textedit-clipboard"
             has_warning = False
             if is_linux():
                 try:
@@ -189,18 +199,25 @@ class TextEditToolApp:
         if self.hotkey_listener:
             self.hotkey_listener.stop()
             self.hotkey_listener = None
+        if self.clipboard_hotkey_listener:
+            self.clipboard_hotkey_listener.stop()
+            self.clipboard_hotkey_listener = None
 
         self.cancel_requested = True
 
     def pause(self):
-        """Pause the hotkey listener."""
+        """Pause TextEdit hotkey listeners."""
         if self.hotkey_listener:
             self.hotkey_listener.pause()
+        if self.clipboard_hotkey_listener:
+            self.clipboard_hotkey_listener.pause()
 
     def resume(self):
-        """Resume the hotkey listener."""
+        """Resume TextEdit hotkey listeners."""
         if self.hotkey_listener:
             self.hotkey_listener.resume()
+        if self.clipboard_hotkey_listener:
+            self.clipboard_hotkey_listener.resume()
 
     def _on_hotkey_pressed(self):
         """Handle hotkey press event."""
@@ -209,6 +226,11 @@ class TextEditToolApp:
         # Show popup immediately in a new thread
         # Multiple concurrent invocations are allowed - each operates independently
         threading.Thread(target=self._show_popup, daemon=True).start()
+
+    def _on_clipboard_hotkey_pressed(self):
+        """Handle explicit Clipboard TextEdit hotkey / IPC trigger."""
+        logging.debug("Clipboard TextEdit hotkey pressed")
+        threading.Thread(target=self._show_clipboard_popup, daemon=True).start()
 
     def _get_popup_position(self) -> tuple[Optional[int], Optional[int]]:
         """Get a compositor cursor position without querying Tk off its GUI thread."""
@@ -255,26 +277,41 @@ class TextEditToolApp:
         else:
             selected_text = self.text_handler.get_selected_text()
 
+        self._show_popup_for_text(selected_text, x=x, y=y)
+
+    def _show_clipboard_popup(self):
+        """Open the action popup using the ordinary clipboard's current text.
+
+        This explicit path intentionally trusts the clipboard and never reads
+        the Wayland primary selection or sends a copy key.
+        """
+        logging.debug("Showing Clipboard TextEdit popup")
+        x, y = self._get_popup_position()
+        clipboard_text = self.text_handler.get_clipboard_text()
+        self._show_popup_for_text(clipboard_text, x=x, y=y)
+
+    def _show_popup_for_text(self, text: str, *, x: Optional[int], y: Optional[int]):
+        """Show an action popup for text, or Direct Chat when it is empty."""
+        from .core import GUICoordinator
+
         # Only offer TTS button in popups if TTS is enabled
         on_tts = self._on_tts_requested if self.config.get("tts_enabled", True) else None
 
-        if selected_text:
-            logging.debug(f'Selected text: "{selected_text[:50]}..."')
-            # Text selected - show prompt selection popup via coordinator
+        if text:
+            logging.debug(f'Processing text: "{text[:50]}..."')
             # Pass live options from PromptsConfig (including _settings for popup_items_per_page)
             GUICoordinator.get_instance().request_prompt_popup(
                 options=self.prompts.get_text_edit_tool(),
                 on_option_selected=self._on_option_selected,
                 on_close=self._on_popup_closed,
-                selected_text=selected_text,
+                selected_text=text,
                 x=x,
                 y=y,
                 on_tts=on_tts,
                 on_request_compare_text=self._on_request_compare_text,
             )
         else:
-            # No text selected - show simple input popup via coordinator
-            logging.debug("No text selected, showing input popup")
+            logging.debug("No text available, showing input popup")
             GUICoordinator.get_instance().request_input_popup(
                 on_submit=self._on_direct_chat,
                 on_close=self._on_popup_closed,

@@ -29,6 +29,7 @@ from typing import Sequence
 KNOWN_TRIGGERS = (
     "snip",
     "textedit",
+    "textedit-clipboard",
     "audio",
     "tts",
     "chat",
@@ -128,7 +129,7 @@ def _resolve_trigger_name(argv: Sequence[str]) -> tuple[str | None, str | None]:
     """
     args = [a for a in argv if a]
     if not args:
-        return None, "missing trigger name (e.g. snip, textedit, audio)"
+        return None, "missing trigger name (e.g. snip, textedit, textedit-clipboard, audio)"
 
     if args[0] in ("-h", "--help"):
         return None, "help"

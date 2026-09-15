@@ -207,6 +207,7 @@ Right-click the tray icon for:
 > **Linux:** use `AIPromptBridge --trigger textedit` from a compositor bind.
 
 **Without selection**: Opens a quick input bar for direct questions.
+> **Clipboard TextEdit:** press **Ctrl+Shift+Space** on Windows, or bind `AIPromptBridge --trigger textedit-clipboard` on Linux, to intentionally process the current clipboard without simulating a copy command.
 
 ### SnipTool (Screen Snipping)
 

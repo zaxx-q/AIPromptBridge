@@ -257,43 +257,43 @@ class TextHandler:
     def _get_copy_capture_strategy(self) -> str:
         """Choose the safe selection-capture strategy for the focused app.
 
-        ``primary_only`` deliberately avoids injecting *any* copy shortcut into
-        detected terminals. Ghostty (and some other terminals) passes
-        Ctrl+Shift+C through as Ctrl+C when no text is selected, which can send
-        SIGINT to the application's own console or another foreground process.
-        Terminal mouse selections are exposed through Wayland's primary
-        selection, so this strategy reads that selection and otherwise lets
-        TextEdit open its normal input popup.
+        ``input_only`` deliberately avoids reading or injecting any selection
+        shortcut into detected terminals. Wayland primary selection can be
+        stale indefinitely, while Ghostty (and some other terminals) passes
+        Ctrl+Shift+C through as Ctrl+C when no text is selected. Either can
+        produce surprising results or send SIGINT to the application's own
+        console or another foreground process. The explicit Clipboard TextEdit
+        hotkey/trigger is the opt-in terminal workflow.
 
         Returns:
             ``normal`` for injected Ctrl+C, ``shifted`` for injected
-            Ctrl+Shift+C, or ``primary_only`` for safe terminal auto-detection.
+            Ctrl+Shift+C, or ``input_only`` for safe terminal auto-detection.
         """
         mode = self._resolve_terminal_copy_mode()
         if mode == "always_ctrl_c":
             return "normal"
         if mode == "always_ctrl_shift_c":
             return "shifted"
-        return "primary_only" if is_focused_app_terminal() else "normal"
+        return "input_only" if is_focused_app_terminal() else "normal"
 
     def _should_use_shifted_copy(self) -> bool:
         """Return whether the current platform should inject Ctrl+Shift+C.
 
-        Linux auto-detected terminals use ``primary_only`` and never inject a
+        Linux auto-detected terminals use ``input_only`` and never inject a
         shortcut. Windows lacks Wayland primary selection, so its terminal
         auto-detection retains Ctrl+Shift+C instead.
         """
         strategy = self._get_copy_capture_strategy()
-        return strategy == "shifted" or (is_windows() and strategy == "primary_only")
+        return strategy == "shifted" or (is_windows() and strategy == "input_only")
 
     def _get_linux_selection_capture_options(self) -> tuple[bool, bool, Optional[Callable[[], bool]]]:
         """Return ``(allow_ctrl_c, allow_primary, copy_fn)`` for Linux capture."""
         strategy = self._get_copy_capture_strategy()
         configured_primary = bool(self.config.get("linux_selection_fallback_primary", False))
 
-        if strategy == "primary_only":
-            # Never synthesize Ctrl+C / Ctrl+Shift+C in an auto-detected terminal.
-            return False, True, None
+        if strategy == "input_only":
+            # This is handled by get_selected_text() without reading primary or injecting keys.
+            return False, False, None
         if strategy == "shifted":
             return True, configured_primary, copy_via_clipboard_shortcut_shifted
         return True, configured_primary, None
@@ -372,6 +372,9 @@ class TextHandler:
         """
         if is_linux():
             try:
+                if self._get_copy_capture_strategy() == "input_only":
+                    # Do not trust stale primary selection or synthesize a terminal copy key.
+                    return ""
                 allow_ctrl_c, allow_primary, copy_fn = self._get_linux_selection_capture_options()
                 return capture_selection_for_textedit(
                     timeout=max_wait,
@@ -508,6 +511,8 @@ class TextHandler:
         """
         if is_linux():
             try:
+                if self._get_copy_capture_strategy() == "input_only":
+                    return ""
                 allow_ctrl_c, allow_primary, copy_fn = self._get_linux_selection_capture_options()
                 return capture_selection_for_textedit(
                     timeout=1.2,
@@ -711,6 +716,27 @@ class TextHandler:
             pyperclip.copy("")
         except Exception as e:
             logging.error(f"Error clearing clipboard: {e}")
+
+    @staticmethod
+    def get_clipboard_text() -> str:
+        """Read plain text from the ordinary clipboard without synthesizing keys.
+
+        Unlike selection capture, this intentionally trusts the clipboard. It
+        is used only by the explicit Clipboard TextEdit hotkey/IPC trigger.
+        """
+        if is_linux():
+            try:
+                return platform_paste_text(primary=False)
+            except Exception as e:
+                logging.error(f"Failed to read Linux clipboard: {e}")
+                return ""
+        try:
+            if pyperclip is None:
+                raise RuntimeError("pyperclip not available")
+            return pyperclip.paste()
+        except Exception as e:
+            logging.error(f"Failed to read clipboard: {e}")
+            return ""
 
     @staticmethod
     def copy_to_clipboard(text: str) -> bool:

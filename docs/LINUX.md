@@ -28,7 +28,7 @@ python -m src.platform.ipc audio
 # Also works after lazy imports, but slower than the scripts above:
 uv run main.py --trigger chat
 
-# Triggers: snip, textedit, audio, tts, chat, browser, settings, prompts
+# Triggers: snip, textedit, textedit-clipboard, audio, tts, chat, browser, settings, prompts
 ```
 
 Example **niri** binds:
@@ -37,6 +37,8 @@ Example **niri** binds:
 binds {
     // Compiled PATH install:
     Mod+Shift+T { spawn-sh "AIPromptBridge --trigger textedit"; }
+    // Explicitly process regular clipboard text; safe for terminal apps.
+    Mod+Shift+C { spawn-sh "AIPromptBridge --trigger textedit-clipboard"; }
     Mod+Shift+S { spawn-sh "AIPromptBridge --trigger snip"; }
     Mod+Shift+A { spawn-sh "AIPromptBridge --trigger audio"; }
     // Source: spawn-sh "python3 /path/to/AIPromptBridge/scripts/aipb_trigger.py snip";
@@ -208,7 +210,7 @@ Interactive console commands (`--show-console`) and batch Pause/Stop keys use `s
 - Pure Wayland apps that ignore virtual keyboard or selection protocols may not accept type/paste/hybrid capture.
 - **Direct Chat:** tray **Direct Chat** and `--trigger chat` always open the input popup; they never capture the primary selection or clipboard. Use `--trigger textedit` for selection-based actions.
 - **Selections:** Wayland primary selection can remain indefinitely after a mouse highlight even after deselecting. TextEdit uses an active Ctrl+C query directly into the focused application (works with Google Docs, browser canvas/DOM, and text editors) to avoid resurrecting stale primary selections. Terminal mouse selection fallback can be enabled via `linux_selection_fallback_primary = true` in `config.ini`.
-- **Terminal-safe selection:** When the focused window is a terminal emulator, TextEdit automatically reads its Wayland primary selection and sends **no copy shortcut**. This prevents Ghostty and similar terminals from passing Ctrl+Shift+C through as Ctrl+C when nothing is selected, which could interrupt the foreground process. If no terminal selection exists, TextEdit opens its normal input popup. Terminal detection uses compositor IPC (`niri msg`, `swaymsg`, `hyprctl`) to read the focused window's `app_id`. Configure via `text_edit_terminal_copy_shortcut` in `config.ini`: `auto` (default, safe primary-selection capture), `always_ctrl_c`, or `always_ctrl_shift_c`. Compare Mode accepts both Ctrl+C and Ctrl+Shift+C.
+- **Terminal-safe selection:** When the focused window is a terminal emulator, TextEdit's default `auto` mode opens Direct Chat and sends **no copy shortcut** or primary-selection query. This prevents both stale Wayland primary selections and Ghostty-style Ctrl+Shift+C pass-through as Ctrl+C, which can interrupt foreground processes. To intentionally process copied text from any app, use `AIPromptBridge --trigger textedit-clipboard` (or the Windows Clipboard hotkey); it reads the ordinary clipboard only and never synthesizes a key. Terminal detection uses compositor IPC (`niri msg`, `swaymsg`, `hyprctl`) to read the focused window's `app_id`. Configure selection behavior via `text_edit_terminal_copy_shortcut` in `config.ini`: `auto` (default), `always_ctrl_c`, or `always_ctrl_shift_c`. Compare Mode accepts both Ctrl+C and Ctrl+Shift+C.
 - **Popup position & focus:** Hyprland cursor IPC places popups near the visible cursor. On compositors without cursor IPC (niri, Sway), popups automatically center on the currently focused monitor via compositor output queries (avoiding stale Xwayland cursor traps from apps like ONLYOFFICE) and use borderless managed splash windows so the active workspace immediately receives keyboard focus.
 - Snip UX uses **slurp** (not the Windows frozen dim overlay).
 - Interactive console keys require a real TTY (`stdin.isatty()`); headless launches (such as autostart) can be attached interactively via tray **Open Terminal (tmux)** or `tmux attach-session -t aipromptbridge` when `tmux` is installed.

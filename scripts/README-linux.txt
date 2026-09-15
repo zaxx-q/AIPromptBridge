@@ -19,6 +19,8 @@ Quick start
   # --trigger uses aipb_trigger.py + system python3 (tens of ms), NOT the
   # full Nuitka binary:
   ./AIPromptBridge --trigger textedit
+  # Process intentionally copied clipboard text; does not synthesize Ctrl+C.
+  ./AIPromptBridge --trigger textedit-clipboard
   ./AIPromptBridge --trigger snip
   ./AIPromptBridge --trigger audio
 

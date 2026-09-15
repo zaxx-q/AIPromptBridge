@@ -27,6 +27,7 @@ SOCKET_NAME = "aipromptbridge.sock"
 KNOWN_TRIGGERS = (
     "snip",
     "textedit",
+    "textedit-clipboard",
     "audio",
     "tts",
     "chat",

@@ -36,6 +36,8 @@ DEFAULT_CONFIG = {
     # TextEditTool settings
     "text_edit_tool_enabled": True,
     "text_edit_tool_hotkey": "ctrl+space",
+    # Process the current clipboard as TextEdit input (Windows hotkey / Linux IPC trigger)
+    "text_edit_clipboard_hotkey": "ctrl+shift+space",
     # Hotkey to abort streaming typing (default: escape)
     "text_edit_tool_abort_hotkey": "escape",
     # Typing speed cap when streaming to text field (milliseconds per character)
@@ -44,7 +46,7 @@ DEFAULT_CONFIG = {
     "streaming_typing_delay": 0,
     # Enable slow application retry strategy for text capture (Obsidian, XMind, Anki, etc.)
     "text_edit_slow_app_retry": False,
-    # Terminal capture mode: auto (safe primary selection), always_ctrl_c, always_ctrl_shift_c
+    # Terminal capture mode: auto (open Direct Chat), always_ctrl_c, always_ctrl_shift_c
     # 'auto' detects focused terminals and avoids injecting any copy shortcut to prevent SIGINT
     "text_edit_terminal_copy_shortcut": "auto",
     # Screen Snipping Tool settings
@@ -409,6 +411,10 @@ text_edit_tool_enabled = true
 # Hotkey combination (e.g., ctrl+space, ctrl+alt+w)
 text_edit_tool_hotkey = ctrl+space
 
+# Clipboard TextEdit hotkey (Windows only; on Linux bind --trigger textedit-clipboard)
+# This intentionally processes the current clipboard without simulating copy.
+text_edit_clipboard_hotkey = ctrl+shift+space
+
 # Hotkey to abort streaming typing (default: escape)
 # Press this key to stop mid-stream typing
 text_edit_tool_abort_hotkey = escape
@@ -424,7 +430,7 @@ streaming_typing_delay = 0
 text_edit_slow_app_retry = false
 
 # Terminal selection capture mode
-# 'auto' = detect terminal apps and read their primary selection without sending a key
+# 'auto' = detect terminal apps and open Direct Chat without reading any selection
 # 'always_ctrl_c' = always inject Ctrl+C (may interrupt terminal processes)
 # 'always_ctrl_shift_c' = always inject Ctrl+Shift+C (some terminals pass it through as Ctrl+C)
 text_edit_terminal_copy_shortcut = auto

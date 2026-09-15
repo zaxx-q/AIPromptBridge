@@ -607,7 +607,7 @@ Linux Wayland (niri / wlroots) supported:
     # source checkout alternatives (prefer fast client over uv run main.py):
     #   python3 scripts/aipb_trigger.py snip
     #   python -m src.platform.ipc snip
-  Other triggers: textedit, audio, tts, chat, browser, settings, prompts.
+  Other triggers: textedit, textedit-clipboard, audio, tts, chat, browser, settings, prompts.
 
   System packages (install as needed):
     wl-clipboard  — clipboard + primary selection (required for TextEdit/Snip paste)
@@ -659,7 +659,7 @@ def dispatch_trigger(name: str) -> tuple:
         return False, "not ready"
 
     try:
-        if name in ("textedit", "chat"):
+        if name in ("textedit", "textedit-clipboard", "chat"):
             from src.gui.text_edit_tool import get_instance
 
             app = get_instance()
@@ -669,6 +669,10 @@ def dispatch_trigger(name: str) -> tuple:
                 if not hasattr(app, "show_direct_chat"):
                     return False, "tool unavailable"
                 app.show_direct_chat()
+            elif name == "textedit-clipboard":
+                if not hasattr(app, "_on_clipboard_hotkey_pressed"):
+                    return False, "tool unavailable"
+                app._on_clipboard_hotkey_pressed()
             else:
                 if not hasattr(app, "_on_hotkey_pressed"):
                     return False, "tool unavailable"
@@ -1377,7 +1381,7 @@ def main():
                     console.print(
                         "   Window-manager binds: [cyan]AIPromptBridge --trigger snip[/cyan] "
                         "or [cyan]python -m src.platform.ipc snip[/cyan] "
-                        "(also: textedit, audio, tts, chat, browser)"
+                        "(also: textedit, textedit-clipboard, audio, tts, chat, browser)"
                     )
                     console.print(
                         "   Tray requires: [cyan]pip install jeepney[/cyan] + StatusNotifier host (waybar/dms)"

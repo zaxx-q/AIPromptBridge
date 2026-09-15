@@ -42,14 +42,24 @@ class ToolsTabMixin:
 
         if linux:
             self._add_linux_trigger_line(content, "textedit")
+            self._add_linux_trigger_line(content, "textedit-clipboard")
         else:
             self._add_entry_field(
                 content,
                 "text_edit_tool_hotkey",
-                "Activation hotkey:",
+                "Selection hotkey:",
                 self.config_data.config.get("text_edit_tool_hotkey", "ctrl+space"),
                 size="md",
                 hint="⚠️ Restart required",
+            )
+
+            self._add_entry_field(
+                content,
+                "text_edit_clipboard_hotkey",
+                "Clipboard hotkey:",
+                self.config_data.config.get("text_edit_clipboard_hotkey", "ctrl+shift+space"),
+                size="md",
+                hint="Processes clipboard text directly • ⚠️ Restart required",
             )
 
             self._add_entry_field(
@@ -72,11 +82,11 @@ class ToolsTabMixin:
         self._add_dropdown_field(
             content,
             "text_edit_terminal_copy_shortcut",
-            "Terminal selection capture:",
+            "Terminal selection mode:",
             self.config_data.config.get("text_edit_terminal_copy_shortcut", "auto"),
             options=["auto", "always_ctrl_c", "always_ctrl_shift_c"],
             size="md",
-            hint="'auto' reads terminal primary selection without sending a copy shortcut",
+            hint="'auto' opens Direct Chat in terminals without reading or sending a copy shortcut",
         )
 
         # --- ScreenSnip ---
