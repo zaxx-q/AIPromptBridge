@@ -487,13 +487,18 @@ class Tooltip:
         self.tooltip_window.wm_overrideredirect(True)
         self.tooltip_window.wm_attributes("-topmost", True)
 
-        # Apply transparency for rounded corners on Windows
-        if sys.platform == "win32":
-            try:
+        # Tk Toplevels default to white on Linux. Give the small area outside
+        # CTkFrame's rounded corners the tooltip color instead. Linux/Xwayland
+        # has no -transparentcolor equivalent, while Windows can make it truly
+        # transparent.
+        try:
+            if sys.platform == "win32":
                 self.tooltip_window.attributes("-transparentcolor", TRANSPARENCY_COLOR)
                 self.tooltip_window.configure(bg=TRANSPARENCY_COLOR)
-            except tk.TclError:
-                pass
+            else:
+                self.tooltip_window.configure(bg=self.colors.surface0)
+        except tk.TclError:
+            pass
 
         if HAVE_CTK:
             frame = ctk.CTkFrame(

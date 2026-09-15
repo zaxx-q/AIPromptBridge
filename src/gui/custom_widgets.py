@@ -1227,7 +1227,7 @@ class ScrollableComboBox:
             return
 
         try:
-            from .popups import TRANSPARENCY_COLOR, Tooltip  # Only for accessing tooltip styling pattern
+            from .popups import TRANSPARENCY_COLOR
         except ImportError:
             TRANSPARENCY_COLOR = "#010101"
 
@@ -1235,13 +1235,17 @@ class ScrollableComboBox:
         tw.wm_overrideredirect(True)
         tw.wm_attributes("-topmost", True)
 
-        # Apply transparency for rounded corners on Windows to avoid white corners
-        if sys.platform == "win32":
-            try:
+        # Tk Toplevels default to white on Linux. Match the tooltip surface in
+        # the area outside CTkFrame's rounded corners; Windows supports real
+        # transparent corners instead.
+        try:
+            if sys.platform == "win32":
                 tw.attributes("-transparentcolor", TRANSPARENCY_COLOR)
                 tw.configure(bg=TRANSPARENCY_COLOR)
-            except tk.TclError:
-                pass
+            else:
+                tw.configure(bg=self.colors.surface0)
+        except tk.TclError:
+            pass
 
         if HAVE_CTK:
             from .themes import get_ctk_font
