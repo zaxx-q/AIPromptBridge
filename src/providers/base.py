@@ -7,6 +7,7 @@ Retry behavior modeled after reverse-proxy/src/upstream/gemini.js and openai-com
 
 import json
 import re
+import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -443,6 +444,20 @@ class BaseProvider(ABC):
         """Check if request has been aborted."""
         if abort_event and abort_event.is_set():
             raise AbortedError("Request aborted")
+
+    def _watch_abort_for_response(self, response: Any, abort_event: Optional[Any]) -> None:
+        """Close the HTTP response immediately if abort_event is set from another thread."""
+        if not abort_event:
+            return
+
+        def _watcher():
+            if abort_event.wait():
+                try:
+                    response.close()
+                except Exception:
+                    pass
+
+        threading.Thread(target=_watcher, daemon=True).start()
 
     def _handle_http_error(
         self, status_code: int, error_text: str, retry: int, max_retries: int, abort_event: Optional[Any] = None

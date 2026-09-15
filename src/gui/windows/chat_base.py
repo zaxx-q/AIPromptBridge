@@ -69,6 +69,7 @@ class ChatWindowBase(ABC):
         self.last_response = initial_response or self._get_last_assistant_response() or ""
         self.is_loading = False
         self._destroyed = False
+        self._abort_event: Optional[threading.Event] = None
 
         # Streaming state
         self.streaming_text = ""
@@ -1302,6 +1303,87 @@ class ChatWindowBase(ABC):
             if color:
                 self.status_label.configure(fg=color)
 
+    def _set_send_button_loading(self, loading: bool):
+        """Switch the Send button between its normal and active-request states."""
+        if not self.send_btn:
+            return
+
+        if HAVE_CTK:
+            if loading:
+                self.send_btn.configure(
+                    **prepare_emoji_content("⏹ Stop", size=16),
+                    state="normal",
+                    command=self._stop_request,
+                    **get_ctk_button_colors(self.theme, "danger"),
+                )
+            else:
+                self.send_btn.configure(
+                    **prepare_emoji_content("📤 Send", size=16),
+                    state="normal",
+                    command=self._send,
+                    **get_ctk_button_colors(self.theme, "success"),
+                )
+        elif loading:
+            self.send_btn.configure(
+                text="Stop",
+                state=tk.NORMAL,
+                command=self._stop_request,
+                bg=self.colors.get("accent_red", "#f38ba8"),
+                fg=self.colors["accent_fg"],
+            )
+        else:
+            self.send_btn.configure(
+                text="Send",
+                state=tk.NORMAL,
+                command=self._send,
+                bg=self.colors["accent"],
+                fg=self.colors["accent_fg"],
+            )
+
+    def _set_inputs_enabled(self, enabled: bool):
+        """Enable or disable input and action widgets."""
+        state_ctk = "normal" if enabled else "disabled"
+        state_tk = tk.NORMAL if enabled else tk.DISABLED
+
+        if HAVE_CTK:
+            if self.input_text:
+                self.input_text.configure(state=state_ctk)
+            if self.attach_btn:
+                self.attach_btn.configure(state=state_ctk)
+            if self.rename_btn:
+                self.rename_btn.configure(state=state_ctk)
+            if self.delete_btn:
+                self.delete_btn.configure(state=state_ctk)
+            if hasattr(self, "regen_btn") and self.regen_btn:
+                self.regen_btn.configure(state=state_ctk)
+        else:
+            if self.input_text:
+                self.input_text.configure(state=state_tk)
+            if self.attach_btn:
+                self.attach_btn.configure(state=state_tk)
+            if self.rename_btn:
+                self.rename_btn.configure(state=state_tk)
+            if self.delete_btn:
+                self.delete_btn.configure(state=state_tk)
+            if hasattr(self, "regen_btn") and self.regen_btn:
+                self.regen_btn.configure(state=state_tk)
+
+    def _stop_request(self):
+        """Signal the active request to abort and immediately unlock the UI."""
+        if not self.is_loading or not self._abort_event or self._abort_event.is_set():
+            return
+
+        self._abort_event.set()
+        self.is_loading = False
+        self.is_streaming = False
+        self.streaming_text = ""
+        self.streaming_thinking = ""
+
+        self._set_send_button_loading(False)
+        self._set_inputs_enabled(True)
+        self._update_chat_display(scroll_to_bottom=True)
+        self._update_status("Request stopped")
+
     def _get_global_sentinel(self) -> str:
         """Build the '(Use Global: <model>)' sentinel label from current config."""
         from ... import web_server
@@ -1727,28 +1809,9 @@ class ChatWindowBase(ABC):
 
         # Disable input
         self.is_loading = True
-        if HAVE_CTK:
-            self.send_btn.configure(state="disabled")
-            if hasattr(self, "regen_btn") and self.regen_btn:
-                self.regen_btn.configure(state="disabled")
-            if self.rename_btn:
-                self.rename_btn.configure(state="disabled")
-            if self.delete_btn:
-                self.delete_btn.configure(state="disabled")
-            self.input_text.configure(state="disabled")
-            if self.attach_btn:
-                self.attach_btn.configure(state="disabled")
-        else:
-            self.send_btn.configure(state=tk.DISABLED)
-            if hasattr(self, "regen_btn") and self.regen_btn:
-                self.regen_btn.configure(state=tk.DISABLED)
-            if self.rename_btn:
-                self.rename_btn.configure(state=tk.DISABLED)
-            if self.delete_btn:
-                self.delete_btn.configure(state=tk.DISABLED)
-            self.input_text.configure(state=tk.DISABLED)
-            if self.attach_btn:
-                self.attach_btn.configure(state=tk.DISABLED)
+        self._abort_event = threading.Event()
+        self._set_send_button_loading(True)
+        self._set_inputs_enabled(False)
 
         # Reset streaming state
         self.streaming_text = ""
@@ -1760,6 +1823,8 @@ class ChatWindowBase(ABC):
             from ... import web_server
             from ...profile_resolver import resolve_profile, resolve_profile_by_name
             from ...request_pipeline import RequestContext, RequestOrigin, RequestPipeline, StreamCallback
+
+            abort_event = self._abort_event
 
             # Always resolve profile to get a merged config with connection keys
             if self.session.profile_override:
@@ -1795,13 +1860,13 @@ class ChatWindowBase(ABC):
             )
 
             def on_text(content):
-                if self._destroyed:
+                if self._destroyed or abort_event.is_set():
                     return
                 self.streaming_text += content
                 self._safe_after(0, self._update_streaming_display)
 
             def on_thinking(content):
-                if self._destroyed:
+                if self._destroyed or abort_event.is_set():
                     return
                 self.streaming_thinking += content
                 self._safe_after(0, self._update_streaming_display)
@@ -1821,13 +1886,24 @@ class ChatWindowBase(ABC):
 
             if streaming_enabled and current_provider in ("custom", "google", "openrouter"):
                 ctx = RequestPipeline.execute_streaming(
-                    ctx, self.session, effective_config, effective_ai_params, effective_key_managers, callbacks
+                    ctx,
+                    self.session,
+                    effective_config,
+                    effective_ai_params,
+                    effective_key_managers,
+                    callbacks,
+                    abort_event=abort_event,
                 )
             else:
                 self.is_streaming = False
                 messages = self.session.get_conversation_for_api(include_image=True)
                 ctx = RequestPipeline.execute_simple(
-                    ctx, messages, effective_config, effective_ai_params, effective_key_managers
+                    ctx,
+                    messages,
+                    effective_config,
+                    effective_ai_params,
+                    effective_key_managers,
+                    abort_event=abort_event,
                 )
 
             self.is_streaming = False
@@ -1845,7 +1921,15 @@ class ChatWindowBase(ABC):
                 if self._destroyed:
                     return
 
-                if ctx.error:
+                if abort_event.is_set():
+                    if on_complete:
+                        on_complete(success=False)
+                        self._update_chat_display(scroll_to_bottom=True)
+                    return
+
+                if ctx.aborted:
+                    self._update_status("Request stopped")
+                elif ctx.error:
                     self._update_status(f"Error: {ctx.error}", self.theme.accent_red)
                 else:
                     self.session.add_message("assistant", ctx.response_text, gemini_parts=ctx.gemini_parts)
@@ -1881,28 +1965,9 @@ class ChatWindowBase(ABC):
                 add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
 
                 self.is_loading = False
-                if HAVE_CTK:
-                    self.send_btn.configure(state="normal")
-                    if hasattr(self, "regen_btn") and self.regen_btn:
-                        self.regen_btn.configure(state="normal")
-                    if self.rename_btn:
-                        self.rename_btn.configure(state="normal")
-                    if self.delete_btn:
-                        self.delete_btn.configure(state="normal")
-                    self.input_text.configure(state="normal")
-                    if self.attach_btn:
-                        self.attach_btn.configure(state="normal")
-                else:
-                    self.send_btn.configure(state=tk.NORMAL)
-                    if hasattr(self, "regen_btn") and self.regen_btn:
-                        self.regen_btn.configure(state=tk.NORMAL)
-                    if self.rename_btn:
-                        self.rename_btn.configure(state=tk.NORMAL)
-                    if self.delete_btn:
-                        self.delete_btn.configure(state=tk.NORMAL)
-                    self.input_text.configure(state=tk.NORMAL)
-                    if self.attach_btn:
-                        self.attach_btn.configure(state=tk.NORMAL)
+                self._abort_event = None
+                self._set_send_button_loading(False)
+                self._set_inputs_enabled(True)
 
                 self.streaming_text = ""
                 self.streaming_thinking = ""
@@ -2619,24 +2684,9 @@ class ChatWindowBase(ABC):
 
         # Disable input
         self.is_loading = True
-        if HAVE_CTK:
-            self.send_btn.configure(state="disabled")
-            if self.rename_btn:
-                self.rename_btn.configure(state="disabled")
-            if self.delete_btn:
-                self.delete_btn.configure(state="disabled")
-            self.input_text.configure(state="disabled")
-            if self.attach_btn:
-                self.attach_btn.configure(state="disabled")
-        else:
-            self.send_btn.configure(state=tk.DISABLED)
-            if self.rename_btn:
-                self.rename_btn.configure(state=tk.DISABLED)
-            if self.delete_btn:
-                self.delete_btn.configure(state=tk.DISABLED)
-            self.input_text.configure(state=tk.DISABLED)
-            if self.attach_btn:
-                self.attach_btn.configure(state=tk.DISABLED)
+        self._abort_event = threading.Event()
+        self._set_send_button_loading(True)
+        self._set_inputs_enabled(False)
         self._update_status("Sending...")
 
         # Clear pending attachments from UI
@@ -2652,6 +2702,8 @@ class ChatWindowBase(ABC):
             from ... import web_server
             from ...attachment_manager import AttachmentManager
             from ...request_pipeline import RequestContext, RequestOrigin, RequestPipeline, StreamCallback
+
+            abort_event = self._abort_event
 
             # Process attachments: save to storage and build attachment list
             message_attachments = []
@@ -2736,13 +2788,13 @@ class ChatWindowBase(ABC):
             )
 
             def on_text(content):
-                if self._destroyed:
+                if self._destroyed or abort_event.is_set():
                     return
                 self.streaming_text += content
                 self._safe_after(0, self._update_streaming_display)
 
             def on_thinking(content):
-                if self._destroyed:
+                if self._destroyed or abort_event.is_set():
                     return
                 self.streaming_thinking += content
                 self._safe_after(0, self._update_streaming_display)
@@ -2762,13 +2814,24 @@ class ChatWindowBase(ABC):
 
             if streaming_enabled and current_provider in ("custom", "google", "openrouter"):
                 ctx = RequestPipeline.execute_streaming(
-                    ctx, self.session, effective_config, effective_ai_params, effective_key_managers, callbacks
+                    ctx,
+                    self.session,
+                    effective_config,
+                    effective_ai_params,
+                    effective_key_managers,
+                    callbacks,
+                    abort_event=abort_event,
                 )
             else:
                 self.is_streaming = False
                 messages = self.session.get_conversation_for_api(include_image=True)
                 ctx = RequestPipeline.execute_simple(
-                    ctx, messages, effective_config, effective_ai_params, effective_key_managers
+                    ctx,
+                    messages,
+                    effective_config,
+                    effective_ai_params,
+                    effective_key_managers,
+                    abort_event=abort_event,
                 )
 
             self.is_streaming = False
@@ -2786,7 +2849,12 @@ class ChatWindowBase(ABC):
                 if self._destroyed:
                     return
 
-                if ctx.error:
+                if abort_event.is_set():
+                    return
+
+                if ctx.aborted:
+                    self._update_status("Request stopped")
+                elif ctx.error:
                     self._update_status(f"Error: {ctx.error}", self.theme.accent_red)
                     # Don't pop user message - keep it for retry via Regen button
                 else:
@@ -2811,24 +2879,9 @@ class ChatWindowBase(ABC):
                     add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
 
                 self.is_loading = False
-                if HAVE_CTK:
-                    self.send_btn.configure(state="normal")
-                    if self.rename_btn:
-                        self.rename_btn.configure(state="normal")
-                    if self.delete_btn:
-                        self.delete_btn.configure(state="normal")
-                    self.input_text.configure(state="normal")
-                    if self.attach_btn:
-                        self.attach_btn.configure(state="normal")
-                else:
-                    self.send_btn.configure(state=tk.NORMAL)
-                    if self.rename_btn:
-                        self.rename_btn.configure(state=tk.NORMAL)
-                    if self.delete_btn:
-                        self.delete_btn.configure(state=tk.NORMAL)
-                    self.input_text.configure(state=tk.NORMAL)
-                    if self.attach_btn:
-                        self.attach_btn.configure(state=tk.NORMAL)
+                self._abort_event = None
+                self._set_send_button_loading(False)
+                self._set_inputs_enabled(True)
 
                 self.streaming_text = ""
                 self.streaming_thinking = ""
@@ -3262,6 +3315,8 @@ class ChatWindowBase(ABC):
         """Close window and cleanup."""
         self._destroyed = True
         self.is_streaming = False
+        if self._abort_event:
+            self._abort_event.set()
         unregister_window(self._get_window_tag())
 
         # Unsubscribe from config change events

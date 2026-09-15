@@ -164,6 +164,7 @@ class GeminiNativeProvider(BaseProvider):
 
         self._check_abort(abort_event)
         response = requests.post(url, headers=headers, json=body, timeout=timeout, stream=True)
+        self._watch_abort_for_response(response, abort_event)
 
         try:
             self._check_abort(abort_event)

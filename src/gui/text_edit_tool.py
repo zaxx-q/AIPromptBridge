@@ -1742,6 +1742,7 @@ class TextEditToolApp:
             resolved.ai_params,
             resolved.key_managers,
             stream_callbacks,
+            abort_event=callbacks.abort_event,
         )
 
         if ctx.error:
@@ -1767,6 +1768,9 @@ class TextEditToolApp:
         # Finalize: add the complete message to session
         response_text = "".join(full_response) or ctx.response_text or ""
         thinking_text = "".join(full_thinking) or ctx.reasoning_text or ""
+
+        if not response_text:
+            return
 
         callbacks.finalize(response_text, thinking_text)
 

@@ -54,6 +54,7 @@ class StreamingChatCallbacks:
     on_done: Optional[Callable[[], None]] = None
     window: Any = None  # Reference to the AttachedChatWindow
     ready: threading.Event = field(default_factory=threading.Event)
+    abort_event: Optional[threading.Event] = None  # Set by chat window Stop button
 
     def finalize(self, response_text: str, thinking_text: str = ""):
         """
@@ -100,6 +101,12 @@ class StreamingChatCallbacks:
 
                 # Update status
                 self.window._update_status("✅ Response received", self.window.theme.accent_green)
+
+                # Reset loading state and re-enable inputs
+                self.window.is_loading = False
+                self.window._abort_event = None
+                self.window._set_send_button_loading(False)
+                self.window._set_inputs_enabled(True)
 
                 # Reset streaming state
                 self.window.streaming_text = ""
@@ -442,21 +449,30 @@ class GUICoordinator:
 
             # Put window in streaming mode
             window.is_streaming = True
+            window.is_loading = True
+            window._abort_event = threading.Event()
             window.streaming_text = ""
             window.streaming_thinking = ""
+
+            # Switch Send → Stop and disable inputs
+            window._set_send_button_loading(True)
+            window._set_inputs_enabled(False)
 
             # Show initial streaming indicator
             window._update_streaming_display()
 
+            # Expose abort event so callers can check/pass it
+            abort_event = window._abort_event
+
             # Create callbacks for streaming updates
             def on_text(content):
-                if window._destroyed:
+                if window._destroyed or abort_event.is_set():
                     return
                 window.streaming_text += content
                 window._safe_after(0, window._update_streaming_display)
 
             def on_thinking(content):
-                if window._destroyed:
+                if window._destroyed or abort_event.is_set():
                     return
                 window.streaming_thinking += content
                 window._safe_after(0, window._update_streaming_display)
@@ -472,6 +488,7 @@ class GUICoordinator:
             callbacks.on_thinking = on_thinking
             callbacks.on_done = on_done
             callbacks.window = window
+            callbacks.abort_event = abort_event
 
         except Exception as e:
             print(f"[GUICoordinator] Error creating streaming chat window: {e}")

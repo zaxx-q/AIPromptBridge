@@ -807,7 +807,13 @@ class SnipToolApp:
 
             # Execute streaming request
             ctx = RequestPipeline.execute_unified_stream(
-                ctx, messages, resolved.config, resolved.ai_params, resolved.key_managers, stream_callbacks
+                ctx,
+                messages,
+                resolved.config,
+                resolved.ai_params,
+                resolved.key_managers,
+                stream_callbacks,
+                abort_event=callbacks.abort_event,
             )
 
             if ctx.error:
@@ -824,6 +830,9 @@ class SnipToolApp:
             # Finalize
             response_text = "".join(full_response) or ctx.response_text or ""
             thinking_text = "".join(full_thinking) or ctx.reasoning_text or ""
+
+            if not response_text:
+                return
 
             callbacks.finalize(response_text, thinking_text)
 

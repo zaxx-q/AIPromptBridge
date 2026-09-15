@@ -392,3 +392,74 @@ class TestTextEditToolAbortSuppression:
             assert isinstance(ev, threading.Event)
             assert app._current_abort_event is ev
             assert app.streaming_aborted is False
+
+
+class TestChatWindowAbort:
+    def test_watch_abort_closes_response_on_event_set(self):
+        """_watch_abort_for_response immediately calls response.close() when abort_event is set."""
+        import time
+
+        from src.providers.base import BaseProvider
+
+        class DummyProvider(BaseProvider):
+            def _do_generate(self, *args, **kwargs):
+                pass
+
+            def _do_generate_stream(self, *args, **kwargs):
+                pass
+
+            def fetch_models(self):
+                return [], None
+
+        provider = DummyProvider.__new__(DummyProvider)
+        mock_resp = MagicMock()
+        abort_event = threading.Event()
+
+        provider._watch_abort_for_response(mock_resp, abort_event)
+        mock_resp.close.assert_not_called()
+
+        abort_event.set()
+        time.sleep(0.05)
+        mock_resp.close.assert_called_once()
+
+    def test_stop_request_immediately_unlocks_ui(self):
+        """_stop_request immediately clears loading/streaming flags, restores Send, and enables inputs."""
+        from src.gui.windows.chat_base import ChatWindowBase
+
+        class DummyChatWindow(ChatWindowBase):
+            def _get_window_tag(self) -> str:
+                return "dummy"
+
+        chat = DummyChatWindow.__new__(DummyChatWindow)
+        chat.is_loading = True
+        chat.is_streaming = True
+        chat.streaming_text = "partial text"
+        chat.streaming_thinking = "thinking"
+        chat._abort_event = threading.Event()
+
+        chat.send_btn = MagicMock()
+        chat.input_text = MagicMock()
+        chat.attach_btn = MagicMock()
+        chat.rename_btn = MagicMock()
+        chat.delete_btn = MagicMock()
+        chat.regen_btn = MagicMock()
+        chat.status_label = MagicMock()
+        chat.chat_text = MagicMock()
+
+        chat._set_send_button_loading = MagicMock()
+        chat._set_inputs_enabled = MagicMock()
+        chat._update_chat_display = MagicMock()
+        chat._update_status = MagicMock()
+
+        chat._stop_request()
+
+        assert chat._abort_event.is_set() is True
+        assert chat.is_loading is False
+        assert chat.is_streaming is False
+        assert chat.streaming_text == ""
+        assert chat.streaming_thinking == ""
+
+        chat._set_send_button_loading.assert_called_once_with(False)
+        chat._set_inputs_enabled.assert_called_once_with(True)
+        chat._update_chat_display.assert_called_once_with(scroll_to_bottom=True)
+        chat._update_status.assert_called_once_with("Request stopped")
