@@ -44,8 +44,8 @@ DEFAULT_CONFIG = {
     "streaming_typing_delay": 0,
     # Enable slow application retry strategy for text capture (Obsidian, XMind, Anki, etc.)
     "text_edit_slow_app_retry": False,
-    # Terminal copy shortcut mode: auto (detect terminals), always_ctrl_c, always_ctrl_shift_c
-    # 'auto' detects if the focused app is a terminal and uses Ctrl+Shift+C to avoid SIGINT
+    # Terminal capture mode: auto (safe primary selection), always_ctrl_c, always_ctrl_shift_c
+    # 'auto' detects focused terminals and avoids injecting any copy shortcut to prevent SIGINT
     "text_edit_terminal_copy_shortcut": "auto",
     # Screen Snipping Tool settings
     "screen_snip_enabled": True,
@@ -423,10 +423,10 @@ streaming_typing_delay = 0
 # where capturing selected text fails. Adds latency when no text is selected.
 text_edit_slow_app_retry = false
 
-# Terminal copy shortcut mode
-# 'auto' = detect terminal apps and use Ctrl+Shift+C (avoids SIGINT)
-# 'always_ctrl_c' = always use Ctrl+C (may interrupt terminal processes)
-# 'always_ctrl_shift_c' = always use Ctrl+Shift+C
+# Terminal selection capture mode
+# 'auto' = detect terminal apps and read their primary selection without sending a key
+# 'always_ctrl_c' = always inject Ctrl+C (may interrupt terminal processes)
+# 'always_ctrl_shift_c' = always inject Ctrl+Shift+C (some terminals pass it through as Ctrl+C)
 text_edit_terminal_copy_shortcut = auto
 
 # ============================================================

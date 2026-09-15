@@ -5,6 +5,7 @@ Text selection and clipboard handler
 
 import logging
 import time
+from collections.abc import Callable
 from typing import Optional
 
 # Soft import: Linux can run without pyperclip when using the platform clipboard service.
@@ -253,19 +254,49 @@ class TextHandler:
             return mode
         return "auto"
 
-    def _should_use_shifted_copy(self) -> bool:
-        """Determine if Ctrl+Shift+C should be used based on config and focused app.
+    def _get_copy_capture_strategy(self) -> str:
+        """Choose the safe selection-capture strategy for the focused app.
+
+        ``primary_only`` deliberately avoids injecting *any* copy shortcut into
+        detected terminals. Ghostty (and some other terminals) passes
+        Ctrl+Shift+C through as Ctrl+C when no text is selected, which can send
+        SIGINT to the application's own console or another foreground process.
+        Terminal mouse selections are exposed through Wayland's primary
+        selection, so this strategy reads that selection and otherwise lets
+        TextEdit open its normal input popup.
 
         Returns:
-            True if Ctrl+Shift+C should be used instead of Ctrl+C.
+            ``normal`` for injected Ctrl+C, ``shifted`` for injected
+            Ctrl+Shift+C, or ``primary_only`` for safe terminal auto-detection.
         """
         mode = self._resolve_terminal_copy_mode()
         if mode == "always_ctrl_c":
-            return False
+            return "normal"
         if mode == "always_ctrl_shift_c":
-            return True
-        # auto: detect if focused app is a terminal
-        return is_focused_app_terminal()
+            return "shifted"
+        return "primary_only" if is_focused_app_terminal() else "normal"
+
+    def _should_use_shifted_copy(self) -> bool:
+        """Return whether the current platform should inject Ctrl+Shift+C.
+
+        Linux auto-detected terminals use ``primary_only`` and never inject a
+        shortcut. Windows lacks Wayland primary selection, so its terminal
+        auto-detection retains Ctrl+Shift+C instead.
+        """
+        strategy = self._get_copy_capture_strategy()
+        return strategy == "shifted" or (is_windows() and strategy == "primary_only")
+
+    def _get_linux_selection_capture_options(self) -> tuple[bool, bool, Optional[Callable[[], bool]]]:
+        """Return ``(allow_ctrl_c, allow_primary, copy_fn)`` for Linux capture."""
+        strategy = self._get_copy_capture_strategy()
+        configured_primary = bool(self.config.get("linux_selection_fallback_primary", False))
+
+        if strategy == "primary_only":
+            # Never synthesize Ctrl+C / Ctrl+Shift+C in an auto-detected terminal.
+            return False, True, None
+        if strategy == "shifted":
+            return True, configured_primary, copy_via_clipboard_shortcut_shifted
+        return True, configured_primary, None
 
     @staticmethod
     def _send_paste_keystroke() -> bool:
@@ -341,18 +372,10 @@ class TextHandler:
         """
         if is_linux():
             try:
-                allow_primary = (
-                    bool(self.config.get("linux_selection_fallback_primary", False))
-                    if hasattr(self, "config") and self.config
-                    else False
-                )
-                # Choose terminal-safe copy shortcut based on focused window
-                copy_fn = (
-                    copy_via_clipboard_shortcut_shifted if self._should_use_shifted_copy() else None  # default Ctrl+C
-                )
+                allow_ctrl_c, allow_primary, copy_fn = self._get_linux_selection_capture_options()
                 return capture_selection_for_textedit(
                     timeout=max_wait,
-                    allow_ctrl_c=True,
+                    allow_ctrl_c=allow_ctrl_c,
                     allow_primary=allow_primary,
                     copy_fn=copy_fn,
                 )
@@ -485,19 +508,11 @@ class TextHandler:
         """
         if is_linux():
             try:
-                allow_primary = (
-                    bool(self.config.get("linux_selection_fallback_primary", False))
-                    if hasattr(self, "config") and self.config
-                    else False
-                )
-                # Use same terminal-safe copy function as fast path
-                copy_fn = (
-                    copy_via_clipboard_shortcut_shifted if self._should_use_shifted_copy() else None  # default Ctrl+C
-                )
+                allow_ctrl_c, allow_primary, copy_fn = self._get_linux_selection_capture_options()
                 return capture_selection_for_textedit(
                     timeout=1.2,
                     poll_interval=0.02,
-                    allow_ctrl_c=True,
+                    allow_ctrl_c=allow_ctrl_c,
                     resend_after=0.4,
                     allow_primary=allow_primary,
                     copy_fn=copy_fn,

@@ -72,11 +72,11 @@ class ToolsTabMixin:
         self._add_dropdown_field(
             content,
             "text_edit_terminal_copy_shortcut",
-            "Terminal copy shortcut:",
+            "Terminal selection capture:",
             self.config_data.config.get("text_edit_terminal_copy_shortcut", "auto"),
             options=["auto", "always_ctrl_c", "always_ctrl_shift_c"],
             size="md",
-            hint="'auto' detects terminals and uses Ctrl+Shift+C to avoid SIGINT",
+            hint="'auto' reads terminal primary selection without sending a copy shortcut",
         )
 
         # --- ScreenSnip ---
