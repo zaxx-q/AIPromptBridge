@@ -7,6 +7,7 @@ Includes TkScrollableFrame for a fallback scrollable frame for standard Tkinter.
 """
 
 import sys
+import threading
 import tkinter as tk
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -1751,3 +1752,165 @@ def ask_themed_string(parent, title: str, prompt: str, colors: ThemeColors) -> O
     dialog = ThemedInputDialog(parent, title, prompt, colors)
     parent.wait_window(dialog)
     return dialog.result
+
+
+class ThemedModelOverrideDialog:
+    """Themed modal combobox for selecting or clearing a session model override."""
+
+    def __init__(
+        self,
+        parent,
+        colors: ThemeColors,
+        profile_name: str,
+        profile_model: str,
+        current_override: Optional[str],
+        load_models: Callable[[], List[str]],
+    ):
+        self.result: Optional[str] = None
+        self.accepted = False
+        self.colors = colors
+        self.current_override = current_override
+        self.load_models = load_models
+        self._loading = True
+        self._inherit_value = f"(Use Profile: {profile_model})" if profile_model else "(Use Profile Model)"
+
+        if HAVE_CTK:
+            self.dialog = ctk.CTkToplevel(parent)
+            self.dialog.withdraw()
+            self.dialog.configure(fg_color=colors.bg)
+        else:
+            self.dialog = tk.Toplevel(parent)
+            self.dialog.withdraw()
+            self.dialog.configure(bg=colors.bg)
+
+        self.dialog.title("Session Model Override")
+        self.dialog.geometry("460x190")
+        self.dialog.resizable(False, False)
+        self.dialog.transient(parent)
+        try:
+            from .windows.utils import set_dark_titlebar, set_window_icon
+
+            set_window_icon(self.dialog)
+            set_dark_titlebar(self.dialog)
+        except ImportError:
+            pass
+
+        px = parent.winfo_rootx() + (parent.winfo_width() - 460) // 2
+        py = parent.winfo_rooty() + (parent.winfo_height() - 190) // 2
+        self.dialog.geometry(f"+{max(0, px)}+{max(0, py)}")
+
+        if HAVE_CTK:
+            frame = ctk.CTkFrame(self.dialog, fg_color="transparent")
+            frame.pack(fill="both", expand=True, padx=20, pady=18)
+            ctk.CTkLabel(frame, text=f"Profile: {profile_name}", font=get_ctk_font(size=12), text_color=colors.fg).pack(
+                anchor="w"
+            )
+            self.status_label = ctk.CTkLabel(
+                frame, text="Loading models…", font=get_ctk_font(size=10), text_color=colors.overlay0
+            )
+        else:
+            frame = tk.Frame(self.dialog, bg=colors.bg)
+            frame.pack(fill="both", expand=True, padx=20, pady=18)
+            tk.Label(frame, text=f"Profile: {profile_name}", font=get_tk_font(10), bg=colors.bg, fg=colors.fg).pack(
+                anchor="w"
+            )
+            self.status_label = tk.Label(
+                frame, text="Loading models…", font=get_tk_font(9), bg=colors.bg, fg=colors.blockquote
+            )
+
+        self.model_dropdown = ScrollableComboBox(
+            frame, colors=colors, values=["(Loading models...)"], width=410, height=32
+        )
+        self.model_dropdown.pack(fill="x", pady=(8, 3))
+        self.model_dropdown.set("(Loading models...)")
+        self.status_label.pack(anchor="w", pady=(0, 12))
+
+        if HAVE_CTK:
+            button_frame = ctk.CTkFrame(frame, fg_color="transparent")
+            button_frame.pack(anchor="e")
+            ctk.CTkButton(
+                button_frame,
+                text="Save",
+                font=get_ctk_font(size=12),
+                width=75,
+                height=30,
+                command=self._save,
+                **get_ctk_button_colors(colors, "success"),
+            ).pack(side="left", padx=(0, 5))
+            ctk.CTkButton(
+                button_frame,
+                text="Cancel",
+                font=get_ctk_font(size=12),
+                width=75,
+                height=30,
+                command=self._cancel,
+                **get_ctk_button_colors(colors, "secondary"),
+            ).pack(side="left")
+        else:
+            button_frame = tk.Frame(frame, bg=colors.bg)
+            button_frame.pack(anchor="e")
+            tk.Button(
+                button_frame,
+                text="Save",
+                font=get_tk_font(10),
+                bg=colors.accent,
+                fg=colors.accent_fg,
+                relief=tk.FLAT,
+                padx=10,
+                pady=5,
+                command=self._save,
+                cursor="hand2",
+            ).pack(side="left", padx=(0, 5))
+            tk.Button(
+                button_frame,
+                text="Cancel",
+                font=get_tk_font(10),
+                bg=colors.surface1,
+                fg=colors.fg,
+                relief=tk.FLAT,
+                padx=10,
+                pady=5,
+                command=self._cancel,
+                cursor="hand2",
+            ).pack(side="left")
+
+        self.dialog.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.dialog.bind("<Escape>", lambda _event: self._cancel())
+        self.dialog.deiconify()
+        self.dialog.grab_set()
+        threading.Thread(target=self._load_models, daemon=True).start()
+
+    def _load_models(self):
+        try:
+            model_ids = self.load_models()
+        except Exception:
+            model_ids = []
+        model_ids = list(dict.fromkeys(model for model in model_ids if model))
+        if self.current_override and self.current_override not in model_ids:
+            model_ids.append(self.current_override)
+
+        try:
+            self.dialog.after(0, lambda: self._set_models(model_ids))
+        except tk.TclError:
+            pass
+
+    def _set_models(self, model_ids: List[str]):
+        if not self.dialog.winfo_exists():
+            return
+        self._loading = False
+        self.model_dropdown.configure(values=[self._inherit_value, *model_ids])
+        self.model_dropdown.set(self.current_override or self._inherit_value)
+        status = "Select a model for this session." if model_ids else "No models found; use the profile model."
+        self.status_label.configure(text=status)
+
+    def _save(self):
+        if self._loading:
+            return
+        selected = self.model_dropdown.get().strip()
+        self.result = None if selected == self._inherit_value else selected or None
+        self.accepted = True
+        self.dialog.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.dialog.destroy()

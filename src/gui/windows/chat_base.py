@@ -17,7 +17,7 @@ from typing import Dict, List, Optional
 from ...model_defaults import get_fallback_models
 from ...session_manager import add_session
 from ..core import get_next_window_id, register_window, unregister_window
-from ..custom_widgets import ScrollableComboBox, SplitButton, post_popup_menu
+from ..custom_widgets import ScrollableComboBox, SplitButton, ThemedModelOverrideDialog, post_popup_menu
 from ..emoji_renderer import prepare_emoji_content
 from ..platform import HAVE_CTK, ctk
 from ..themes import (
@@ -88,8 +88,12 @@ class ChatWindowBase(ABC):
         # Profile selector mode: show profiles instead of model list
         self._use_profile_mode = self._compute_profile_mode()
 
-        # Manual mode: per-session toggle
-        self._manual_mode = self.session.manual_mode
+        # Manual provider selection was retired in favor of profile-based
+        # sessions. Convert legacy manual sessions to the active/profile setup.
+        if self.session.manual_mode:
+            self.session.manual_mode = False
+            self.session.provider_override = None
+            self.session.model_override = None
 
         # Theme
         self.theme = get_colors()
@@ -117,18 +121,11 @@ class ChatWindowBase(ABC):
         # Info label (row 0) — stored for dynamic updates
         self.info_label = None
 
-        # Manual mode toggle
-        self.manual_toggle_btn = None
+        # Per-session model override
+        self.model_override_btn = None
 
-        # Right-side container frames for toolbar
+        # Right-side container frame for toolbar
         self._profile_widgets_frame = None  # Contains profile label + dropdown
-        self._manual_widgets_frame = None  # Contains provider label + dropdown + model label + dropdown
-
-        # Manual mode widgets
-        self.provider_dropdown = None
-        self.provider_label_widget = None
-        self.manual_model_dropdown = None
-        self.manual_model_label_widget = None
         self.h_scrollbar = None
         self.v_scrollbar = None
         # Placeholder state
@@ -255,10 +252,7 @@ class ChatWindowBase(ABC):
         base = f"Session: {self.session.session_id} | Origin: {self.session.origin}"
 
         # Determine provider/model to display
-        if self._manual_mode:
-            provider = self.session.provider_override or "—"
-            model = self.session.model_override or "—"
-        elif self.session.profile_override:
+        if self.session.profile_override:
             # Look up profile to get its provider/model
             try:
                 from ...connection_profiles import ProfileStore
@@ -266,7 +260,7 @@ class ChatWindowBase(ABC):
                 profile = ProfileStore.get_instance().get_profile(self.session.profile_override)
                 if profile:
                     provider = profile.provider
-                    model = profile.model
+                    model = self.session.model_override or profile.model
                 else:
                     provider = "?"
                     model = "?"
@@ -280,7 +274,7 @@ class ChatWindowBase(ABC):
 
                 active = ProfileStore.get_instance().get_active_profile()
                 provider = active.provider
-                model = active.model
+                model = self.session.model_override or active.model
             except Exception:
                 provider = web_server.get_active_setting("provider", "google")
                 model = web_server.get_active_setting("model", "")
@@ -378,20 +372,18 @@ class ChatWindowBase(ABC):
             right_container = ctk.CTkFrame(btn_frame, fg_color="transparent")
             right_container.pack(side="right")
 
-            # Toggle button (always visible, leftmost in right group)
-            toggle_text = "⚙️ Manual" if self._manual_mode else "📋 Profile"
-            toggle_content = prepare_emoji_content(toggle_text, size=14)
-            self.manual_toggle_btn = ctk.CTkButton(
+            # Session model override (uses models for the selected profile)
+            self.model_override_btn = ctk.CTkButton(
                 right_container,
-                **toggle_content,
+                text="Model Override",
                 font=get_ctk_font(size=11),
-                width=80,
+                width=115,
                 height=28,
                 corner_radius=6,
-                command=self._toggle_manual_mode,
+                command=self._open_model_override_dialog,
                 **btn_colors,
             )
-            self.manual_toggle_btn.pack(side="left", padx=(0, 6))
+            self.model_override_btn.pack(side="left", padx=(0, 6))
 
             # ---- Profile mode frame ----
             self._profile_widgets_frame = ctk.CTkFrame(right_container, fg_color="transparent")
@@ -422,62 +414,7 @@ class ChatWindowBase(ABC):
             self.model_dropdown.pack(side="left", padx=(0, 0))
             self.model_dropdown.set(initial_display)
 
-            # ---- Manual mode frame ----
-            self._manual_widgets_frame = ctk.CTkFrame(right_container, fg_color="transparent")
-
-            # Provider dropdown
-            from ...providers.registry import PROVIDER_REGISTRY
-
-            provider_ids = sorted(PROVIDER_REGISTRY.keys())
-
-            self.provider_label_widget = ctk.CTkLabel(
-                self._manual_widgets_frame, text="Provider:", font=get_ctk_font(size=11), text_color=self.theme.fg
-            )
-            self.provider_label_widget.pack(side="left", padx=(0, 3))
-
-            self.provider_dropdown = ScrollableComboBox(
-                self._manual_widgets_frame,
-                colors=self.theme,
-                values=provider_ids,
-                width=95,
-                height=28,
-                command=self._on_manual_provider_select,
-            )
-            self.provider_dropdown.pack(side="left", padx=(0, 8))
-
-            # Model dropdown (manual mode)
-            self.manual_model_label_widget = ctk.CTkLabel(
-                self._manual_widgets_frame, text="Model:", font=get_ctk_font(size=11), text_color=self.theme.fg
-            )
-            self.manual_model_label_widget.pack(side="left", padx=(0, 3))
-
-            self.manual_model_dropdown = ScrollableComboBox(
-                self._manual_widgets_frame,
-                colors=self.theme,
-                values=["(select provider)"],
-                width=140,
-                height=28,
-                command=self._on_manual_model_select,
-            )
-            self.manual_model_dropdown.pack(side="left")
-
-            # Initialize manual mode dropdowns with session state
-            if self.session.provider_override:
-                self.provider_dropdown.set(self.session.provider_override)
-                # Will be populated by _load_manual_models
-            if self.session.model_override and self._manual_mode:
-                self.manual_model_dropdown.set(self.session.model_override)
-
-            # Show the correct frame based on mode
-            if self._manual_mode:
-                self._manual_widgets_frame.pack(side="left")
-                # Trigger model loading for the current provider
-                if self.session.provider_override:
-                    threading.Thread(
-                        target=self._load_manual_models, args=(self.session.provider_override,), daemon=True
-                    ).start()
-            else:
-                self._profile_widgets_frame.pack(side="left")
+            self._profile_widgets_frame.pack(side="left")
         else:
             from tkinter import ttk
 
@@ -560,21 +497,20 @@ class ChatWindowBase(ABC):
             right_container = tk.Frame(btn_frame, bg=self.colors["bg"])
             right_container.pack(side=tk.RIGHT)
 
-            # Toggle button
-            toggle_text = "⚙️ Manual" if self._manual_mode else "📋 Profile"
-            self.manual_toggle_btn = tk.Button(
+            # Session model override (uses models for the selected profile)
+            self.model_override_btn = tk.Button(
                 right_container,
-                text=toggle_text,
+                text="Model Override",
                 font=get_tk_font(9),
                 bg=self.colors["button_bg"],
                 fg=self.colors["fg"],
                 relief=tk.FLAT,
                 padx=8,
                 pady=4,
-                command=self._toggle_manual_mode,
+                command=self._open_model_override_dialog,
                 cursor="hand2",
             )
-            self.manual_toggle_btn.pack(side=tk.LEFT, padx=(0, 8))
+            self.model_override_btn.pack(side=tk.LEFT, padx=(0, 8))
 
             # ---- Profile mode frame ----
             self._profile_widgets_frame = tk.Frame(right_container, bg=self.colors["bg"])
@@ -611,70 +547,15 @@ class ChatWindowBase(ABC):
             self.model_dropdown.pack(side=tk.LEFT)
             self.model_dropdown.set(initial_display)
 
-            # ---- Manual mode frame ----
-            self._manual_widgets_frame = tk.Frame(right_container, bg=self.colors["bg"])
-
-            from ...providers.registry import PROVIDER_REGISTRY
-
-            provider_ids = sorted(PROVIDER_REGISTRY.keys())
-
-            self.provider_label_widget = tk.Label(
-                self._manual_widgets_frame,
-                text="Provider:",
-                font=get_tk_font(9),
-                bg=self.colors["bg"],
-                fg=self.colors["fg"],
-            )
-            self.provider_label_widget.pack(side=tk.LEFT, padx=(0, 3))
-
-            self.provider_dropdown = ttk.Combobox(
-                self._manual_widgets_frame, values=provider_ids, width=9, state="readonly"
-            )
-            self.provider_dropdown.pack(side=tk.LEFT, padx=(0, 8))
-            self.provider_dropdown.bind(
-                "<<ComboboxSelected>>", lambda e: self._on_manual_provider_select(self.provider_dropdown.get())
-            )
-
-            self.manual_model_label_widget = tk.Label(
-                self._manual_widgets_frame,
-                text="Model:",
-                font=get_tk_font(9),
-                bg=self.colors["bg"],
-                fg=self.colors["fg"],
-            )
-            self.manual_model_label_widget.pack(side=tk.LEFT, padx=(0, 3))
-
-            self.manual_model_dropdown = ttk.Combobox(
-                self._manual_widgets_frame, values=["(select provider)"], width=16, state="readonly"
-            )
-            self.manual_model_dropdown.pack(side=tk.LEFT)
-            self.manual_model_dropdown.bind(
-                "<<ComboboxSelected>>", lambda e: self._on_manual_model_select(self.manual_model_dropdown.get())
-            )
-
-            # Initialize from session state
-            if self.session.provider_override:
-                self.provider_dropdown.set(self.session.provider_override)
-            if self.session.model_override and self._manual_mode:
-                self.manual_model_dropdown.set(self.session.model_override)
-
-            # Show correct frame
-            if self._manual_mode:
-                self._manual_widgets_frame.pack(side=tk.LEFT)
-                if self.session.provider_override:
-                    threading.Thread(
-                        target=self._load_manual_models, args=(self.session.provider_override,), daemon=True
-                    ).start()
-            else:
-                self._profile_widgets_frame.pack(side=tk.LEFT)
+            self._profile_widgets_frame.pack(side=tk.LEFT)
 
         # Schedule model loading
         self._schedule_model_loading()
 
     def _schedule_model_loading(self):
-        """Schedule model loading - skip in profile mode or manual mode."""
-        if self._use_profile_mode or self._manual_mode:
-            return  # Profile names or manual dropdowns handle their own loading
+        """Schedule model loading when the legacy model selector is enabled."""
+        if self._use_profile_mode:
+            return  # Profile names handle their own loading
         threading.Thread(target=self._load_models, daemon=True).start()
 
     def _create_chat_area(self):
@@ -1428,173 +1309,54 @@ class ChatWindowBase(ABC):
         global_model = web_server.get_active_setting("model", "")
         return f"(Use Global: {global_model})" if global_model else "(Use Global)"
 
-    def _toggle_manual_mode(self):
-        """Toggle between profile mode and manual mode."""
-        self._manual_mode = not self._manual_mode
-        self.session.manual_mode = self._manual_mode
+    def _open_model_override_dialog(self):
+        """Choose a model override from the profile currently used by this session."""
+        if self.is_loading or self._destroyed:
+            return
 
-        if self._manual_mode:
-            # Switch to manual mode
-            self._profile_widgets_frame.pack_forget()
-            self._manual_widgets_frame.pack(side="left" if HAVE_CTK else tk.LEFT)
+        from ... import web_server
+        from ...connection_profiles import ProfileStore
+        from ...profile_resolver import resolve_profile, resolve_profile_by_name
 
-            if HAVE_CTK:
-                content = prepare_emoji_content("📋 Profile", size=14)
-                self.manual_toggle_btn.configure(**content)
-            else:
-                self.manual_toggle_btn.configure(text="📋 Profile")
-
-            # If provider was previously set, load models for it
-            if self.session.provider_override:
-                self.provider_dropdown.set(self.session.provider_override)
-                if self.session.model_override:
-                    self.manual_model_dropdown.set(self.session.model_override)
-                threading.Thread(
-                    target=self._load_manual_models, args=(self.session.provider_override,), daemon=True
-                ).start()
-
-            self._update_status("Manual mode: select provider & model")
+        if self.session.profile_override:
+            profile_name = self.session.profile_override
+            resolved = resolve_profile_by_name(
+                profile_name, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS
+            )
         else:
-            # Switch to profile mode
-            self._manual_widgets_frame.pack_forget()
-            self._profile_widgets_frame.pack(side="left" if HAVE_CTK else tk.LEFT)
+            profile_name = ProfileStore.get_instance().get_active_profile_name()
+            resolved = resolve_profile(None, web_server.CONFIG, web_server.AI_PARAMS, web_server.KEY_MANAGERS)
 
-            if HAVE_CTK:
-                content = prepare_emoji_content("⚙️ Manual", size=14)
-                self.manual_toggle_btn.configure(**content)
-            else:
-                self.manual_toggle_btn.configure(text="⚙️ Manual")
-
-            # Clear manual overrides — revert to profile-based resolution
-            self.session.provider_override = None
-            # Keep model_override only if it was set in profile mode
-            if not self.session.profile_override:
-                self.session.model_override = None
-
-            self._update_status("Profile mode")
-
-        # Update info label and persist
-        self._update_info_label()
-
-        from ... import web_server
-
-        add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
-
-    def _on_manual_provider_select(self, selected: str):
-        """Handle provider selection in manual mode."""
-        if not selected:
-            return
-
-        self.session.provider_override = selected
-        self.session.profile_override = None  # Manual mode clears profile
-        self.session.model_override = None  # Reset model when provider changes
-
-        # Reset model dropdown
-        if HAVE_CTK:
-            self.manual_model_dropdown.configure(values=["(loading...)"])
-            self.manual_model_dropdown.set("(loading...)")
-        else:
-            self.manual_model_dropdown.configure(values=["(loading...)"])
-            self.manual_model_dropdown.set("(loading...)")
-
-        # Update info label
-        self._update_info_label()
-
-        # Load models for the selected provider
-        threading.Thread(target=self._load_manual_models, args=(selected,), daemon=True).start()
-
-        self._update_status(f"Provider: {selected}")
-
-        from ... import web_server
-
-        add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
-
-    def _on_manual_model_select(self, selected: str):
-        """Handle model selection in manual mode."""
-        if not selected or selected in ("(loading...)", "(select provider)", "(no models)"):
-            return
-
-        self.session.model_override = selected
-        self.selected_model = selected
-
-        # Update info label
-        self._update_info_label()
-
-        self._update_status(f"✅ Model: {selected}", self.theme.accent_green)
-
-        from ... import web_server
-
-        add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
-
-    def _load_manual_models(self, provider: str):
-        """Load models for a specific provider (manual mode). Runs in background thread."""
-        if self._destroyed:
-            return
-
-        try:
-            from ... import web_server
+        def load_models() -> List[str]:
             from ...api_client import fetch_models
-            from ...model_defaults import get_fallback_models
 
-            # Try live fetch first
-            models, error = fetch_models(web_server.CONFIG, web_server.KEY_MANAGERS, provider_override=provider)
+            models, _error = fetch_models(resolved.config, resolved.key_managers, provider_override=resolved.provider)
+            return [model["id"] for model in models or [] if model.get("id")] or get_fallback_models(resolved.provider)
 
-            if models and not error and not self._destroyed:
-                model_ids = [m["id"] for m in models]
-            else:
-                # Fall back to curated list
-                model_ids = get_fallback_models(provider)
+        dialog = ThemedModelOverrideDialog(
+            self.root, self.theme, profile_name, resolved.model, self.session.model_override, load_models
+        )
+        self.root.wait_window(dialog.dialog)
+        if not dialog.accepted:
+            return
 
-            if not model_ids:
-                model_ids = ["(no models)"]
+        self.session.model_override = dialog.result
+        self.session.manual_mode = False
+        self.session.provider_override = None
+        self.selected_model = dialog.result
+        self._update_info_label()
 
-            def update_dropdown():
-                if self._destroyed:
-                    return
-                try:
-                    if HAVE_CTK:
-                        self.manual_model_dropdown.configure(values=model_ids)
-                    else:
-                        self.manual_model_dropdown.configure(values=model_ids)
-
-                    # Restore session's model if it's in the list
-                    if self.session.model_override and self.session.model_override in model_ids:
-                        self.manual_model_dropdown.set(self.session.model_override)
-                    elif self.session.model_override:
-                        # Model not in list but keep showing it
-                        self.manual_model_dropdown.set(self.session.model_override)
-                    elif model_ids and model_ids[0] != "(no models)":
-                        self.manual_model_dropdown.set(model_ids[0])
-                except Exception:
-                    pass
-
-            self._safe_after(0, update_dropdown)
-
-        except Exception as e:
-            print(f"[ChatWindowBase] Error loading manual models: {e}")
-            # Use fallback
-            from ...model_defaults import get_fallback_models
-
-            fallback = get_fallback_models(provider) or ["(no models)"]
-
-            def update_fallback():
-                if self._destroyed:
-                    return
-                try:
-                    if HAVE_CTK:
-                        self.manual_model_dropdown.configure(values=fallback)
-                    else:
-                        self.manual_model_dropdown.configure(values=fallback)
-                except Exception:
-                    pass
-
-            self._safe_after(0, update_fallback)
+        if dialog.result:
+            self._update_status(f"✅ Session model: {dialog.result}", self.theme.accent_green)
+        else:
+            self._update_status("✅ Using profile model", self.theme.accent_green)
+        add_session(self.session, web_server.CONFIG.get("max_sessions", 200))
 
     def _refresh_profile_list(self):
         """Refresh the profile dropdown values (called when profiles change)."""
         if self._destroyed or not self.model_dropdown:
             return
-        if not self._use_profile_mode or self._manual_mode:
+        if not self._use_profile_mode:
             return  # Only relevant in profile mode
 
         try:
@@ -1811,11 +1573,15 @@ class ChatWindowBase(ABC):
             if selected == "(Use Global)":
                 self.session.profile_override = None
                 self.session.model_override = None
+                self.session.manual_mode = False
+                self.session.provider_override = None
                 self.selected_model = None
                 self._update_status("✅ Using global settings", self.theme.accent_green)
             else:
                 self.session.profile_override = selected
                 self.session.model_override = None  # Profile handles model
+                self.session.manual_mode = False
+                self.session.provider_override = None
                 self.selected_model = None
                 self._update_status(f"✅ Using profile: {selected}", self.theme.accent_green)
         else:
