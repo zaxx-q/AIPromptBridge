@@ -1,14 +1,16 @@
 # Changelog
 
-## [8.4.1] - 2026-09-15
+## [8.5.0] - 2026-09-15
 
 ### New Features
 
 - **Clipboard TextEdit**: Added a dedicated way to process text you have intentionally copied without simulating a copy command. Use Ctrl+Shift+Space on Windows or AIPromptBridge --trigger textedit-clipboard` on Linux. The Windows shortcut is configurable in Settings.
 - **Direct Linux Launch**: Pass `--no-tmux` to run directly in the terminal that launched the app instead of creating or attaching to the `aipromptbridge` tmux session.
 - **Per-Session Model Overrides**: Chat now uses profile-based configuration instead of the manual provider/model mode. The new Model Override dialog loads models from the session's selected connection profile, lets you set one model for that session, and can clear the override to restore the profile's default. Existing manual sessions automatically return to profile-based settings.
+- **Chat Stop Button**: The Send button in chat windows turns into a red Stop button while a request is active. Clicking Stop immediately unlocks the UI, halts streaming, and tears down the underlying HTTP connection so the response doesn't keep arriving in the background. Works for messages sent from the chat window as well as initial requests triggered by TextEditTool, SnipTool, and AudioTool popups.
 
 ### Improvements
+
 - **Terminal-Safe Text Selection**: TextEdit now automatically detects when the focused application is a terminal emulator and opens Direct Chat when its normal selection trigger is used in a detected Linux terminal. In the default `auto` mode, it neither reads the Wayland primary selection nor sends a copy shortcut, avoiding stale selections and accidental SIGINT from terminals that pass Ctrl+Shift+C through as Ctrl+C. Use Clipboard TextEdit when you deliberately want to process copied text. Terminal detection queries compositor IPC (`niri msg`, `swaymsg`, `hyprctl`) on Linux and process names on Windows, matching against ~50 known terminal app IDs with reverse-DNS last-segment matching (e.g. `com.mitchellh.ghostty`). Configure via `text_edit_terminal_copy_shortcut` in Settings (auto/always_ctrl_c/always_ctrl_shift_c). Compare Mode also accepts both Ctrl+C and Ctrl+Shift+C.
 - **Debug Logging Is Explicit**: `--show-console` now only keeps the Windows console visible. Use the new `--debug` flag to enable debug logging and the tray options for editing configuration files.
 - **Clipboard Chord Reliability**: Clipboard shortcut injection (Ctrl+C, Ctrl+V) now prefers `wlrctl` over `wtype` on Linux, avoiding a `wtype` quirk that can emit a spurious Escape event during modifier key chords. `wtype` remains the preferred backend for text typing.
