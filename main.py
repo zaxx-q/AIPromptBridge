@@ -7,6 +7,7 @@ Usage:
     python main.py              # Start with tray (console hidden)
     python main.py --show-console   # Start with tray + console visible
     python main.py --no-wt      # Skip Windows Terminal auto-detection
+    python main.py --no-tmux    # Linux: run directly instead of inside tmux
     python main.py --trigger snip   # Linux: trigger tool on running instance
 
 Nuitka Configuration:
@@ -596,6 +597,7 @@ Examples:
   python main.py                  Start application (console hidden by default)
   python main.py --show-console   Start application with console visible
   python main.py --no-wt          Skip Windows Terminal auto-detection
+  python main.py --no-tmux        Linux: run directly instead of inside tmux
   python main.py --trigger snip   Linux: invoke tool on the running instance
   python -m src.platform.ipc snip Fast source client (stdlib IPC only)
   ./AIPromptBridge --trigger snip Compiled: outer launcher uses aipb_trigger.py
@@ -622,6 +624,11 @@ Linux Wayland (niri / wlroots) supported:
     )
     parser.add_argument("--show-console", action="store_true", help="Start with console visible")
     parser.add_argument("--dummy", action="store_true", help="Dummy argument (does nothing)")
+    parser.add_argument(
+        "--no-tmux",
+        action="store_true",
+        help="Linux: bypass tmux and run directly in the current terminal",
+    )
     parser.add_argument(
         "--trigger",
         choices=list(KNOWN_TRIGGERS),
@@ -1006,7 +1013,7 @@ def main():
     if args.trigger:
         sys.exit(run_trigger_client(args.trigger))
 
-    if is_linux() and not _is_compiled():
+    if is_linux() and not _is_compiled() and not args.no_tmux:
         from src.platform.tmux import maybe_exec_in_tmux
 
         source_command = [sys.executable, str(Path(__file__).resolve()), *sys.argv[1:]]

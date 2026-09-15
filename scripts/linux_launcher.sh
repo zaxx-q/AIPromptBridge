@@ -48,12 +48,14 @@ fi
 
 APP_CMD=("${INTERNAL}" --launched-mode=console "$@")
 
-if [[ -z "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
-  TMUX_DETACHED=0
-  for arg in "$@"; do
-    [[ "$arg" == "--tmux-detached" ]] && TMUX_DETACHED=1
-  done
+NO_TMUX=0
+TMUX_DETACHED=0
+for arg in "$@"; do
+  [[ "$arg" == "--no-tmux" ]] && NO_TMUX=1
+  [[ "$arg" == "--tmux-detached" ]] && TMUX_DETACHED=1
+done
 
+if [[ "$NO_TMUX" -eq 0 ]] && [[ -z "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
   if [[ "$TMUX_DETACHED" -eq 1 ]]; then
     exec tmux new-session -d -A -s aipromptbridge "${APP_CMD[@]}"
   fi

@@ -14,6 +14,8 @@ Quick start
   tar -xzf AIPromptBridge-*-linux-x86_64.tar.gz
   cd AIPromptBridge-*-linux-x86_64   # or the extracted folder name
   ./AIPromptBridge --show-console
+  # To run directly in this terminal instead of tmux:
+  ./AIPromptBridge --no-tmux --show-console
 
   # IPC triggers (requires a running instance), e.g. from niri binds.
   # --trigger uses aipb_trigger.py + system python3 (tens of ms), NOT the
@@ -51,6 +53,7 @@ need a newer glibc or a source install instead.
 Interactive console (tmux)
 --------------------------
   When tmux is installed, launches run in a named session "aipromptbridge".
+  Pass --no-tmux to bypass it and keep the app's logs in the launching terminal.
   You can attach to the running console at any time:
     - via tray menu: "Open Terminal (tmux)"
     - via terminal:  tmux attach-session -t aipromptbridge

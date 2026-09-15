@@ -15,6 +15,10 @@ uv pip install -r requirements.txt
 uv run main.py --show-console
 ```
 
+To keep the app in the current terminal rather than creating or attaching to
+the `aipromptbridge` tmux session, add `--no-tmux` (for example,
+`uv run main.py --no-tmux --show-console` or `./AIPromptBridge --no-tmux`).
+
 Trigger tools from another terminal or a window-manager bind (no in-process global hotkeys on pure Wayland). **Prefer the fast IPC client** so each keypress does not cold-start Nuitka or the full `main.py` import graph (~3–6 s → tens of ms):
 
 ```bash
@@ -134,6 +138,7 @@ When `tmux` is installed:
   ```
 - **Inside tmux:** if `$TMUX` is already set (e.g. running inside an existing user pane), the app runs directly without creating nested sessions.
 - **IPC triggers:** `--trigger` bypasses tmux entirely, ensuring compositor keybinds remain fast.
+- **Direct launch:** pass `--no-tmux` to bypass tmux and keep logs in the terminal that started the app.
 
 If `tmux` is not installed, the app launches directly as before without errors.
 
