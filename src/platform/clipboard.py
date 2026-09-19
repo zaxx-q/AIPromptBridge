@@ -386,8 +386,8 @@ def _capture_via_ctrl_c(
         if not _hybrid_wlrctl_missing_warned:
             _hybrid_wlrctl_missing_warned = True
             logger.info(
-                "No primary selection; Ctrl+C inject unavailable — install wlrctl "
-                "for keyboard-selection capture (wlroots compositors such as niri)."
+                "Active selection capture unavailable: Ctrl+C injection requires wlrctl "
+                "(wlroots compositors such as niri)."
             )
         return ""
 
@@ -414,8 +414,8 @@ def _capture_via_ctrl_c(
             if not _hybrid_fail_warned:
                 _hybrid_fail_warned = True
                 logger.info(
-                    "No primary selection; copy shortcut inject failed — install wlrctl "
-                    "and focus the target app for keyboard-selection capture."
+                    "Active selection Ctrl+C capture failed — install wlrctl and focus "
+                    "the target app before invoking TextEdit."
                 )
             return ""
 
@@ -446,8 +446,8 @@ def _capture_via_ctrl_c(
         if not captured and not _hybrid_fail_warned:
             _hybrid_fail_warned = True
             logger.info(
-                "No primary selection; copy shortcut inject produced no clipboard text — "
-                "focus the target app, or select text with the mouse (primary)."
+                "Active selection Ctrl+C capture produced no clipboard text — focus "
+                "the target app and make a selection before invoking TextEdit."
             )
         return captured
     except Exception as e:
