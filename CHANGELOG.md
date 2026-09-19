@@ -1,5 +1,22 @@
 # Changelog
 
+## [8.6.0] - 2026-09-19
+
+### New Features
+
+- **Scriptable File Processor API**: Added a loopback-only HTTP API for submitting synchronous File Processor jobs from Bash, PowerShell, or Python. It uses saved connection profiles, reports capabilities and output paths, prevents concurrent jobs, and retains failed jobs for inspection, deletion, or resume.
+
+### Improvements
+
+- **Connection Profile Manager Startup**: The profile manager now paints its shell before constructing the detailed editor, making it open more quickly on Linux.
+- **Linux Compare Mode**: After choosing Compare, select the second text and invoke the existing TextEdit compositor binding again. No separate global shortcut or copy-key listener is required.
+
+### Fixes
+
+- **Linux Popup Responsiveness**: Prevented compositor stalls while popups resize or carousel content changes, while preserving active-workspace placement and keyboard focus.
+- **Chat Message Editor**: Fixed the edit-message dialog occasionally appearing empty on Linux/Wayland by rendering its content before mapping the window.
+- **TextEdit Abort State**: Fixed non-streaming requests opened in chat windows accessing uninitialized abort-listener state.
+
 ## [8.5.0] - 2026-09-15
 
 ### New Features
