@@ -378,6 +378,30 @@ class TestTextEditToolAbortSuppression:
             call_kwargs = mock_exec.call_args.kwargs
             assert call_kwargs.get("abort_event") is abort_event
 
+    def test_call_api_without_abort_listener_uses_no_abort_event(self):
+        """Non-streaming chat-window requests work before an abort listener starts."""
+        from src.gui.text_edit_tool import TextEditToolApp
+
+        app = TextEditToolApp(config={}, ai_params={}, key_managers={})
+        resolved = MagicMock(
+            provider="google",
+            model="test-model",
+            config={"streaming_enabled": False},
+            thinking_enabled=False,
+            ai_params={},
+            key_managers={},
+        )
+        mock_ctx = MagicMock(aborted=False, error=None, response_text="response")
+
+        with (
+            patch("src.profile_resolver.resolve_profile", return_value=resolved),
+            patch("src.request_pipeline.RequestPipeline.execute_simple", return_value=mock_ctx) as mock_execute,
+        ):
+            response, error = app._call_api([{"role": "user", "content": "test"}])
+
+        assert (response, error) == ("response", None)
+        assert mock_execute.call_args.kwargs["abort_event"] is None
+
     def test_abort_listener_creates_event_if_none(self):
         """_start_abort_listener creates a threading.Event if not provided and sets _current_abort_event."""
         from src.gui.text_edit_tool import TextEditToolApp

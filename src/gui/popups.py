@@ -162,23 +162,13 @@ def setup_transparent_popup(window, colors: ThemeColors):
 
 
 def setup_popup_window(window):
-    """Configure a popup window to be borderless and properly focused across platforms.
+    """Configure a popup window to be borderless and floating across platforms.
 
-    On Windows, overrideredirect(True) produces clean borderless windows that
-    take global keyboard focus via SetForegroundWindow.
-    On Linux/Xwayland, overrideredirect(True) causes Xwayland to treat the window
-    as an unmanaged surface; if another X11 client (e.g. ONLYOFFICE) is open,
-    Xwayland pins the popup to that client and drops Wayland keyboard focus.
-    Using -type splash creates a borderless managed window that the compositor
-    maps to the active workspace and assigns proper keyboard focus.
+    Using overrideredirect(True) produces clean borderless unmanaged windows
+    that avoid window manager tiling, decoration, and configure-transaction latency
+    during dynamic content and carousel redraws.
     """
-    if sys.platform == "win32":
-        window.overrideredirect(True)
-    else:
-        try:
-            window.attributes("-type", "splash")
-        except tk.TclError:
-            window.overrideredirect(True)
+    window.overrideredirect(True)
     window.attributes("-topmost", True)
 
 

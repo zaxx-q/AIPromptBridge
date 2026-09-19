@@ -81,9 +81,11 @@ class TextEditToolApp:
         self._tasks_lock = threading.Lock()
         self.cancel_requested = False
 
-        # Streaming abort state
+        # Streaming abort state. Non-streaming requests that open a chat window
+        # do not start a listener, but _call_api still consults this attribute.
         self.streaming_aborted = False
         self._abort_listener = None
+        self._current_abort_event = None
 
         logging.debug("TextEditToolApp initialized")
 

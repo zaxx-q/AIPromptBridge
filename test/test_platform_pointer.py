@@ -172,7 +172,7 @@ def test_get_popup_position_non_wayland_falls_back_to_pointer():
         assert (x, y) == (505, 320)
 
 
-def test_setup_popup_window_linux_uses_splash():
+def test_setup_popup_window_linux():
     from unittest.mock import MagicMock
 
     from src.gui.popups import setup_popup_window
@@ -180,12 +180,11 @@ def test_setup_popup_window_linux_uses_splash():
     mock_win = MagicMock()
     with patch("sys.platform", "linux"):
         setup_popup_window(mock_win)
-        mock_win.attributes.assert_any_call("-type", "splash")
-        mock_win.attributes.assert_any_call("-topmost", True)
-        mock_win.overrideredirect.assert_not_called()
+        mock_win.overrideredirect.assert_called_once_with(True)
+        mock_win.attributes.assert_called_once_with("-topmost", True)
 
 
-def test_setup_popup_window_windows_uses_overrideredirect():
+def test_setup_popup_window_windows():
     from unittest.mock import MagicMock
 
     from src.gui.popups import setup_popup_window
