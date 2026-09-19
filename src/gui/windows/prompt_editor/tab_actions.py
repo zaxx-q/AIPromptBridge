@@ -843,7 +843,9 @@ class ActionsTabMixin:
         try:
             from ..connection_manager import ConnectionProfileManager
 
-            ConnectionProfileManager(self.root, colors=self.colors, on_close=self._refresh_profile_dropdown)
+            ConnectionProfileManager(
+                self.root, colors=self.colors, on_close=self._refresh_profile_dropdown, defer_build=True
+            )
         except Exception as e:
             print(f"[PromptEditor] Error opening connection manager: {e}")
 

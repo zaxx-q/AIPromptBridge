@@ -158,7 +158,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
     Profiles are complete — every field always has a value (no sparse overrides).
     """
 
-    def __init__(self, parent, colors: ThemeColors = None, on_close=None):
+    def __init__(self, parent, colors: ThemeColors = None, on_close=None, defer_build: bool = False):
         super().__init__(parent)
         self.colors = colors or get_colors()
         self.on_close = on_close
@@ -178,6 +178,10 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         self._custom_url_label = None
         self._api_key_name_dropdown = None
         self._ignore_select_event = False
+        self._right_panel = None
+        self._editor_loading_label = None
+        self._editor_ready = False
+        self._defer_build = defer_build
 
         self.title("Connection Profiles")
         self.geometry("780x740")
@@ -195,49 +199,32 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         set_dark_titlebar(self)
         set_window_icon(self)
 
-        # Resolve api_key_pool options from KeyStore
         self.profile_fields = []
-        try:
-            from ...key_store import KeyStore
-
-            pools = KeyStore.get_instance().get_all_pool_ids()
-        except Exception:
-            pools = []
-        for field in PROFILE_FIELDS:
-            if field[0] == "api_key_pool":
-                self.profile_fields.append(("api_key_pool", "API Key Pool", "combobox", ["", *pools]))
-            else:
-                self.profile_fields.append(field)
-
-        self._build_ui()
-
-        # Subscribe to KeyStore changes to refresh key name options
-        try:
-            from ...key_store import KeyStore
-
-            self._keystore_callback = self._on_keystore_changed
-            KeyStore.get_instance().subscribe(self._keystore_callback)
-        except Exception:
-            self._keystore_callback = None
-
-        # Trace api_key_pool changes to update key name options
-        pool_info = self.field_widgets.get("api_key_pool")
-        if pool_info:
-            pool_info["var"].trace_add("write", lambda *_: self._update_api_key_name_options())
-
-        # Trace name and description changes for unsaved indicator
-        self.name_var.trace_add("write", lambda *_: self._check_unsaved())
-        self.description_var.trace_add("write", lambda *_: self._check_unsaved())
-
+        self._keystore_callback = None
+        self._build_shell()
         self._refresh_list()
-        self.deiconify()
+        if self._defer_build:
+            self.deiconify()
+            # Build the large, all-in-one editor after the toplevel has had a
+            # chance to map. The settings window and prompt editor achieve the
+            # same quick first paint through lazy tabs; this preserves the
+            # profile manager's single-page layout while avoiding a long blank
+            # window.
+            self.update_idletasks()
+            self.after(25, self._finish_build_ui)
+        else:
+            # Preserve the synchronous constructor behavior for direct users
+            # of this public window class (including existing integrations).
+            self._finish_build_ui()
+            self.deiconify()
 
         # Intercept window close for unsaved changes guard
         self.protocol("WM_DELETE_WINDOW", self._on_close_attempt)
 
     # ─── Build UI ─────────────────────────────────────────────────────────
 
-    def _build_ui(self):
+    def _build_shell(self):
+        """Build the lightweight portion needed for the window's first paint."""
         c = self.colors
 
         # Title
@@ -281,9 +268,76 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         )
         create_emoji_button(btn_frame, "", "🗑️", c, "danger", 35, 30, self._delete_profile).pack(side="left", padx=2)
 
-        # Right panel: editor
-        right = ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=c.bg)
-        right.pack(side="left", fill="both", expand=True)
+        # Right panel: the detailed editor is intentionally deferred. On
+        # Linux, constructing its many CTk controls and emoji images before
+        # mapping the toplevel made this window noticeably slower than the
+        # lazily populated settings and prompt editor windows.
+        self._right_panel = (
+            ctk.CTkFrame(container, fg_color="transparent") if self.use_ctk else tk.Frame(container, bg=c.bg)
+        )
+        self._right_panel.pack(side="left", fill="both", expand=True)
+        if self.use_ctk:
+            self._editor_loading_label = ctk.CTkLabel(
+                self._right_panel,
+                text="Loading profile editor…",
+                font=get_ctk_font(13),
+                **get_ctk_label_colors(c, muted=True),
+            )
+        else:
+            self._editor_loading_label = tk.Label(
+                self._right_panel,
+                text="Loading profile editor…",
+                font=get_tk_font(10),
+                bg=c.bg,
+                fg=c.blockquote,
+            )
+        self._editor_loading_label.pack(expand=True)
+
+    def _finish_build_ui(self):
+        """Populate the deferred editor after the toplevel is visible."""
+        if self._destroyed or not self.winfo_exists():
+            return
+
+        # Resolve pool names only after the shell is visible. KeyStore may
+        # need to read keys.json, which is unnecessary work for first paint.
+        try:
+            from ...key_store import KeyStore
+
+            pools = KeyStore.get_instance().get_all_pool_ids()
+        except Exception:
+            pools = []
+        self.profile_fields = [
+            ("api_key_pool", "API Key Pool", "combobox", ["", *pools]) if field[0] == "api_key_pool" else field
+            for field in PROFILE_FIELDS
+        ]
+
+        if self._editor_loading_label:
+            self._editor_loading_label.destroy()
+            self._editor_loading_label = None
+
+        self._build_ui()
+        self._editor_ready = True
+
+        # Subscribe only once the widgets that consume these updates exist.
+        try:
+            from ...key_store import KeyStore
+
+            self._keystore_callback = self._on_keystore_changed
+            KeyStore.get_instance().subscribe(self._keystore_callback)
+        except Exception:
+            self._keystore_callback = None
+
+        pool_info = self.field_widgets.get("api_key_pool")
+        if pool_info:
+            pool_info["var"].trace_add("write", lambda *_: self._update_api_key_name_options())
+
+        self.name_var.trace_add("write", lambda *_: self._check_unsaved())
+        self.description_var.trace_add("write", lambda *_: self._check_unsaved())
+
+    def _build_ui(self):
+        """Build the detailed profile editor after the window's first paint."""
+        c = self.colors
+        right = self._right_panel
 
         # Scrollable editor area
         if self.use_ctk:
@@ -1571,7 +1625,7 @@ class AttachedConnectionManager:
 
     def __init__(self, parent_root, on_close=None):
         self.parent_root = parent_root
-        ConnectionProfileManager(parent_root, on_close=on_close)
+        ConnectionProfileManager(parent_root, on_close=on_close, defer_build=True)
 
 
 def create_attached_connection_manager(parent_root, on_close=None):
