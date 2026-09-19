@@ -3371,8 +3371,6 @@ class _EditMessageDialog:
         px = parent.winfo_rootx() + (parent.winfo_width() - 600) // 2
         py = parent.winfo_rooty() + (parent.winfo_height() - 400) // 2
         self.dialog.geometry(f"+{max(0, px)}+{max(0, py)}")
-        self.dialog.deiconify()
-        self.dialog.grab_set()
 
         self.dialog.columnconfigure(0, weight=1)
         self.dialog.rowconfigure(1, weight=1)
@@ -3497,7 +3495,11 @@ class _EditMessageDialog:
         self.dialog.protocol("WM_DELETE_WINDOW", self._cancel)
         self.dialog.bind("<Escape>", lambda e: self._cancel())
 
-        # Focus the text area
+        # Populate the withdrawn dialog before mapping it.  On Linux/Wayland,
+        # mapping the CTk toplevel first can leave it painted as an empty window.
+        self.dialog.update_idletasks()
+        self.dialog.deiconify()
+        self.dialog.grab_set()
         self.text_area.focus_set()
 
         # Block until dialog closes
