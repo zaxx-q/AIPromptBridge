@@ -427,6 +427,7 @@ class FileHandler:
         extension: str,
         index: int = 0,
         base_input_path: Optional[Path] = None,
+        timestamp=None,
     ) -> Path:
         """
         Generate output file path based on template.
@@ -453,7 +454,7 @@ class FileHandler:
         """
         from datetime import datetime
 
-        now = datetime.now()
+        now = timestamp or datetime.now()
 
         # Build template variables
         variables = {

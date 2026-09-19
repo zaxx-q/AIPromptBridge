@@ -133,6 +133,15 @@ The **File Processor** tool enables bulk operations:
   - **Checkpoints**: Resume interrupted jobs or retry failures
   - **Interactive Mode**: Pause (`P`), Stop (`S`), or Abort (`Esc`) during processing
 
+#### Scriptable File Processor API
+
+When AIPromptBridge is running, scripts can submit synchronous File Processor
+jobs to its loopback-only Flask API. Jobs use saved connection profiles rather
+than accepting keys or remote URLs, return output paths for chaining, and keep
+failed jobs available for inspection and resume. See
+[File Processor API](docs/FILE_PROCESSOR_API.md) for the complete schema and
+Bash, PowerShell, and Python examples.
+
 The **TTS Processor** tool enables batch text-to-speech generation:
 
 - **Text Splitting**: Lines, paragraphs, sentences, or whole file modes

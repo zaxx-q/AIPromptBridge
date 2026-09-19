@@ -8,7 +8,7 @@ AIPromptBridge is a **Windows-first** Python desktop app with **Linux Wayland** 
 
 Major pieces:
 
-1. **Flask Web Server** - Internal REST API for session/model management
+1. **Flask Web Server** - Loopback REST API for session/model management and scripted File Processor jobs
 2. **System Tray** - `infi.systray` (Windows) / `StatusNotifier` / `pystray` (Linux)
 3. **CustomTkinter GUI** - Chat, session browser, popups, multi-theme UI
 4. **Rich Console Interface** - Terminal UI with structured logging
@@ -76,6 +76,9 @@ flowchart TB
 
     Tray --> Pipeline
     Flask --> Pipeline
+    Scripts[External scripts] --> Flask
+    Flask --> FPService[FileProcessorJobService]
+    FPService --> Tools
     Console --> Tools
     Tools --> Pipeline
     TET --> Popups
@@ -103,6 +106,10 @@ flowchart TB
     TET --> Input
     Snip --> Shot
 ```
+
+The File Processor HTTP interface is deliberately separate from Linux IPC:
+scripts call the loopback Flask service and receive structured JSON, while IPC
+(`--trigger`) remains a lightweight Linux GUI-trigger protocol only.
 
 ## Provider System
 

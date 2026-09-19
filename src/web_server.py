@@ -3,6 +3,7 @@
 Flask web server for AIPromptBridge
 """
 
+import logging
 import time
 
 from flask import Flask, jsonify, request
@@ -38,8 +39,88 @@ SESSION_OVERRIDES = {}  # In-memory session overrides from terminal toggles
 
 # Cached models list
 CACHED_MODELS = None
+FILE_PROCESSOR_JOB_SERVICE = None
 
 app = Flask(__name__)
+
+
+def _get_file_processor_service():
+    """Construct the non-Flask job service only after app state is initialized."""
+    global FILE_PROCESSOR_JOB_SERVICE
+    if FILE_PROCESSOR_JOB_SERVICE is None:
+        from .tools.file_processor_service import FileProcessorJobService
+
+        FILE_PROCESSOR_JOB_SERVICE = FileProcessorJobService(CONFIG, AI_PARAMS, KEY_MANAGERS)
+    return FILE_PROCESSOR_JOB_SERVICE
+
+
+@app.get("/file-processor/capabilities")
+def file_processor_capabilities():
+    return jsonify(_get_file_processor_service().capabilities())
+
+
+@app.post("/file-processor/jobs")
+def create_file_processor_job():
+    from .tools.file_processor_service import JobBusyError, JobSemanticError, JobValidationError
+
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Expected a JSON object"}), 400
+    try:
+        result = _get_file_processor_service().run(payload)
+        return jsonify(result.to_api_dict()), 200 if result.success else 422
+    except JobBusyError as exc:
+        return jsonify({"error": str(exc), "active_job_id": exc.job_id}), 409
+    except JobSemanticError as exc:
+        return jsonify({"error": str(exc), "fields": exc.errors}), 422
+    except JobValidationError as exc:
+        return jsonify({"error": str(exc), "fields": exc.errors}), 400
+    except Exception:
+        logging.exception("File Processor job failed unexpectedly")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.get("/file-processor/jobs/<job_id>")
+def get_file_processor_job(job_id):
+    value = _get_file_processor_service().get(job_id)
+    return (jsonify(value), 200) if value else (jsonify({"error": "Job not found"}), 404)
+
+
+@app.post("/file-processor/jobs/<job_id>/resume")
+def resume_file_processor_job(job_id):
+    from .tools.file_processor_service import JobBusyError, JobSemanticError, JobValidationError
+
+    payload = request.get_json(silent=True)
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Expected a JSON object"}), 400
+    try:
+        result = _get_file_processor_service().resume(job_id, payload)
+        return jsonify(result.to_api_dict()), 200 if result.success else 422
+    except FileNotFoundError:
+        return jsonify({"error": "Job not found"}), 404
+    except JobBusyError as exc:
+        return jsonify({"error": str(exc), "active_job_id": exc.job_id}), 409
+    except JobSemanticError as exc:
+        return jsonify({"error": str(exc), "fields": exc.errors}), 422
+    except JobValidationError as exc:
+        return jsonify({"error": str(exc), "fields": exc.errors}), 400
+    except Exception:
+        logging.exception("File Processor resume failed unexpectedly")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.delete("/file-processor/jobs/<job_id>")
+def delete_file_processor_job(job_id):
+    from .tools.file_processor_service import JobBusyError
+
+    try:
+        if not _get_file_processor_service().delete(job_id):
+            return jsonify({"error": "Job not found"}), 404
+    except JobBusyError as exc:
+        return jsonify({"error": str(exc), "active_job_id": exc.job_id}), 409
+    return "", 204
 
 
 @app.route("/")
@@ -138,10 +219,11 @@ def server_error(e):
 
 def init_web_server(config, ai_params, key_managers):
     """Initialize web server with configuration"""
-    global CONFIG, AI_PARAMS, KEY_MANAGERS, ACTIVE_PROFILE
+    global CONFIG, AI_PARAMS, KEY_MANAGERS, ACTIVE_PROFILE, FILE_PROCESSOR_JOB_SERVICE
     CONFIG = config
     AI_PARAMS = ai_params
     KEY_MANAGERS = key_managers
+    FILE_PROCESSOR_JOB_SERVICE = None
 
     # Set active profile from ProfileStore
     from .connection_profiles import ProfileStore

@@ -25,6 +25,7 @@ Import policy (Linux IPC latency):
 import argparse
 import contextlib
 import ctypes
+import ipaddress
 import logging
 import os
 import shutil
@@ -926,6 +927,21 @@ def find_available_port(host: str, port: int, max_attempts: int = 20) -> int:
     raise RuntimeError(f"No available port found in range {port}-{port + max_attempts - 1}")
 
 
+def is_loopback_host(host: str) -> bool:
+    """Return whether every address for *host* is loopback-only."""
+    host = (host or "").strip().lower()
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        try:
+            addresses = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+            return bool(addresses) and all(ipaddress.ip_address(info[4][0]).is_loopback for info in addresses)
+        except socket.gaierror:
+            return False
+
+
 def acquire_single_instance_mutex():
     """
     Legacy wrapper — prefer src.platform.acquire_single_instance().
@@ -942,6 +958,10 @@ def run_server(config, ai_params):
     """Run the Flask server (used by both tray and terminal modes)"""
     host = web_server.CONFIG.get("host", "127.0.0.1")
     port = int(web_server.CONFIG.get("port", 5000))
+    if not is_loopback_host(host):
+        print_warning(f"Refusing non-loopback server host {host!r}; using 127.0.0.1")
+        host = "127.0.0.1"
+        web_server.CONFIG["host"] = host
 
     try:
         # Run Flask with minimal output
@@ -1159,6 +1179,10 @@ def main():
 
     # Resolve port early before starting the server thread to prevent false port-occupied warnings
     host = web_server.CONFIG.get("host", "127.0.0.1")
+    if not is_loopback_host(host):
+        print_warning(f"Refusing non-loopback server host {host!r}; using 127.0.0.1")
+        host = "127.0.0.1"
+        web_server.CONFIG["host"] = host
     configured_port = int(web_server.CONFIG.get("port", 5000))
     try:
         actual_port = find_available_port(host, configured_port)
@@ -1187,6 +1211,10 @@ def main():
         # Update config in memory (so run_server picks it up)
         web_server.CONFIG["port"] = actual_port
 
+    # The scripting API must run whether or not a tray backend is available.
+    server_thread = threading.Thread(target=lambda: run_server(config, ai_params), daemon=True)
+    server_thread.start()
+
     # Pre-launch system tray
     # Launching it early prevents race conditions and ensures it respects OS dark mode
     # before heavy UI modules block or alter global app/thread state.
@@ -1194,10 +1222,6 @@ def main():
     use_tray = HAVE_TRAY
     tray = None
     if use_tray:
-        # Start Flask server in background thread
-        server_thread = threading.Thread(target=lambda: run_server(config, ai_params), daemon=True)
-        server_thread.start()
-
         allow_console_toggle = has_real_console
         tray = TrayApp(
             on_exit_callback=cleanup, allow_console_toggle=allow_console_toggle, show_edit_file_items=args.debug
@@ -1417,8 +1441,12 @@ def main():
         terminal_thread = threading.Thread(target=lambda: terminal_session_manager(), daemon=True)
         terminal_thread.start()
 
-        # Run server in main thread
-        run_server(config, ai_params)
+        # Server already runs in the background so the terminal remains usable.
+        try:
+            while True:
+                threading.Event().wait(3600)
+        except (KeyboardInterrupt, SystemExit):
+            cleanup()
 
 
 if __name__ == "__main__":

@@ -112,6 +112,7 @@ class FileProcessor(BaseTool):
         self._large_file_mode: Dict[str, str] = {}  # file_path -> mode
         self._audio_preprocessing: Optional[Dict[str, Any]] = None  # Audio preprocessing settings
         self._pdf_temp_dirs: List[Path] = []  # PDF temporary directories to clean up
+        self._output_timestamp = None  # Set by scripted service for deterministic preflight
 
         # Custom instructions state
         self._custom_instructions: Optional[str] = None  # Batch-wide instructions
@@ -301,6 +302,77 @@ class FileProcessor(BaseTool):
             profile_name=kwargs.get("profile_name", active_profile),
         )
 
+        return self._execute_processing(interactive=False)
+
+    def run_scripted(
+        self,
+        options,
+        *,
+        input_files: Optional[List[FileInfo]] = None,
+        checkpoint: Optional[FileProcessorCheckpoint] = None,
+    ) -> ToolResult:
+        """Configure and execute a validated, non-interactive File Processor job.
+
+        ``options`` deliberately uses a small duck-typed interface so this core
+        tool does not import the HTTP service (and therefore cannot create an
+        import cycle).
+        """
+        self.reset()
+        self._large_file_mode = {"_default": options.large_file_mode}
+        self._audio_preprocessing = options.audio_preprocessing
+        self._custom_instructions = options.custom_instructions
+        self._include_filename = options.include_filename
+        self._ask_per_file = False
+
+        if checkpoint is None:
+            if input_files is None:
+                scan = self.file_handler.scan(options.input_path, recursive=options.recursive)
+                if options.file_types:
+                    scan.files = [f for f in scan.files if f.file_type in options.file_types]
+                    scan.by_type = {}
+                    for info in scan.files:
+                        scan.by_type.setdefault(info.file_type, []).append(info)
+                input_files = scan.files
+            if not input_files:
+                return ToolResult(success=False, message="No supported files found")
+            self._current_checkpoint = self.checkpoint_manager.create(
+                input_path=str(options.input_path),
+                input_files=[str(info.path) for info in input_files],
+                prompt_key=options.prompt_key,
+                prompt_text=options.prompt_text,
+                output_mode=options.output.mode,
+                output_path=str(options.output.path),
+                naming_template=options.output.naming,
+                output_extension=options.output.extension,
+                delay=options.delay,
+                use_batch=options.use_batch,
+                audio_preprocessing=options.audio_preprocessing,
+                transcribe_config=options.transcribe_config,
+                custom_instructions=options.custom_instructions,
+                skip_per_file_prompts=True,
+                include_filename=options.include_filename,
+                profile_name=options.profile_name,
+            )
+            self._current_checkpoint.per_file_instructions = dict(options.per_file_instructions)
+        else:
+            self._current_checkpoint = checkpoint
+            checkpoint.prompt_key = options.prompt_key
+            checkpoint.prompt_text = options.prompt_text
+            checkpoint.output_mode = options.output.mode
+            checkpoint.output_path = str(options.output.path)
+            checkpoint.naming_template = options.output.naming
+            checkpoint.output_extension = options.output.extension
+            checkpoint.delay_between_requests = options.delay
+            checkpoint.use_batch = options.use_batch
+            checkpoint.profile_name = options.profile_name
+            checkpoint.audio_preprocessing = options.audio_preprocessing
+            checkpoint.transcribe_config = options.transcribe_config
+            checkpoint.custom_instructions = options.custom_instructions
+            checkpoint.include_filename = options.include_filename
+            checkpoint.per_file_instructions.update(options.per_file_instructions)
+            checkpoint.skip_per_file_prompts = True
+
+        self.checkpoint_manager.save(self._current_checkpoint)
         return self._execute_processing(interactive=False)
 
     # ─────────────────────────────────────────────────────────────────
@@ -2570,6 +2642,7 @@ class FileProcessor(BaseTool):
                             cp.output_extension,
                             index=len(cp.completed_files),
                             base_input_path=Path(cp.input_path) if cp.input_path else None,
+                            timestamp=self._output_timestamp,
                         )
 
                         # Write output
@@ -2615,12 +2688,18 @@ class FileProcessor(BaseTool):
         # Handle combined output
         if cp.output_mode == "combined" and cp.combined_output_content:
             combined_path = self.file_handler.get_output_path(
-                Path(cp.input_path), Path(cp.output_path), "batch_output_{date}_{time}", cp.output_extension, index=0
+                Path(cp.input_path),
+                Path(cp.output_path),
+                "batch_output_{date}_{time}",
+                cp.output_extension,
+                index=0,
+                timestamp=self._output_timestamp,
             )
             combined_path.parent.mkdir(parents=True, exist_ok=True)
             with open(combined_path, "w", encoding="utf-8") as f:
                 f.write(cp.combined_output_content)
             result.output_path = str(combined_path)
+            result.output_paths.append(str(combined_path))
             if interactive:
                 print(f"\n📄 Combined output: {combined_path}")
 
@@ -2656,7 +2735,8 @@ class FileProcessor(BaseTool):
         else:
             result.message = f"Processed {result.processed_count}/{total} files"
 
-        self.status = ToolStatus.COMPLETED
+        result.success = result.failed_count == 0 and not cp.failed_files and cp.is_complete
+        self.status = ToolStatus.COMPLETED if result.success else ToolStatus.FAILED
         return result
 
     # ─────────────────────────────────────────────────────────────────
@@ -2934,6 +3014,11 @@ class FileProcessor(BaseTool):
         Returns:
             Mode string: LARGE_FILE_MODE_FILES_API, LARGE_FILE_MODE_CHUNKING, or LARGE_FILE_MODE_SKIP
         """
+        # Scripted jobs explicitly select a policy. It must never be replaced
+        # by the interactive global preference.
+        if not interactive and self._large_file_mode.get("_default"):
+            return self._large_file_mode["_default"]
+
         # Check if Files API is disabled
         disable_files_api = get_setting(self.tools_config, "disable_files_api", False)
 
@@ -3023,9 +3108,7 @@ class FileProcessor(BaseTool):
         Returns:
             Response text or None on failure
         """
-        from src import web_server
-        from src.api_client import call_api_with_retry
-        from src.profile_resolver import resolve_profile
+        from src.request_pipeline import RequestOrigin, RequestPipeline, create_request_context
 
         # Build message (respect user's filename context preference)
         # Pass original_name so the AI sees the real filename, not a temp processed one
@@ -3036,20 +3119,18 @@ class FileProcessor(BaseTool):
         # Resolve effective settings using profile or checkpoint fallback
         provider, model_override, resolved = self._resolve_execution_settings(checkpoint)
 
-        # Call API
-        response, error = call_api_with_retry(
-            provider=provider,
-            messages=[message],
-            model_override=model_override if model_override else None,
-            config=resolved.config,
-            ai_params=resolved.ai_params,
-            key_managers=resolved.key_managers,
+        ctx = create_request_context(
+            RequestOrigin.FILE_PROCESSOR,
+            provider,
+            model_override or "",
+            streaming=False,
+            thinking_enabled=resolved.thinking_enabled,
+            session_id=checkpoint.session_id,
         )
-
-        if error:
-            raise Exception(error)
-
-        return response
+        ctx = RequestPipeline.execute_simple(ctx, [message], resolved.config, resolved.ai_params, resolved.key_managers)
+        if ctx.error:
+            raise Exception(ctx.error)
+        return ctx.response_text
 
     def _process_with_files_api(
         self, filepath: Path, prompt: str, checkpoint: FileProcessorCheckpoint, interactive: bool
