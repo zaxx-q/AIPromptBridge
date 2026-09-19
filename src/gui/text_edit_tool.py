@@ -15,6 +15,7 @@ import threading
 import time
 from typing import Dict, Optional
 
+from ..console import print_info
 from ..platform import is_linux
 from ..platform.clipboard import copy_text as platform_copy_text
 from ..platform.clipboard import paste_text as platform_paste_text
@@ -80,6 +81,12 @@ class TextEditToolApp:
         self._active_tasks = 0
         self._tasks_lock = threading.Lock()
         self.cancel_requested = False
+
+        # Wayland has no in-process global key listener.  During a Linux
+        # compare flow, the next normal TextEdit IPC trigger confirms the
+        # second selection instead of opening another popup.
+        self._linux_compare_lock = threading.Lock()
+        self._pending_linux_compare: Optional[dict] = None
 
         # Streaming abort state. Non-streaming requests that open a chat window
         # do not start a listener, but _call_api still consults this attribute.
@@ -207,6 +214,13 @@ class TextEditToolApp:
 
         self.cancel_requested = True
 
+        # Do not let a compare timeout enqueue work after GUI teardown.
+        with self._linux_compare_lock:
+            pending = self._pending_linux_compare
+            self._pending_linux_compare = None
+        if pending and pending.get("timer"):
+            pending["timer"].cancel()
+
     def pause(self):
         """Pause TextEdit hotkey listeners."""
         if self.hotkey_listener:
@@ -224,6 +238,13 @@ class TextEditToolApp:
     def _on_hotkey_pressed(self):
         """Handle hotkey press event."""
         logging.debug("Hotkey pressed")
+
+        if is_linux() and self._has_pending_linux_compare():
+            # The compositor's existing TextEdit bind is reused as the compare
+            # confirmation action.  Capture before opening any new UI, while
+            # the user-selected target window still owns keyboard focus.
+            threading.Thread(target=self._capture_pending_linux_compare, daemon=True).start()
+            return
 
         # Show popup immediately in a new thread
         # Multiple concurrent invocations are allowed - each operates independently
@@ -364,23 +385,29 @@ class TextEditToolApp:
         """
         Handle request for a second text selection (compare mode).
 
-        Shows a toast notification instructing the user to select text and
-        press Ctrl+C (or Ctrl+Shift+C in terminals). Listens for both key
-        combos via pynput, reads the clipboard after a short delay, then
-        invokes on_captured/on_cancelled on the GUI thread (via
-        GUICoordinator.run_on_gui_thread) to avoid the "main thread is not
-        in main loop" Tkinter error.
+        **Linux:** stores a pending request and uses the next normal TextEdit
+        IPC trigger as confirmation. It then captures the active selection
+        while the target app is still focused; no global key listener or Tk
+        overlay is used.
+
+        **Windows:** shows an instruction toast and listens for Ctrl+C (or
+        Ctrl+Shift+C in terminals), then invokes the callback on the GUI
+        thread to avoid Tkinter cross-thread access.
 
         Args:
             on_captured: Callable[[str], None] - called with the second text
             on_cancelled: Callable[[], None] - called if no text was captured
         """
+        TIMEOUT_SECS = 20
+
+        if is_linux():
+            self._start_linux_compare_capture(on_captured, on_cancelled, timeout_secs=TIMEOUT_SECS)
+            return
+
         import pyperclip
         from pynput import keyboard as pykeyboard
 
         from .core import GUICoordinator
-
-        TIMEOUT_SECS = 20
 
         logging.debug("[TextEditTool] Compare mode: waiting for copy shortcut with second text...")
 
@@ -481,6 +508,94 @@ class TextEditToolApp:
             _finish(None)
 
         threading.Thread(target=_timeout, daemon=True).start()
+
+    def _has_pending_linux_compare(self) -> bool:
+        """Return whether the next Linux TextEdit trigger confirms a comparison."""
+        with self._linux_compare_lock:
+            return self._pending_linux_compare is not None
+
+    def _start_linux_compare_capture(self, on_captured, on_cancelled, *, timeout_secs: int) -> None:
+        """Wait for the existing Linux TextEdit IPC trigger to confirm selection.
+
+        The prompt popup has already been withdrawn by its caller, returning
+        focus to the source application.  A desktop notification is used here
+        rather than a Tk toast: a topmost Tk surface consumes clicks and makes
+        selecting text underneath it unreliable on Wayland.
+        """
+        from ..platform.notifications import send_desktop_notification
+
+        pending: dict = {"on_captured": on_captured, "on_cancelled": on_cancelled, "timer": None}
+        with self._linux_compare_lock:
+            # A popup cannot normally request this twice, but cancelling the
+            # earlier request keeps callbacks and hidden windows consistent.
+            previous = self._pending_linux_compare
+            self._pending_linux_compare = pending
+
+        if previous:
+            self._complete_linux_compare(previous, None)
+
+        # Install and start the timer before displaying the instruction: a
+        # very fast second IPC trigger must still be able to cancel it.
+        timer = threading.Timer(timeout_secs, lambda: self._expire_linux_compare(pending))
+        timer.daemon = True
+        pending["timer"] = timer
+        timer.start()
+
+        logging.debug("[TextEditTool] Linux compare mode: waiting for next TextEdit trigger")
+        print_info("Compare mode: select the second text, then invoke your normal TextEdit compositor binding again")
+        send_desktop_notification(
+            "Compare Mode — Select 2nd text",
+            "Select the second text, then invoke your normal TextEdit binding again.",
+            timeout_ms=timeout_secs * 1000,
+        )
+
+    def _expire_linux_compare(self, pending: dict) -> None:
+        """Restore the hidden popup if Linux compare confirmation times out."""
+        with self._linux_compare_lock:
+            if self._pending_linux_compare is not pending:
+                return
+            self._pending_linux_compare = None
+        self._complete_linux_compare(pending, None)
+
+    def _capture_pending_linux_compare(self) -> None:
+        """Capture the active selection for the pending Linux comparison."""
+        with self._linux_compare_lock:
+            pending = self._pending_linux_compare
+            if pending is None:
+                return
+            self._pending_linux_compare = None
+
+        try:
+            if self.config.get("text_edit_slow_app_retry", False):
+                text = self.text_handler.get_selected_text_with_retry()
+            else:
+                text = self.text_handler.get_selected_text()
+        except Exception as exc:
+            logging.error("[TextEditTool] Linux compare selection capture failed: %s", exc)
+            text = ""
+
+        # No active selection is treated as cancellation and restores the
+        # original popup, so the user does not lose the chosen compare action.
+        self._complete_linux_compare(pending, text.strip() if text else None)
+
+    def _complete_linux_compare(self, pending: dict, text_or_none: Optional[str]) -> None:
+        """Finish a Linux compare request and invoke its popup callback safely."""
+        timer = pending.get("timer")
+        if timer:
+            timer.cancel()
+
+        from .core import GUICoordinator
+
+        if text_or_none:
+            logging.debug("[TextEditTool] Linux compare text captured: %r", text_or_none[:50])
+            print_info(f"Compare text captured ({len(text_or_none)} chars)")
+            callback = lambda: pending["on_captured"](text_or_none)
+        else:
+            logging.debug("[TextEditTool] Linux compare mode cancelled / timed out")
+            print_info("Compare mode cancelled - no second text captured")
+            callback = pending["on_cancelled"]
+
+        GUICoordinator.get_instance().run_on_gui_thread(callback)
 
     def _on_option_selected(
         self,

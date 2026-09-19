@@ -76,6 +76,57 @@ def test_chat_textedit_and_clipboard_triggers_take_separate_routes(monkeypatch):
     app._on_clipboard_hotkey_pressed.assert_called_once()
 
 
+def test_linux_compare_confirmation_reuses_textedit_trigger():
+    config = {"text_edit_tool_enabled": True, "tts_enabled": False}
+    captured = []
+    cancelled = []
+
+    with (
+        patch("src.gui.text_edit_tool.TextHandler") as mock_handler_class,
+        patch("src.gui.text_edit_tool.is_linux", return_value=True),
+        patch("src.platform.notifications.send_desktop_notification"),
+        patch("src.gui.core.GUICoordinator") as mock_coordinator_class,
+    ):
+        coordinator = MagicMock()
+        coordinator.run_on_gui_thread.side_effect = lambda callback: callback()
+        mock_coordinator_class.get_instance.return_value = coordinator
+        handler = mock_handler_class.return_value
+        handler.get_selected_text.return_value = "second selection"
+        app = TextEditToolApp(config=config, ai_params={}, key_managers={})
+
+        app._on_request_compare_text(captured.append, lambda: cancelled.append(True))
+        assert app._has_pending_linux_compare()
+        app._capture_pending_linux_compare()
+
+    handler.get_selected_text.assert_called_once()
+    assert captured == ["second selection"]
+    assert cancelled == []
+    assert not app._has_pending_linux_compare()
+
+
+def test_linux_compare_without_selection_restores_popup_callback():
+    config = {"text_edit_tool_enabled": True, "tts_enabled": False}
+    cancelled = []
+
+    with (
+        patch("src.gui.text_edit_tool.TextHandler") as mock_handler_class,
+        patch("src.gui.text_edit_tool.is_linux", return_value=True),
+        patch("src.platform.notifications.send_desktop_notification"),
+        patch("src.gui.core.GUICoordinator") as mock_coordinator_class,
+    ):
+        coordinator = MagicMock()
+        coordinator.run_on_gui_thread.side_effect = lambda callback: callback()
+        mock_coordinator_class.get_instance.return_value = coordinator
+        handler = mock_handler_class.return_value
+        handler.get_selected_text.return_value = ""
+        app = TextEditToolApp(config=config, ai_params={}, key_managers={})
+
+        app._on_request_compare_text(MagicMock(), lambda: cancelled.append(True))
+        app._capture_pending_linux_compare()
+
+    assert cancelled == [True]
+
+
 def test_snip_popup_receives_compositor_cursor_position():
     capture = MagicMock(width=640, height=480)
     with (
