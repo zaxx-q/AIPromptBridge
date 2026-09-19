@@ -162,13 +162,23 @@ def setup_transparent_popup(window, colors: ThemeColors):
 
 
 def setup_popup_window(window):
-    """Configure a popup window to be borderless and floating across platforms.
+    """Configure a popup window to be borderless and properly focused across platforms.
 
-    Using overrideredirect(True) produces clean borderless unmanaged windows
-    that avoid window manager tiling, decoration, and configure-transaction latency
-    during dynamic content and carousel redraws.
+    On Windows, overrideredirect(True) produces clean borderless windows that
+    take global keyboard focus via SetForegroundWindow.
+    On Linux/Xwayland, overrideredirect(True) causes Xwayland to treat the window
+    as an unmanaged surface; if another X11 client (e.g. ONLYOFFICE) is open,
+    Xwayland pins the popup to that client and drops Wayland keyboard focus.
+    Using -type splash creates a borderless managed window that the compositor
+    maps to the active workspace and assigns proper keyboard focus.
     """
-    window.overrideredirect(True)
+    if sys.platform == "win32":
+        window.overrideredirect(True)
+    else:
+        try:
+            window.attributes("-type", "splash")
+        except tk.TclError:
+            window.overrideredirect(True)
     window.attributes("-topmost", True)
 
 
@@ -2372,10 +2382,10 @@ class AttachedPromptPopup:
             items.append((key, key, icon, tooltip))
 
         if items:
-            carousel = CarouselButtonList(
+            self.carousel = CarouselButtonList(
                 parent, items=items, on_click=self._on_option_click, items_per_page=items_per_page
             )
-            carousel.pack(fill="x")
+            self.carousel.pack(fill="x")
 
     def _create_carousel_tk(self, parent):
         """Create the carousel with action buttons (tk fallback)."""
@@ -2421,10 +2431,10 @@ class AttachedPromptPopup:
             items.append((key, key, icon, tooltip))
 
         if items:
-            carousel = CarouselButtonList(
+            self.carousel = CarouselButtonList(
                 parent, items=items, on_click=self._on_option_click, items_per_page=items_per_page
             )
-            carousel.pack(fill=tk.X)
+            self.carousel.pack(fill=tk.X)
 
     def _on_edit_focus_in(self):
         """Handle edit input focus in (tk fallback)."""
@@ -2477,6 +2487,15 @@ class AttachedPromptPopup:
             return
 
         self.root.update_idletasks()
+
+        if sys.platform != "win32":
+            # On Linux/Xwayland, popups use splash attributes so the compositor
+            # maps them to the active workspace rather than pinning them to an
+            # inactive X11 window (such as ONLYOFFICE). Calling geometry() during
+            # dynamic content changes triggers a multi-second compositor configure
+            # stall because winfo_x/y report 0 under Xwayland. Tk automatically
+            # adjusts container geometry to fit the newly packed widgets.
+            return
 
         x = self.root.winfo_x()
         y = self.root.winfo_y()

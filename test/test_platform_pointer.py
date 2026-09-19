@@ -180,8 +180,9 @@ def test_setup_popup_window_linux():
     mock_win = MagicMock()
     with patch("sys.platform", "linux"):
         setup_popup_window(mock_win)
-        mock_win.overrideredirect.assert_called_once_with(True)
-        mock_win.attributes.assert_called_once_with("-topmost", True)
+        mock_win.attributes.assert_any_call("-type", "splash")
+        mock_win.attributes.assert_any_call("-topmost", True)
+        mock_win.overrideredirect.assert_not_called()
 
 
 def test_setup_popup_window_windows():
@@ -194,3 +195,19 @@ def test_setup_popup_window_windows():
         setup_popup_window(mock_win)
         mock_win.overrideredirect.assert_called_once_with(True)
         mock_win.attributes.assert_called_once_with("-topmost", True)
+
+
+def test_reposition_window_linux_skips_geometry():
+    """On Linux, _reposition_window updates idle tasks without calling geometry()."""
+    from unittest.mock import MagicMock
+
+    from src.gui.popups import AttachedPromptPopup
+
+    mock_popup = MagicMock(spec=AttachedPromptPopup)
+    mock_popup.root = MagicMock()
+
+    with patch("sys.platform", "linux"):
+        AttachedPromptPopup._reposition_window(mock_popup)
+
+    mock_popup.root.update_idletasks.assert_called_once()
+    mock_popup.root.geometry.assert_not_called()

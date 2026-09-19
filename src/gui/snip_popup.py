@@ -16,6 +16,7 @@ Threading Note:
 import gc
 import io
 import logging
+import sys
 import tkinter as tk
 from typing import Any, Callable, Dict, List, Optional
 
@@ -1071,6 +1072,11 @@ class AttachedSnipPopup:
             return
 
         self.root.update_idletasks()
+
+        if sys.platform != "win32":
+            # On Linux/Xwayland, managed popups automatically resize with content.
+            # Avoid geometry() calls that cause compositor configure stalls.
+            return
 
         x = self.root.winfo_x()
         y = self.root.winfo_y()
