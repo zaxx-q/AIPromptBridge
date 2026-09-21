@@ -2663,7 +2663,7 @@ class FileProcessor(BaseTool):
                     result.processed_count += 1
 
                 except Exception as e:
-                    error_msg = str(e)[:100]
+                    error_msg = str(e)
                     cp.mark_failed(file_path, error_msg)
                     result.add_error(file_path, error_msg)
                     if interactive:
@@ -2989,9 +2989,9 @@ class FileProcessor(BaseTool):
         for i, f in enumerate(failed_files[:display_count]):
             filepath = Path(f["path"])
             error = f.get("error", "Unknown error")
-            # Truncate error if too long
-            if len(error) > 50:
-                error = error[:47] + "..."
+            # Truncate error if too long for display
+            if len(error) > 200:
+                error = error[:197] + "..."
             print(f"   {i + 1}. {filepath.name}")
             print(f"      Error: {error}")
 

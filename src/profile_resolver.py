@@ -124,13 +124,13 @@ def resolve_profile(
         else:
             merged_config.pop("reasoning_effort", None)
 
-        # request_timeout
+        # request_timeout — only override when the profile explicitly sets one;
+        # None means "use the global value already present in config".
         if effective_profile.request_timeout is not None:
             merged_config["request_timeout"] = effective_profile.request_timeout
-        else:
-            merged_config.pop("request_timeout", None)
 
-        # base_url override - if empty/None on the effective profile, we clear it so providers fallback to default URL
+        # base_url override — only set when the profile provides one;
+        # empty/None means "use the provider's default URL".
         if effective_profile.base_url:
             merged_config["base_url"] = effective_profile.base_url
         else:
@@ -160,11 +160,13 @@ def resolve_profile(
                 effective_key_managers = dict(key_managers)
                 effective_key_managers[provider] = resolved_km
     else:
-        # No effective profile, clear any overridden parameters to use defaults
+        # No effective profile — clear provider-specific overrides so
+        # downstream code uses its built-in defaults.  But leave
+        # request_timeout alone: the global value from config.ini
+        # (already in merged_config) must survive.
         merged_config.pop("thinking_budget", None)
         merged_config.pop("thinking_level", None)
         merged_config.pop("reasoning_effort", None)
-        merged_config.pop("request_timeout", None)
         merged_config.pop("base_url", None)
         merged_ai_params.pop("temperature", None)
         merged_ai_params.pop("max_tokens", None)
