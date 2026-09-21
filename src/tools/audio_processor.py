@@ -2077,12 +2077,13 @@ class AudioProcessor:
         """
         Merge transcripts from multiple chunks into a single output.
 
-        Adjusts any timestamps the model generated within each chunk so they
-        reflect the position in the full audio rather than restarting at 00:00.
+        The caller is responsible for ensuring timestamps within each chunk's
+        text are already correct (e.g. by injecting the time offset into the
+        prompt so the model generates absolute timestamps).
 
         Args:
             chunk_outputs: List of (chunk, transcript_text) tuples
-            include_timestamps: Whether to add chunk timestamps as headers
+            include_timestamps: Whether to add chunk boundary markers
 
         Returns:
             Merged transcript text
@@ -2095,15 +2096,12 @@ class AudioProcessor:
 
         parts = []
         for chunk, text in sorted(chunk_outputs, key=lambda x: x[0].index):
-            # Shift model-generated timestamps (e.g. [00:00]) by the chunk's
-            # start offset so they are correct relative to the full audio.
-            adjusted = adjust_transcript_timestamps(text.strip(), chunk.start_time)
             if include_timestamps:
-                # Use a visible but unobtrusive comment-style divider that
-                # won't clash with the model's own ### section headings.
-                parts.append(f"<!-- chunk {chunk.time_range_str} -->\n\n{adjusted}")
+                # Use an HTML comment as a chunk boundary marker that won't
+                # clash with the model's own markdown headings.
+                parts.append(f"<!-- chunk {chunk.time_range_str} -->\n\n{text.strip()}")
             else:
-                parts.append(adjusted)
+                parts.append(text.strip())
 
         return "\n\n".join(parts)
 
@@ -2249,35 +2247,8 @@ def adjust_transcript_timestamps(transcript: str, offset_seconds: float) -> str:
 
         return f"{open_delim}{new_start}{sep}{new_end}{close_delim}"
 
-    # Phase 1: adjust range timestamps like (00:10->00:15) or [00:10 - 00:15]
-    range_pattern = re.compile(r"([\(\[])\s*([0-9a-zA-Z:.]+?)(\s*(?:->|–>|—>|to|-)\s*)([0-9a-zA-Z:.]+?)\s*([\)\]])")
-    result = range_pattern.sub(_replace_ts, transcript)
-
-    # Phase 2: adjust standalone single timestamps in markdown patterns.
-    # Matches patterns like:  ### [00:15] Section Name  or  **[02:30]** inline
-    # Only matches MM:SS or HH:MM:SS inside square brackets that are NOT part of
-    # a range (the range pattern above already consumed those).
-    def _replace_single_ts(match: re.Match) -> str:
-        prefix = match.group(1)  # e.g. "### [" or "**["
-        ts_str = match.group(2)  # e.g. "00:15" or "01:02:30"
-        suffix = match.group(3)  # e.g. "]"
-
-        parsed = _parse_time_str(ts_str)
-        if not parsed:
-            return match.group(0)
-
-        val, fmt_type = parsed
-        new_ts = _format_time_str(val + offset_seconds, fmt_type, ts_str)
-        return f"{prefix}{new_ts}{suffix}"
-
-    single_ts_pattern = re.compile(
-        r"((?:^|\n)#{1,6}\s+\[|\*\*\[)"
-        r"(\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?)"
-        r"(\])",
-    )
-    result = single_ts_pattern.sub(_replace_single_ts, result)
-
-    return result
+    pattern = re.compile(r"([\(\[])\s*([0-9a-zA-Z:.]+?)(\s*(?:->|–>|—>|to|-)\s*)([0-9a-zA-Z:.]+?)\s*([\)\]])")
+    return pattern.sub(_replace_ts, transcript)
 
 
 def merge_transcribe_transcripts(chunk_outputs: List[Tuple[AudioChunk, str]]) -> str:

@@ -3733,8 +3733,27 @@ class FileProcessor(BaseTool):
                     chunk_display = original_name
                 else:
                     chunk_display = None
+
+                # For multi-chunk audio: tell the model the real time offset so
+                # any timestamps it generates are absolute, not chunk-local.
+                chunk_prompt = prompt
+                if total_chunks > 1 and chunk.start_time > 0:
+                    m, s = divmod(int(chunk.start_time), 60)
+                    h, m = divmod(m, 60)
+                    if h > 0:
+                        offset_str = f"{h}:{m:02d}:{s:02d}"
+                    else:
+                        offset_str = f"{m:02d}:{s:02d}"
+                    chunk_prompt = (
+                        f"{prompt}\n\n"
+                        f"IMPORTANT: This is part {i + 1} of {total_chunks} from a longer recording. "
+                        f"This segment starts at {offset_str} in the full audio. "
+                        f"If you include any timestamps, they must be relative to the full recording "
+                        f"(i.e. start from {offset_str}, not from 00:00)."
+                    )
+
                 message = self.file_handler.build_api_message(
-                    chunk.path, prompt, include_filename=self._include_filename, display_name=chunk_display
+                    chunk.path, chunk_prompt, include_filename=self._include_filename, display_name=chunk_display
                 )
 
                 # Call API (use resolved config from outer scope)

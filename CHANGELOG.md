@@ -16,6 +16,10 @@
 - **Linux Popup Responsiveness**: Prevented compositor stalls while popups resize or carousel content changes, while preserving active-workspace placement and keyboard focus.
 - **Chat Message Editor**: Fixed the edit-message dialog occasionally appearing empty on Linux/Wayland by rendering its content before mapping the window.
 - **TextEdit Abort State**: Fixed non-streaming requests opened in chat windows accessing uninitialized abort-listener state.
+- **Audio Chunk Timestamps**: When a large audio file is split into multiple chunks for prompt-based transcription, the prompt for each chunk now includes the real time offset (e.g. "this segment starts at 28:11") so the model generates correct absolute timestamps instead of restarting at 00:00 per chunk.
+- **Audio Chunk Separator**: Changed the chunk separator from `### [time_range]` (which clashed with the model's own H3 section headings) to an invisible HTML comment `<!-- chunk MM:SS - MM:SS -->`.
+- **File Processor Request Timeout**: Profile resolver was removing `request_timeout` from the merged config when a connection profile had it set to `None` (use global), causing all file processor requests to ignore the user's `config.ini` timeout and fall back to the hardcoded 120 s default.
+- **File Processor Error Messages**: Removed the 100-character truncation on error messages stored in checkpoint and result JSON. Increased the console display limit for failed file summaries from 50 to 200 characters.
 
 ## [8.5.0] - 2026-09-15
 
