@@ -206,7 +206,7 @@ def test_apply_deepfilter_preset_pipeline_mocked(tmp_path):
 
         # Step 2 simulation: deep-filter creates output wav in output dir
         if cmd[0] == "/mock/deep-filter":
-            out_dir = Path(cmd[3])
+            out_dir = Path(cmd[4])
             cleaned_file = out_dir / "input_clean.wav"
             cleaned_file.write_bytes(b"cleaned wav data")
 

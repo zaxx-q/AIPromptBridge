@@ -1137,7 +1137,7 @@ class AudioProcessor:
             df_output_dir = Path(tempfile.mkdtemp(prefix="df_output_"))
             temp_files_to_cleanup.append(df_output_dir)
 
-            df_cmd = [deep_filter_bin, str(wav_path), "-o", str(df_output_dir)]
+            df_cmd = [deep_filter_bin, "-D", str(wav_path), "-o", str(df_output_dir)]
             result = subprocess.run(
                 df_cmd,
                 capture_output=True,
