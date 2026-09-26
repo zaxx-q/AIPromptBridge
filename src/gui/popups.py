@@ -38,7 +38,7 @@ else:
 # Import CustomTkinter with fallback
 from ..platform.detect import is_wayland
 from ..platform.pointer import get_focused_output_geometry, get_pointer_position
-from .custom_widgets import create_emoji_button
+from .custom_widgets import ExpandableInput, create_emoji_button
 from .platform import HAVE_CTK, ctk
 
 # Import theme system
@@ -1559,22 +1559,6 @@ class AttachedInputPopup:
             input_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
             input_frame.pack(fill="x")
 
-            self.input_entry = ctk.CTkEntry(
-                input_frame,
-                placeholder_text=self.PLACEHOLDER,
-                font=get_ctk_font(size=12),
-                height=42,
-                corner_radius=8,
-                fg_color=self.colors.surface0,
-                border_color=self.colors.surface2,
-                text_color=self.colors.text,
-                placeholder_text_color=self.colors.overlay0,
-                width=280,
-            )
-            self.input_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            self.input_entry.bind("<Return>", lambda e: self._submit())
-            _bind_select_all(self.input_entry)
-
             send_btn = ctk.CTkButton(
                 input_frame,
                 text="➤",
@@ -1587,7 +1571,28 @@ class AttachedInputPopup:
                 font=get_ctk_font(size=14),
                 command=self._submit,
             )
-            send_btn.pack(side="right")
+            send_btn.pack(side="right", anchor="s")
+
+            self.input_entry = ExpandableInput(
+                input_frame,
+                placeholder=self.PLACEHOLDER,
+                colors=self.colors,
+                on_submit=self._submit,
+                on_expand=self._reposition_window,
+                is_ctk=True,
+                entry_height=42,
+                expanded_height=85,
+                font=get_ctk_font(size=12),
+                corner_radius=8,
+                border_width=1,
+                fg_color=self.colors.surface0,
+                border_color=self.colors.surface2,
+                text_color=self.colors.text,
+                placeholder_text_color=self.colors.overlay0,
+                width=280,
+                pack_kwargs={"side": "left", "fill": "x", "expand": True, "padx": (0, 8)},
+                expanded_pack_kwargs={"side": "left", "fill": "both", "expand": True, "padx": (0, 8)},
+            )
         else:
             # Fallback to tk
             self.root.configure(bg=self.colors.base)
@@ -1656,34 +1661,6 @@ class AttachedInputPopup:
             input_frame = tk.Frame(content_frame, bg=self.colors.base)
             input_frame.pack(fill=tk.X)
 
-            # Input container with border
-            input_container = tk.Frame(
-                input_frame, bg=self.colors.surface0, highlightbackground=self.colors.surface2, highlightthickness=1
-            )
-            input_container.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
-
-            self.input_var = tk.StringVar(master=self.root)
-
-            self.input_entry = tk.Entry(
-                input_container,
-                textvariable=self.input_var,
-                font=("Arial", 11),
-                bg=self.colors.surface0,
-                fg=self.colors.text,
-                insertbackground=self.colors.text,
-                relief=tk.FLAT,
-                bd=0,
-                width=35,
-            )
-            self.input_entry.pack(fill=tk.X, padx=10, pady=10)
-            self.input_entry.insert(0, self.PLACEHOLDER)
-            self.input_entry.config(fg=self.colors.overlay0)
-
-            self.input_entry.bind("<FocusIn>", self._on_focus_in)
-            self.input_entry.bind("<FocusOut>", self._on_focus_out)
-            self.input_entry.bind("<Return>", lambda e: self._submit())
-            _bind_select_all(self.input_entry)
-
             # Send button
             send_btn = tk.Label(
                 input_frame,
@@ -1695,10 +1672,33 @@ class AttachedInputPopup:
                 pady=8,
                 cursor="hand2",
             )
-            send_btn.pack(side=tk.RIGHT)
+            send_btn.pack(side=tk.RIGHT, anchor=tk.S)
             send_btn.bind("<Button-1>", lambda e: self._submit())
             send_btn.bind("<Enter>", lambda e: send_btn.config(bg=self.colors.lavender))
             send_btn.bind("<Leave>", lambda e: send_btn.config(bg=self.colors.blue))
+
+            # Input container with border
+            input_container = tk.Frame(
+                input_frame, bg=self.colors.surface0, highlightbackground=self.colors.surface2, highlightthickness=1
+            )
+            input_container.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
+
+            self.input_entry = ExpandableInput(
+                input_container,
+                placeholder=self.PLACEHOLDER,
+                colors=self.colors,
+                on_submit=self._submit,
+                on_expand=self._reposition_window,
+                is_ctk=False,
+                font=("Arial", 11),
+                expanded_height=4,
+                fg_color=self.colors.surface0,
+                text_color=self.colors.text,
+                placeholder_text_color=self.colors.overlay0,
+                width=35,
+                pack_kwargs={"fill": tk.X, "padx": 10, "pady": 10},
+                expanded_pack_kwargs={"fill": tk.BOTH, "expand": True, "padx": 10, "pady": 10},
+            )
 
         # Enable drag-to-move on non-interactive areas
         _make_draggable(self.root, main_frame)
@@ -1745,26 +1745,39 @@ class AttachedInputPopup:
 
         self.root.geometry(f"+{x}+{y}")
 
-    def _on_focus_in(self, event):
-        """Handle input focus in."""
-        if self.input_entry.get() == self.PLACEHOLDER:
-            self.input_entry.delete(0, tk.END)
-            self.input_entry.config(fg=self.colors.text)
+    def _reposition_window(self):
+        """Reposition after content changes (e.g. text field expansion)."""
+        if not self.root:
+            return
 
-    def _on_focus_out(self, event):
-        """Handle input focus out."""
-        if not self.input_entry.get():
-            self.input_entry.insert(0, self.PLACEHOLDER)
-            self.input_entry.config(fg=self.colors.overlay0)
+        self.root.update_idletasks()
+
+        if sys.platform != "win32":
+            return
+
+        x = self.root.winfo_x()
+        y = self.root.winfo_y()
+
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        window_width = self.root.winfo_reqwidth()
+        window_height = self.root.winfo_reqheight()
+
+        if x + window_width > screen_width:
+            x = screen_width - window_width - 10
+        if y + window_height > screen_height:
+            y = screen_height - window_height - 10
+
+        x = max(10, x)
+        y = max(10, y)
+
+        self.root.geometry(f"+{x}+{y}")
 
     def _submit(self):
         """Handle form submission."""
-        text = self.input_entry.get().strip()
+        text = self.input_entry.get() if self.input_entry else ""
 
-        # Check if empty (handling placeholder check for Tk)
-        is_empty = not text or (not HAVE_CTK and text == self.PLACEHOLDER)
-
-        if not is_empty:
+        if text and text != self.PLACEHOLDER:
             response_mode = self.response_toggle.get() if self.response_toggle else "default"
             profile_override = get_profile_override_value(self.profile_var)
             self._close()
@@ -1774,12 +1787,9 @@ class AttachedInputPopup:
 
     def _on_tts(self):
         """Handle TTS button click - grab text and open TTS Window."""
-        text = self.input_entry.get().strip()
+        text = self.input_entry.get() if self.input_entry else ""
 
-        # Check if empty (handling placeholder check for Tk)
-        is_empty = not text or (not HAVE_CTK and text == self.PLACEHOLDER)
-
-        if not is_empty and self.on_tts_callback:
+        if text and text != self.PLACEHOLDER and self.on_tts_callback:
             self._close()
             self.on_tts_callback(text)
         elif self.on_tts_callback:
@@ -1833,7 +1843,9 @@ class AttachedInputPopup:
 
         # Release widget references so CTk-internal Variables are GC'd
         # on the main thread NOW, not later on a background thread.
-        self.input_entry = None
+        if self.input_entry:
+            self.input_entry.destroy()
+            self.input_entry = None
         self.response_toggle = None
         self.input_var = None
         self.profile_var = None
@@ -2005,20 +2017,9 @@ class AttachedPromptPopup:
             )
             edit_frame.pack(fill="x", pady=(0, 6))
 
-            self.edit_input = ctk.CTkEntry(
-                edit_frame,
-                placeholder_text=self.PLACEHOLDER_EDIT,
-                font=get_ctk_font(size=12),
-                height=40,
-                corner_radius=0,
-                fg_color="transparent",
-                border_width=0,
-                text_color=self.colors.text,
-                placeholder_text_color=self.colors.overlay0,
-            )
             # Create a fixed-size container for the button to prevent scaling issues
             edit_btn_container = ctk.CTkFrame(edit_frame, width=40, height=40, fg_color="transparent")
-            edit_btn_container.pack(side="right")
+            edit_btn_container.pack(side="right", anchor="s")
             edit_btn_container.pack_propagate(False)
 
             # Create Edit button using helper
@@ -2036,22 +2037,26 @@ class AttachedPromptPopup:
             # Ensure proper styling
             edit_btn.configure(corner_radius=8)
             edit_btn.pack(fill="both", expand=True)
+            Tooltip(edit_btn, "Edit text with custom instructions")
 
-            self.edit_input = ctk.CTkEntry(
+            self.edit_input = ExpandableInput(
                 edit_frame,
-                placeholder_text=self.PLACEHOLDER_EDIT,
+                placeholder=self.PLACEHOLDER_EDIT,
+                colors=self.colors,
+                on_submit=self._on_custom_submit,
+                on_expand=self._reposition_window,
+                is_ctk=True,
+                entry_height=40,
+                expanded_height=85,
                 font=get_ctk_font(size=12),
-                height=40,
                 corner_radius=0,
-                fg_color="transparent",
                 border_width=0,
+                fg_color="transparent",
                 text_color=self.colors.text,
                 placeholder_text_color=self.colors.overlay0,
+                pack_kwargs={"side": "left", "fill": "x", "expand": True, "padx": (10, 0)},
+                expanded_pack_kwargs={"side": "left", "fill": "both", "expand": True, "padx": (10, 0)},
             )
-            self.edit_input.pack(side="left", fill="x", expand=True, padx=(10, 0))
-            self.edit_input.bind("<Return>", lambda e: self._on_custom_submit())
-            _bind_select_all(self.edit_input)
-            Tooltip(edit_btn, "Edit text with custom instructions")
 
             # Ask input with split buttons (Ask + Compare)
             ask_frame = ctk.CTkFrame(
@@ -2065,7 +2070,7 @@ class AttachedPromptPopup:
 
             # Container for both buttons
             ask_btns_container = ctk.CTkFrame(ask_frame, fg_color="transparent")
-            ask_btns_container.pack(side="right")
+            ask_btns_container.pack(side="right", anchor="s")
 
             # Compare button (left of Ask button)
             compare_btn_container = ctk.CTkFrame(ask_btns_container, width=32, height=40, fg_color="transparent")
@@ -2107,20 +2112,24 @@ class AttachedPromptPopup:
             ask_btn.pack(fill="both", expand=True)
             Tooltip(ask_btn, "Ask a question about the text")
 
-            self.ask_input = ctk.CTkEntry(
+            self.ask_input = ExpandableInput(
                 ask_frame,
-                placeholder_text=self.PLACEHOLDER_ASK,
+                placeholder=self.PLACEHOLDER_ASK,
+                colors=self.colors,
+                on_submit=self._on_ask_submit,
+                on_expand=self._reposition_window,
+                is_ctk=True,
+                entry_height=40,
+                expanded_height=85,
                 font=get_ctk_font(size=12),
-                height=40,
                 corner_radius=0,
-                fg_color="transparent",
                 border_width=0,
+                fg_color="transparent",
                 text_color=self.colors.text,
                 placeholder_text_color=self.colors.overlay0,
+                pack_kwargs={"side": "left", "fill": "x", "expand": True, "padx": (10, 0)},
+                expanded_pack_kwargs={"side": "left", "fill": "both", "expand": True, "padx": (10, 0)},
             )
-            self.ask_input.pack(side="left", fill="x", expand=True, padx=(10, 0))
-            self.ask_input.bind("<Return>", lambda e: self._on_ask_submit())
-            _bind_select_all(self.ask_input)
 
             # Action buttons
             self._create_carousel(content_frame)
@@ -2218,38 +2227,50 @@ class AttachedPromptPopup:
                 pady=8,
                 cursor="hand2",
             )
-            edit_send_btn.pack(side=tk.RIGHT, fill=tk.Y)
+            edit_send_btn.pack(side=tk.RIGHT, anchor=tk.S)
             edit_send_btn.bind("<Button-1>", lambda e: self._on_custom_submit())
             edit_send_btn.bind("<Enter>", lambda e: edit_send_btn.config(bg=self.colors.lavender))
             edit_send_btn.bind("<Leave>", lambda e: edit_send_btn.config(bg=self.colors.blue))
             Tooltip(edit_send_btn, "Edit text with custom instructions")
 
-            self.edit_input_var = tk.StringVar(master=self.root)
-
-            self.edit_input = tk.Entry(
+            self.edit_input = ExpandableInput(
                 edit_container,
-                textvariable=self.edit_input_var,
+                placeholder=self.PLACEHOLDER_EDIT,
+                colors=self.colors,
+                on_submit=self._on_custom_submit,
+                on_expand=self._reposition_window,
+                is_ctk=False,
                 font=("Arial", 11),
-                bg=self.colors.surface0,
-                fg=self.colors.text,
-                insertbackground=self.colors.text,
-                relief=tk.FLAT,
-                bd=0,
+                expanded_height=4,
+                fg_color=self.colors.surface0,
+                text_color=self.colors.text,
+                placeholder_text_color=self.colors.overlay0,
+                pack_kwargs={"side": tk.LEFT, "fill": tk.BOTH, "expand": True, "padx": 10, "pady": 10},
+                expanded_pack_kwargs={"side": tk.LEFT, "fill": tk.BOTH, "expand": True, "padx": 10, "pady": 10},
             )
-            self.edit_input.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
-            self.edit_input.insert(0, self.PLACEHOLDER_EDIT)
-            self.edit_input.config(fg=self.colors.overlay0)
-
-            self.edit_input.bind("<FocusIn>", lambda e: self._on_edit_focus_in())
-            self.edit_input.bind("<FocusOut>", lambda e: self._on_edit_focus_out())
-            self.edit_input.bind("<Return>", lambda e: self._on_custom_submit())
-            _bind_select_all(self.edit_input)
 
             # Ask input area with split buttons (Ask + Compare)
             ask_container = tk.Frame(
                 content_frame, bg=self.colors.surface0, highlightbackground=self.colors.surface2, highlightthickness=1
             )
             ask_container.pack(fill=tk.X, pady=(0, 12))
+
+            # Ask send button (packed first to sit at rightmost edge)
+            ask_send_btn = tk.Label(
+                ask_container,
+                text="❓",
+                font=("Arial", 12),
+                bg=self.colors.green,
+                fg=self.colors.accent_fg,
+                width=3,
+                pady=8,
+                cursor="hand2",
+            )
+            ask_send_btn.pack(side=tk.RIGHT, anchor=tk.S)
+            ask_send_btn.bind("<Button-1>", lambda e: self._on_ask_submit())
+            ask_send_btn.bind("<Enter>", lambda e: ask_send_btn.config(bg=self.colors.peach))
+            ask_send_btn.bind("<Leave>", lambda e: ask_send_btn.config(bg=self.colors.green))
+            Tooltip(ask_send_btn, "Ask a question about the text")
 
             # Compare button (left of Ask button)
             compare_btn = tk.Label(
@@ -2262,49 +2283,27 @@ class AttachedPromptPopup:
                 pady=8,
                 cursor="hand2",
             )
-            compare_btn.pack(side=tk.RIGHT, fill=tk.Y)
+            compare_btn.pack(side=tk.RIGHT, anchor=tk.S)
             compare_btn.bind("<Button-1>", lambda e: self._on_ask_compare_submit())
             compare_btn.bind("<Enter>", lambda e: compare_btn.config(bg=self.colors.surface2))
             compare_btn.bind("<Leave>", lambda e: compare_btn.config(bg=self.colors.surface1))
             Tooltip(compare_btn, "Compare with another text selection")
 
-            # Ask send button
-            ask_send_btn = tk.Label(
+            self.ask_input = ExpandableInput(
                 ask_container,
-                text="❓",
-                font=("Arial", 12),
-                bg=self.colors.green,
-                fg=self.colors.accent_fg,
-                width=3,
-                pady=8,
-                cursor="hand2",
-            )
-            ask_send_btn.pack(side=tk.RIGHT, fill=tk.Y)
-            ask_send_btn.bind("<Button-1>", lambda e: self._on_ask_submit())
-            ask_send_btn.bind("<Enter>", lambda e: ask_send_btn.config(bg=self.colors.peach))
-            ask_send_btn.bind("<Leave>", lambda e: ask_send_btn.config(bg=self.colors.green))
-            Tooltip(ask_send_btn, "Ask a question about the text")
-
-            self.ask_input_var = tk.StringVar(master=self.root)
-
-            self.ask_input = tk.Entry(
-                ask_container,
-                textvariable=self.ask_input_var,
+                placeholder=self.PLACEHOLDER_ASK,
+                colors=self.colors,
+                on_submit=self._on_ask_submit,
+                on_expand=self._reposition_window,
+                is_ctk=False,
                 font=("Arial", 11),
-                bg=self.colors.surface0,
-                fg=self.colors.text,
-                insertbackground=self.colors.text,
-                relief=tk.FLAT,
-                bd=0,
+                expanded_height=4,
+                fg_color=self.colors.surface0,
+                text_color=self.colors.text,
+                placeholder_text_color=self.colors.overlay0,
+                pack_kwargs={"side": tk.LEFT, "fill": tk.BOTH, "expand": True, "padx": 10, "pady": 10},
+                expanded_pack_kwargs={"side": tk.LEFT, "fill": tk.BOTH, "expand": True, "padx": 10, "pady": 10},
             )
-            self.ask_input.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
-            self.ask_input.insert(0, self.PLACEHOLDER_ASK)
-            self.ask_input.config(fg=self.colors.overlay0)
-
-            self.ask_input.bind("<FocusIn>", lambda e: self._on_ask_focus_in())
-            self.ask_input.bind("<FocusOut>", lambda e: self._on_ask_focus_out())
-            self.ask_input.bind("<Return>", lambda e: self._on_ask_submit())
-            _bind_select_all(self.ask_input)
 
             # Action buttons carousel
             self._create_carousel_tk(content_frame)
@@ -2436,30 +2435,6 @@ class AttachedPromptPopup:
             )
             self.carousel.pack(fill=tk.X)
 
-    def _on_edit_focus_in(self):
-        """Handle edit input focus in (tk fallback)."""
-        if self.edit_input.get() == self.PLACEHOLDER_EDIT:
-            self.edit_input.delete(0, tk.END)
-            self.edit_input.config(fg=self.colors.text)
-
-    def _on_edit_focus_out(self):
-        """Handle edit input focus out (tk fallback)."""
-        if not self.edit_input.get():
-            self.edit_input.insert(0, self.PLACEHOLDER_EDIT)
-            self.edit_input.config(fg=self.colors.overlay0)
-
-    def _on_ask_focus_in(self):
-        """Handle ask input focus in (tk fallback)."""
-        if self.ask_input.get() == self.PLACEHOLDER_ASK:
-            self.ask_input.delete(0, tk.END)
-            self.ask_input.config(fg=self.colors.text)
-
-    def _on_ask_focus_out(self):
-        """Handle ask input focus out (tk fallback)."""
-        if not self.ask_input.get():
-            self.ask_input.insert(0, self.PLACEHOLDER_ASK)
-            self.ask_input.config(fg=self.colors.overlay0)
-
     def _position_window(self):
         """Position the window."""
         self.root.update_idletasks()
@@ -2590,12 +2565,7 @@ class AttachedPromptPopup:
 
     def _on_custom_submit(self):
         """Handle custom edit submission."""
-        if HAVE_CTK:
-            custom_text = self.edit_input.get().strip()
-        else:
-            custom_text = (
-                self.edit_input_var.get().strip() if hasattr(self, "edit_input_var") and self.edit_input_var else ""
-            )
+        custom_text = self.edit_input.get() if self.edit_input else ""
 
         if not custom_text or custom_text == self.PLACEHOLDER_EDIT:
             return
@@ -2609,10 +2579,7 @@ class AttachedPromptPopup:
 
     def _on_ask_submit(self):
         """Handle ask submission."""
-        if HAVE_CTK:
-            ask_text = self.ask_input.get().strip()
-        else:
-            ask_text = self.ask_input_var.get().strip() if hasattr(self, "ask_input_var") and self.ask_input_var else ""
+        ask_text = self.ask_input.get() if self.ask_input else ""
 
         if not ask_text or ask_text == self.PLACEHOLDER_ASK:
             return
@@ -2626,10 +2593,7 @@ class AttachedPromptPopup:
 
     def _on_ask_compare_submit(self):
         """Handle ask with compare mode - triggers second text selection."""
-        if HAVE_CTK:
-            ask_text = self.ask_input.get().strip()
-        else:
-            ask_text = self.ask_input_var.get().strip() if hasattr(self, "ask_input_var") and self.ask_input_var else ""
+        ask_text = self.ask_input.get() if self.ask_input else ""
 
         if not ask_text or ask_text == self.PLACEHOLDER_ASK:
             return
@@ -2685,8 +2649,12 @@ class AttachedPromptPopup:
 
         # Release widget references so CTk-internal Variables are GC'd
         # on the main thread NOW, not later on a background thread.
-        self.edit_input = None
-        self.ask_input = None
+        if self.edit_input:
+            self.edit_input.destroy()
+            self.edit_input = None
+        if self.ask_input:
+            self.ask_input.destroy()
+            self.ask_input = None
         self.response_toggle = None
         self.modifier_bar = None
         self.carousel = None

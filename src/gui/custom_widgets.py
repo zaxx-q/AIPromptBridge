@@ -1914,3 +1914,528 @@ class ThemedModelOverrideDialog:
     def _cancel(self):
         self.result = None
         self.dialog.destroy()
+
+
+class ExpandableInput:
+    """A text input component that starts as a single-line Entry and expands
+
+    to a multi-line Text/CTkTextbox on double-click.
+
+    Supports:
+    - Double-click to expand to multi-line mode.
+    - Seamless text preservation during expansion.
+    - Enter / Ctrl+Enter to submit; Shift+Enter to insert newline.
+    - Cross-platform Ctrl+A select-all.
+    - Placeholder handling for both CTk and standard Tk widgets.
+    - Dual-UI support (CustomTkinter and standard Tkinter fallback).
+    - Unified .get() returning stripped text without placeholder.
+    """
+
+    def __init__(
+        self,
+        parent,
+        placeholder: str = "",
+        colors=None,
+        on_submit: Optional[Callable[[], None]] = None,
+        on_expand: Optional[Callable[[], None]] = None,
+        is_ctk: bool = True,
+        entry_height: int = 40,
+        font=None,
+        corner_radius: int = 0,
+        border_width: int = 0,
+        fg_color: str = "transparent",
+        border_color: Optional[str] = None,
+        text_color: Optional[str] = None,
+        placeholder_text_color: Optional[str] = None,
+        pack_kwargs: Optional[dict] = None,
+        expanded_height: int = 85,
+        expanded_pack_kwargs: Optional[dict] = None,
+        width: Optional[int] = None,
+    ):
+        self.parent = parent
+        self.placeholder = placeholder
+        self.colors = colors
+        self.on_submit = on_submit
+        self.on_expand = on_expand
+        self.is_ctk = is_ctk and HAVE_CTK
+        self.entry_height = entry_height
+        self.font = font
+        self.corner_radius = corner_radius
+        self.border_width = border_width
+        self.fg_color = fg_color
+        self.border_color = border_color
+        self.text_color = text_color
+        self.placeholder_text_color = placeholder_text_color
+        self.width = width
+        self.pack_kwargs = pack_kwargs or {
+            "side": "left",
+            "fill": "x",
+            "expand": True,
+        }
+        self.expanded_height = expanded_height
+        self.expanded_pack_kwargs = expanded_pack_kwargs or {
+            "side": "left",
+            "fill": "both",
+            "expand": True,
+        }
+
+        self._is_expanded = False
+        self._has_placeholder = True
+        self.entry = None
+        self.textbox = None
+        self._active_widget = None
+
+        self._create_single_line_entry()
+
+    def _create_single_line_entry(self):
+        """Create and pack the initial single-line Entry widget."""
+        if self.is_ctk:
+            kwargs = {
+                "placeholder_text": self.placeholder,
+                "height": self.entry_height,
+                "corner_radius": self.corner_radius,
+                "border_width": self.border_width,
+                "fg_color": self.fg_color,
+                "text_color": self.text_color,
+            }
+            if self.font is not None:
+                kwargs["font"] = self.font
+            if self.border_color:
+                kwargs["border_color"] = self.border_color
+            if self.placeholder_text_color:
+                kwargs["placeholder_text_color"] = self.placeholder_text_color
+            if self.width is not None:
+                kwargs["width"] = self.width
+
+            self.entry = ctk.CTkEntry(self.parent, **kwargs)
+            self._active_widget = self.entry
+            self.entry.pack(**self.pack_kwargs)
+
+            # Key bindings
+            for w in (self.entry, getattr(self.entry, "_entry", None)):
+                if w is not None:
+                    w.bind("<Return>", lambda e: self._on_submit_key())
+                    w.bind("<KP_Enter>", lambda e: self._on_submit_key())
+            self._bind_select_all(self.entry)
+            self._bind_double_click(self.entry)
+        else:
+            # Standard Tk Entry
+            kwargs = {
+                "relief": tk.FLAT,
+                "bd": 0,
+            }
+            if self.font is not None:
+                kwargs["font"] = self.font
+            if self.fg_color and self.fg_color != "transparent":
+                kwargs["bg"] = self.fg_color
+            if self.placeholder_text_color:
+                kwargs["fg"] = self.placeholder_text_color
+            if self.text_color:
+                kwargs["insertbackground"] = self.text_color
+            if self.width is not None:
+                kwargs["width"] = self.width
+
+            self.entry = tk.Entry(self.parent, **kwargs)
+            self._active_widget = self.entry
+            self.entry.pack(**self.pack_kwargs)
+
+            if self.placeholder:
+                self.entry.insert(0, self.placeholder)
+                self._has_placeholder = True
+
+            self.entry.bind("<FocusIn>", self._on_entry_focus_in)
+            self.entry.bind("<FocusOut>", self._on_entry_focus_out)
+            self.entry.bind("<Return>", lambda e: self._on_submit_key())
+            self.entry.bind("<KP_Enter>", lambda e: self._on_submit_key())
+            self._bind_select_all(self.entry)
+            self._bind_double_click(self.entry)
+
+        # Also bind double-click on parent container frame so clicking near the entry expands it
+        try:
+            self.parent.bind("<Double-Button-1>", self._on_double_click, add="+")
+        except Exception:
+            pass
+
+    def _bind_double_click(self, widget):
+        """Bind double click to expand on the entry and its internal subwidgets."""
+        for w in (widget, getattr(widget, "_entry", None), getattr(widget, "_canvas", None)):
+            if w is not None:
+                try:
+                    w.bind("<Double-Button-1>", self._on_double_click, add="+")
+                except Exception:
+                    pass
+
+    def _bind_select_all(self, widget):
+        """Bind Ctrl+A cross-platform select all."""
+
+        def select_all(_event):
+            try:
+                if self._is_expanded:
+                    native = getattr(widget, "_textbox", widget)
+                    native.tag_add("sel", "1.0", "end")
+                    native.mark_set("insert", "end")
+                else:
+                    native = getattr(widget, "_entry", widget)
+                    native.selection_range(0, tk.END)
+                    native.icursor(tk.END)
+            except Exception:
+                pass
+            return "break"
+
+        for w in (
+            widget,
+            getattr(widget, "_entry", None),
+            getattr(widget, "_textbox", None),
+        ):
+            if w is not None:
+                try:
+                    w.bind("<Control-a>", select_all)
+                    w.bind("<Control-A>", select_all)
+                except Exception:
+                    pass
+
+    def _on_entry_focus_in(self, event=None):
+        if not self.is_ctk and self.entry:
+            if self.entry.get() == self.placeholder:
+                self.entry.delete(0, tk.END)
+                if self.text_color:
+                    self.entry.config(fg=self.text_color)
+                self._has_placeholder = False
+
+    def _on_entry_focus_out(self, event=None):
+        if not self.is_ctk and self.entry:
+            if not self.entry.get():
+                self.entry.insert(0, self.placeholder)
+                if self.placeholder_text_color:
+                    self.entry.config(fg=self.placeholder_text_color)
+                self._has_placeholder = True
+
+    def _on_submit_key(self):
+        if self.on_submit:
+            self.on_submit()
+
+    def _on_double_click(self, event=None):
+        if not self._is_expanded:
+            self.expand()
+            return "break"
+        return None
+
+    @property
+    def is_expanded(self) -> bool:
+        return self._is_expanded
+
+    def expand(self):
+        """Expand from single-line entry to multi-line textbox."""
+        if self._is_expanded or self.entry is None:
+            return
+
+        current_text = self.get()
+
+        # Unpack entry
+        try:
+            self.entry.pack_forget()
+        except Exception:
+            pass
+
+        self._is_expanded = True
+
+        if self.is_ctk:
+            kwargs = {
+                "height": self.expanded_height,
+                "corner_radius": self.corner_radius,
+                "border_width": self.border_width,
+                "fg_color": self.fg_color,
+                "text_color": self.text_color,
+                "wrap": "word",
+            }
+            if self.font is not None:
+                kwargs["font"] = self.font
+            if self.border_color:
+                kwargs["border_color"] = self.border_color
+
+            self.textbox = ctk.CTkTextbox(self.parent, **kwargs)
+            self._active_widget = self.textbox
+            self.textbox.pack(**self.expanded_pack_kwargs)
+
+            if current_text:
+                self.textbox.insert("0.0", current_text)
+                self._has_placeholder = False
+            elif self.placeholder:
+                self.textbox.insert("0.0", self.placeholder)
+                if self.placeholder_text_color:
+                    self.textbox.configure(text_color=self.placeholder_text_color)
+                self._has_placeholder = True
+
+            self.textbox.bind("<FocusIn>", self._on_tb_focus_in)
+            self.textbox.bind("<FocusOut>", self._on_tb_focus_out)
+            self._bind_textbox_keys(self.textbox)
+            self._bind_select_all(self.textbox)
+
+            self.textbox.focus_set()
+            if current_text:
+                try:
+                    self.textbox._textbox.mark_set("insert", "end")
+                    self.textbox._textbox.see("insert")
+                except Exception:
+                    pass
+        else:
+            # Standard Tk Text
+            tk_height = self.expanded_height if self.expanded_height < 20 else 4
+            kwargs = {
+                "height": tk_height,
+                "relief": tk.FLAT,
+                "bd": 0,
+                "wrap": tk.WORD,
+            }
+            if self.font is not None:
+                kwargs["font"] = self.font
+            if self.fg_color and self.fg_color != "transparent":
+                kwargs["bg"] = self.fg_color
+            if self.text_color:
+                kwargs["insertbackground"] = self.text_color
+
+            self.textbox = tk.Text(self.parent, **kwargs)
+            self._active_widget = self.textbox
+            self.textbox.pack(**self.expanded_pack_kwargs)
+
+            if current_text:
+                self.textbox.insert("1.0", current_text)
+                if self.text_color:
+                    self.textbox.config(fg=self.text_color)
+                self._has_placeholder = False
+            elif self.placeholder:
+                self.textbox.insert("1.0", self.placeholder)
+                if self.placeholder_text_color:
+                    self.textbox.config(fg=self.placeholder_text_color)
+                self._has_placeholder = True
+
+            self.textbox.bind("<FocusIn>", self._on_tb_focus_in)
+            self.textbox.bind("<FocusOut>", self._on_tb_focus_out)
+            self._bind_textbox_keys(self.textbox)
+            self._bind_select_all(self.textbox)
+
+            self.textbox.focus_set()
+            if current_text:
+                try:
+                    self.textbox.mark_set("insert", "end")
+                    self.textbox.see("insert")
+                except Exception:
+                    pass
+
+        if self.on_expand:
+            try:
+                self.on_expand()
+            except Exception:
+                pass
+
+    def _bind_textbox_keys(self, widget):
+        """Set up Return/Shift+Return/Ctrl+Return key bindings."""
+
+        def on_return(event):
+            if getattr(event, "state", 0) & 0x1:  # Shift held -> insert newline
+                return None
+            if self.on_submit:
+                self.on_submit()
+            return "break"
+
+        def on_ctrl_return(event):
+            if self.on_submit:
+                self.on_submit()
+            return "break"
+
+        self._on_return_handler = on_return
+        self._on_ctrl_return_handler = on_ctrl_return
+
+        target_widgets = [widget]
+        native = getattr(widget, "_textbox", None)
+        if native is not None:
+            target_widgets.append(native)
+
+        for w in target_widgets:
+            w.bind("<Return>", on_return)
+            w.bind("<KP_Enter>", on_return)
+            w.bind("<Control-Return>", on_ctrl_return)
+            w.bind("<Control-KP_Enter>", on_ctrl_return)
+
+    def _on_tb_focus_in(self, event=None):
+        if self._has_placeholder and self.textbox:
+            if self.is_ctk:
+                self.textbox.delete("0.0", "end")
+                if self.text_color:
+                    self.textbox.configure(text_color=self.text_color)
+            else:
+                self.textbox.delete("1.0", tk.END)
+                if self.text_color:
+                    self.textbox.config(fg=self.text_color)
+            self._has_placeholder = False
+
+    def _on_tb_focus_out(self, event=None):
+        if self.textbox:
+            if self.is_ctk:
+                txt = self.textbox.get("0.0", "end-1c").strip()
+            else:
+                txt = self.textbox.get("1.0", "end-1c").strip()
+
+            if not txt and self.placeholder:
+                if self.is_ctk:
+                    self.textbox.insert("0.0", self.placeholder)
+                    if self.placeholder_text_color:
+                        self.textbox.configure(text_color=self.placeholder_text_color)
+                else:
+                    self.textbox.insert("1.0", self.placeholder)
+                    if self.placeholder_text_color:
+                        self.textbox.config(fg=self.placeholder_text_color)
+                self._has_placeholder = True
+
+    def get(self) -> str:
+        """Return stripped text value, or empty string if placeholder or empty."""
+        if not self._is_expanded:
+            if not self.entry:
+                return ""
+            val = self.entry.get().strip()
+            if not self.is_ctk and (val == self.placeholder or self._has_placeholder):
+                return ""
+            return val
+        else:
+            if not self.textbox or self._has_placeholder:
+                return ""
+            if self.is_ctk:
+                val = self.textbox.get("0.0", "end-1c").strip()
+            else:
+                val = self.textbox.get("1.0", "end-1c").strip()
+            if val == self.placeholder:
+                return ""
+            return val
+
+    def insert(self, index, text: str):
+        """Insert text into the active widget."""
+        if self._is_expanded:
+            if self.is_ctk:
+                idx = "0.0" if index == 0 or index == "0" else index
+                if self._has_placeholder and self.textbox:
+                    self.textbox.delete("0.0", "end")
+                    if self.text_color:
+                        self.textbox.configure(text_color=self.text_color)
+                    self._has_placeholder = False
+                self.textbox.insert(idx, text)
+            else:
+                idx = "1.0" if index == 0 or index == "0" else index
+                if self._has_placeholder and self.textbox:
+                    self.textbox.delete("1.0", tk.END)
+                    if self.text_color:
+                        self.textbox.config(fg=self.text_color)
+                    self._has_placeholder = False
+                self.textbox.insert(idx, text)
+        else:
+            if not self.is_ctk and self._has_placeholder and self.entry:
+                self.entry.delete(0, tk.END)
+                if self.text_color:
+                    self.entry.config(fg=self.text_color)
+                self._has_placeholder = False
+            if self.entry:
+                self.entry.insert(index, text)
+
+    def delete(self, first, last=None):
+        """Delete text from the active widget."""
+        if self._is_expanded:
+            if self.textbox:
+                if self.is_ctk:
+                    f_idx = "0.0" if first == 0 or first == "0" else first
+                    l_idx = "end" if last == tk.END or last == "end" else (last or "end")
+                    self.textbox.delete(f_idx, l_idx)
+                else:
+                    f_idx = "1.0" if first == 0 or first == "0" else first
+                    l_idx = tk.END if last == tk.END or last == "end" else (last or tk.END)
+                    self.textbox.delete(f_idx, l_idx)
+        else:
+            if self.entry:
+                if last is None:
+                    self.entry.delete(first)
+                else:
+                    self.entry.delete(first, last)
+
+    def set_text(self, text: str):
+        """Programmatically set text content."""
+        if self._is_expanded:
+            if self.is_ctk:
+                self.textbox.delete("0.0", "end")
+                if text:
+                    self.textbox.insert("0.0", text)
+                    if self.text_color:
+                        self.textbox.configure(text_color=self.text_color)
+                    self._has_placeholder = False
+                elif self.placeholder:
+                    self.textbox.insert("0.0", self.placeholder)
+                    if self.placeholder_text_color:
+                        self.textbox.configure(text_color=self.placeholder_text_color)
+                    self._has_placeholder = True
+            else:
+                self.textbox.delete("1.0", tk.END)
+                if text:
+                    self.textbox.insert("1.0", text)
+                    if self.text_color:
+                        self.textbox.config(fg=self.text_color)
+                    self._has_placeholder = False
+                elif self.placeholder:
+                    self.textbox.insert("1.0", self.placeholder)
+                    if self.placeholder_text_color:
+                        self.textbox.config(fg=self.placeholder_text_color)
+                    self._has_placeholder = True
+        else:
+            if self.is_ctk:
+                self.entry.delete(0, tk.END)
+                if text:
+                    self.entry.insert(0, text)
+            else:
+                self.entry.delete(0, tk.END)
+                if text:
+                    self.entry.insert(0, text)
+                    if self.text_color:
+                        self.entry.config(fg=self.text_color)
+                    self._has_placeholder = False
+                elif self.placeholder:
+                    self.entry.insert(0, self.placeholder)
+                    if self.placeholder_text_color:
+                        self.entry.config(fg=self.placeholder_text_color)
+                    self._has_placeholder = True
+
+    def focus_set(self):
+        if self._active_widget:
+            try:
+                self._active_widget.focus_set()
+            except Exception:
+                pass
+
+    def configure(self, **kwargs):
+        if self._active_widget:
+            return self._active_widget.configure(**kwargs)
+
+    def config(self, **kwargs):
+        return self.configure(**kwargs)
+
+    def cget(self, key):
+        if self._active_widget:
+            return self._active_widget.cget(key)
+        return None
+
+    def winfo_exists(self) -> bool:
+        if self._active_widget:
+            return bool(self._active_widget.winfo_exists())
+        return False
+
+    def destroy(self):
+        """Clean up widgets."""
+        for w in (self.entry, self.textbox):
+            if w is not None:
+                try:
+                    w.destroy()
+                except Exception:
+                    pass
+        self.entry = None
+        self.textbox = None
+        self._active_widget = None
+
+    def __getattr__(self, name):
+        if self._active_widget is not None and hasattr(self._active_widget, name):
+            return getattr(self._active_widget, name)
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")

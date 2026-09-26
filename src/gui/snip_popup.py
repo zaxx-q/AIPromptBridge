@@ -22,7 +22,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from PIL import Image, ImageTk
 
-from .custom_widgets import create_emoji_button
+from .custom_widgets import ExpandableInput, create_emoji_button
 from .emoji_renderer import get_emoji_renderer, prepare_emoji_content
 
 # Import CustomTkinter with fallback
@@ -337,21 +337,9 @@ class AttachedSnipPopup:
         )
         input_frame.pack(fill="x")
 
-        self.input_entry = ctk.CTkEntry(
-            input_frame,
-            placeholder_text=self.PLACEHOLDER,
-            font=get_ctk_font(size=12),
-            height=38,
-            corner_radius=0,
-            fg_color="transparent",
-            border_width=0,
-            text_color=self.colors.text,
-            placeholder_text_color=self.colors.overlay0,
-        )
-
         # Send button container
         send_container = ctk.CTkFrame(input_frame, width=38, height=38, fg_color="transparent")
-        send_container.pack(side="right")
+        send_container.pack(side="right", anchor="s")
         send_container.pack_propagate(False)
 
         send_btn = create_emoji_button(
@@ -368,8 +356,24 @@ class AttachedSnipPopup:
         send_btn.configure(corner_radius=8)
         send_btn.pack(fill="both", expand=True)
 
-        self.input_entry.pack(side="left", fill="x", expand=True, padx=(10, 0))
-        self.input_entry.bind("<Return>", lambda e: self._on_custom_submit())
+        self.input_entry = ExpandableInput(
+            input_frame,
+            placeholder=self.PLACEHOLDER,
+            colors=self.colors,
+            on_submit=self._on_custom_submit,
+            on_expand=self._reposition_window,
+            is_ctk=True,
+            entry_height=38,
+            expanded_height=85,
+            font=get_ctk_font(size=12),
+            corner_radius=0,
+            border_width=0,
+            fg_color="transparent",
+            text_color=self.colors.text,
+            placeholder_text_color=self.colors.overlay0,
+            pack_kwargs={"side": "left", "fill": "x", "expand": True, "padx": (10, 0)},
+            expanded_pack_kwargs={"side": "left", "fill": "both", "expand": True, "padx": (10, 0)},
+        )
 
         Tooltip(send_btn, "Ask a question about this image")
 
@@ -525,25 +529,6 @@ class AttachedSnipPopup:
         )
         input_container.pack(fill=tk.X)
 
-        self.input_var = tk.StringVar(master=self.root)
-        self.input_entry = tk.Entry(
-            input_container,
-            textvariable=self.input_var,
-            font=("Arial", 11),
-            bg=self.colors.surface0,
-            fg=self.colors.text,
-            insertbackground=self.colors.text,
-            relief=tk.FLAT,
-            bd=0,
-        )
-        self.input_entry.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
-        self.input_entry.insert(0, self.PLACEHOLDER)
-        self.input_entry.config(fg=self.colors.overlay0)
-
-        self.input_entry.bind("<FocusIn>", self._on_input_focus_in)
-        self.input_entry.bind("<FocusOut>", self._on_input_focus_out)
-        self.input_entry.bind("<Return>", lambda e: self._on_custom_submit())
-
         # Send button
         send_btn = tk.Label(
             input_container,
@@ -555,10 +540,26 @@ class AttachedSnipPopup:
             pady=8,
             cursor="hand2",
         )
-        send_btn.pack(side=tk.RIGHT, fill=tk.Y)
+        send_btn.pack(side=tk.RIGHT, anchor=tk.S)
         send_btn.bind("<Button-1>", lambda e: self._on_custom_submit())
         send_btn.bind("<Enter>", lambda e: send_btn.config(bg=self.colors.lavender))
         send_btn.bind("<Leave>", lambda e: send_btn.config(bg=self.colors.blue))
+
+        self.input_entry = ExpandableInput(
+            input_container,
+            placeholder=self.PLACEHOLDER,
+            colors=self.colors,
+            on_submit=self._on_custom_submit,
+            on_expand=self._reposition_window,
+            is_ctk=False,
+            font=("Arial", 11),
+            expanded_height=4,
+            fg_color=self.colors.surface0,
+            text_color=self.colors.text,
+            placeholder_text_color=self.colors.overlay0,
+            pack_kwargs={"side": tk.LEFT, "fill": tk.BOTH, "expand": True, "padx": 10, "pady": 10},
+            expanded_pack_kwargs={"side": tk.LEFT, "fill": tk.BOTH, "expand": True, "padx": 10, "pady": 10},
+        )
 
         # Compare Mode checkbox row (tk version)
         compare_row = tk.Frame(right_side, bg=self.colors.base)
@@ -1016,10 +1017,7 @@ class AttachedSnipPopup:
 
     def _on_custom_submit(self):
         """Handle custom question submission."""
-        if HAVE_CTK:
-            text = self.input_entry.get().strip()
-        else:
-            text = self.input_var.get().strip() if hasattr(self, "input_var") else ""
+        text = self.input_entry.get() if self.input_entry else ""
 
         if not text or text == self.PLACEHOLDER:
             return
@@ -1031,18 +1029,6 @@ class AttachedSnipPopup:
             return
 
         self._execute_action(self.action_source, "_Custom", text)
-
-    def _on_input_focus_in(self, event):
-        """Handle input focus in (tk fallback)."""
-        if self.input_entry.get() == self.PLACEHOLDER:
-            self.input_entry.delete(0, tk.END)
-            self.input_entry.config(fg=self.colors.text)
-
-    def _on_input_focus_out(self, event):
-        """Handle input focus out (tk fallback)."""
-        if not self.input_entry.get():
-            self.input_entry.insert(0, self.PLACEHOLDER)
-            self.input_entry.config(fg=self.colors.overlay0)
 
     def _position_window(self):
         """Position the window."""
@@ -1140,7 +1126,9 @@ class AttachedSnipPopup:
         # objects are also GC'd NOW (on the main thread) rather than later on
         # a background thread where their __del__ would crash.
         self.source_dropdown = None
-        self.input_entry = None
+        if self.input_entry:
+            self.input_entry.destroy()
+            self.input_entry = None
         self.compare_checkbox = None
         self.compare_indicator = None
         self.carousel = None
