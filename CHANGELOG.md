@@ -1,5 +1,21 @@
 # Changelog
 
+## [8.7.0] - 2026-09-26
+
+### New Features
+
+- **Expandable Popup Input Fields**: Added double-click expansion to text input fields in the TextEditTool and SnipTool popups. Double-clicking any single-line entry expands it into a multi-line text editor with seamless text preservation, Shift+Enter for newlines, Enter or Ctrl+Enter to submit, and cross-platform Ctrl+A selection support. Popups automatically resize and reposition when expanded. Supports both CustomTkinter and standard Tkinter fallback modes.
+
+### Improvements
+
+- **Unified Native Transcription Prompt**: Consolidated the separate verbatim and smart transcribe presets in the File Processor into a single "Transcribe (Native Model)" prompt. Transcription settings (mode, diarization, timestamps, language hints, custom vocabulary) are now derived directly from the selected connection profile. Existing configurations automatically clean up deprecated default prompts on load.
+- **Files API Original Filename & Context**: Uploads via Google Files API (including batch processing and transcribe jobs) now preserve original filenames as display names in Google Cloud and include the filename in the prompt context when filename injection is enabled, matching inline processing behavior.
+
+### Fixes
+
+- **Files API Transcribe Key Pinning**: Pinned transcription requests to the specific API key used during file upload to Google Files API, preventing `PERMISSION_DENIED` errors caused by key rotation between upload and transcription steps.
+- **DeepFilterNet Processing Delay**: Added the `-D` flag to DeepFilterNet command execution in the audio processor to compensate for algorithmic processing delay and keep output audio in sync with input timing.
+
 ## [8.6.0] - 2026-09-19
 
 ### New Features
