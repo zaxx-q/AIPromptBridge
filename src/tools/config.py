@@ -122,6 +122,14 @@ def _merge_with_defaults(user_config: Dict[str, Any]) -> tuple[Dict[str, Any], b
                     u_action["_is_default"] = False
                 changed = True
 
+        # Remove deprecated defaults if untouched
+        deprecated_defaults = ["Transcribe (Native Verbatim)", "Transcribe (Native Smart)"]
+        for old_name in deprecated_defaults:
+            if old_name in user_prompts and isinstance(user_prompts[old_name], dict):
+                if user_prompts[old_name].get("_is_default", False):
+                    del user_prompts[old_name]
+                    changed = True
+
         # Add missing or update default
         for name, d_action in default_prompts.items():
             if name in deleted_defaults:

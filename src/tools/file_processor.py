@@ -196,9 +196,16 @@ class FileProcessor(BaseTool):
                 transcribe_config = None
 
                 if is_transcribe_prompt:
-                    transcribe_config = self._step_transcribe_configuration(prompt_config)
-                    if transcribe_config is None:
-                        return ToolResult(success=False, message="Cancelled")
+                    # Native transcribe model: all settings (mode, diarization, timestamps,
+                    # language, vocabulary) come from the Connection Profile selected in Step 4.
+                    transcribe_config = {
+                        "model": "gemini-3.5-transcribe",
+                        "mode": prompt_config.get("transcribe_mode", "VERBATIM"),
+                        "diarization": False,
+                        "word_timestamp": False,
+                        "language_codes": [],
+                        "custom_vocabulary": [],
+                    }
 
                 # Step 2.5: Custom instructions (optional - skipped for transcribe model)
                 if not is_transcribe_prompt:
@@ -224,6 +231,26 @@ class FileProcessor(BaseTool):
                 exec_settings = self._step_execution_settings()
                 if exec_settings is None:
                     return ToolResult(success=False, message="Cancelled")
+
+                # If user selected a transcription profile in step 4, its settings
+                # override the prompt-level transcribe config from step 2 so there
+                # is a single source of truth.
+                if is_transcribe_prompt:
+                    from src.connection_profiles import ProfileStore
+
+                    profile_name = exec_settings.get("profile_name")
+                    if profile_name:
+                        _prof = ProfileStore.get_instance().get_profile(profile_name)
+                        if _prof and _prof.provider == "transcription":
+                            transcribe_config = _prof.to_transcribe_config()
+                            print_info(
+                                f"Using transcription settings from profile '{profile_name}' "
+                                f"(mode: {transcribe_config.get('mode', 'VERBATIM')})"
+                            )
+                        elif _prof:
+                            transcribe_config["model"] = _prof.model or "gemini-3.5-transcribe"
+                            if prompt_config.get("transcribe_mode"):
+                                transcribe_config["mode"] = prompt_config["transcribe_mode"]
 
                 # Create checkpoint (include audio preprocessing, transcribe config, and custom instructions)
                 input_files = [str(f.path) for f in scan_result.files]
@@ -1951,96 +1978,6 @@ class FileProcessor(BaseTool):
 
         return include
 
-    def _step_transcribe_configuration(self, prompt_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        Configure transcription options for gemini-3.5-transcribe.
-
-        Args:
-            prompt_config: The prompt config dict (contains transcribe_mode)
-
-        Returns:
-            Transcription config dict or None if cancelled
-        """
-        mode = prompt_config.get("transcribe_mode", "VERBATIM")
-
-        print("\n🎙️ Gemini Native Transcription Configuration")
-        print("─" * 50)
-        print(f"  Mode: {mode}")
-
-        config = {
-            "model": "gemini-3.5-transcribe",
-            "mode": mode,
-            "diarization": False,
-            "word_timestamp": False,
-            "language_codes": [],
-            "custom_vocabulary": [],
-        }
-
-        # SMART mode is incompatible with diarization and timestamps
-        if mode == "VERBATIM":
-            # Diarization
-            print("\n👥 Speaker Diarization (identify different speakers)?")
-            print("  [Y] Yes - label speakers (spk_1, spk_2, etc.)")
-            print("  [N] No (default)")
-            try:
-                diar_choice = input("\nChoice [N]: ").strip().lower() or "n"
-            except (EOFError, KeyboardInterrupt):
-                return None
-            config["diarization"] = diar_choice == "y"
-
-            # Word timestamps
-            print("\n⏱️ Word-level timestamps?")
-            print("  Note: May slightly reduce transcription accuracy")
-            print("  [Y] Yes")
-            print("  [N] No (default)")
-            try:
-                ts_choice = input("\nChoice [N]: ").strip().lower() or "n"
-            except (EOFError, KeyboardInterrupt):
-                return None
-            config["word_timestamp"] = ts_choice == "y"
-        else:
-            print("\n  ℹ️  Smart mode: diarization and timestamps are not available")
-
-        # Language hint (both modes)
-        print("\n🌐 Language hint (improves accuracy if known)?")
-        print("  Enter BCP-47 code (e.g., 'en-US', 'es-ES', 'ja-JP')")
-        print("  Leave empty for auto-detection")
-        try:
-            lang = input("\nLanguage [auto]: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            return None
-        if lang:
-            config["language_codes"] = [lang]
-
-        # Custom vocabulary
-        print("\n📝 Custom vocabulary (domain terms, names, acronyms)?")
-        print("  Enter terms separated by commas, or leave empty")
-        print("  Example: Kubernetes, BigQuery, gRPC")
-        try:
-            vocab = input("\nVocabulary []: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            return None
-        if vocab:
-            config["custom_vocabulary"] = [v.strip() for v in vocab.split(",") if v.strip()]
-
-        # Summary
-        print("\n📋 Transcription Config:")
-        print("  Model: gemini-3.5-transcribe")
-        print(f"  Mode: {config['mode']}")
-        if config["diarization"]:
-            print("  Diarization: ON")
-        if config["word_timestamp"]:
-            print("  Word timestamps: ON")
-        if config["language_codes"]:
-            print(f"  Language: {', '.join(config['language_codes'])}")
-        if config["custom_vocabulary"]:
-            vocab_preview = ", ".join(config["custom_vocabulary"][:5])
-            if len(config["custom_vocabulary"]) > 5:
-                vocab_preview += "..."
-            print(f"  Vocabulary: {vocab_preview}")
-
-        return config
-
     def _prompt_per_file_instructions(self, filepath: Path, file_index: int, total_files: int) -> Optional[str]:
         """
         Prompt for per-file instructions during processing.
@@ -2429,17 +2366,32 @@ class FileProcessor(BaseTool):
 
         # Auto-detect transcribe model if user selected it in their profile
         if model and "transcribe" in model.lower() and not cp.transcribe_config:
-            if interactive:
-                print_info(f"\n🎙️ Detected transcribe model: {model}")
-                print_info("Using default verbatim transcription config")
-            cp.transcribe_config = {
-                "model": model,
-                "mode": "VERBATIM",
-                "diarization": False,
-                "word_timestamp": False,
-                "language_codes": [],
-                "custom_vocabulary": [],
-            }
+            # Try to pull transcribe settings from the connection profile
+            from src.connection_profiles import ProfileStore
+
+            profile_name = getattr(cp, "profile_name", None)
+            profile = None
+            if profile_name:
+                store = ProfileStore.get_instance()
+                profile = store.get_profile(profile_name)
+
+            if profile and profile.provider == "transcription":
+                cp.transcribe_config = profile.to_transcribe_config()
+                if interactive:
+                    mode = cp.transcribe_config.get("mode", "VERBATIM")
+                    print_info(f"\n🎙️ Using transcription profile: {profile_name} (mode: {mode})")
+            else:
+                if interactive:
+                    print_info(f"\n🎙️ Detected transcribe model: {model}")
+                    print_info("Using default verbatim transcription config")
+                cp.transcribe_config = {
+                    "model": model,
+                    "mode": "VERBATIM",
+                    "diarization": False,
+                    "word_timestamp": False,
+                    "language_codes": [],
+                    "custom_vocabulary": [],
+                }
 
         if interactive:
             self._print_header("📁 FILE PROCESSOR - Processing")
@@ -2570,7 +2522,11 @@ class FileProcessor(BaseTool):
                     if is_transcribe_run and is_audio:
                         # Use dedicated transcribe model path
                         response = self._process_with_transcribe_model(
-                            process_path, cp.transcribe_config, cp, interactive
+                            process_path,
+                            cp.transcribe_config,
+                            cp,
+                            interactive,
+                            original_name=file_path_obj.name,
                         )
                     elif is_large:
                         if interactive:
@@ -2588,7 +2544,13 @@ class FileProcessor(BaseTool):
                                     process_path, final_prompt, cp, interactive, original_name=file_path_obj.name
                                 )
                             else:
-                                response = self._process_with_files_api(process_path, final_prompt, cp, interactive)
+                                response = self._process_with_files_api(
+                                    process_path,
+                                    final_prompt,
+                                    cp,
+                                    interactive,
+                                    original_name=file_path_obj.name,
+                                )
                         else:
                             # Get handling mode (prompt if needed)
                             # Note: We pass original path for cache key/display, but logic uses is_audio
@@ -2613,7 +2575,13 @@ class FileProcessor(BaseTool):
 
                             elif mode == LARGE_FILE_MODE_FILES_API:
                                 # Use Files API with the processed file
-                                response = self._process_with_files_api(process_path, final_prompt, cp, interactive)
+                                response = self._process_with_files_api(
+                                    process_path,
+                                    final_prompt,
+                                    cp,
+                                    interactive,
+                                    original_name=file_path_obj.name,
+                                )
 
                             else:
                                 # Fallback: send inline (for disable_files_api case with non-audio)
@@ -2623,7 +2591,13 @@ class FileProcessor(BaseTool):
 
                     # Check for Batch API
                     elif cp.use_batch and provider.lower() == "google":
-                        response = self._process_file_batch(process_path, final_prompt, cp, interactive)
+                        response = self._process_file_batch(
+                            process_path,
+                            final_prompt,
+                            cp,
+                            interactive,
+                            original_name=file_path_obj.name,
+                        )
                     else:
                         # Standard inline processing
                         response = self._process_file_inline(
@@ -3133,7 +3107,12 @@ class FileProcessor(BaseTool):
         return ctx.response_text
 
     def _process_with_files_api(
-        self, filepath: Path, prompt: str, checkpoint: FileProcessorCheckpoint, interactive: bool
+        self,
+        filepath: Path,
+        prompt: str,
+        checkpoint: FileProcessorCheckpoint,
+        interactive: bool,
+        original_name: Optional[str] = None,
     ) -> Optional[str]:
         """
         Process a file using the Gemini Files API.
@@ -3143,6 +3122,7 @@ class FileProcessor(BaseTool):
             prompt: Processing prompt
             checkpoint: Current checkpoint
             interactive: Show progress
+            original_name: Original filename for context (when filepath is a temp file)
 
         Returns:
             Response text or None on failure
@@ -3167,11 +3147,12 @@ class FileProcessor(BaseTool):
         # Create provider instance for upload
         provider = create_provider("google", key_manager, resolved.config)
 
-        # Upload file
+        # Upload file (pass original_name so Google Cloud shows the real filename)
         if interactive:
             print("   📤 Uploading to Files API...")
 
-        uploaded, error = provider.upload_file(filepath)
+        display_name = original_name or filepath.name
+        uploaded, error = provider.upload_file(filepath, display_name=display_name)
         if error:
             raise Exception(f"Upload failed: {error}")
 
@@ -3181,10 +3162,15 @@ class FileProcessor(BaseTool):
         try:
             from src.messages import build_file_message
 
+            # Include filename context in prompt if enabled (consistent with inline processing)
+            file_task = prompt
+            if self._include_filename and original_name:
+                file_task = f"{prompt}\n\n[File: {original_name}]"
+
             messages = build_file_message(
                 file_uri=uploaded.uri,
                 mime_type=uploaded.mime_type,
-                task=prompt,
+                task=file_task,
                 # system_prompt is handled via checkpoint.prompt_text if it was part of it,
                 # FileProcessor just uses prompt as user prompt usually.
             )
@@ -3216,6 +3202,7 @@ class FileProcessor(BaseTool):
         transcribe_config: Dict[str, Any],
         checkpoint: FileProcessorCheckpoint,
         interactive: bool,
+        original_name: Optional[str] = None,
     ) -> Optional[str]:
         """
         Process audio file using gemini-3.5-transcribe.
@@ -3228,6 +3215,7 @@ class FileProcessor(BaseTool):
             transcribe_config: Transcription configuration
             checkpoint: Current checkpoint
             interactive: Show progress
+            original_name: Original filename for display/metadata
 
         Returns:
             Transcript text or None on failure
@@ -3254,16 +3242,22 @@ class FileProcessor(BaseTool):
                         f"({max_duration / 60:.0f}m)"
                     )
                 return self._process_transcribe_with_chunking(
-                    filepath, transcribe_config, checkpoint, interactive, max_duration
+                    filepath,
+                    transcribe_config,
+                    checkpoint,
+                    interactive,
+                    max_duration,
+                    original_name=original_name,
                 )
 
         from src.providers import create_provider
 
-        # Check if disable_files_api is set and warn user if so
+        # Check if disable_files_api is set and warn user (once per run)
         disable_files_api = get_setting(self.tools_config, "disable_files_api", False)
-        if disable_files_api and interactive:
+        if disable_files_api and interactive and not getattr(self, "_files_api_override_warned", False):
             print_warning("⚠️  Files API is disabled in settings, but the transcribe model requires Files API upload.")
-            print("  The file will be uploaded via Files API for transcription despite the setting.")
+            print("  Files will be uploaded via Files API for transcription despite the setting.")
+            self._files_api_override_warned = True
 
         # Resolve settings
         provider_name, _model_override, resolved = self._resolve_execution_settings(checkpoint)
@@ -3290,7 +3284,13 @@ class FileProcessor(BaseTool):
         if interactive:
             print("   📤 Uploading to Files API for transcription...")
 
-        uploaded, error = provider.upload_file(filepath)
+        # Capture the current key BEFORE upload so we can pin transcription to it.
+        # Files API uploads are bound to the API key (project) that created them;
+        # using a different key for the transcription request causes PERMISSION_DENIED.
+        upload_key = provider.key_manager.get_current_key() if provider.key_manager else None
+
+        display_name = original_name or filepath.name
+        uploaded, error = provider.upload_file(filepath, display_name=display_name)
         if error:
             raise Exception(f"Upload failed: {error}")
 
@@ -3313,6 +3313,7 @@ class FileProcessor(BaseTool):
                 file_uri=uploaded.uri,
                 mime_type=uploaded.mime_type,
                 transcribe_config=transcribe_config,
+                upload_key=upload_key,
             )
 
             if error:
@@ -3333,6 +3334,7 @@ class FileProcessor(BaseTool):
         checkpoint: FileProcessorCheckpoint,
         interactive: bool,
         max_duration_seconds: float,
+        original_name: Optional[str] = None,
     ) -> Optional[str]:
         """
         Process a long audio file by splitting into chunks under the transcribe duration limit.
@@ -3343,17 +3345,19 @@ class FileProcessor(BaseTool):
             checkpoint: Current checkpoint
             interactive: Show progress
             max_duration_seconds: Maximum chunk duration in seconds
+            original_name: Original filename for chunk display names
 
         Returns:
             Merged transcript text or None on failure
         """
         from src.providers import create_provider
 
-        # Check if disable_files_api is set and warn user if so
+        # Check if disable_files_api is set and warn user (once per run)
         disable_files_api = get_setting(self.tools_config, "disable_files_api", False)
-        if disable_files_api and interactive:
+        if disable_files_api and interactive and not getattr(self, "_files_api_override_warned", False):
             print_warning("⚠️  Files API is disabled in settings, but the transcribe model requires Files API upload.")
             print("  The chunks will be uploaded via Files API for transcription despite the setting.")
+            self._files_api_override_warned = True
 
         # Resolve settings
         provider_name, _model_override, resolved = self._resolve_execution_settings(checkpoint)
@@ -3394,7 +3398,16 @@ class FileProcessor(BaseTool):
                 if interactive:
                     print(f"   [{i + 1}/{len(split_result.chunks)}] Uploading {chunk.time_range_str}...")
 
-                uploaded, error = provider.upload_file(chunk.path)
+                # Capture the key BEFORE upload so transcription is pinned to it
+                chunk_upload_key = provider.key_manager.get_current_key() if provider.key_manager else None
+
+                total_chunks = len(split_result.chunks)
+                chunk_display = (
+                    f"{original_name} (Part {i + 1}/{total_chunks})"
+                    if original_name and total_chunks > 1
+                    else (original_name or chunk.path.name)
+                )
+                uploaded, error = provider.upload_file(chunk.path, display_name=chunk_display)
                 if error:
                     chunk_errors.append(f"Chunk {i + 1} upload: {error}")
                     if interactive:
@@ -3416,6 +3429,7 @@ class FileProcessor(BaseTool):
                         file_uri=uploaded.uri,
                         mime_type=uploaded.mime_type,
                         transcribe_config=transcribe_config,
+                        upload_key=chunk_upload_key,
                     )
 
                     if error:
@@ -3826,7 +3840,12 @@ class FileProcessor(BaseTool):
         print(f"{'═' * 60}")
 
     def _process_file_batch(
-        self, filepath: Path, prompt: str, checkpoint: FileProcessorCheckpoint, interactive: bool
+        self,
+        filepath: Path,
+        prompt: str,
+        checkpoint: FileProcessorCheckpoint,
+        interactive: bool,
+        original_name: Optional[str] = None,
     ) -> Optional[str]:
         """
         Process a file using Gemini Batch API.
@@ -3836,6 +3855,7 @@ class FileProcessor(BaseTool):
             prompt: Prompt text
             checkpoint: Checkpoint with content settings
             interactive: Whether to show output
+            original_name: Original filename for context and batch display
 
         Returns:
             String with Batch Operation details
@@ -3883,11 +3903,15 @@ class FileProcessor(BaseTool):
             if hasattr(provider, "upload_file"):
                 if interactive:
                     print("   📤 Uploading to Files API (Batch requirement)...")
-                uploaded, error = provider.upload_file(filepath)
+                display_name = original_name or filepath.name
+                uploaded, error = provider.upload_file(filepath, display_name=display_name)
                 if error:
                     raise Exception(error)
 
-                msgs = build_file_message(file_uri=uploaded.uri, mime_type=uploaded.mime_type, task=prompt)
+                batch_task = prompt
+                if self._include_filename and original_name:
+                    batch_task = f"{prompt}\n\n[File: {original_name}]"
+                msgs = build_file_message(file_uri=uploaded.uri, mime_type=uploaded.mime_type, task=batch_task)
             else:
                 raise Exception("Provider does not support file upload")
         else:
@@ -3897,16 +3921,20 @@ class FileProcessor(BaseTool):
             with open(filepath, "rb") as f:
                 data = base64.b64encode(f.read()).decode("utf-8")
 
-            msgs = build_inline_message(data_b64=data, mime_type=mime_type, task=prompt)
+            batch_task = prompt
+            if self._include_filename and original_name:
+                batch_task = f"{prompt}\n\n[File: {original_name}]"
+            msgs = build_inline_message(data_b64=data, mime_type=mime_type, task=batch_task)
 
         if interactive:
             print("   ⏳ Submitting batch job...")
 
+        file_display = original_name or filepath.name
         result, error = provider.create_batch(
             messages=msgs,
             model=model_override,
             params={"temperature": 0.7},  # defaults?
-            display_name=f"Batch: {filepath.name}",
+            display_name=f"Batch: {file_display}",
         )
 
         if error:
@@ -3917,7 +3945,7 @@ class FileProcessor(BaseTool):
         op_name = result.get("name", "unknown")
 
         output = f"""--- BATCH JOB SUBMITTED ---
-File: {filepath.name}
+File: {file_display}
 Batch Name: {op_name}
 Date: {time.strftime("%Y-%m-%d %H:%M:%S")}
 

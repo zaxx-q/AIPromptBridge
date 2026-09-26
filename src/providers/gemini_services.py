@@ -449,11 +449,17 @@ def generate_transcription(
     mime_type: str,
     transcribe_config: Dict[str, Any],
     retry_count: int = 0,
+    upload_key: Optional[str] = None,
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     Generate transcription using gemini-3.5-transcribe.
 
     Uses audio_transcription_config instead of regular prompts.
+
+    When upload_key is provided, the request is pinned to that key because
+    Files API uploads are bound to the API key (project) that created them.
+    Key rotation on 429 is replaced by a delay-and-retry with the same key
+    to avoid PERMISSION_DENIED errors from a different project's key.
 
     Args:
         provider: GeminiNativeProvider instance
@@ -462,6 +468,8 @@ def generate_transcription(
         transcribe_config: Dict with keys: model, mode, diarization,
                           word_timestamp, language_codes, custom_vocabulary
         retry_count: Current retry attempt count
+        upload_key: If set, pin all requests to this key (must match the
+                    key used to upload the file)
 
     Returns:
         (transcript_text, error) tuple
@@ -469,7 +477,11 @@ def generate_transcription(
     if not provider.key_manager or not provider.key_manager.has_keys():
         return None, "No API keys configured for Gemini"
 
-    current_key = provider.key_manager.get_current_key()
+    # Pin to the upload key when provided (Files API files are key-scoped)
+    if upload_key:
+        current_key = upload_key
+    else:
+        current_key = provider.key_manager.get_current_key()
     if not current_key:
         return None, "No API key available"
 
@@ -545,13 +557,30 @@ def generate_transcription(
                 error_brief = provider.sanitize_api_error(error_text, status_code)
                 provider.log_retry(reason, retry_count + 1, delay, error_brief)
 
-                if reason in (RetryReason.RATE_LIMITED, RetryReason.AUTH_ERROR):
-                    provider.rotate_key_if_possible(f"({reason.value})")
+                if upload_key:
+                    # Pinned to upload key — do NOT rotate (file is bound to this key's project).
+                    # On 429, wait longer before retrying with the same key.
+                    if reason == RetryReason.AUTH_ERROR:
+                        # PERMISSION_DENIED with the upload key itself means the file
+                        # expired or was deleted — retrying won't help.
+                        provider.log_error(f"[Transcribe] API error: {error_text}", status_code)
+                        return (
+                            None,
+                            f"Transcription error ({status_code}): {provider.sanitize_api_error(error_text, status_code)}",
+                        )
+                    if reason == RetryReason.RATE_LIMITED:
+                        delay = max(delay, 5.0)  # Give rate limit time to clear on same key
+                        provider.log("info", f"[Transcribe] Rate limited — waiting {delay}s (pinned to upload key)")
+                else:
+                    if reason in (RetryReason.RATE_LIMITED, RetryReason.AUTH_ERROR):
+                        provider.rotate_key_if_possible(f"({reason.value})")
 
                 if delay > 0:
                     time.sleep(delay)
 
-                return generate_transcription(provider, file_uri, mime_type, transcribe_config, retry_count + 1)
+                return generate_transcription(
+                    provider, file_uri, mime_type, transcribe_config, retry_count + 1, upload_key
+                )
 
             provider.log_error(f"[Transcribe] API error: {error_text}", status_code)
             return None, f"Transcription error ({status_code}): {provider.sanitize_api_error(error_text, status_code)}"
@@ -635,7 +664,9 @@ def generate_transcription(
                     )
                     if delay > 0:
                         time.sleep(delay)
-                    return generate_transcription(provider, file_uri, mime_type, transcribe_config, retry_count + 1)
+                    return generate_transcription(
+                        provider, file_uri, mime_type, transcribe_config, retry_count + 1, upload_key
+                    )
                 return "(No speech detected)", None
 
         except (KeyError, IndexError) as e:
@@ -659,10 +690,11 @@ def generate_transcription(
         if provider.should_retry(RetryReason.NETWORK_ERROR, retry_count):
             delay = provider.get_retry_delay(RetryReason.NETWORK_ERROR)
             provider.log_retry(RetryReason.NETWORK_ERROR, retry_count + 1, delay, f"timeout after {timeout}s")
-            provider.rotate_key_if_possible("(timeout)")
+            if not upload_key:
+                provider.rotate_key_if_possible("(timeout)")
             if delay > 0:
                 time.sleep(delay)
-            return generate_transcription(provider, file_uri, mime_type, transcribe_config, retry_count + 1)
+            return generate_transcription(provider, file_uri, mime_type, transcribe_config, retry_count + 1, upload_key)
         return None, f"Transcription timeout after {timeout}s"
 
     except requests.exceptions.RequestException as e:
@@ -672,10 +704,11 @@ def generate_transcription(
         if provider.should_retry(RetryReason.NETWORK_ERROR, retry_count):
             delay = provider.get_retry_delay(RetryReason.NETWORK_ERROR)
             provider.log_retry(RetryReason.NETWORK_ERROR, retry_count + 1, delay, error_msg[:100])
-            provider.rotate_key_if_possible("(network error)")
+            if not upload_key:
+                provider.rotate_key_if_possible("(network error)")
             if delay > 0:
                 time.sleep(delay)
-            return generate_transcription(provider, file_uri, mime_type, transcribe_config, retry_count + 1)
+            return generate_transcription(provider, file_uri, mime_type, transcribe_config, retry_count + 1, upload_key)
         return None, f"Transcription network error: {error_msg}"
 
     except Exception as e:

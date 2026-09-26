@@ -124,13 +124,8 @@ def test_defaults_include_new_audio_settings_and_prompts():
 
     # Check transcribe prompts
     prompts = DEFAULT_TOOLS_CONFIG["file_processor"]["prompts"]
-    assert "Transcribe (Native Verbatim)" in prompts
-    assert prompts["Transcribe (Native Verbatim)"]["transcribe_model"] is True
-    assert prompts["Transcribe (Native Verbatim)"]["transcribe_mode"] == "VERBATIM"
-
-    assert "Transcribe (Native Smart)" in prompts
-    assert prompts["Transcribe (Native Smart)"]["transcribe_model"] is True
-    assert prompts["Transcribe (Native Smart)"]["transcribe_mode"] == "SMART"
+    assert "Transcribe (Native Model)" in prompts
+    assert prompts["Transcribe (Native Model)"]["transcribe_model"] is True
 
 
 def test_checkpoint_transcribe_config_serialization():
@@ -959,3 +954,88 @@ def test_split_audio_floating_point_bounds(tmp_path):
         assert result.chunks[-1].end_time == 3871.659002
         for chunk in result.chunks:
             assert chunk.duration > 1000.0  # Safe duration, no 1e-13 leftover chunks
+
+
+def test_deprecated_transcribe_prompts_cleaned_up(tmp_path):
+    from src.tools.config import _merge_with_defaults
+
+    # Simulate user config with old untouched defaults
+    old_config = {
+        "_settings": {},
+        "file_processor": {
+            "prompts": {
+                "Transcribe (Native Verbatim)": {"_is_default": True, "prompt": ""},
+                "Transcribe (Native Smart)": {"_is_default": True, "prompt": ""},
+                "Custom Prompt": {"_is_default": False, "prompt": "custom"},
+            }
+        },
+    }
+
+    result, changed = _merge_with_defaults(old_config)
+    assert changed is True
+    prompts = result["file_processor"]["prompts"]
+    assert "Transcribe (Native Verbatim)" not in prompts
+    assert "Transcribe (Native Smart)" not in prompts
+    assert "Transcribe (Native Model)" in prompts
+    assert "Custom Prompt" in prompts
+
+
+def test_files_api_uses_original_name_and_context(tmp_path):
+    from unittest.mock import MagicMock, patch
+
+    from src.tools.checkpoint import FileProcessorCheckpoint
+    from src.tools.file_processor import FileProcessor
+
+    tool = FileProcessor()
+    tool._include_filename = True
+
+    mock_cp = FileProcessorCheckpoint(
+        session_id="chk_files_api",
+        created_at="2026-01-01T00:00:00",
+        updated_at="2026-01-01T00:00:00",
+        input_path="/tmp/test.mp3",
+        input_files=["/tmp/test.mp3"],
+        prompt_key="Transcribe",
+        prompt_text="Do task",
+        output_mode="individual",
+        output_path="/tmp/output",
+        naming_template="{filename}",
+        output_extension=".txt",
+        profile_name="Default",
+        delay_between_requests=0.0,
+    )
+
+    temp_file = tmp_path / "processed_abc123.mp3"
+    temp_file.write_bytes(b"dummy")
+
+    mock_provider = MagicMock()
+    mock_uploaded = MagicMock()
+    mock_uploaded.uri = "https://files.test/123"
+    mock_uploaded.mime_type = "audio/mp3"
+    mock_uploaded.name = "files/123"
+    mock_provider.upload_file.return_value = (mock_uploaded, None)
+
+    with (
+        patch.object(tool, "_resolve_execution_settings") as mock_resolve,
+        patch("src.providers.create_provider", return_value=mock_provider),
+        patch("src.api_client.call_api_with_retry", return_value=("result", None)) as mock_api,
+    ):
+        resolved_mock = MagicMock()
+        resolved_mock.config = {}
+        resolved_mock.ai_params = {}
+        resolved_mock.key_managers = {"google": MagicMock()}
+        mock_resolve.return_value = ("google", "gemini-2.5-flash", resolved_mock)
+
+        result = tool._process_with_files_api(
+            temp_file, "My Prompt", mock_cp, interactive=False, original_name="real_recording.mp3"
+        )
+
+        assert result == "result"
+        # Check upload used original name as display_name
+        mock_provider.upload_file.assert_called_once_with(temp_file, display_name="real_recording.mp3")
+
+        # Check message task included filename context
+        call_kwargs = mock_api.call_args[1]
+        messages = call_kwargs["messages"]
+        user_msg = next(m for m in messages if m["role"] == "user")
+        assert any("[File: real_recording.mp3]" in part.get("text", "") for part in user_msg["content"])

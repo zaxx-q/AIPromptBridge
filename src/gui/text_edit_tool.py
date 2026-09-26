@@ -589,7 +589,9 @@ class TextEditToolApp:
         if text_or_none:
             logging.debug("[TextEditTool] Linux compare text captured: %r", text_or_none[:50])
             print_info(f"Compare text captured ({len(text_or_none)} chars)")
-            callback = lambda: pending["on_captured"](text_or_none)
+
+            def callback():
+                pending["on_captured"](text_or_none)
         else:
             logging.debug("[TextEditTool] Linux compare mode cancelled / timed out")
             print_info("Compare mode cancelled - no second text captured")

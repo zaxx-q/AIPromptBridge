@@ -450,6 +450,11 @@ class AudioToolApp:
                                 f"Transcribing [{i + 1}/{num_chunks}] ({chunk.time_range_str}){extra_str}..."
                             )
 
+                        # Capture key before upload — Files API files are bound to the uploading key
+                        chunk_upload_key = (
+                            prov_instance.key_manager.get_current_key() if prov_instance.key_manager else None
+                        )
+
                         uploaded_chunk, err = prov_instance.upload_file(chunk.path)
                         if err:
                             if callback_error:
@@ -461,6 +466,7 @@ class AudioToolApp:
                                 file_uri=uploaded_chunk.uri,
                                 mime_type=uploaded_chunk.mime_type,
                                 transcribe_config=transcribe_config,
+                                upload_key=chunk_upload_key,
                             )
                             if err:
                                 if callback_error:
@@ -484,6 +490,9 @@ class AudioToolApp:
             if callback_progress:
                 callback_progress("Uploading audio...")
 
+            # Capture key before upload — Files API files are bound to the uploading key
+            upload_key = prov_instance.key_manager.get_current_key() if prov_instance.key_manager else None
+
             uploaded_file, error = prov_instance.upload_file(Path(temp_file_path))
             if error:
                 if callback_error:
@@ -506,6 +515,7 @@ class AudioToolApp:
                     file_uri=uploaded_file.uri,
                     mime_type=uploaded_file.mime_type,
                     transcribe_config=transcribe_config,
+                    upload_key=upload_key,
                 )
 
                 if error:

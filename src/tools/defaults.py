@@ -72,27 +72,15 @@ DEFAULT_TOOLS_CONFIG = {
                 "output_extension": ".md",
                 "default_naming": "{filename}_transcript",
             },
-            "Transcribe (Native Verbatim)": {
+            "Transcribe (Native Model)": {
                 "_is_default": True,
                 "icon": "🎙️",
-                "description": "Transcribe audio using Gemini's dedicated transcription model (verbatim)",
+                "description": "Transcribe audio using native transcription model, not LLM (settings in profile)",
                 "input_types": ["audio"],
-                "prompt": "",  # Not used - transcription uses audio_transcription_config
+                "prompt": "",  # Not used - transcription uses audio_transcription_config from profile
                 "output_extension": ".txt",
                 "default_naming": "{filename}_transcript",
                 "transcribe_model": True,  # Flag to trigger transcribe path
-                "transcribe_mode": "VERBATIM",
-            },
-            "Transcribe (Native Smart)": {
-                "_is_default": True,
-                "icon": "✨",
-                "description": "Smart transcription with disfluency removal and formatting (Gemini native)",
-                "input_types": ["audio"],
-                "prompt": "",  # Not used
-                "output_extension": ".md",
-                "default_naming": "{filename}_transcript",
-                "transcribe_model": True,
-                "transcribe_mode": "SMART",
             },
             "Describe Audio": {
                 "_is_default": True,

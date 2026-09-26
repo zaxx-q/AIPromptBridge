@@ -133,8 +133,11 @@ class GeminiNativeProvider(BaseProvider):
         mime_type: str,
         transcribe_config: Dict[str, Any],
         retry_count: int = 0,
+        upload_key: Optional[str] = None,
     ) -> Tuple[Optional[str], Optional[str]]:
-        return gemini_services.generate_transcription(self, file_uri, mime_type, transcribe_config, retry_count)
+        return gemini_services.generate_transcription(
+            self, file_uri, mime_type, transcribe_config, retry_count, upload_key
+        )
 
     # =========================================================================
     # CORE GENERATION PIPELINE (TEMPLATE METHOD IMPLEMENTATIONS)
