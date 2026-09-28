@@ -287,9 +287,19 @@ class TTSToolApp:
                 from ..profile_resolver import resolve_profile
 
                 resolved = resolve_profile(None, self.config, self.ai_params, self.key_managers)
+                use_official = bool(resolved.config.get("tts_use_official_endpoint", False))
 
-                key_manager = resolved.key_managers.get("google")
-                if not key_manager:
+                if use_official:
+                    from ..key_store import KeyStore
+
+                    key_store = KeyStore.get_instance()
+                    key_manager = key_store.build_key_manager_for_pool("google", "google")
+                    if not key_manager or not key_manager.has_keys():
+                        key_manager = self.key_managers.get("google")
+                else:
+                    key_manager = resolved.key_managers.get(resolved.provider) or resolved.key_managers.get("google")
+
+                if not key_manager or not key_manager.has_keys():
                     if callback_error:
                         callback_error("No Google API key configured")
                     return

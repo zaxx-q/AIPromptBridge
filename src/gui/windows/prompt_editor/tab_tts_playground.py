@@ -480,13 +480,30 @@ class TTSPlaygroundMixin:
 
                 # Resolve profile to get merged config with connection keys
                 resolved = resolve_profile(None, _ws.CONFIG, _ws.AI_PARAMS, _ws.KEY_MANAGERS)
+                use_official = bool(resolved.config.get("tts_use_official_endpoint", False))
 
-                from ....key_store import KeyStore
+                if use_official:
+                    from ....key_store import KeyStore
 
-                key_store = KeyStore.get_instance()
-                keys_data = key_store.get_pool_for_provider("google")
-                key_strings = [kd["key"] for kd in keys_data if kd.get("key")]
-                key_manager = KeyManager(key_strings, "google")
+                    key_store = KeyStore.get_instance()
+                    key_manager = key_store.build_key_manager_for_pool("google", "google")
+                    if not key_manager or not key_manager.has_keys():
+                        key_manager = _ws.KEY_MANAGERS.get("google")
+                else:
+                    key_manager = resolved.key_managers.get(resolved.provider) or resolved.key_managers.get("google")
+
+                if not key_manager or not key_manager.has_keys():
+
+                    def _err_no_keys():
+                        if not self._destroyed:
+                            self.tts_pg_is_generating = False
+                            self.tts_pg_generate_btn.configure(state="normal")
+                            self._set_tts_status(
+                                self.tts_pg_gen_status, "❌ No Google API key configured", self.colors.accent_red
+                            )
+
+                    self.queue.put(_err_no_keys)
+                    return
 
                 provider = create_provider("google", key_manager, resolved.config)
                 pcm_data, error = provider.generate_tts(
