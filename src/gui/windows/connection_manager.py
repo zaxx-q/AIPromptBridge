@@ -629,9 +629,9 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             )
 
             self._model_status_label = ctk.CTkLabel(
-                row, text="", font=get_ctk_font(10), width=120, **get_ctk_label_colors(c, muted=True)
+                row, text="", font=get_ctk_font(10), width=0, **get_ctk_label_colors(c, muted=True)
             )
-            self._model_status_label.pack(side="left", padx=(6, 0))
+            self._model_status_label.pack(side="left", padx=(6, 0), fill="x", expand=True)
         else:
             from tkinter import ttk as ttk_local
 
@@ -646,8 +646,8 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 side="left", padx=(4, 0)
             )
 
-            self._model_status_label = tk.Label(row, text="", font=get_tk_font(8), bg=c.bg, fg=c.blockquote, width=14)
-            self._model_status_label.pack(side="left", padx=(4, 0))
+            self._model_status_label = tk.Label(row, text="", font=get_tk_font(8), bg=c.bg, fg=c.blockquote, anchor="w")
+            self._model_status_label.pack(side="left", padx=(4, 0), fill="x", expand=True)
 
         # Track unsaved changes
         var.trace_add("write", lambda *_: self._check_unsaved())
@@ -935,10 +935,10 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         return
                 temp_config = {"request_timeout": 30}
 
-                if base_url_value:
-                    temp_config["base_url"] = base_url_value
-                else:
-                    temp_config["base_url"] = _ws.get_active_setting("base_url", "")
+                # Always use the viewed profile's base_url — don't fall
+                # back to the active profile.  create_provider() already
+                # resolves an empty string to the provider's default URL.
+                temp_config["base_url"] = base_url_value
 
                 if provider == "custom" and not temp_config["base_url"]:
                     self._schedule_ui(lambda: self._set_model_status("No base URL", "error"))
@@ -948,7 +948,13 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 models, error = provider_instance.fetch_models()
 
                 if error:
-                    err_msg = str(error)[:35]
+                    err_full = str(error)
+                    from ...console import print_error
+
+                    print_error(f"Model refresh failed ({provider}): {err_full}")
+                    err_msg = err_full[:80]
+                    if len(err_full) > 80:
+                        err_msg += "…"
                     fallback = get_fallback_models(provider)
 
                     def _fallback_with_error(msg=err_msg, fb=fallback):
@@ -994,7 +1000,13 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 self._schedule_ui(_update)
 
             except Exception as e:
-                err_msg = str(e)[:30]
+                err_full = str(e)
+                from ...console import print_error
+
+                print_error(f"Model refresh failed ({provider}): {err_full}")
+                err_msg = err_full[:80]
+                if len(err_full) > 80:
+                    err_msg += "…"
                 fallback = get_fallback_models(provider)
 
                 def _fallback_on_exception(msg=err_msg, fb=fallback):
@@ -1027,6 +1039,14 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             self._model_status_label.configure(text=text, text_color=color)
         else:
             self._model_status_label.configure(text=text, fg=color)
+        # Attach / update tooltip so full message is visible on hover
+        if text:
+            if not getattr(self, "_model_status_tooltip", None):
+                self._model_status_tooltip = Tooltip(self._model_status_label, text)
+            else:
+                self._model_status_tooltip.text = text
+        elif getattr(self, "_model_status_tooltip", None):
+            self._model_status_tooltip.text = ""
 
     def _schedule_ui(self, callback):
         if self._destroyed:
