@@ -1,6 +1,6 @@
 # Changelog
 
-## [8.7.0] - 2026-09-26
+## [8.7.2] - 2026-09-26
 
 ### New Features
 
@@ -15,6 +15,8 @@
 
 - **Files API Transcribe Key Pinning**: Pinned transcription requests to the specific API key used during file upload to Google Files API, preventing `PERMISSION_DENIED` errors caused by key rotation between upload and transcription steps.
 - **DeepFilterNet Processing Delay**: Added the `-D` flag to DeepFilterNet command execution in the audio processor to compensate for algorithmic processing delay and keep output audio in sync with input timing.
+- **TTS Key Pool Resolution**: When `tts_use_official_endpoint` is enabled, TTS generation now always draws from the full Google key pool (all keys, no single-key filter or active profile override), allowing key rotation to work as expected. When the setting is disabled, the active profile's configured key pool and key name are used instead.
+- **Connection Manager Model Refresh**: Model refresh no longer falls back to the active profile's `base_url` when the viewed profile's field is empty — `create_provider()` already resolves an empty string to the provider's default URL, so falling back was silently injecting the wrong endpoint. Error messages are now truncated at 80 characters (up from 30–35) with an ellipsis, printed in full to the console via `print_error()`, and the model status label expands to fill available space with a tooltip showing the full message on hover.
 
 ## [8.6.0] - 2026-09-19
 
