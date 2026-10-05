@@ -10,7 +10,7 @@ from ...updater import is_compiled, perform_update
 from ..core import GUICoordinator
 from ..platform import ctk
 from ..themes import get_colors, get_ctk_button_colors, get_ctk_font, get_ctk_label_colors, get_ctk_textbox_colors
-from .utils import set_dark_titlebar, set_window_icon
+from .utils import center_window, set_dark_titlebar, set_window_icon
 
 
 def show_up_to_date_dialog(current_version: str):
@@ -43,9 +43,7 @@ def show_up_to_date_dialog(current_version: str):
     dialog.update_idletasks()
     w = max(350, dialog.winfo_reqwidth())
     h = max(180, dialog.winfo_reqheight())
-    x = (dialog.winfo_screenwidth() - w) // 2
-    y = (dialog.winfo_screenheight() - h) // 2
-    dialog.geometry(f"{w}x{h}+{x}+{y}")
+    center_window(dialog, w, h)
     dialog.deiconify()
     dialog.focus_force()
 
@@ -132,11 +130,7 @@ def show_update_available_dialog(info, current_version: str):
             progress_bar.set(0)
 
             dialog.update_idletasks()
-            w = 400
-            h = 200
-            x = (dialog.winfo_screenwidth() - w) // 2
-            y = (dialog.winfo_screenheight() - h) // 2
-            dialog.geometry(f"{w}x{h}+{x}+{y}")
+            center_window(dialog, 400, 200)
 
             # Define progress update handler
             def update_progress(stage, current, total):
@@ -218,8 +212,6 @@ def show_update_available_dialog(info, current_version: str):
     dialog.update_idletasks()
     w = max(550, dialog.winfo_reqwidth())
     h = max(380, dialog.winfo_reqheight())
-    x = (dialog.winfo_screenwidth() - w) // 2
-    y = (dialog.winfo_screenheight() - h) // 2
-    dialog.geometry(f"{w}x{h}+{x}+{y}")
+    center_window(dialog, w, h)
     dialog.deiconify()
     dialog.focus_force()

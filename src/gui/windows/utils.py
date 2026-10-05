@@ -101,6 +101,62 @@ def set_dark_titlebar(window):
         pass
 
 
+def center_window(
+    window,
+    width: int,
+    height: int,
+    max_w_ratio: float = 0.92,
+    max_h_ratio: float = 0.88,
+) -> tuple[int, int]:
+    """
+    Center a Tk or CustomTkinter window on the screen with DPI scaling awareness.
+
+    CustomTkinter windows apply geometry scaling internally to (w, h, x, y),
+    whereas winfo_screenwidth/height return raw physical pixels.
+    This helper normalizes screen dimensions by the window scaling factor so
+    the calculated geometry string remains within screen bounds and correctly centered.
+
+    Args:
+        window: The Tk or CTk window instance
+        width: Desired logical width
+        height: Desired logical height
+        max_w_ratio: Maximum proportion of available screen width to use
+        max_h_ratio: Maximum proportion of available screen height to use
+
+    Returns:
+        (w, h): Final width and height applied.
+    """
+    window.update_idletasks()
+
+    scale = 1.0
+    if hasattr(window, "_get_window_scaling"):
+        try:
+            scale = float(window._get_window_scaling())
+        except Exception:
+            scale = 1.0
+    if scale <= 0:
+        scale = 1.0
+
+    screen_w = window.winfo_screenwidth()
+    screen_h = window.winfo_screenheight()
+
+    logical_screen_w = int(screen_w / scale)
+    logical_screen_h = int(screen_h / scale)
+
+    # Bound size so it never overflows screen at any DPI scaling
+    max_w = max(300, int(logical_screen_w * max_w_ratio))
+    max_h = max(200, int(logical_screen_h * max_h_ratio))
+
+    w = min(width, max_w)
+    h = min(height, max_h)
+
+    x = max(0, (logical_screen_w - w) // 2)
+    y = max(0, (logical_screen_h - h) // 2)
+
+    window.geometry(f"{w}x{h}+{x}+{y}")
+    return w, h
+
+
 def get_profile_tooltip_text(profile_name: str) -> str:
     """Build tooltip text for a connection profile name.
 

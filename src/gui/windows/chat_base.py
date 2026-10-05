@@ -42,7 +42,7 @@ from ..utils import (
     render_markdown,
     setup_text_tags,
 )
-from .utils import set_dark_titlebar, set_window_icon
+from .utils import center_window, set_dark_titlebar, set_window_icon
 
 
 class ChatWindowBase(ABC):
@@ -2520,9 +2520,7 @@ class ChatWindowBase(ABC):
             # Center on screen
             w = photo.width() + 20
             h = photo.height() + 60
-            x = (self.root.winfo_screenwidth() - w) // 2
-            y = (self.root.winfo_screenheight() - h) // 2
-            modal.geometry(f"{w}x{h}+{x}+{y}")
+            center_window(modal, w, h)
             modal.deiconify()
 
             # Display image

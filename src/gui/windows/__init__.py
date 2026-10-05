@@ -44,7 +44,7 @@ from .settings_window import SettingsWindow, create_attached_settings_window, sh
 
 # TTS window
 from .tts_window import TTSWindow, create_tts_window
-from .utils import get_icon_path, set_window_icon
+from .utils import center_window, get_icon_path, set_window_icon
 
 __all__ = [
     "AttachedBrowserWindow",
@@ -69,6 +69,8 @@ __all__ = [
     "StandaloneSessionBrowserWindow",
     # TTS window
     "TTSWindow",
+    # Utils
+    "center_window",
     "create_attached_browser_window",
     "create_attached_chat_window",
     "create_attached_onboarding_window",
@@ -76,7 +78,6 @@ __all__ = [
     "create_attached_settings_window",
     "create_audio_analyzer_window",
     "create_tts_window",
-    # Utils
     "get_icon_path",
     "set_window_icon",
     "show_onboarding_blocking",

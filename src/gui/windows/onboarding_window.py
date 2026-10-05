@@ -33,7 +33,7 @@ from ..themes import (
     get_ctk_segmented_colors,
     get_tk_font,
 )
-from .utils import set_dark_titlebar, set_window_icon
+from .utils import center_window, set_dark_titlebar, set_window_icon
 
 try:
     from ..emoji_renderer import HAVE_PIL, get_emoji_renderer, prepare_emoji_content
@@ -123,8 +123,8 @@ class OnboardingWizard:
                 pass
 
         self.root.title("Welcome to AIPromptBridge")
-        self.root.geometry("750x700")
-        self.root.resizable(False, False)
+        self.root.resizable(True, True)
+        self.root.minsize(520, 420)
 
         if self.use_ctk:
             self.root.configure(fg_color=self.colors.bg)
@@ -145,14 +145,6 @@ class OnboardingWizard:
     def show(self):
         c = self.colors
 
-        # Center the window on the screen
-        self.root.update_idletasks()
-        w = 750
-        h = 700
-        x = (self.root.winfo_screenwidth() - w) // 2
-        y = (self.root.winfo_screenheight() - h) // 2
-        self.root.geometry(f"{w}x{h}+{x}+{y}")
-
         # Bottom navigation layout first (prevents squashing when content_frame expands)
         self.nav_frame = (
             ctk.CTkFrame(self.root, fg_color=c.surface0, height=64)
@@ -166,10 +158,13 @@ class OnboardingWizard:
         self.content_frame = (
             ctk.CTkFrame(self.root, fg_color="transparent") if self.use_ctk else tk.Frame(self.root, bg=c.bg)
         )
-        self.content_frame.pack(fill="both", expand=True, padx=25, pady=(20, 10))
+        self.content_frame.pack(fill="both", expand=True, padx=25, pady=(15, 10))
 
         self._build_nav_frame(self.nav_frame)
         self._show_page(0)
+
+        # Center the window on the screen with DPI scaling awareness
+        center_window(self.root, 720, 560)
 
         self.root.deiconify()
         self.root.focus_force()
@@ -409,12 +404,12 @@ class OnboardingWizard:
             title = ctk.CTkLabel(
                 parent, text="Welcome to AIPromptBridge", font=get_ctk_font(22, "bold"), **get_ctk_label_colors(c)
             )
-            title.pack(pady=(20, 5))
+            title.pack(pady=(12, 3))
 
             ver = ctk.CTkLabel(
                 parent, text=f"Version {__version__}", font=get_ctk_font(12), **get_ctk_label_colors(c, muted=True)
             )
-            ver.pack()
+            ver.pack(pady=(0, 2))
 
             desc = ctk.CTkLabel(
                 parent,
@@ -426,16 +421,17 @@ class OnboardingWizard:
                 wraplength=600,
                 **get_ctk_label_colors(c),
             )
-            desc.pack(pady=(15, 10))
+            desc.pack(pady=(8, 8))
 
-            features_frame = ctk.CTkFrame(parent, fg_color="transparent")
-            features_frame.pack(fill="x", expand=True, padx=20)
+            features_frame = ctk.CTkScrollableFrame(parent, fg_color="transparent")
+            features_parent = features_frame
+            features_frame.pack(fill="both", expand=True, padx=15, pady=(2, 5))
         else:
             title = tk.Label(parent, text="Welcome to AIPromptBridge", font=get_tk_font(18, "bold"), bg=c.bg, fg=c.fg)
-            title.pack(pady=(20, 5))
+            title.pack(pady=(12, 3))
 
             ver = tk.Label(parent, text=f"Version {__version__}", font=get_tk_font(9), bg=c.bg, fg=c.blockquote)
-            ver.pack()
+            ver.pack(pady=(0, 2))
 
             desc = tk.Label(
                 parent,
@@ -447,10 +443,11 @@ class OnboardingWizard:
                 bg=c.bg,
                 fg=c.fg,
             )
-            desc.pack(pady=(15, 10))
+            desc.pack(pady=(8, 8))
 
-            features_frame = tk.Frame(parent, bg=c.bg)
-            features_frame.pack(fill="x", expand=True, padx=20)
+            features_frame = TkScrollableFrame(parent, bg_color=c.bg)
+            features_parent = features_frame.scrollable_frame
+            features_frame.pack(fill="both", expand=True, padx=15, pady=(2, 5))
 
         features = [
             (
@@ -474,11 +471,11 @@ class OnboardingWizard:
 
         for emoji, name, text in features:
             row = (
-                ctk.CTkFrame(features_frame, fg_color=c.surface0, corner_radius=8)
+                ctk.CTkFrame(features_parent, fg_color=c.surface0, corner_radius=8)
                 if self.use_ctk
-                else tk.Frame(features_frame, bg=c.surface0, bd=1, relief="solid", pady=4)
+                else tk.Frame(features_parent, bg=c.surface0, bd=1, relief="solid", pady=3)
             )
-            row.pack(fill="x", pady=4, ipady=4)
+            row.pack(fill="x", pady=3, ipady=3)
 
             if self.use_ctk:
                 if HAVE_EMOJI and prepare_emoji_content:
@@ -1274,12 +1271,20 @@ class OnboardingWizard:
             ),
         ]
 
+        cards_container = (
+            ctk.CTkScrollableFrame(parent, fg_color="transparent")
+            if self.use_ctk
+            else TkScrollableFrame(parent, bg_color=c.bg)
+        )
+        cards_parent = cards_container if self.use_ctk else cards_container.scrollable_frame
+        cards_container.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+
         for config_key, name, hotkey, desc, default_on in tools:
             self._tool_vars[config_key] = tk.BooleanVar(value=default_on)
 
             if self.use_ctk:
-                card = ctk.CTkFrame(parent, fg_color=c.surface0, corner_radius=8)
-                card.pack(fill="x", pady=5, ipady=6)
+                card = ctk.CTkFrame(cards_parent, fg_color=c.surface0, corner_radius=8)
+                card.pack(fill="x", pady=4, ipady=4)
 
                 # Left: Toggle switch
                 switch = ctk.CTkSwitch(
@@ -1326,7 +1331,7 @@ class OnboardingWizard:
                 ).pack(anchor="w")
             else:
                 # Tk fallback with Checkbutton
-                card = tk.Frame(parent, bg=c.surface0, bd=1, relief="solid")
+                card = tk.Frame(cards_parent, bg=c.surface0, bd=1, relief="solid")
                 card.pack(fill="x", pady=4, ipady=4)
                 tk.Checkbutton(
                     card,
@@ -1354,12 +1359,12 @@ class OnboardingWizard:
             note_text = "⚠️ Note: Tool changes made during a re-run require a restart to take effect."
 
         if self.use_ctk:
-            ctk.CTkLabel(parent, text=note_text, font=get_ctk_font(11), **get_ctk_label_colors(c, muted=True)).pack(
-                anchor="w", pady=(15, 0)
-            )
+            ctk.CTkLabel(
+                cards_parent, text=note_text, font=get_ctk_font(11), **get_ctk_label_colors(c, muted=True)
+            ).pack(anchor="w", pady=(10, 5))
         else:
-            tk.Label(parent, text=note_text, font=get_tk_font(9), bg=c.bg, fg=c.blockquote).pack(
-                anchor="w", pady=(10, 0)
+            tk.Label(cards_parent, text=note_text, font=get_tk_font(9), bg=c.bg, fg=c.blockquote).pack(
+                anchor="w", pady=(10, 5)
             )
 
     def _save_tool_toggles(self):

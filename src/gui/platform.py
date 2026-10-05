@@ -56,6 +56,18 @@ CTkImage = None
 
 if not _force_standard_tk:
     try:
+        # On Windows, activate DPI awareness before any Tk/GDI initialization
+        if sys.platform == "win32":
+            try:
+                import ctypes
+
+                ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            except Exception:
+                try:
+                    ctypes.windll.user32.SetProcessDPIAware()
+                except Exception:
+                    pass
+
         import customtkinter as ctk
         from customtkinter import CTkImage as _CTkImage
 

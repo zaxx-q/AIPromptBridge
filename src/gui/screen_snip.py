@@ -19,6 +19,7 @@ Threading Note:
 import base64
 import io
 import logging
+import sys
 import tkinter as tk
 from dataclasses import dataclass
 from typing import Callable, Optional
@@ -139,19 +140,56 @@ class ScreenSnipOverlay:
 
         self.screen_width, self.screen_height = self.background_image.size
 
+        # Query virtual screen origin on Windows (SM_XVIRTUALSCREEN / SM_YVIRTUALSCREEN)
+        vx = 0
+        vy = 0
+        if sys.platform == "win32":
+            try:
+                import ctypes
+
+                vx = ctypes.windll.user32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
+                vy = ctypes.windll.user32.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
+            except Exception:
+                vx, vy = 0, 0
+
         # Create fullscreen toplevel window
         # Use standard Toplevel (not CTkToplevel) for canvas support
         self.root = tk.Toplevel(self.parent_root)
 
-        # Configure window for fullscreen overlay
-        self.root.attributes("-fullscreen", True)
+        # Configure window for borderless fullscreen overlay.
+        # NOTE: Do NOT use attributes("-fullscreen", True) here!
+        # On Windows high-DPI displays (e.g. 150% scaling), Tk's internal -fullscreen
+        # implementation queries logical primary display metrics (e.g. 1066x600 instead
+        # of 1600x900) and locks the window geometry, ignoring subsequent geometry()
+        # calls and leaving part of the screen uncovered.
+        # overrideredirect(True) creates a borderless popup window (WS_POPUP).
+        self.root.overrideredirect(True)
         self.root.attributes("-topmost", True)
         self.root.config(cursor="crosshair")
-        self.root.overrideredirect(True)  # No window decorations
 
-        # Position at top-left of virtual screen (handles multi-monitor)
-        # On Windows, negative coordinates may be used for monitors left of primary
-        self.root.geometry(f"{self.screen_width}x{self.screen_height}+0+0")
+        # Position at top-left of virtual screen (handles multi-monitor and negative offsets)
+        self.root.geometry(f"{self.screen_width}x{self.screen_height}{vx:+d}{vy:+d}")
+
+        if sys.platform == "win32":
+            try:
+                import ctypes
+
+                self.root.update_idletasks()
+                hwnd = self.root.winfo_id()
+                parent_hwnd = ctypes.windll.user32.GetParent(hwnd)
+                target_hwnd = parent_hwnd if parent_hwnd else hwnd
+                # HWND_TOPMOST = -1, SWP_SHOWWINDOW = 0x0040
+                ctypes.windll.user32.SetWindowPos(
+                    target_hwnd,
+                    -1,
+                    vx,
+                    vy,
+                    self.screen_width,
+                    self.screen_height,
+                    0x0040,
+                )
+            except Exception as e:
+                logging.debug(f"[ScreenSnip] SetWindowPos failed: {e}")
 
         # Canvas for drawing
         self.canvas = tk.Canvas(
