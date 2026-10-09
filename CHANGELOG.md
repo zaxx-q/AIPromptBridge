@@ -1,5 +1,16 @@
 # Changelog
 
+## [8.7.4] - 2026-10-05
+
+### Improvements
+
+- **Digest Transcript Handling**: Updated the Digest prompts in TextEdit and the File Processor to correct obvious speech-recognition errors using context, mark unrecoverable passages as unclear, and clearly label any added contextual notes.
+- **High-DPI Window Layouts**: Made the onboarding wizard resizable and its content scrollable, and added DPI-aware window centering for onboarding, update dialogs, and chat image previews so windows fit on scaled displays.
+
+### Fixes
+
+- **High-DPI Snip Overlay**: Fixed the Windows snip overlay leaving part of the screen uncovered at high display scaling by using explicit physical-pixel geometry instead of Tk's fullscreen attribute. Windows DPI awareness is now initialized before CustomTkinter loads.
+
 ## [8.7.2] - 2026-09-26
 
 ### New Features
