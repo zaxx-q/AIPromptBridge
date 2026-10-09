@@ -1,6 +1,6 @@
 # Changelog
 
-## [8.7.4] - 2026-10-05
+## [8.7.5] - 2026-10-05
 
 ### Improvements
 
@@ -10,6 +10,7 @@
 ### Fixes
 
 - **High-DPI Snip Overlay**: Fixed the Windows snip overlay leaving part of the screen uncovered at high display scaling by using explicit physical-pixel geometry instead of Tk's fullscreen attribute. Windows DPI awareness is now initialized before CustomTkinter loads.
+- **High-DPI Popup Placement**: Fixed TextEdit, Snip, error, toast, and tooltip popups being confined to the primary screen or appearing at the wrong position on scaled multi-monitor Windows desktops. Popups now use physical virtual-desktop coordinates.
 
 ## [8.7.2] - 2026-09-26
 
