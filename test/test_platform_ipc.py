@@ -7,8 +7,11 @@ Does not start the full application.
 from __future__ import annotations
 
 import socket
+import sys
 import time
 from pathlib import Path
+
+import pytest
 
 from src.platform.ipc import (
     KNOWN_TRIGGERS,
@@ -65,6 +68,7 @@ def test_send_trigger_rejects_unknown(tmp_path: Path):
     assert "unknown trigger" in msg
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix sockets")
 def test_client_server_round_trip(tmp_path: Path):
     """Fake server thread handles snip → ok and missing tool → error."""
     sock_path = str(tmp_path / "aipromptbridge-test.sock")
@@ -102,6 +106,7 @@ def test_client_server_round_trip(tmp_path: Path):
     assert not Path(sock_path).exists()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix sockets")
 def test_server_rejects_unknown_trigger(tmp_path: Path):
     sock_path = str(tmp_path / "aipromptbridge-unknown.sock")
     server = TriggerServer(handler=lambda n: (True, ""), socket_path=sock_path)
@@ -155,6 +160,7 @@ def test_get_socket_path_tmp_fallback(monkeypatch):
         assert path == "/tmp/aipromptbridge.sock"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix sockets")
 def test_bind_listen_socket_sets_permissions(tmp_path: Path):
     import os
     import sys

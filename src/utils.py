@@ -78,8 +78,16 @@ def resolve_file_path(file_path: Union[str, Path, None], anchor_dir: Optional[st
                 if rel_path.exists() and is_safe(rel_path) and anchor in rel_path.resolve().parts:
                     return rel_path
 
-    # Fallback to normalized Path
-    return norm_path
+    # Never return a path that escapes the workspace. This final check matters
+    # on Windows, where ``Path.exists()`` can normalize ``..`` before checking
+    # the filesystem and otherwise make an outside file look valid.
+    if is_safe(norm_path):
+        return norm_path
+
+    # Keep the established non-throwing API for malformed or unsafe stored
+    # paths, but return a non-existent path inside the workspace so callers
+    # cannot accidentally treat the workspace directory as an attachment.
+    return Path("__invalid_unsafe_path__")
 
 
 def is_compiled() -> bool:

@@ -34,8 +34,11 @@ from .popups import (
     ModifierBar,
     SegmentedToggle,
     Tooltip,
+    _clamp_popup_position,
     _get_popup_position,
+    _get_popup_screen_bounds,
     _make_draggable,
+    _place_popup_window,
     create_profile_dropdown_ctk,
     create_profile_dropdown_tk,
     get_profile_override_value,
@@ -677,8 +680,7 @@ class AttachedSnipPopup:
             orig_width, orig_height = img.size
 
             # Scale to fit screen (max 80% of screen size)
-            screen_w = self.root.winfo_screenwidth()
-            screen_h = self.root.winfo_screenheight()
+            screen_x, screen_y, screen_w, screen_h = _get_popup_screen_bounds(self.root)
             max_w = int(screen_w * 0.8)
             max_h = int(screen_h * 0.8)
 
@@ -704,9 +706,10 @@ class AttachedSnipPopup:
             modal.update_idletasks()
             w = photo.width() + 20
             h = photo.height() + 60
-            x = (screen_w - w) // 2
-            y = (screen_h - h) // 2
+            x = screen_x + (screen_w - w) // 2
+            y = screen_y + (screen_h - h) // 2
             modal.geometry(f"{w}x{h}+{x}+{y}")
+            _place_popup_window(modal, x, y)
 
             # Main container
             if HAVE_CTK:
@@ -1036,21 +1039,11 @@ class AttachedSnipPopup:
 
         x, y = _get_popup_position(self.root, self.x, self.y)
 
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
 
-        # Ensure window stays on screen
-        if x + window_width > screen_width:
-            x = screen_width - window_width - 10
-        if y + window_height > screen_height:
-            y = screen_height - window_height - 10
-
-        x = max(10, x)
-        y = max(10, y)
-
-        self.root.geometry(f"+{x}+{y}")
+        x, y = _clamp_popup_position(self.root, x, y, window_width, window_height)
+        _place_popup_window(self.root, x, y)
 
     def _reposition_window(self):
         """Reposition after content changes."""
@@ -1067,20 +1060,11 @@ class AttachedSnipPopup:
         x = self.root.winfo_x()
         y = self.root.winfo_y()
 
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
 
-        if x + window_width > screen_width:
-            x = screen_width - window_width - 10
-        if y + window_height > screen_height:
-            y = screen_height - window_height - 10
-
-        x = max(10, x)
-        y = max(10, y)
-
-        self.root.geometry(f"+{x}+{y}")
+        x, y = _clamp_popup_position(self.root, x, y, window_width, window_height)
+        _place_popup_window(self.root, x, y)
 
     def _show_and_focus(self):
         """Show window after UI is built."""

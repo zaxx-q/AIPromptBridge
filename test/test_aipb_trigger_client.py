@@ -50,6 +50,7 @@ def test_client_cli_unknown_trigger(trigger_mod, tmp_path: Path):
     assert code == 1
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix sockets")
 def test_client_send_trigger_round_trip(trigger_mod, tmp_path: Path):
     sock_path = str(tmp_path / "aipb-client-test.sock")
     received: list[str] = []
@@ -78,28 +79,10 @@ def test_client_send_trigger_round_trip(trigger_mod, tmp_path: Path):
         server.stop()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="CLI triggers are Linux-only")
 def test_client_cli_main_with_server(trigger_mod, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    sock_path = str(tmp_path / "aipb-cli-test.sock")
-    server = TriggerServer(handler=lambda n: (True, ""), socket_path=sock_path)
-    server.start()
-    try:
-        deadline = time.time() + 2.0
-        while time.time() < deadline and not Path(sock_path).exists():
-            time.sleep(0.01)
-
-        monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
-        # Point client at our temp sock by overriding get_socket_path via env:
-        # SOCKET_NAME is fixed; put sock at XDG_RUNTIME_DIR/aipromptbridge.sock
-        target = Path(tmp_path) / "aipromptbridge.sock"
-        if Path(sock_path).exists() and not target.exists():
-            # Server bound sock_path; rebind by stopping and using standard name
-            pass
-    finally:
-        server.stop()
-
-    # Use explicit socket via send_trigger; cli_main uses get_socket_path.
-    # Re-run with socket at XDG path:
-    sock_path = str(Path(tmp_path) / "aipromptbridge.sock")
+    # cli_main always uses the fixed socket name within XDG_RUNTIME_DIR.
+    sock_path = str(tmp_path / "aipromptbridge.sock")
     server = TriggerServer(handler=lambda n: (True, ""), socket_path=sock_path)
     server.start()
     try:
@@ -113,10 +96,11 @@ def test_client_cli_main_with_server(trigger_mod, tmp_path: Path, monkeypatch: p
         server.stop()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="CLI triggers are Linux-only")
 def test_ipc_cli_main_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from src.platform import ipc as ipc_mod
 
-    sock_path = str(Path(tmp_path) / "aipromptbridge.sock")
+    sock_path = str(tmp_path / "aipromptbridge.sock")
     server = TriggerServer(handler=lambda n: (True, ""), socket_path=sock_path)
     server.start()
     try:

@@ -176,18 +176,21 @@ class ScreenSnipOverlay:
 
                 self.root.update_idletasks()
                 hwnd = self.root.winfo_id()
-                parent_hwnd = ctypes.windll.user32.GetParent(hwnd)
-                target_hwnd = parent_hwnd if parent_hwnd else hwnd
-                # HWND_TOPMOST = -1, SWP_SHOWWINDOW = 0x0040
-                ctypes.windll.user32.SetWindowPos(
-                    target_hwnd,
-                    -1,
-                    vx,
-                    vy,
-                    self.screen_width,
-                    self.screen_height,
-                    0x0040,
-                )
+                # Tk returns an integer HWND. Avoid calling the native API when
+                # the window is a test double or an incomplete Tk wrapper.
+                if isinstance(hwnd, int):
+                    parent_hwnd = ctypes.windll.user32.GetParent(hwnd)
+                    target_hwnd = parent_hwnd if parent_hwnd else hwnd
+                    # HWND_TOPMOST = -1, SWP_SHOWWINDOW = 0x0040
+                    ctypes.windll.user32.SetWindowPos(
+                        target_hwnd,
+                        -1,
+                        vx,
+                        vy,
+                        self.screen_width,
+                        self.screen_height,
+                        0x0040,
+                    )
             except Exception as e:
                 logging.debug(f"[ScreenSnip] SetWindowPos failed: {e}")
 

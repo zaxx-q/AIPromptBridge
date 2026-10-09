@@ -109,3 +109,32 @@ class TestScreenSnipOverlayDpi:
         assert "1600x900" in geom_call
 
         overlay._close()
+
+
+class TestPopupDpi:
+    """Test popup placement uses the full Windows virtual desktop."""
+
+    @patch("ctypes.windll", create=True)
+    @patch("src.gui.popups.sys.platform", "win32")
+    def test_popup_clamping_allows_negative_monitor_coordinates(self, mock_windll):
+        from src.gui.popups import _clamp_popup_position
+
+        user32 = mock_windll.user32
+        user32.GetSystemMetrics.side_effect = [-1920, -200, 3840, 1200]
+
+        root = MagicMock()
+        assert _clamp_popup_position(root, 1900, 900, 400, 300) == (1510, 690)
+
+    @patch("ctypes.windll", create=True)
+    @patch("src.gui.popups.sys.platform", "win32")
+    def test_popup_position_uses_native_physical_coordinates(self, mock_windll):
+        from src.gui.popups import _place_popup_window
+
+        root = MagicMock()
+        root.winfo_id.return_value = 123
+        mock_windll.user32.GetParent.return_value = 456
+
+        _place_popup_window(root, 1400, 800)
+
+        root.geometry.assert_called_once_with("+1400+800")
+        mock_windll.user32.SetWindowPos.assert_called_once_with(456, 0, 1400, 800, 0, 0, 0x0015)

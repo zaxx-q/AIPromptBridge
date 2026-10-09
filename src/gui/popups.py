@@ -123,6 +123,73 @@ def _get_popup_position(
     return root.winfo_pointerx() + offset_x, root.winfo_pointery() + offset_y
 
 
+def _get_popup_screen_bounds(root) -> tuple[int, int, int, int]:
+    """Return the usable virtual-desktop bounds for popup positioning.
+
+    Tk reports only the primary screen origin and can report logical dimensions
+    for a high-DPI CustomTkinter window.  Windows pointer coordinates and the
+    virtual desktop, however, use physical pixels.  Query the same virtual
+    screen metrics used by :class:`ScreenSnipOverlay` so a popup can follow a
+    cursor on every monitor, including monitors left of or above the primary.
+    """
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            user32 = ctypes.windll.user32
+            x = user32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
+            y = user32.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
+            width = user32.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
+            height = user32.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
+            if width > 0 and height > 0:
+                return x, y, width, height
+        except Exception:
+            pass
+
+    return 0, 0, root.winfo_screenwidth(), root.winfo_screenheight()
+
+
+def _clamp_popup_position(
+    root, x: int, y: int, window_width: int, window_height: int, margin: int = 10
+) -> tuple[int, int]:
+    """Keep a popup within its virtual desktop, including negative origins."""
+    screen_x, screen_y, screen_width, screen_height = _get_popup_screen_bounds(root)
+    min_x = screen_x + margin
+    min_y = screen_y + margin
+    max_x = max(min_x, screen_x + screen_width - window_width - margin)
+    max_y = max(min_y, screen_y + screen_height - window_height - margin)
+    return max(min_x, min(x, max_x)), max(min_y, min(y, max_y))
+
+
+def _place_popup_window(root, x: int, y: int) -> None:
+    """Place a popup at physical virtual-desktop coordinates on Windows.
+
+    ``CTkToplevel.geometry()`` applies its own DPI scaling.  That makes a
+    physical cursor coordinate land in the wrong place at 125%/150% scaling
+    and confines it to Tk's primary-screen coordinate space.  Let Tk process
+    its normal geometry first, then use the native HWND position without
+    resizing or mapping the withdrawn window.
+    """
+    root.geometry(f"+{x}+{y}")
+    if sys.platform != "win32":
+        return
+
+    try:
+        import ctypes
+
+        root.update_idletasks()
+        hwnd = root.winfo_id()
+        if not isinstance(hwnd, int):
+            return
+        parent_hwnd = ctypes.windll.user32.GetParent(hwnd)
+        target_hwnd = parent_hwnd if parent_hwnd else hwnd
+        # SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE.  Deliberately omit
+        # SWP_SHOWWINDOW so popup construction remains flicker-free.
+        ctypes.windll.user32.SetWindowPos(target_hwnd, 0, x, y, 0, 0, 0x0015)
+    except Exception as exc:
+        logging.debug("[Popup] SetWindowPos failed: %s", exc)
+
+
 # Transparency color for Windows (must be a color not used in UI)
 TRANSPARENCY_COLOR = "#010101"  # Near-black that won't appear in themes
 
@@ -206,7 +273,7 @@ def _make_draggable(root, frame):
         try:
             new_x = root.winfo_x() + dx
             new_y = root.winfo_y() + dy
-            root.geometry(f"+{new_x}+{new_y}")
+            _place_popup_window(root, new_x, new_y)
         except tk.TclError:
             pass
         _drag_data["x"] = event.x_root
@@ -541,7 +608,15 @@ class Tooltip:
             )
             label.pack()
 
-        self.tooltip_window.wm_geometry(f"+{x}+{y}")
+        self.tooltip_window.update_idletasks()
+        x, y = _clamp_popup_position(
+            self.tooltip_window,
+            x,
+            y,
+            self.tooltip_window.winfo_reqwidth(),
+            self.tooltip_window.winfo_reqheight(),
+        )
+        _place_popup_window(self.tooltip_window, x, y)
 
     def _hide_tooltip(self):
         """Hide the tooltip."""
@@ -1732,18 +1807,10 @@ class AttachedInputPopup:
         self.root.update_idletasks()
 
         x, y = _get_popup_position(self.root, self.x, self.y)
-
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
-
-        if x + window_width > screen_width:
-            x = screen_width - window_width - 10
-        if y + window_height > screen_height:
-            y = y - window_height - 30
-
-        self.root.geometry(f"+{x}+{y}")
+        x, y = _clamp_popup_position(self.root, x, y, window_width, window_height)
+        _place_popup_window(self.root, x, y)
 
     def _reposition_window(self):
         """Reposition after content changes (e.g. text field expansion)."""
@@ -1758,20 +1825,10 @@ class AttachedInputPopup:
         x = self.root.winfo_x()
         y = self.root.winfo_y()
 
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
-
-        if x + window_width > screen_width:
-            x = screen_width - window_width - 10
-        if y + window_height > screen_height:
-            y = screen_height - window_height - 10
-
-        x = max(10, x)
-        y = max(10, y)
-
-        self.root.geometry(f"+{x}+{y}")
+        x, y = _clamp_popup_position(self.root, x, y, window_width, window_height)
+        _place_popup_window(self.root, x, y)
 
     def _submit(self):
         """Handle form submission."""
@@ -2440,21 +2497,10 @@ class AttachedPromptPopup:
         self.root.update_idletasks()
 
         x, y = _get_popup_position(self.root, self.x, self.y)
-
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
-
-        if x + window_width > screen_width:
-            x = screen_width - window_width - 10
-        if y + window_height > screen_height:
-            y = screen_height - window_height - 10
-
-        x = max(10, x)
-        y = max(10, y)
-
-        self.root.geometry(f"+{x}+{y}")
+        x, y = _clamp_popup_position(self.root, x, y, window_width, window_height)
+        _place_popup_window(self.root, x, y)
 
     def _reposition_window(self):
         """Reposition after content changes."""
@@ -2475,20 +2521,10 @@ class AttachedPromptPopup:
         x = self.root.winfo_x()
         y = self.root.winfo_y()
 
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
-
-        if x + window_width > screen_width:
-            x = screen_width - window_width - 10
-        if y + window_height > screen_height:
-            y = screen_height - window_height - 10
-
-        x = max(10, x)
-        y = max(10, y)
-
-        self.root.geometry(f"+{x}+{y}")
+        x, y = _clamp_popup_position(self.root, x, y, window_width, window_height)
+        _place_popup_window(self.root, x, y)
 
     def _on_modifiers_changed(self, active_modifiers: List[str]):
         """Handle modifier toggle changes."""
@@ -2855,19 +2891,16 @@ class TypingIndicator:
                 offset_y=self.OFFSET_Y,
             )
 
-            screen_width = self.root.winfo_screenwidth()
-            screen_height = self.root.winfo_screenheight()
-
             self.root.update_idletasks()
             window_width = self.root.winfo_width()
             window_height = self.root.winfo_height()
-
-            if x + window_width > screen_width:
+            screen_x, screen_y, screen_width, screen_height = _get_popup_screen_bounds(self.root)
+            if x + window_width > screen_x + screen_width:
                 x -= window_width + (2 * self.OFFSET_X) + 10
-            if y + window_height > screen_height:
+            if y + window_height > screen_y + screen_height:
                 y -= window_height + (2 * self.OFFSET_Y) + 10
-
-            self.root.geometry(f"+{x}+{y}")
+            x, y = _clamp_popup_position(self.root, x, y, window_width, window_height)
+            _place_popup_window(self.root, x, y)
         except tk.TclError:
             pass
 
@@ -3232,15 +3265,14 @@ class ErrorPopup:
         """Position window at center of screen."""
         self.root.update_idletasks()
 
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
         window_width = max(400, self.root.winfo_reqwidth())
         window_height = self.root.winfo_reqheight()
-
-        x = (screen_width - window_width) // 2
-        y = (screen_height - window_height) // 2
+        screen_x, screen_y, screen_width, screen_height = _get_popup_screen_bounds(self.root)
+        x = screen_x + (screen_width - window_width) // 2
+        y = screen_y + (screen_height - window_height) // 2
 
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        _place_popup_window(self.root, x, y)
 
     def _copy_to_clipboard(self):
         """Copy error details to clipboard."""
@@ -3497,20 +3529,19 @@ class ToastNotification:
         """Calculate target position at bottom right of screen."""
         self.root.update_idletasks()
 
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
         window_width = self.root.winfo_reqwidth()
         window_height = self.root.winfo_reqheight()
+        screen_x, screen_y, screen_width, screen_height = _get_popup_screen_bounds(self.root)
 
         # Position with margin from bottom-right corner
-        self.target_x = screen_width - window_width - self.MARGIN_X
+        self.target_x = screen_x + screen_width - window_width - self.MARGIN_X
         # Target Y is the final resting position
-        self.target_y = screen_height - window_height - self.MARGIN_Y - 40  # Account for taskbar
+        self.target_y = screen_y + screen_height - window_height - self.MARGIN_Y - 40  # Account for taskbar
 
         # Start from bottom of screen (off-screen)
-        self.start_rise_y = screen_height
+        self.start_rise_y = screen_y + screen_height
 
-        self.root.geometry(f"+{self.target_x}+{self.start_rise_y}")
+        _place_popup_window(self.root, self.target_x, self.start_rise_y)
 
     def _show(self):
         """Show the window and start entry animation."""
@@ -3550,7 +3581,7 @@ class ToastNotification:
 
             dist = self.start_rise_y - self.target_y
             current_y = int(self.start_rise_y - (dist * ease))
-            self.root.geometry(f"+{self.target_x}+{current_y}")
+            _place_popup_window(self.root, self.target_x, current_y)
 
             if progress < 1.0:
                 self.root.after(16, lambda: self._animate_entry(step + 1))
