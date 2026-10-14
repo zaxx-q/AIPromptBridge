@@ -238,6 +238,47 @@ def paste_bytes(mime: str, *, primary: bool = False) -> bytes:
         return b""
 
 
+def has_image(*, primary: bool = False) -> bool:
+    """
+    True when the clipboard (or primary selection) currently offers image data.
+
+    Linux-only MIME probe via ``wl-paste --list-types``; False elsewhere.
+    """
+    try:
+        return any(t.startswith("image/") for t in list_types(primary=primary))
+    except Exception:
+        return False
+
+
+def paste_image_bytes(*, primary: bool = False) -> tuple[bytes, str]:
+    """
+    Paste image data from the clipboard (or primary selection).
+
+    Prefers PNG (lossless), then JPEG, then the first other advertised
+    ``image/*`` type. Returns ``(data, mime_type)``; empty bytes and empty
+    MIME on failure or when no image is present.
+    """
+    empty: tuple[bytes, str] = (b"", "")
+    if not is_linux():
+        return empty
+    try:
+        types = list_types(primary=primary)
+    except Exception:
+        return empty
+    image_types = [t for t in types if t.startswith("image/")]
+    if not image_types:
+        return empty
+    ordered = sorted(
+        image_types,
+        key=lambda t: 0 if t == _IMAGE_PNG_MIME else 1 if t in ("image/jpeg", "image/jpg") else 2,
+    )
+    for mime in ordered:
+        data = paste_bytes(mime, primary=primary)
+        if data:
+            return data, ("image/jpeg" if mime == "image/jpg" else mime)
+    return empty
+
+
 def copy_bytes(data: bytes, mime: str, *, primary: bool = False) -> bool:
     """
     Copy raw bytes with an explicit MIME type (best-effort for images).

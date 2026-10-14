@@ -50,19 +50,35 @@ def png_bytes_to_capture_result(png: bytes) -> Optional[CaptureResult]:
     """
     if not png:
         return None
+    result = image_bytes_to_capture_result(png, "image/png")
+    if result is None:
+        logging.error("[ScreenSnip] Failed to decode PNG capture")
+    return result
+
+
+def image_bytes_to_capture_result(data: bytes, mime_type: str = "image/png") -> Optional[CaptureResult]:
+    """
+    Decode raw image bytes (PNG/JPEG) into a ``CaptureResult``.
+
+    Used for clipboard images (e.g. the textedit-clipboard trigger redirecting
+    to SnipTool when the clipboard holds an image instead of text). Base64
+    encoding matches the ImageGrab paths: raw bytes → b64 UTF-8 string.
+    """
+    if not data:
+        return None
     try:
-        img = Image.open(io.BytesIO(png))
+        img = Image.open(io.BytesIO(data))
         img.load()
-        image_base64 = base64.b64encode(png).decode("utf-8")
+        image_base64 = base64.b64encode(data).decode("utf-8")
         return CaptureResult(
             image_base64=image_base64,
-            mime_type="image/png",
+            mime_type=mime_type or "image/png",
             width=img.width,
             height=img.height,
             pil_image=img,
         )
     except Exception as e:
-        logging.error(f"[ScreenSnip] Failed to decode PNG capture: {e}")
+        logging.error(f"[ScreenSnip] Failed to decode clipboard image: {e}")
         return None
 
 

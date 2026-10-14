@@ -141,6 +141,56 @@ class SnipToolApp:
             on_capture=self._on_image_captured, on_cancel=self._on_snip_cancelled
         )
 
+    def show_popup_for_clipboard_image(self) -> bool:
+        """
+        Read an image from the system clipboard and open the snip popup for it,
+        skipping the region-selection overlay.
+
+        Used by the ``textedit-clipboard`` trigger when the clipboard holds an
+        image instead of text. Must be called from a background thread (clipboard
+        reads spawn subprocesses). Returns True when an image was found and the
+        popup was requested; False when the clipboard has no usable image (caller
+        should fall back to the normal text flow).
+        """
+        capture: Optional[CaptureResult] = None
+
+        if is_linux():
+            try:
+                from ..platform import clipboard as platform_clipboard
+
+                data, mime = platform_clipboard.paste_image_bytes(primary=False)
+                if data:
+                    from .screen_snip import image_bytes_to_capture_result
+
+                    capture = image_bytes_to_capture_result(data, mime)
+            except Exception as e:
+                logging.error(f"[SnipTool] Failed to read Linux clipboard image: {e}")
+        else:
+            # Windows: PIL can read clipboard images directly (thread-safe;
+            # opens its own clipboard session, no Tk dependency).
+            try:
+                import io as _io
+
+                from PIL import ImageGrab
+
+                grabbed = ImageGrab.grabclipboard()
+                if grabbed is not None:
+                    from .screen_snip import image_bytes_to_capture_result
+
+                    buf = _io.BytesIO()
+                    grabbed.convert("RGB").save(buf, format="PNG")
+                    capture = image_bytes_to_capture_result(buf.getvalue(), "image/png")
+            except Exception as e:
+                logging.error(f"[SnipTool] Failed to read Windows clipboard image: {e}")
+
+        if capture is None:
+            return False
+
+        logging.info(f"[SnipTool] Clipboard image found ({capture.width}x{capture.height}) — opening snip popup")
+        self.cancel_requested = False
+        self._on_image_captured(capture)
+        return True
+
     def _on_snip_cancelled(self):
         """Handle snip cancellation."""
         logging.debug("Snip cancelled by user")

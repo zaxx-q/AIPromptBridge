@@ -307,9 +307,24 @@ class TextEditToolApp:
 
         This explicit path intentionally trusts the clipboard and never reads
         the Wayland primary selection or sends a copy key.
+
+        When the clipboard holds an image instead of text, the request is
+        handed off to SnipTool, which opens its action popup with the
+        clipboard image as context.
         """
         logging.debug("Showing Clipboard TextEdit popup")
         x, y = self._get_popup_position()
+
+        # Redirect to SnipTool when the clipboard contains an image.
+        try:
+            from .snip_tool import get_instance as get_snip_instance
+
+            snip = get_snip_instance()
+            if snip is not None and snip.show_popup_for_clipboard_image():
+                return
+        except Exception as e:
+            logging.debug(f"Clipboard image redirect failed, falling back to text: {e}")
+
         clipboard_text = self.text_handler.get_clipboard_text()
         self._show_popup_for_text(clipboard_text, x=x, y=y)
 
