@@ -75,20 +75,35 @@ def get_base_url_for_status(config, provider, profile=None):
     return "Not configured"
 
 
-def print_system_info(include_server_and_keys=True, delay_val=None):
-    """Print current system/profile info (styled like 'i' command)."""
+def print_system_info(include_server_and_keys=True, delay_val=None, profile=None, profile_name=None):
+    """Print current system/profile info (styled like 'i' command).
+
+    Args:
+        include_server_and_keys: Include server/API key counts.
+        delay_val: Optional request delay to display.
+        profile: Optional ConnectionProfile override — when given, display this
+            profile instead of the active one (e.g. File Processor session-local
+            selection preview). Global state is untouched.
+        profile_name: Display name for ``profile`` (defaults to "Selected Profile").
+    """
     from . import web_server
     from .connection_profiles import ProfileStore
 
     store = ProfileStore.get_instance()
-    active_profile = store.get_active_profile_name()
-    profile = web_server.ACTIVE_PROFILE  # ConnectionProfile object
-
-    provider = web_server.get_active_setting("provider", "google")
-    model = web_server.get_active_setting("model", "not set")
+    if profile is not None:
+        active_profile = profile_name or "Selected Profile"
+        provider = profile.provider
+        model = profile.model or "not set"
+        streaming = profile.streaming
+        thinking = profile.thinking
+    else:
+        profile = web_server.ACTIVE_PROFILE  # ConnectionProfile object
+        active_profile = profile_name if profile_name is not None else store.get_active_profile_name()
+        provider = web_server.get_active_setting("provider", "google")
+        model = web_server.get_active_setting("model", "not set")
+        streaming = web_server.get_active_setting("streaming", True)
+        thinking = web_server.get_active_setting("thinking", False)
     base_url = get_base_url_for_status(web_server.CONFIG, provider, profile=profile)
-    streaming = web_server.get_active_setting("streaming", True)
-    thinking = web_server.get_active_setting("thinking", False)
 
     if HAVE_RICH:
         from rich.panel import Panel as RichPanel

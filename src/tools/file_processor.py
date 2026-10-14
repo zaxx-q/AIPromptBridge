@@ -2170,7 +2170,7 @@ class FileProcessor(BaseTool):
         # Import web_server for current config
         from src import web_server
         from src.connection_profiles import ProfileStore
-        from src.web_server import switch_active_profile
+        from src.terminal import print_system_info
 
         # Display current settings using System Info panel
         self._print_system_info()
@@ -2178,10 +2178,15 @@ class FileProcessor(BaseTool):
         current_provider = web_server.get_active_setting("provider", "google")
         current_model = web_server.get_active_setting("model", "not set")
 
+        # Session-local profile selection. The chosen profile is stored on the
+        # checkpoint (resumed later via resolve_profile_by_name); the global
+        # active profile is deliberately NOT switched.
+        selected_profile_name = None
+
         # Ask configuration choice
         print("How would you like to configure execution settings?")
         print("  [1] Use active connection profile (default)")
-        print("  [2] Select a different connection profile")
+        print("  [2] Select a different connection profile (this session only)")
         print("  [Q] Cancel")
 
         try:
@@ -2200,7 +2205,8 @@ class FileProcessor(BaseTool):
             choice = "1"
 
         if choice == "2":
-            # Select different connection profile
+            # Select different connection profile (session-local, does not
+            # change the app-wide active profile)
             store = ProfileStore.get_instance()
             names = store.get_profile_names()
             active = store.get_active_profile_name()
@@ -2229,12 +2235,19 @@ class FileProcessor(BaseTool):
             except ValueError:
                 new_profile = profile_choice
 
-            if switch_active_profile(new_profile):
-                print(f"\n✅ Switched to profile: {new_profile}")
-                # print updated system info
-                self._print_system_info()
-                current_provider = web_server.get_active_setting("provider", "google")
-                current_model = web_server.get_active_setting("model", "not set")
+            selected = store.get_profile(new_profile)
+            if selected and selected.enabled:
+                selected_profile_name = new_profile
+                print(f"\n✅ Using profile for this session: {new_profile} (global active profile unchanged)")
+                # print session settings preview
+                print_system_info(
+                    include_server_and_keys=False,
+                    delay_val=get_setting(self.tools_config, "default_delay_between_requests", 1.0),
+                    profile=selected,
+                    profile_name=new_profile,
+                )
+                current_provider = selected.provider
+                current_model = selected.model
             else:
                 print(f"\n✗ Profile '{new_profile}' not found. Continuing with active profile '{active}'.")
 
@@ -2251,15 +2264,18 @@ class FileProcessor(BaseTool):
             except ValueError:
                 pass
 
-        # Get active profile name
-        active_profile_name = ProfileStore.get_instance().get_active_profile_name()
+        # Profile used for this session: explicitly selected in step 4, else
+        # the global active profile (snapshot at creation time; the checkpoint
+        # keeps using it even if the global active profile changes later).
+        if selected_profile_name is None:
+            selected_profile_name = ProfileStore.get_instance().get_active_profile_name()
 
         settings = {
             "provider": current_provider,
             "model": current_model,
             "delay": default_delay,
             "use_batch": False,
-            "profile_name": active_profile_name,
+            "profile_name": selected_profile_name,
         }
 
         # Batch API (Google/Gemini only)
@@ -2362,7 +2378,7 @@ class FileProcessor(BaseTool):
             keyboard_thread = self._start_keyboard_listener()
 
         # Resolve settings to print correct provider and model
-        provider, model, _resolved = self._resolve_execution_settings(cp)
+        provider, model, resolved_settings = self._resolve_execution_settings(cp)
 
         # Auto-detect transcribe model if user selected it in their profile
         if model and "transcribe" in model.lower() and not cp.transcribe_config:
@@ -2401,11 +2417,9 @@ class FileProcessor(BaseTool):
                 print(f"   Profile:  {profile_name}")
             print(f"   Provider: {provider}")
             print(f"   Model:    {model}")
-            from src import web_server
 
-            current_thinking = web_server.get_active_setting("thinking", False)
-            thinking_status = "ON" if current_thinking else "OFF"
-            print(f"   Thinking: {thinking_status} (System Setting)")
+            thinking_status = "ON" if resolved_settings.thinking_enabled else "OFF"
+            print(f"   Thinking: {thinking_status}")
             print(f"   Delay:    {cp.delay_between_requests}s")
             if cp.use_batch:
                 print("   Mode:     BATCH API (Async)")
