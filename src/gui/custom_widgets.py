@@ -712,6 +712,12 @@ class ScrollableComboBox:
         # Create the input widgets
         self._create_widgets()
 
+        # Track external variable writes so variable.set() updates the entry,
+        # matching CTkComboBox's textvariable behavior
+        self._var_trace_name = None
+        if self.variable:
+            self._var_trace_name = self.variable.trace_add("write", self._on_variable_changed)
+
         # Initialize with variable value if set
         if variable and variable.get():
             self._selected_value = variable.get()
@@ -1471,6 +1477,18 @@ class ScrollableComboBox:
         if self.command:
             self.command(value)
 
+    def _on_variable_changed(self, *args):
+        """Sync widget state when the variable is written externally."""
+        if not self.variable:
+            return
+        try:
+            new_value = self.variable.get()
+        except tk.TclError:
+            return
+        if new_value != self._selected_value:
+            self._selected_value = new_value
+            self._update_entry_text()
+
     def _update_entry_text(self):
         """Update the entry text."""
         try:
@@ -1563,6 +1581,12 @@ class ScrollableComboBox:
 
     def destroy(self):
         self._close_dropdown()
+        if self._var_trace_name and self.variable:
+            try:
+                self.variable.trace_remove("write", self._var_trace_name)
+            except tk.TclError:
+                pass
+            self._var_trace_name = None
         self.frame.destroy()
 
 

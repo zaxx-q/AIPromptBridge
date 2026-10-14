@@ -83,3 +83,41 @@ def test_scrollable_combobox_mousewheel_closed_dropdown(dummy_colors):
         assert res is None
     finally:
         root.destroy()
+
+
+def test_scrollable_combobox_variable_sync(dummy_colors):
+    """External variable.set() must update the widget (CTkComboBox textvariable parity).
+
+    Regression test: the prompt editor sets profile_var directly when an action is
+    selected; the combo entry must reflect it instead of showing a stale value.
+    """
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except tk.TclError:
+        pytest.skip("Tkinter TclError (no display available)")
+        return
+
+    try:
+        var = tk.StringVar(value="(None)")
+        cmd = MagicMock()
+        combo = ScrollableComboBox(
+            root, colors=dummy_colors, values=["(None)", "Work", "Personal"], variable=var, command=cmd
+        )
+
+        # External write updates entry text and internal selection state
+        var.set("Work")
+        assert combo.entry.get() == "Work"
+        assert combo._selected_value == "Work"
+        assert combo.get() == "Work"
+
+        # External writes must not fire the command callback (only user selection does)
+        assert cmd.call_count == 0
+
+        # Reverting works too
+        var.set("(None)")
+        assert combo.entry.get() == "(None)"
+
+        combo.destroy()
+    finally:
+        root.destroy()
