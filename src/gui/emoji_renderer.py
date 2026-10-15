@@ -185,9 +185,6 @@ class EmojiRenderer:
         # This is safe because we've already created (and know the path of) our current dir
         threading.Thread(target=self._clean_stale_dirs, daemon=True).start()
 
-        # Preload app emojis in background so PIL cache is warm by first popup
-        threading.Thread(target=self._preload_app_emojis, daemon=True).start()
-
         # ZIP file handling
         self.zip_file: Optional[zipfile.ZipFile] = None
         self.zip_data: Optional[bytes] = None
@@ -208,12 +205,32 @@ class EmojiRenderer:
         # This is the primary performance cache — avoids re-reading the ZIP and
         # re-decoding PNGs on every call. Benefits all consumers:
         # get_emoji_image(), get_ctk_image(), get_emoji_icon_path().
+        # PIL Images are pure data objects and are safe to share across Tk roots.
         self._pil_cache: Dict[str, Image.Image] = {}
+
+        # Guard for _pil_cache / _missing_cache: ZIP reads and PNG decoding
+        # happen on background preload threads while GUI-thread lookups run,
+        # so cache mutations must be serialized.
+        self._cache_lock = threading.Lock()
 
         # Cache for CTkImage (CTkButton/CTkLabel widgets)
         # We DO NOT cache CTkImage objects because they are bound to the Tk instance
         # they were created in. If multiple threads/windows create their own roots,
         # sharing CTkImage objects causes "pyimage doesn't exist" errors.
+
+        # Tk interpreter that all PhotoImages are bound to. Deferred until the
+        # first request so this module stays importable before any root exists.
+        self._tk_root = None
+
+        # Executor that marshals PhotoImage creation onto whichever thread owns
+        # the Tk interpreter. ImageTk.PhotoImage created from a non-Tk thread
+        # makes Tcl's image refcounting race with the GUI thread, which on
+        # Linux Xft builds shows up as broken/garbled inline images (the GUI
+        # loop processes the queue while the worker thread mutates image state).
+        # NOTE: PhotoImage creation MUST happen on the Tk thread itself — a
+        # dedicated worker thread is still foreign to Tcl and raises
+        # "RuntimeError: main thread is not in main loop" in threaded builds.
+        # insert_text_with_emojis therefore marshals through widget.after().
 
         # Track missing files to avoid repeated lookups
         self._missing_cache: set = set()
@@ -221,6 +238,10 @@ class EmojiRenderer:
         # Check if PIL is available
         if not HAVE_PIL:
             print("[Warning] PIL not available - emoji rendering disabled")
+
+        # Preload app emojis in background so PIL cache is warm by first popup
+        # (ZIP reads + PNG decoding only — no Tk objects are touched there)
+        threading.Thread(target=self._preload_app_emojis, daemon=True).start()
 
     def _get_temp_icon_dir(self) -> str:
         """Get the temporary directory for icon files."""
@@ -391,19 +412,19 @@ class EmojiRenderer:
         filenames_to_try = list(dict.fromkeys(filenames_to_try))
 
         # Check PIL cache first (any variant key resolves to the same image)
-        for filename in filenames_to_try:
-            if filename in self._pil_cache:
-                return self._pil_cache[filename]
+        with self._cache_lock:
+            for filename in filenames_to_try:
+                if filename in self._pil_cache:
+                    return self._pil_cache[filename]
 
-        # Check if we already know ALL variants are missing
-        if all(f in self._missing_cache for f in filenames_to_try):
-            return None
+            # Check if we already know ALL variants are missing
+            if all(f in self._missing_cache for f in filenames_to_try):
+                return None
 
-        # Try to load the image from disk/ZIP
-        for filename in filenames_to_try:
-            if filename in self._missing_cache:
-                continue
+            try_variants = [f for f in filenames_to_try if f not in self._missing_cache]
 
+        # Try to load the image from disk/ZIP (outside the lock — I/O bound)
+        for filename in try_variants:
             try:
                 name_variants = [f"{filename}.png", f"{filename.lower()}.png"]
 
@@ -422,8 +443,9 @@ class EmojiRenderer:
                             img_data = f.read()
                             img = Image.open(io.BytesIO(img_data)).convert("RGBA")
                             # Cache under all tried filenames so both VS16 variants hit
-                            for fn in filenames_to_try:
-                                self._pil_cache[fn] = img
+                            with self._cache_lock:
+                                for fn in filenames_to_try:
+                                    self._pil_cache[fn] = img
                             return img
 
                 elif not self.is_zip and self.assets_path.exists():
@@ -432,17 +454,80 @@ class EmojiRenderer:
                         image_path = self.assets_path / name
                         if image_path.exists():
                             img = Image.open(image_path).convert("RGBA")
-                            for fn in filenames_to_try:
-                                self._pil_cache[fn] = img
+                            with self._cache_lock:
+                                for fn in filenames_to_try:
+                                    self._pil_cache[fn] = img
                             return img
 
             except Exception:
                 pass
 
             # If we got here, this filename failed
-            self._missing_cache.add(filename)
+            with self._cache_lock:
+                self._missing_cache.add(filename)
 
         return None
+
+    def _ensure_tk_root(self, text_widget=None):
+        """Return the single Tk interpreter used for PhotoImage creation.
+
+        Deferred until first use so this module stays importable before any
+        root exists. Prefers the main-thread default root; if none exists yet
+        (e.g. a standalone window created its own root first), adopts the
+        calling widget's interpreter and uses it forever after. PhotoImages
+        are then "rename"d per target interpreter (see _clone_for_widget),
+        which shares the underlying pixel data cheaply.
+        """
+        root = self._tk_root
+        if root is None:
+            try:
+                root = tk._default_root
+            except Exception:
+                root = None
+            if root is None and text_widget is not None:
+                try:
+                    root = text_widget.tk  # adopt the widget's interpreter
+                except Exception:
+                    root = None
+            if root is not None:
+                self._tk_root = root
+        if root is None:
+            raise RuntimeError("EmojiRenderer: no Tk root available yet")
+        return root
+
+    def _clone_for_widget(self, photo, text_widget):
+        """Return a copy of *photo* bound to *text_widget*'s interpreter.
+
+        PhotoImages live in the single cached interpreter; when a widget from
+        a different (standalone-window) interpreter needs the same image we
+        cheaply alias it via Tcl's `rename`, which shares the pixel data.
+        """
+        if text_widget is None:
+            return photo
+        try:
+            widget_interp = text_widget.tk
+        except Exception:
+            return photo
+        if widget_interp is self._tk_root:
+            return photo
+        # Create a uniquely-named alias in the widget's interpreter
+        clone = tk.PhotoImage(master=text_widget, width=1, height=1)
+        try:
+            widget_interp.call("rename", str(clone), str(photo))
+        except Exception:
+            return photo  # fall back to the original (may misrender, never crash)
+        return clone
+
+    def _create_photo_image(self, pil_image):
+        """Create a Tk PhotoImage.
+
+        Requires the caller to already be on the Tk thread. PhotoImages are
+        bound to the renderer's single Tk interpreter and cached there; callers
+        from foreign threads must marshal through the event loop first
+        (insert_text_with_emojis does this via widget.after()).
+        """
+        root = self._ensure_tk_root()
+        return ImageTk.PhotoImage(pil_image, master=root)
 
     @staticmethod
     def _hex_to_rgba(hex_color: str) -> Tuple[int, int, int, int]:
@@ -454,7 +539,7 @@ class EmojiRenderer:
         return (r, g, b, 255)
 
     def get_emoji_image(
-        self, emoji: str, size: Optional[int] = None, bg_color: Optional[str] = None
+        self, emoji: str, size: Optional[int] = None, bg_color: Optional[str] = None, text_widget=None
     ) -> Optional[ImageTk.PhotoImage]:
         """
         Load and cache an emoji image as PhotoImage (for tk.Text widgets).
@@ -464,6 +549,10 @@ class EmojiRenderer:
             size: Size in pixels (uses default if not specified)
             bg_color: Optional hex background color (e.g. '#1e3e2e') to composite
                       the emoji against, so transparency blends with tag backgrounds.
+            text_widget: Target tk.Text widget. When the widget lives in a
+                      different Tk interpreter than the cached PhotoImage (e.g.
+                      standalone windows with their own root), a cheap alias of
+                      the image is created in the widget's interpreter instead.
 
         Returns:
             PhotoImage if found, None otherwise
@@ -480,9 +569,15 @@ class EmojiRenderer:
         filename = self.get_codepoint_filename(emoji)
         cache_key = (filename, size, bg_color)
 
+        try:
+            # Ensure the Tk interpreter exists before serving cached images
+            self._ensure_tk_root(text_widget)
+        except Exception:
+            return None
+
         # Check cache
         if cache_key in self._cache:
-            return self._cache[cache_key]
+            return self._clone_for_widget(self._cache[cache_key], text_widget)
 
         # Load PIL image
         pil_image = self._load_pil_image(emoji)
@@ -500,13 +595,13 @@ class EmojiRenderer:
                 bg = Image.new("RGBA", (size, size), self._hex_to_rgba(bg_color))
                 pil_image = Image.alpha_composite(bg, pil_image)
 
-            # Convert to PhotoImage
-            photo = ImageTk.PhotoImage(pil_image)
+            # Convert to PhotoImage (marshalled to the Tk thread when needed)
+            photo = self._create_photo_image(pil_image)
 
             # Cache it (IMPORTANT: must keep reference to prevent garbage collection)
             self._cache[cache_key] = photo
 
-            return photo
+            return self._clone_for_widget(photo, text_widget)
 
         except Exception:
             return None
@@ -689,6 +784,51 @@ class EmojiRenderer:
             tags: Tags to apply to non-emoji text
             at_end: If True, insert at end; otherwise at current cursor
         """
+        # PhotoImages and Text-widget manipulation must happen on the thread
+        # that runs the Tk event loop. When called from a foreign thread,
+        # marshal the whole insertion through after() and wait for it — the
+        # alternative (a dedicated worker thread) is still foreign to Tcl and
+        # raises "RuntimeError: main thread is not in main loop".
+        try:
+            root = self._ensure_tk_root(text_widget)
+        except Exception:
+            root = None
+
+        if root is not None:
+            tk_thread = getattr(root, "_creation_thread", None)
+            if tk_thread is not None and threading.current_thread() is not tk_thread:
+                done = threading.Event()
+                token = f"<<EmojiRender-{id(done):x}>>"
+
+                def _run():
+                    try:
+                        self._insert_text_with_emojis_impl(text_widget, text, tags, at_end)
+                    finally:
+                        done.set()
+
+                # Register the handler and wake the interpreter with an event.
+                # event_generate(when="tail") is one of the few Tk calls that is
+                # explicitly safe from foreign threads: it only enqueues onto
+                # Tk's thread queue and wakes the notifier. after()/after_idle()
+                # are NOT safe here — they raise "RuntimeError: main thread is
+                # not in main loop" in threaded Tcl builds.
+                root.bind(token, lambda _e: _run())
+                try:
+                    root.event_generate(token, when="tail")
+                    done.wait()
+                finally:
+                    try:
+                        root.unbind(token)
+                    except Exception:
+                        pass
+                return
+
+        self._insert_text_with_emojis_impl(text_widget, text, tags, at_end)
+
+    def _insert_text_with_emojis_impl(
+        self, text_widget: tk.Text, text: str, tags: Optional[Tuple[str, ...]] = None, at_end: bool = True
+    ):
+        """Perform the actual text/emoji insertion (must run on the Tk thread)."""
         if not HAVE_PIL:
             # Fallback: just insert text normally
             if at_end:
@@ -732,7 +872,9 @@ class EmojiRenderer:
                 text_widget.insert(pos, text[last_end:start], tags)
 
             # Try to get emoji image (with bg_color for proper blending)
-            img = self.get_emoji_image(emoji_char, bg_color=bg_color)
+            # Pass text_widget so the image can be aliased into the widget's
+            # Tk interpreter when it differs from the cache's interpreter.
+            img = self.get_emoji_image(emoji_char, bg_color=bg_color, text_widget=text_widget)
 
             if img:
                 # Record position before insertion so we can tag the image

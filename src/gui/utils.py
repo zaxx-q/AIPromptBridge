@@ -1040,9 +1040,11 @@ def _insert_with_emojis(
     """
     Insert text into a Text widget, optionally rendering emojis as images.
 
-    On Windows, this replaces emoji characters with inline PNG images
-    for proper color emoji display. On other platforms or if the emoji
-    renderer is not available, falls back to plain text insertion.
+    Tkinter Text widgets cannot render color emoji fonts on most systems
+    (Windows shows monochrome outlines; many Linux Tk builds show broken or
+    blank glyphs), so emojis are replaced with inline PNG images from the
+    Twemoji set. Falls back to plain text insertion if the emoji renderer
+    is unavailable.
 
     Args:
         text_widget: The tk.Text widget
@@ -1058,11 +1060,9 @@ def _insert_with_emojis(
                 link_url = tag[4:]
                 break
 
-    # Only use emoji rendering on Windows and if available
     use_emoji_renderer = (
         enable_emojis
         and HAVE_EMOJI_RENDERER
-        and sys.platform == "win32"
         and get_emoji_renderer is not None
         and not link_url  # Check if this is a link URL segment
     )

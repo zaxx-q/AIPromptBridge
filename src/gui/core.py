@@ -201,6 +201,10 @@ class GUICoordinator:
 
                 self._root.withdraw()  # Hidden root window
 
+                # Mark this thread as the interpreter owner so other modules
+                # (e.g. EmojiRenderer) can marshal Tk object creation here.
+                self._root._creation_thread = threading.current_thread()
+
                 # Linux: probe Tk fonts + fix DrawEngine (no-xft / broken font_shapes).
                 # Must run on the GUI thread with a live interpreter before any windows.
                 if HAVE_CTK:
