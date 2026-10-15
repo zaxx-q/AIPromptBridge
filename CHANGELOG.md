@@ -1,5 +1,17 @@
 # Changelog
 
+## [8.8.0] - 2026-10-15
+
+### New Features
+
+- **Clipboard Image Handling**: When the clipboard contains an image instead of text, the Clipboard TextEdit trigger now opens the Snip Tool popup with that image, so you can run snip actions on it without taking a screenshot.
+
+### Fixes
+
+- **File Processor Profile Selection**: Choosing a different connection profile in the File Processor now applies to that run only, instead of changing the app-wide active profile. The choice is saved with the checkpoint and reused when resuming, and the run header shows the thinking state of the selected profile.
+- **Prompt Editor Dropdowns**: Fixed dropdown fields showing stale values like "(None)" when updated by the app, such as when selecting an action in the Prompt Editor.
+- **Linux Chat Emojis**: Emojis in chat messages now render as proper color images on Linux too, instead of broken or colorless glyphs.
+
 ## [8.7.5] - 2026-10-05
 
 ### Improvements
