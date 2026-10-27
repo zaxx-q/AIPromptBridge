@@ -70,10 +70,21 @@ in AIPromptBridge first. Requests never contain API keys or upstream URLs.
 
 Optional `pdf` is `{ "split": false, "page_range": "all" }`; splitting
 requires pypdf and accepts ranges such as `1-3,5`. Optional `transcription`
-contains `model`, `mode` (`VERBATIM` or `SMART`), `diarization`,
-`word_timestamp`, `language_codes`, and `custom_vocabulary`. SMART cannot use
-diarization or word timestamps. Native transcription always uses the existing
-Gemini Files API flow.
+contains an `engine` (`gemini` by default for compatibility, or `groq`) and a
+`model`, plus engine-specific options. Gemini supports `mode` (`VERBATIM` or
+`SMART`), `diarization`, `word_timestamp`, `language_codes`, and
+`custom_vocabulary`; SMART cannot use diarization or word timestamps. Gemini
+transcription uses the Files API and chunks by duration.
+
+Groq profiles use `whisper-large-v3` or `whisper-large-v3-turbo` and support
+`groq_response_format` (`text`, `json`, or `verbose_json`),
+`groq_timestamp_granularity` (`segment` or `word`, for `verbose_json` only),
+`groq_temperature` (0–1, omitted when null), and `language_codes`. Language
+hints are normalized from BCP-47 to ISO-639-1. Groq does not support Gemini's
+mode, diarization, or vocabulary options. Audio is uploaded directly as
+multipart data; files above the 24 MiB target are split and transcoded to
+16 kHz mono FLAC to stay below Groq's 25 MB free-tier request limit. Groq
+requires a key in the `groq` key pool (or a profile key-pool override).
 
 Optional `audio` is null, `{ "type": "normalize" }`, `amplify` or
 `amplify_normalize` with positive `volume_percent`, a `preset` with

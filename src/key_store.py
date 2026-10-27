@@ -44,7 +44,7 @@ _FORMAT_VERSION = 2
 _OBF_PREFIX = "$OBF$"
 
 # Built-in provider IDs that always have a pool by default
-_BUILTIN_PROVIDERS = ("google", "openrouter", "custom", "anthropic", "openai", "xai", "mistral", "cohere")
+_BUILTIN_PROVIDERS = ("google", "openrouter", "custom", "anthropic", "openai", "xai", "mistral", "cohere", "groq")
 
 # Salt mixed into the machine key derivation
 _SALT = b"AIPromptBridge::key-obfuscation::v1"
@@ -398,6 +398,7 @@ class KeyStore:
             "xai": ["XAI_API_KEY"],
             "mistral": ["MISTRAL_API_KEY"],
             "cohere": ["COHERE_API_KEY"],
+            "groq": ["GROQ_API_KEY"],
         }
         for provider, env_vars in env_map.items():
             if not legacy_keys[provider]:
@@ -428,6 +429,8 @@ class KeyStore:
                     display = "OpenRouter"
                 elif provider == "xai":
                     display = "xAI"
+                elif provider == "groq":
+                    display = "Groq"
                 self._pools[provider] = {
                     "display_name": display,
                     "keys": keys_list,
@@ -457,6 +460,8 @@ class KeyStore:
                     display = "OpenRouter"
                 elif provider == "xai":
                     display = "xAI"
+                elif provider == "groq":
+                    display = "Groq"
                 self._pools[provider] = {"display_name": display, "keys": []}
             if provider not in self._provider_pool_map:
                 self._provider_pool_map[provider] = provider
@@ -476,6 +481,7 @@ class KeyStore:
             "xai": ["XAI_API_KEY"],
             "mistral": ["MISTRAL_API_KEY"],
             "cohere": ["COHERE_API_KEY"],
+            "groq": ["GROQ_API_KEY"],
         }
 
         appended = False

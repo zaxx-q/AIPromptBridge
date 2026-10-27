@@ -171,27 +171,35 @@ def resolve_profile(
         merged_ai_params.pop("temperature", None)
         merged_ai_params.pop("max_tokens", None)
 
-    # For transcription provider, resolve key manager from google pool and set model keys
+    # For transcription provider, resolve key manager and model keys based on engine
     if provider == "transcription":
+        engine = (getattr(effective_profile, "transcribe_engine", "gemini") or "gemini").lower()
         merged_config["transcription_model"] = model
-        merged_config["google_model"] = model
+        merged_config["transcription_engine"] = engine
+
+        if engine == "groq":
+            merged_config["groq_model"] = model
+            pool_provider = "groq"
+        else:
+            merged_config["google_model"] = model
+            pool_provider = "google"
 
         if effective_profile and (effective_profile.api_key_pool or effective_profile.api_key_name):
             resolved_km = _resolve_key_override(
                 effective_profile.api_key_pool,
                 effective_profile.api_key_name,
-                "google",
+                pool_provider,
                 key_managers,
             )
             if resolved_km is not None:
                 effective_key_managers = dict(effective_key_managers)
                 effective_key_managers["transcription"] = resolved_km
-                effective_key_managers["google"] = resolved_km
+                effective_key_managers[pool_provider] = resolved_km
         else:
-            google_km = effective_key_managers.get("google")
-            if google_km:
+            default_km = effective_key_managers.get(pool_provider)
+            if default_km:
                 effective_key_managers = dict(effective_key_managers)
-                effective_key_managers["transcription"] = google_km
+                effective_key_managers["transcription"] = default_km
 
     if not model and provider:
         model = merged_config.get(f"{provider}_model", "")

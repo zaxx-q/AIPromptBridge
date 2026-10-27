@@ -80,6 +80,19 @@ LARGE_FILE_MODE_CHUNKING = "chunking"
 LARGE_FILE_MODE_SKIP = "skip"
 
 
+def _is_transcription_profile(profile_name: Optional[str]) -> bool:
+    """Check whether the named connection profile is a transcription profile."""
+    if not profile_name:
+        return False
+    try:
+        from src.connection_profiles import ProfileStore
+
+        profile = ProfileStore.get_instance().get_profile(profile_name)
+        return bool(profile and profile.provider == "transcription")
+    except Exception:
+        return False
+
+
 class FileProcessor(BaseTool):
     """
     File Processor Tool - Process files with AI prompts.
@@ -249,6 +262,9 @@ class FileProcessor(BaseTool):
                             )
                         elif _prof:
                             transcribe_config["model"] = _prof.model or "gemini-3.5-transcribe"
+                            transcribe_config["engine"] = (
+                                "groq" if transcribe_config["model"].lower().startswith("whisper-") else "gemini"
+                            )
                             if prompt_config.get("transcribe_mode"):
                                 transcribe_config["mode"] = prompt_config["transcribe_mode"]
 
@@ -2381,7 +2397,16 @@ class FileProcessor(BaseTool):
         provider, model, resolved_settings = self._resolve_execution_settings(cp)
 
         # Auto-detect transcribe model if user selected it in their profile
-        if model and "transcribe" in model.lower() and not cp.transcribe_config:
+        # ("transcribe" models = Gemini; "whisper-" models = Groq)
+        is_transcribe_model = bool(
+            model
+            and (
+                "transcribe" in model.lower()
+                or model.lower().startswith("whisper-")
+                or _is_transcription_profile(getattr(cp, "profile_name", None))
+            )
+        )
+        if is_transcribe_model and not cp.transcribe_config:
             # Try to pull transcribe settings from the connection profile
             from src.connection_profiles import ProfileStore
 
@@ -2394,19 +2419,25 @@ class FileProcessor(BaseTool):
             if profile and profile.provider == "transcription":
                 cp.transcribe_config = profile.to_transcribe_config()
                 if interactive:
+                    engine = cp.transcribe_config.get("engine", "gemini")
                     mode = cp.transcribe_config.get("mode", "VERBATIM")
-                    print_info(f"\n🎙️ Using transcription profile: {profile_name} (mode: {mode})")
+                    print_info(f"\n🎙️ Using transcription profile: {profile_name} ({engine}, mode: {mode})")
             else:
                 if interactive:
                     print_info(f"\n🎙️ Detected transcribe model: {model}")
-                    print_info("Using default verbatim transcription config")
+                    print_info("Using default transcription config")
+                engine = "groq" if model.lower().startswith("whisper-") else "gemini"
                 cp.transcribe_config = {
+                    "engine": engine,
                     "model": model,
                     "mode": "VERBATIM",
                     "diarization": False,
                     "word_timestamp": False,
                     "language_codes": [],
                     "custom_vocabulary": [],
+                    "groq_response_format": "text",
+                    "groq_timestamp_granularity": "segment",
+                    "groq_temperature": None,
                 }
 
         if interactive:
@@ -3234,6 +3265,13 @@ class FileProcessor(BaseTool):
         Returns:
             Transcript text or None on failure
         """
+        # Route to the Groq (Whisper) backend when the engine demands it
+        engine = (transcribe_config.get("engine") or "gemini").lower()
+        if engine == "groq":
+            return self._process_with_groq(
+                filepath, transcribe_config, checkpoint, interactive, original_name=original_name
+            )
+
         # Check force no-chunking
         force_no_chunk = False
         if self._audio_preprocessing:
@@ -3488,6 +3526,185 @@ class FileProcessor(BaseTool):
             split_result.cleanup()
             if interactive:
                 print("   🗑️ Cleaned up temporary files")
+
+    def _process_with_groq(
+        self,
+        filepath: Path,
+        transcribe_config: Dict[str, Any],
+        checkpoint: FileProcessorCheckpoint,
+        interactive: bool,
+        original_name: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Process audio file via Groq's Whisper-based transcription API.
+
+        Size-based chunking (25 MB request limit): chunks are transcoded to
+        16 kHz mono FLAC by ``AudioProcessor.split_audio_for_groq``. Small
+        files with supported containers are uploaded as-is.
+
+        Args:
+            filepath: Path to audio file
+            transcribe_config: Transcription configuration (engine == "groq")
+            checkpoint: Current checkpoint
+            interactive: Show progress
+            original_name: Original filename for display
+
+        Returns:
+            Transcript text or None on failure
+        """
+        from src.providers import groq_transcription
+        from src.request_pipeline import RequestContext, RequestOrigin, RequestPipeline
+
+        # Resolve key manager: Groq pool, or the resolver-pinned transcription entry
+        _provider_name, _model_override, resolved = self._resolve_execution_settings(checkpoint)
+        key_manager = resolved.key_managers.get("groq") or resolved.key_managers.get("transcription")
+        if not key_manager or not key_manager.has_keys():
+            raise Exception("No Groq API key available (add a key to the 'groq' pool in Settings → API Keys)")
+
+        api_key = key_manager.get_current_key()
+        if not api_key:
+            raise Exception("No Groq API key available")
+
+        model = transcribe_config.get("model") or "whisper-large-v3-turbo"
+        language = transcribe_config.get("language_codes", [""])[0] if transcribe_config.get("language_codes") else ""
+        response_format = transcribe_config.get("groq_response_format", "text")
+        timestamp_granularity = transcribe_config.get("groq_timestamp_granularity", "segment")
+        temperature = transcribe_config.get("groq_temperature")
+
+        # Derive a style/context prompt from the batch prompt if available
+        groq_prompt = ""
+        if checkpoint.prompt_text:
+            groq_prompt = checkpoint.prompt_text.strip()[: groq_transcription.GROQ_PROMPT_MAX_CHARS]
+
+        # Check force no-chunking
+        force_no_chunk = bool(self._audio_preprocessing and self._audio_preprocessing.get("force_no_chunking", False))
+
+        # Use the actual file size even if ffprobe is unavailable; oversized
+        # requests must still take the safe split path (which reports missing
+        # FFmpeg clearly).
+        file_size = filepath.stat().st_size
+        audio_info = self.audio_processor.get_audio_info(filepath) if self.audio_processor.is_available() else None
+        is_oversized = file_size > groq_transcription.GROQ_MAX_FILE_BYTES
+        supported_container = filepath.suffix.lower() in groq_transcription.GROQ_SUPPORTED_EXTS
+
+        split_result = None
+        try:
+            if is_oversized:
+                if force_no_chunk and supported_container:
+                    if interactive:
+                        print(
+                            f"   ⚠️ File is {file_size / (1024 * 1024):.1f} MB (over Groq's "
+                            f"{groq_transcription.GROQ_MAX_FILE_BYTES / (1024 * 1024):.0f} MB limit), but "
+                            "force_no_chunking is enabled. Attempting single request..."
+                        )
+                else:
+                    if interactive:
+                        print(
+                            f"   ✂️ File is {file_size / (1024 * 1024):.1f} MB (over Groq's "
+                            f"{groq_transcription.GROQ_MAX_FILE_BYTES / (1024 * 1024):.0f} MB limit) — "
+                            "splitting into FLAC chunks..."
+                        )
+                    split_result = self.audio_processor.split_audio_for_groq(filepath, force_single=force_no_chunk)
+                    if not split_result.success:
+                        raise Exception(f"Chunking failed: {split_result.error}")
+            elif not supported_container:
+                # Unsupported container: transcode to FLAC even when
+                # force_no_chunking is enabled; Groq cannot accept it as-is.
+                if interactive:
+                    print("   🔄 Converting to FLAC for Groq upload...")
+                split_result = self.audio_processor.split_audio_for_groq(filepath)
+                if not split_result.success:
+                    raise Exception(f"Transcode failed: {split_result.error}")
+
+            chunks = (
+                split_result.chunks
+                if split_result
+                else [
+                    # Single-shot: point at the original file
+                    AudioChunk(
+                        path=filepath,
+                        index=0,
+                        start_time=0.0,
+                        end_time=audio_info.duration_seconds if audio_info else 0.0,
+                        duration=audio_info.duration_seconds if audio_info else 0.0,
+                        size_bytes=audio_info.size_bytes if audio_info else filepath.stat().st_size,
+                    )
+                ]
+            )
+
+            chunk_outputs: List[Tuple[AudioChunk, str]] = []
+            chunk_errors: List[str] = []
+
+            for i, chunk in enumerate(chunks):
+                if interactive:
+                    total = len(chunks)
+                    rng = f" ({chunk.time_range_str})" if total > 1 else ""
+                    print(f"   [{i + 1}/{total}] Transcribing via Groq{rng}...")
+
+                request_ctx = RequestPipeline.execute_side_operation(
+                    RequestContext(
+                        origin=RequestOrigin.FILE_PROCESSOR,
+                        provider="groq",
+                        model=model,
+                        streaming=False,
+                        thinking_enabled=False,
+                    ),
+                    lambda chunk_path=chunk.path: groq_transcription.transcribe_file(
+                        chunk_path,
+                        api_key=api_key,
+                        model=model,
+                        language=language,
+                        prompt=groq_prompt,
+                        temperature=temperature,
+                        response_format=response_format,
+                        timestamp_granularity=timestamp_granularity,
+                    ),
+                )
+                transcript, error = request_ctx.response_text, request_ctx.error
+
+                if error:
+                    chunk_errors.append(f"Chunk {i + 1}: {error}")
+                    if interactive:
+                        print(f"      ⚠️ {error[:80]}")
+                    if i < len(chunks) - 1 and checkpoint.delay_between_requests > 0:
+                        time.sleep(checkpoint.delay_between_requests)
+                    continue
+
+                if transcript:
+                    # Shift timestamps for chunks beyond the first (only
+                    # meaningful when the response format carries timestamps)
+                    if chunk.start_time > 0 and response_format == "verbose_json":
+                        transcript = adjust_transcript_timestamps(transcript, chunk.start_time)
+                    chunk_outputs.append((chunk, transcript))
+                    if interactive:
+                        print("      ✅ Done")
+                else:
+                    chunk_errors.append(f"Chunk {i + 1}: Empty response")
+
+                # Delay between chunks if configured
+                if i < len(chunks) - 1 and checkpoint.delay_between_requests > 0:
+                    time.sleep(checkpoint.delay_between_requests)
+
+            if chunk_errors:
+                unique_errors = list(dict.fromkeys(chunk_errors))[:3]
+                error_summary = "; ".join(unique_errors)
+                if len(chunk_errors) > 3:
+                    error_summary += f" (+{len(chunk_errors) - 3} more)"
+                raise Exception(f"{len(chunk_errors)}/{len(chunks)} Groq chunks failed: {error_summary}")
+
+            if not chunk_outputs:
+                raise Exception("No transcription output")
+
+            if interactive and len(chunk_outputs) > 1:
+                print(f"   📝 Merging {len(chunk_outputs)} chunk transcripts...")
+
+            return merge_transcribe_transcripts(chunk_outputs)
+
+        finally:
+            if split_result:
+                split_result.cleanup()
+                if interactive:
+                    print("   🗑️ Cleaned up temporary files")
 
     def _preprocess_audio_if_needed(
         self, filepath: Path, interactive: bool

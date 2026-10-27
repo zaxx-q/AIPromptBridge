@@ -408,6 +408,37 @@ class RequestPipeline:
         return ctx
 
     @staticmethod
+    def execute_side_operation(
+        ctx: RequestContext,
+        operation: Callable[[], tuple[Optional[str], Optional[str]]],
+    ) -> RequestContext:
+        """Run a non-chat provider operation through the observability pipeline.
+
+        Side APIs such as speech transcription do not fit the chat-provider
+        message interface, but still need consistent request logging and usage
+        summaries. The operation returns ``(text, error)``; because these APIs
+        generally do not report token usage, input usage is left at zero and
+        output tokens are estimated from the returned text.
+        """
+        from .providers.base import estimate_tokens
+
+        RequestPipeline.log_request_start(ctx)
+        start_time = time.time()
+        try:
+            text, error = operation()
+            ctx.response_text = text or ""
+            ctx.error = error
+            if not error:
+                ctx.output_tokens = estimate_tokens(ctx.response_text)
+                ctx.total_tokens = ctx.input_tokens + ctx.output_tokens
+                ctx.estimated = True
+        except Exception as exc:
+            ctx.error = str(exc)
+        ctx.elapsed_time = time.time() - start_time
+        RequestPipeline.log_request_complete(ctx)
+        return ctx
+
+    @staticmethod
     def execute_unified_stream(
         ctx: RequestContext,
         messages: List[Dict],

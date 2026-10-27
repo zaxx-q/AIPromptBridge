@@ -45,6 +45,12 @@ PROFILE_DEFAULTS: Dict[str, Any] = {
     "transcribe_timestamps": False,  # Word-level timestamps
     "transcribe_language": "",  # BCP-47 language code (empty = auto-detect)
     "transcribe_vocabulary": "",  # Comma-separated custom vocabulary terms
+    # Engine selection ("gemini" or "groq"); other transcribe fields are Gemini-only
+    "transcribe_engine": "gemini",
+    # Groq-specific transcription fields (only used when transcribe_engine == "groq")
+    "groq_response_format": "text",  # "text", "json", "verbose_json"
+    "groq_timestamp_granularity": "segment",  # "segment" or "word" (verbose_json only)
+    "groq_temperature": None,  # 0-1; None = API default (0)
 }
 
 
@@ -73,14 +79,29 @@ class ConnectionProfile:
     transcribe_timestamps: bool = False
     transcribe_language: str = ""
     transcribe_vocabulary: str = ""
+    # Engine selection ("gemini" or "groq")
+    transcribe_engine: str = "gemini"
+    # Groq-specific fields
+    groq_response_format: str = "text"
+    groq_timestamp_granularity: str = "segment"
+    groq_temperature: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
     def to_transcribe_config(self) -> Dict[str, Any]:
-        """Build transcribe_config dict for gemini_services.generate_transcription."""
+        """Build transcribe_config dict for transcription backends.
+
+        Includes the engine key so callers can branch between the Gemini
+        (gemini_services.generate_transcription) and Groq
+        (providers.groq_transcription) paths. Gemini-only keys are still
+        present for Groq configs (ignored by that backend) so a single dict
+        shape flows through both pipelines.
+        """
+        engine = (self.transcribe_engine or "gemini").lower()
         return {
-            "model": self.model or "gemini-3.5-transcribe",
+            "engine": engine,
+            "model": self.model or ("whisper-large-v3-turbo" if engine == "groq" else "gemini-3.5-transcribe"),
             "mode": self.transcribe_mode or "VERBATIM",
             "diarization": self.transcribe_diarization,
             "word_timestamp": self.transcribe_timestamps,
@@ -88,6 +109,10 @@ class ConnectionProfile:
             "custom_vocabulary": [v.strip() for v in self.transcribe_vocabulary.split(",") if v.strip()]
             if self.transcribe_vocabulary.strip()
             else [],
+            # Groq-specific keys
+            "groq_response_format": self.groq_response_format or "text",
+            "groq_timestamp_granularity": self.groq_timestamp_granularity or "segment",
+            "groq_temperature": self.groq_temperature,
         }
 
     @classmethod
@@ -114,7 +139,7 @@ class ConnectionProfile:
                         val = -1
                 else:
                     val = None  # explicit: blank = no override
-            elif k == "temperature":
+            elif k in ("temperature", "groq_temperature"):
                 if val is not None and val != "":
                     try:
                         val = float(val)
@@ -140,7 +165,14 @@ class ConnectionProfile:
                     val = None
             elif k in ("transcribe_diarization", "transcribe_timestamps"):
                 val = bool(val) if val is not None else default
-            elif k in ("transcribe_mode", "transcribe_language", "transcribe_vocabulary"):
+            elif k in (
+                "transcribe_mode",
+                "transcribe_language",
+                "transcribe_vocabulary",
+                "transcribe_engine",
+                "groq_response_format",
+                "groq_timestamp_granularity",
+            ):
                 val = str(val) if val is not None else default
 
             clean[k] = val

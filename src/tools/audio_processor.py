@@ -62,6 +62,14 @@ TARGET_CHUNK_SIZE_BYTES = 14.5 * 1024 * 1024
 TRANSCRIBE_STANDARD_MAX_DURATION = 3000.0  # 50 minutes (safe margin under 60m limit)
 TRANSCRIBE_ADVANCED_MAX_DURATION = 1500.0  # 25 minutes (safe margin under 30m limit for diarization/timestamps)
 
+# Groq transcription: per-request size limit (25 MB free tier). Target 24 MB
+# per chunk after transcoding to 16 kHz mono FLAC.
+GROQ_TARGET_CHUNK_BYTES = 24 * 1024 * 1024
+
+# Groq-supported upload container extensions (keep local to avoid importing
+# the provider package into this generic FFmpeg utility module).
+GROQ_SUPPORTED_EXTS = {".flac", ".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".ogg", ".wav", ".webm"}
+
 # Supported audio formats
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".aiff", ".aac", ".ogg", ".flac", ".m4a", ".wma"}
 
@@ -2068,6 +2076,142 @@ class AudioProcessor:
             print_info(f"Created {len(chunks)} duration chunks in {temp_dir}")
             return ChunkingResult(success=True, chunks=chunks, temp_dir=temp_dir, original_info=audio_info)
 
+        except Exception as e:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            return ChunkingResult(success=False, error=str(e))
+
+    def split_audio_for_groq(self, filepath: Path, *, force_single: bool = False) -> ChunkingResult:
+        """
+        Split/transcode audio for Groq transcription (size-based).
+
+        Groq caps each request at 25 MB (free tier) — a SIZE limit, not a
+        duration limit. Each chunk is transcoded to 16 kHz mono FLAC, which
+        shrinks speech audio without quality loss for Whisper's 16 kHz
+        server-side downsampling.
+
+        Short-circuits:
+        - File already under GROQ_TARGET_CHUNK_BYTES AND a Groq-supported
+          container → single chunk pointing at the original (no transcode).
+        - File under the target but unsupported container → single FLAC chunk.
+        - ``force_single`` converts the whole file to one FLAC upload even when
+          it exceeds the size target (the caller can then surface Groq's limit
+          error when the user explicitly disabled chunking).
+
+        Args:
+            filepath: Path to audio file
+            force_single: Do not divide an oversized file into multiple chunks.
+
+        Returns:
+            ChunkingResult with FLAC chunks (or the original file)
+        """
+        if not self.is_available():
+            return ChunkingResult(success=False, error="FFmpeg not available on PATH")
+
+        audio_info = self.get_audio_info(filepath)
+        if not audio_info:
+            return ChunkingResult(success=False, error=f"Could not analyze audio file: {filepath}")
+
+        ext_supported = filepath.suffix.lower() in GROQ_SUPPORTED_EXTS
+
+        # Small enough already and Groq accepts the container as-is → no work
+        if audio_info.size_bytes <= GROQ_TARGET_CHUNK_BYTES and ext_supported:
+            print_info(f"Audio is {audio_info.size_mb:.1f} MB with a supported container, no chunking needed")
+            return ChunkingResult(
+                success=True,
+                chunks=[
+                    AudioChunk(
+                        path=filepath,
+                        index=0,
+                        start_time=0.0,
+                        end_time=audio_info.duration_seconds,
+                        duration=audio_info.duration_seconds,
+                        size_bytes=audio_info.size_bytes,
+                    )
+                ],
+                original_info=audio_info,
+            )
+
+        # FLAC speech size is influenced more by content than by the source
+        # codec's bitrate. Use the conservative 32 kB/s estimate even when a
+        # low-bitrate compressed source would suggest a smaller output; add
+        # margin for unusually noisy/high-entropy material.
+        bytes_per_second = 32_000 * 1.1
+
+        total_duration = audio_info.duration_seconds
+        chunk_duration = max(30, int((GROQ_TARGET_CHUNK_BYTES / bytes_per_second) / 10) * 10)
+        chunk_duration = min(chunk_duration, 1800)
+
+        # A small unsupported container only needs conversion, not splitting,
+        # regardless of its duration.
+        if force_single or audio_info.size_bytes <= GROQ_TARGET_CHUNK_BYTES:
+            num_chunks = 1
+        else:
+            num_chunks = max(1, -(-int(total_duration) // int(chunk_duration)))
+            even_duration = total_duration / num_chunks
+            while even_duration > chunk_duration and num_chunks < 200:
+                num_chunks += 1
+                even_duration = total_duration / num_chunks
+            if even_duration > chunk_duration:
+                return ChunkingResult(
+                    success=False, error="Audio is too long to split into a safe number of Groq chunks"
+                )
+
+        temp_dir = Path(tempfile.mkdtemp(prefix="groq_chunks_"))
+        chunks: List[AudioChunk] = []
+        try:
+            if num_chunks == 1:
+                print_info("Transcoding to 16 kHz mono FLAC for Groq...")
+            else:
+                print_info(
+                    f"Splitting {audio_info.size_mb:.1f} MB audio into {num_chunks} FLAC chunks "
+                    f"(~{total_duration / num_chunks:.0f}s each)"
+                )
+
+            for i in range(num_chunks):
+                start = i * total_duration / num_chunks
+                end = total_duration if i == num_chunks - 1 else (i + 1) * total_duration / num_chunks
+                dur = end - start
+                if dur <= 0.001:
+                    continue
+                out = temp_dir / f"chunk_{i:03d}.flac"
+                cmd = [
+                    get_ffmpeg_path(),
+                    "-y",
+                    "-i",
+                    str(filepath),
+                    "-ss",
+                    f"{start:.6f}",
+                    "-t",
+                    f"{dur:.6f}",
+                    "-vn",
+                    "-ar",
+                    "16000",
+                    "-ac",
+                    "1",
+                    "-map",
+                    "0:a",
+                    "-c:a",
+                    "flac",
+                    str(out),
+                ]
+                result = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=600, creationflags=get_creation_flags()
+                )
+                if result.returncode != 0:
+                    raise RuntimeError(f"FFmpeg chunking failed: {format_ffmpeg_error(result.stderr)}")
+
+                chunk_size = out.stat().st_size
+                if chunk_size > GROQ_TARGET_CHUNK_BYTES:
+                    # Very unusual with FLAC; warn but attempt (Groq returns 413 otherwise)
+                    print_warning(
+                        f"Groq chunk {i + 1} is {chunk_size / (1024 * 1024):.1f} MB "
+                        f"(over {GROQ_TARGET_CHUNK_BYTES / (1024 * 1024):.0f} MB target); attempting anyway"
+                    )
+                chunks.append(
+                    AudioChunk(path=out, index=i, start_time=start, end_time=end, duration=dur, size_bytes=chunk_size)
+                )
+
+            return ChunkingResult(success=True, chunks=chunks, temp_dir=temp_dir, original_info=audio_info)
         except Exception as e:
             shutil.rmtree(temp_dir, ignore_errors=True)
             return ChunkingResult(success=False, error=str(e))

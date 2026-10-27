@@ -128,6 +128,71 @@ class TestProfileResolverOverrides(unittest.TestCase):
         self.assertEqual(cfg["language_codes"], ["es-ES"])
         self.assertEqual(cfg["custom_vocabulary"], ["Kubernetes", "BigQuery"])
 
+    def test_transcription_profile_groq_engine_resolution(self):
+        """Groq-engine transcription profiles route to the groq key pool."""
+        from unittest.mock import MagicMock
+
+        transcribe_profile = ConnectionProfile(
+            provider="transcription",
+            model="whisper-large-v3-turbo",
+            transcribe_engine="groq",
+            transcribe_language="en-US",
+            groq_response_format="verbose_json",
+            groq_timestamp_granularity="word",
+            groq_temperature=0.2,
+        )
+        self.store._profiles["GroqProf"] = transcribe_profile.to_dict()
+
+        groq_km = MagicMock()
+        key_managers = {"google": MagicMock(), "groq": groq_km}
+
+        action = {"connection_profile": "GroqProf"}
+        resolved = resolve_profile(action, {}, {}, key_managers)
+
+        self.assertEqual(resolved.provider, "transcription")
+        self.assertEqual(resolved.model, "whisper-large-v3-turbo")
+        self.assertEqual(resolved.config.get("transcription_model"), "whisper-large-v3-turbo")
+        self.assertEqual(resolved.config.get("transcription_engine"), "groq")
+        self.assertEqual(resolved.config.get("groq_model"), "whisper-large-v3-turbo")
+        # Must NOT set google_model for a Groq-engine profile
+        self.assertIsNone(resolved.config.get("google_model"))
+        # Key manager drawn from the groq pool
+        self.assertIn("transcription", resolved.key_managers)
+        self.assertEqual(resolved.key_managers["transcription"], groq_km)
+        self.assertEqual(resolved.key_managers["groq"], groq_km)
+
+        # to_transcribe_config includes engine + groq keys
+        cfg = transcribe_profile.to_transcribe_config()
+        self.assertEqual(cfg["engine"], "groq")
+        self.assertEqual(cfg["model"], "whisper-large-v3-turbo")
+        self.assertEqual(cfg["groq_response_format"], "verbose_json")
+        self.assertEqual(cfg["groq_timestamp_granularity"], "word")
+        self.assertEqual(cfg["groq_temperature"], 0.2)
+        self.assertEqual(cfg["language_codes"], ["en-US"])
+
+    def test_transcription_profile_gemini_engine_backward_compat(self):
+        """Existing Gemini transcription profiles keep default engine routing."""
+        from unittest.mock import MagicMock
+
+        transcribe_profile = ConnectionProfile(provider="transcription", model="gemini-3.5-transcribe")
+        self.store._profiles["GeminiProf"] = transcribe_profile.to_dict()
+
+        google_km = MagicMock()
+        key_managers = {"google": google_km, "groq": MagicMock()}
+
+        action = {"connection_profile": "GeminiProf"}
+        resolved = resolve_profile(action, {}, {}, key_managers)
+
+        self.assertEqual(resolved.config.get("transcription_engine"), "gemini")
+        self.assertEqual(resolved.config.get("google_model"), "gemini-3.5-transcribe")
+        self.assertNotIn("groq_model", resolved.config)
+        self.assertEqual(resolved.key_managers["transcription"], google_km)
+
+        cfg = transcribe_profile.to_transcribe_config()
+        self.assertEqual(cfg["engine"], "gemini")
+        self.assertEqual(cfg["groq_response_format"], "text")
+        self.assertIsNone(cfg["groq_temperature"])
+
     def test_connection_profile_manager_on_provider_change_transcribe_mode(self):
         import tkinter as tk
 

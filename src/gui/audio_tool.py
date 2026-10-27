@@ -266,10 +266,11 @@ class AudioToolApp:
                         audio_data=audio_data,
                         mime_type=mime_type,
                         resolved=resolved,
-                        profile_name=profile_name,
+                        profile_name=resolved.profile_name or profile_name,
                         callback_progress=callback_progress,
                         callback_success=callback_success,
                         callback_error=callback_error,
+                        system_prompt=system_prompt,
                     )
                     return
 
@@ -355,8 +356,9 @@ class AudioToolApp:
         callback_progress: Optional[Callable[[str], None]],
         callback_success: Optional[Callable[[str, int], None]],
         callback_error: Optional[Callable[[str], None]],
+        system_prompt: str = "",
     ):
-        """Process audio using the dedicated transcription API (gemini-3.5-transcribe)."""
+        """Process audio using a dedicated transcription backend (Gemini or Groq)."""
         temp_file_path = None
         try:
             if callback_progress:
@@ -366,21 +368,44 @@ class AudioToolApp:
             from ..connection_profiles import ProfileStore
 
             transcribe_config = None
-            if profile_name:
-                store = ProfileStore.get_instance()
-                profile = store.get_profile(profile_name)
-                if profile and profile.provider == "transcription":
-                    transcribe_config = profile.to_transcribe_config()
+            store = ProfileStore.get_instance()
+            profile = store.get_profile(profile_name) if profile_name else store.get_active_profile()
+            if profile and profile.provider == "transcription":
+                transcribe_config = profile.to_transcribe_config()
 
             if not transcribe_config:
+                engine = (
+                    resolved.config.get("transcription_engine")
+                    or ("groq" if (resolved.model or "").lower().startswith("whisper-") else "gemini")
+                ).lower()
                 transcribe_config = {
-                    "model": resolved.model or "gemini-3.5-transcribe",
+                    "engine": engine,
+                    "model": resolved.model
+                    or ("whisper-large-v3-turbo" if engine == "groq" else "gemini-3.5-transcribe"),
                     "mode": "VERBATIM",
                     "diarization": False,
                     "word_timestamp": False,
                     "language_codes": [],
                     "custom_vocabulary": [],
+                    "groq_response_format": "text",
+                    "groq_timestamp_granularity": "segment",
+                    "groq_temperature": None,
                 }
+
+            # Route to the Groq (Whisper) backend when the engine demands it
+            engine = (transcribe_config.get("engine") or "gemini").lower()
+            if engine == "groq":
+                self._process_transcription_groq(
+                    audio_data,
+                    mime_type,
+                    transcribe_config,
+                    resolved,
+                    callback_progress,
+                    callback_success,
+                    callback_error,
+                    system_prompt=system_prompt,
+                )
+                return
 
             # Get google key manager (transcription uses Google API)
             key_manager = resolved.key_managers.get("google") or resolved.key_managers.get("transcription")
@@ -532,6 +557,164 @@ class AudioToolApp:
 
         except Exception as e:
             logging.error(f"[AudioTool] Transcription error: {e}")
+            if callback_error:
+                callback_error(str(e))
+        finally:
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                except Exception:
+                    pass
+
+    def _process_transcription_groq(
+        self,
+        audio_data: bytes,
+        mime_type: str,
+        transcribe_config: Dict[str, Any],
+        resolved: Any,
+        callback_progress: Optional[Callable[[str], None]],
+        callback_success: Optional[Callable[[str, int], None]],
+        callback_error: Optional[Callable[[str], None]],
+        system_prompt: str = "",
+    ):
+        """Process audio via Groq's Whisper transcription API (size-based chunking)."""
+        from ..providers import groq_transcription
+        from ..request_pipeline import RequestContext, RequestOrigin, RequestPipeline
+        from ..tools.audio_processor import (
+            GROQ_TARGET_CHUNK_BYTES,
+            AudioProcessor,
+            adjust_transcript_timestamps,
+            merge_transcribe_transcripts,
+        )
+
+        temp_file_path = None
+        try:
+            if callback_progress:
+                callback_progress("Preparing Groq transcription...")
+
+            key_manager = resolved.key_managers.get("groq") or resolved.key_managers.get("transcription")
+            if not key_manager or not key_manager.has_keys():
+                if callback_error:
+                    callback_error("No Groq API key available (add a key to the 'groq' pool)")
+                return
+            api_key = key_manager.get_current_key()
+            if not api_key:
+                if callback_error:
+                    callback_error("No Groq API key available")
+                return
+
+            model = transcribe_config.get("model") or "whisper-large-v3-turbo"
+            language = (
+                transcribe_config.get("language_codes", [""])[0] if transcribe_config.get("language_codes") else ""
+            )
+            response_format = transcribe_config.get("groq_response_format", "text")
+            timestamp_granularity = transcribe_config.get("groq_timestamp_granularity", "segment")
+            temperature = transcribe_config.get("groq_temperature")
+
+            # Determine file extension for temp file
+            ext = ".wav"
+            if "ogg" in mime_type:
+                ext = ".ogg"
+            elif "mpeg" in mime_type or "mp3" in mime_type:
+                ext = ".mp3"
+            elif "webm" in mime_type:
+                ext = ".webm"
+            elif "mp4" in mime_type:
+                ext = ".mp4"
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as f:
+                f.write(audio_data)
+                temp_file_path = f.name
+
+            audio_proc = AudioProcessor()
+            audio_info = audio_proc.get_audio_info(Path(temp_file_path)) if audio_proc.is_available() else None
+            file_size = Path(temp_file_path).stat().st_size
+            supported_container = Path(temp_file_path).suffix.lower() in groq_transcription.GROQ_SUPPORTED_EXTS
+
+            split_res = None
+            try:
+                if file_size > GROQ_TARGET_CHUNK_BYTES:
+                    if callback_progress:
+                        callback_progress(
+                            f"Splitting audio ({file_size / (1024 * 1024):.1f} MB over "
+                            f"{GROQ_TARGET_CHUNK_BYTES / (1024 * 1024):.0f} MB limit)..."
+                        )
+                    split_res = audio_proc.split_audio_for_groq(Path(temp_file_path))
+                    if not split_res.success:
+                        if callback_error:
+                            callback_error(f"Failed to split audio: {split_res.error}")
+                        return
+                    chunks = split_res.chunks
+                elif not supported_container:
+                    # Unsupported container: transcode to FLAC
+                    if callback_progress:
+                        callback_progress("Converting audio to FLAC...")
+                    split_res = audio_proc.split_audio_for_groq(Path(temp_file_path))
+                    if not split_res.success:
+                        if callback_error:
+                            callback_error(f"Failed to convert audio: {split_res.error}")
+                        return
+                    chunks = split_res.chunks
+                else:
+                    from ..tools.audio_processor import AudioChunk
+
+                    chunks = [
+                        AudioChunk(
+                            path=Path(temp_file_path),
+                            index=0,
+                            start_time=0.0,
+                            end_time=audio_info.duration_seconds if audio_info else 0.0,
+                            duration=audio_info.duration_seconds if audio_info else 0.0,
+                            size_bytes=audio_info.size_bytes if audio_info else file_size,
+                        )
+                    ]
+
+                chunk_outputs = []
+                num_chunks = len(chunks)
+                for i, chunk in enumerate(chunks):
+                    if callback_progress:
+                        rng = f" ({chunk.time_range_str})" if num_chunks > 1 else ""
+                        callback_progress(f"Transcribing via Groq [{i + 1}/{num_chunks}]{rng}...")
+
+                    request_ctx = RequestPipeline.execute_side_operation(
+                        RequestContext(
+                            origin=RequestOrigin.AUDIO_TOOL,
+                            provider="groq",
+                            model=model,
+                            streaming=False,
+                            thinking_enabled=False,
+                        ),
+                        lambda chunk_path=chunk.path: groq_transcription.transcribe_file(
+                            chunk_path,
+                            api_key=api_key,
+                            model=model,
+                            language=language,
+                            prompt=system_prompt.strip()[: groq_transcription.GROQ_PROMPT_MAX_CHARS],
+                            temperature=temperature,
+                            response_format=response_format,
+                            timestamp_granularity=timestamp_granularity,
+                        ),
+                    )
+                    chunk_text, err = request_ctx.response_text, request_ctx.error
+                    if err:
+                        if callback_error:
+                            callback_error(f"Transcription failed for chunk {i + 1}: {err}")
+                        return
+
+                    if chunk_text:
+                        if chunk.start_time > 0 and response_format == "verbose_json":
+                            chunk_text = adjust_transcript_timestamps(chunk_text, chunk.start_time)
+                        chunk_outputs.append((chunk, chunk_text))
+
+                merged = merge_transcribe_transcripts(chunk_outputs)
+                if callback_success:
+                    callback_success(merged, len(merged.split()))
+            finally:
+                if split_res:
+                    split_res.cleanup()
+
+        except Exception as e:
+            logging.error(f"[AudioTool] Groq transcription error: {e}")
             if callback_error:
                 callback_error(str(e))
         finally:

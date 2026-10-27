@@ -88,6 +88,8 @@ FALLBACK_MODELS: dict[str, list[str]] = {
     ],
     "transcription": [
         "gemini-3.5-transcribe",
+        "whisper-large-v3",
+        "whisper-large-v3-turbo",
     ],
 }
 

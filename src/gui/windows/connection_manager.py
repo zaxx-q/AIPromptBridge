@@ -55,6 +55,7 @@ PROFILE_FIELDS = [
         ["google", "anthropic", "openai", "openrouter", "xai", "mistral", "cohere", "custom", "transcription"],
     ),
     ("model", "Model", "model_dropdown", None),
+    ("transcribe_engine", "Transcribe Engine", "combobox", ["gemini", "groq"]),
     ("enabled", "Enabled", "toggle", None),
     ("streaming", "Streaming", "toggle", None),
     ("thinking", "Thinking", "toggle", None),
@@ -70,6 +71,9 @@ PROFILE_FIELDS = [
     ("transcribe_timestamps", "Word Timestamps", "toggle", None),
     ("transcribe_language", "Language Hint", "entry", None),
     ("transcribe_vocabulary", "Custom Vocabulary", "entry", None),
+    ("groq_response_format", "Response Format", "combobox", ["text", "json", "verbose_json"]),
+    ("groq_timestamp_granularity", "Timestamp Granularity", "combobox", ["segment", "word"]),
+    ("groq_temperature", "Temperature (0-1)", "entry", None),
     ("api_key_name", "API Key Name", "key_name_dropdown", None),
     ("api_key_pool", "API Key Pool", "combobox", None),
 ]
@@ -88,11 +92,15 @@ PROVIDER_FIELD_VISIBILITY = {
     "request_timeout": _ALL_NON_TRANSCRIPTION,
     "base_url": _ALL_NON_TRANSCRIPTION,
     # Transcription-specific fields:
+    "transcribe_engine": {"transcription"},
     "transcribe_mode": {"transcription"},
     "transcribe_diarization": {"transcription"},
     "transcribe_timestamps": {"transcription"},
     "transcribe_language": {"transcription"},
     "transcribe_vocabulary": {"transcription"},
+    "groq_response_format": {"transcription"},
+    "groq_timestamp_granularity": {"transcription"},
+    "groq_temperature": {"transcription"},
 }
 
 # Thinking sub-fields that require thinking toggle to be ON
@@ -121,8 +129,12 @@ FIELD_HELP = {
     "transcribe_mode": "VERBATIM: exact word-for-word transcript. SMART: removes filler words, applies formatting. Smart mode is incompatible with diarization and timestamps.",
     "transcribe_diarization": "Identify and label distinct speakers (spk_1, spk_2, etc.). Supports up to 8 speakers. Only available in VERBATIM mode.",
     "transcribe_timestamps": "Include word-level start/end timestamps. May slightly reduce accuracy. Only available in VERBATIM mode.",
-    "transcribe_language": "BCP-47 language code (e.g., 'en-US', 'es-ES', 'ja-JP'). Leave empty for auto-detection with code-switching support.",
+    "transcribe_language": "Language code hint. Gemini wants BCP-47 (e.g., 'en-US'); Groq uses ISO-639-1 (e.g., 'en') — longer codes are auto-normalized. Leave empty for auto-detection.",
     "transcribe_vocabulary": "Comma-separated domain terms, acronyms, or proper names to improve recognition (up to 1000 terms). Example: Kubernetes, BigQuery, gRPC",
+    "transcribe_engine": "Transcription backend: 'gemini' (gemini-3.5-transcribe via Files API) or 'groq' (Whisper models via Groq's fast speech-to-text API).",
+    "groq_response_format": "Groq response format: 'text' (plain transcript), 'json' (JSON with text field), or 'verbose_json' (includes segments/words with timestamps).",
+    "groq_timestamp_granularity": "Timestamp granularity for verbose_json responses: 'segment' or 'word'. Only meaningful with verbose_json.",
+    "groq_temperature": "Groq sampling temperature (0-1). Leave empty for the API default (0).",
     "api_key_name": "Use a specific named key from the pool. When set, key rotation is disabled and only this key will be used. Leave empty to use pool rotation.",
     "api_key_pool": "Override which key pool this profile uses. Leave empty to use provider default.",
 }
@@ -146,6 +158,10 @@ SUMMARY_ICONS = {
     "transcribe_timestamps": "⏱️",
     "transcribe_language": "🌐",
     "transcribe_vocabulary": "📖",
+    "transcribe_engine": "🛠️",
+    "groq_response_format": "📨",
+    "groq_timestamp_granularity": "⏬",
+    "groq_temperature": "🌡️",
     "api_key_name": "🔑",
     "api_key_pool": "🗝️",
 }
@@ -657,7 +673,11 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
     def _build_combobox_field(self, row, key: str, label: str, options: list, c: ThemeColors):
         """Build a combobox/dropdown field."""
         var = tk.StringVar()
-        command = self._on_provider_change if key in ("provider", "transcribe_mode") else None
+        command = (
+            self._on_provider_change
+            if key in ("provider", "transcribe_mode", "transcribe_engine", "groq_response_format")
+            else None
+        )
         is_required = key in REQUIRED_FIELDS
 
         if self.use_ctk:
@@ -787,15 +807,46 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 row.pack(fill="x", pady=3)
 
         # Transcription provider SMART mode constraints
+        transcribe_engine = ""
         if provider == "transcription":
-            mode_info = self.field_widgets.get("transcribe_mode")
-            mode = mode_info["var"].get() if mode_info else "VERBATIM"
-            if mode == "SMART":
-                # Hide diarization and timestamps (incompatible with SMART mode)
-                for key in ("transcribe_diarization", "transcribe_timestamps"):
+            engine_info = self.field_widgets.get("transcribe_engine")
+            transcribe_engine = (engine_info["var"].get() if engine_info else "gemini") or "gemini"
+
+            if transcribe_engine == "groq":
+                # Groq engine: hide Gemini-only fields, show Groq fields
+                for key in (
+                    "transcribe_mode",
+                    "transcribe_diarization",
+                    "transcribe_timestamps",
+                    "transcribe_vocabulary",
+                ):
                     row = self.field_rows.get(key)
                     if row:
                         row.pack_forget()
+            else:
+                # Gemini engine: hide Groq fields
+                for key in ("groq_response_format", "groq_timestamp_granularity", "groq_temperature"):
+                    row = self.field_rows.get(key)
+                    if row:
+                        row.pack_forget()
+
+                mode_info = self.field_widgets.get("transcribe_mode")
+                mode = mode_info["var"].get() if mode_info else "VERBATIM"
+                if mode == "SMART":
+                    # Hide diarization and timestamps (incompatible with SMART mode)
+                    for key in ("transcribe_diarization", "transcribe_timestamps"):
+                        row = self.field_rows.get(key)
+                        if row:
+                            row.pack_forget()
+
+        # Timestamp granularity only meaningful with verbose_json
+        if provider == "transcription" and transcribe_engine == "groq":
+            fmt_info = self.field_widgets.get("groq_response_format")
+            fmt_val = fmt_info["var"].get() if fmt_info else "text"
+            gran_row = self.field_rows.get("groq_timestamp_granularity")
+            if gran_row:
+                if fmt_val != "verbose_json":
+                    gran_row.pack_forget()
 
         # Dynamic bold for base_url label when provider is custom
         if self._custom_url_label:
@@ -821,14 +872,25 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         # Refresh key name options when provider changes
         self._update_api_key_name_options()
 
-        # Populate model dropdown with fallback list so it's never empty
+        # Populate model dropdown with fallback list so it's never empty.
+        # Transcription model options follow the selected engine, and changing
+        # engines replaces an incompatible model with a valid default.
         fallback = get_fallback_models(provider)
+        if provider == "transcription":
+            engine_info = self.field_widgets.get("transcribe_engine")
+            engine = (engine_info["var"].get() if engine_info else "gemini") or "gemini"
+            fallback = (
+                [m for m in fallback if m.startswith("whisper-")]
+                if engine == "groq"
+                else [m for m in fallback if "transcribe" in m]
+            )
         if fallback and self._model_dropdown_widget:
             model_info = self.field_widgets.get("model")
             current_model = model_info["var"].get() if model_info else ""
             self._model_dropdown_widget.configure(values=fallback)
-            # Only override if the current model field is empty/blank
-            if model_info and not current_model.strip():
+            if model_info and (
+                not current_model.strip() or (provider == "transcription" and current_model not in fallback)
+            ):
                 model_info["var"].set(fallback[0])
 
     # ─── Key Name Options ────────────────────────────────────────────────
@@ -853,6 +915,10 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 # Use provider's default pool
                 provider_info = self.field_widgets.get("provider")
                 provider = provider_info["var"].get() if provider_info else ""
+                if provider == "transcription":
+                    engine_info = self.field_widgets.get("transcribe_engine")
+                    engine = (engine_info["var"].get() if engine_info else "gemini") or "gemini"
+                    provider = "groq" if engine == "groq" else "google"
                 pool_id = key_store.get_provider_pool_id(provider) if provider else ""
 
             # Fetch key names from pool
@@ -881,6 +947,9 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
         provider = provider_info["var"].get() if provider_info else ""
         if not provider:
             self._set_model_status("Select provider first", "error")
+            return
+        if provider == "transcription":
+            self._set_model_status("Use the built-in Gemini / Groq model list", "info")
             return
 
         base_url_info = self.field_widgets.get("base_url")
@@ -1151,11 +1220,29 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 # Thinking sub-fields visibility
                 elif key_field in THINKING_FIELDS and not thinking_enabled:
                     visible = False
-                # Transcription SMART mode visibility constraints
-                elif provider == "transcription" and key_field in ("transcribe_diarization", "transcribe_timestamps"):
-                    mode_info = self.field_widgets.get("transcribe_mode")
-                    if mode_info and mode_info["var"].get() == "SMART":
-                        visible = False
+                # Transcription engine visibility constraints
+                elif provider == "transcription":
+                    engine_info = self.field_widgets.get("transcribe_engine")
+                    engine = (engine_info["var"].get() if engine_info else "gemini") or "gemini"
+                    if engine == "groq":
+                        if key_field in (
+                            "transcribe_mode",
+                            "transcribe_diarization",
+                            "transcribe_timestamps",
+                            "transcribe_vocabulary",
+                        ):
+                            visible = False
+                    else:
+                        if key_field in ("groq_response_format", "groq_timestamp_granularity", "groq_temperature"):
+                            visible = False
+                        elif key_field in ("transcribe_diarization", "transcribe_timestamps"):
+                            mode_info = self.field_widgets.get("transcribe_mode")
+                            if mode_info and mode_info["var"].get() == "SMART":
+                                visible = False
+                    if engine == "groq" and key_field == "groq_timestamp_granularity":
+                        fmt_info = self.field_widgets.get("groq_response_format")
+                        if fmt_info and fmt_info["var"].get() != "verbose_json":
+                            visible = False
 
             # Get display value
             val = ""
@@ -1379,7 +1466,7 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 profile[key] = widget_info["var"].get()
             elif widget_info["type"] in ("entry", "combobox", "model_dropdown", "key_name_dropdown"):
                 val = widget_info["var"].get().strip()
-                if key == "temperature":
+                if key in ("temperature", "groq_temperature"):
                     try:
                         profile[key] = float(val) if val else None
                     except ValueError:
@@ -1500,6 +1587,18 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
             errors.append("Model is required")
         if profile_data.get("provider") == "custom" and not profile_data.get("base_url"):
             errors.append("Base URL is required for custom provider")
+
+        # Transcription engine/model consistency and Groq parameter bounds
+        if profile_data.get("provider") == "transcription":
+            engine = (profile_data.get("transcribe_engine") or "gemini").lower()
+            model_id = (profile_data.get("model") or "").lower()
+            if engine == "groq" and model_id and not model_id.startswith("whisper-"):
+                errors.append("Groq transcription engine requires a whisper-* model (e.g. whisper-large-v3-turbo)")
+            elif engine == "gemini" and model_id and "transcribe" not in model_id:
+                errors.append("Gemini transcription engine requires a transcribe model (e.g. gemini-3.5-transcribe)")
+            groq_temperature = profile_data.get("groq_temperature")
+            if groq_temperature is not None and not 0 <= groq_temperature <= 1:
+                errors.append("Groq temperature must be between 0 and 1")
 
         if errors:
             messagebox.showwarning("Validation", "\n".join(errors), parent=self)

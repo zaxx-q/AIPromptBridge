@@ -306,7 +306,13 @@ def parse_scripted_options(
     large = data.get("large_file_mode", LARGE_FILE_MODE_FILES_API)
     if large not in LARGE_FILE_MODES:
         errors["large_file_mode"] = "Unsupported large file mode"
-    if profile and large == LARGE_FILE_MODE_FILES_API and profile.provider != "google":
+    is_groq_transcription_profile = bool(
+        profile
+        and profile.provider == "transcription"
+        and (getattr(profile, "transcribe_engine", "gemini") or "gemini").lower() == "groq"
+    )
+    is_transcription_profile = bool(profile and profile.provider == "transcription")
+    if profile and large == LARGE_FILE_MODE_FILES_API and profile.provider != "google" and not is_transcription_profile:
         errors["large_file_mode"] = "Files API requires a Google profile"
     pdf = data.get("pdf", {"split": False, "page_range": "all"})
     if (
@@ -327,11 +333,15 @@ def parse_scripted_options(
         ):
             errors["transcription"] = "Requires a transcription prompt or profile"
         else:
-            mode = transcription.get("mode", "VERBATIM")
-            if mode not in {"VERBATIM", "SMART"}:
-                errors["transcription.mode"] = "Must be VERBATIM or SMART"
-            if mode == "SMART" and (transcription.get("diarization") or transcription.get("word_timestamp")):
-                errors["transcription"] = "SMART does not support diarization or word timestamps"
+            # Gemini-only constraints (mode/diarization/word_timestamp are
+            # Gemini constructs; Groq does not support them)
+            engine = (transcription.get("engine") or getattr(profile, "transcribe_engine", None) or "gemini").lower()
+            if engine != "groq":
+                mode = transcription.get("mode", "VERBATIM")
+                if mode not in {"VERBATIM", "SMART"}:
+                    errors["transcription.mode"] = "Must be VERBATIM or SMART"
+                if mode == "SMART" and (transcription.get("diarization") or transcription.get("word_timestamp")):
+                    errors["transcription"] = "SMART does not support diarization or word timestamps"
             if any(not isinstance(x, str) or not x.strip() for x in transcription.get("language_codes", [])):
                 errors["transcription.language_codes"] = "Must contain non-empty strings"
             if any(not isinstance(x, str) for x in transcription.get("custom_vocabulary", [])):
