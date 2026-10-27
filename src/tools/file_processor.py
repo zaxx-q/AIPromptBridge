@@ -79,6 +79,9 @@ LARGE_FILE_MODE_FILES_API = "files_api"
 LARGE_FILE_MODE_CHUNKING = "chunking"
 LARGE_FILE_MODE_SKIP = "skip"
 
+# Export mode sentinel — not a real connection profile
+EXPORT_MODE_PROFILE = "__export__"
+
 
 def _groq_srt_words_per_cue(transcribe_config: Dict[str, Any]) -> int:
     """Map the profile's SRT cue preset to the maximum words per cue."""
@@ -143,6 +146,340 @@ class FileProcessor(BaseTool):
         self._custom_instructions: Optional[str] = None  # Batch-wide instructions
         self._ask_per_file: bool = False  # Whether to prompt for per-file instructions
         self._include_filename: bool = True  # Whether to include filename in context
+        self._export_path: Optional[str] = None  # Export directory for export mode
+        self._last_output_path: Optional[str] = None  # Stashed from Step 3 for export default
+
+    # ─────────────────────────────────────────────────────────────────
+    # Export Mode Helpers
+    # ─────────────────────────────────────────────────────────────────
+
+    def _is_export_mode(self) -> bool:
+        """Check if current checkpoint is in export mode (no API calls)."""
+        cp = self._current_checkpoint
+        return cp is not None and getattr(cp, "profile_name", None) == EXPORT_MODE_PROFILE
+
+    def _export_text_file(self, filepath: Path, prompt: str, export_dir: Path, interactive: bool) -> None:
+        """Export a text/code file by embedding its content into the prompt."""
+        _content_type, content, _mime_type = self.file_handler.read_file(filepath)
+
+        file_type = self.file_handler.detect_type(filepath)
+        if file_type == "code":
+            ext = filepath.suffix.lower().lstrip(".")
+            lang_map = {
+                "py": "python",
+                "js": "javascript",
+                "ts": "typescript",
+                "java": "java",
+                "c": "c",
+                "cpp": "cpp",
+                "go": "go",
+                "rs": "rust",
+                "rb": "ruby",
+                "php": "php",
+                "cs": "csharp",
+                "html": "html",
+                "css": "css",
+                "json": "json",
+                "xml": "xml",
+                "yaml": "yaml",
+                "yml": "yaml",
+                "sql": "sql",
+                "md": "markdown",
+                "sh": "bash",
+                "bash": "bash",
+                "zsh": "bash",
+            }
+            lang = lang_map.get(ext, ext)
+            file_content = f"```{lang}\n{content}\n```"
+        else:
+            file_content = content
+
+        if self._include_filename:
+            full_prompt = f'{prompt}\n\n<file_content filename="{filepath.name}">\n{file_content}\n</file_content>'
+        else:
+            full_prompt = f"{prompt}\n\n<file_content>\n{file_content}\n</file_content>"
+
+        output_name = f"{filepath.stem}_prompt.txt"
+        output_path = export_dir / output_name
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(full_prompt)
+
+        if interactive:
+            print(f"   ✅ → {output_name} (prompt with embedded content)")
+
+    def _export_binary_file(self, filepath: Path, prompt: str, export_dir: Path, interactive: bool) -> None:
+        """Export an image or document file: copy original + write companion prompt."""
+        import shutil
+
+        dest = export_dir / filepath.name
+        if dest.exists():
+            stem = filepath.stem
+            suffix = filepath.suffix
+            counter = 1
+            while dest.exists():
+                dest = export_dir / f"{stem}_{counter}{suffix}"
+                counter += 1
+
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(filepath, dest)
+
+        prompt_with_filename = prompt
+        if self._include_filename:
+            prompt_with_filename = f"{prompt}\n\n[File: {filepath.name}]"
+
+        prompt_path = export_dir / f"{dest.stem}_prompt.txt"
+        with open(prompt_path, "w", encoding="utf-8") as f:
+            f.write(prompt_with_filename)
+
+        if interactive:
+            print(f"   ✅ → {dest.name} + {prompt_path.name}")
+
+    def _export_audio_file(self, filepath: Path, prompt: str, export_dir: Path, interactive: bool) -> None:
+        """Export an audio file: preprocess, optimize, chunk if needed, then copy + prompt files."""
+        import shutil
+
+        process_path, preprocess_result = self._preprocess_audio_if_needed(filepath, interactive)
+
+        try:
+            file_size = process_path.stat().st_size
+            is_large = file_size > MAX_INLINE_SIZE
+
+            force_no_chunk = False
+            if self._audio_preprocessing:
+                force_no_chunk = self._audio_preprocessing.get("force_no_chunking", False)
+
+            if is_large and not force_no_chunk and is_audio_file(process_path):
+                if interactive:
+                    print(f"   ✂️ Splitting audio ({file_size / (1024 * 1024):.1f} MB)...")
+
+                chunk_result = self.audio_processor.split_audio(process_path)
+                if not chunk_result.success:
+                    raise Exception(f"Chunking failed: {chunk_result.error}")
+
+                if interactive:
+                    print(f"   📊 {len(chunk_result.chunks)} chunks created")
+
+                try:
+                    total_chunks = len(chunk_result.chunks)
+                    for ci, chunk in enumerate(chunk_result.chunks):
+                        chunk_name = f"{filepath.stem}_chunk{ci + 1:03d}{chunk.path.suffix}"
+                        chunk_dest = export_dir / chunk_name
+                        shutil.copy2(chunk.path, chunk_dest)
+
+                        # Build chunk-specific prompt (mirrors _process_audio_with_chunking)
+                        chunk_prompt = prompt
+                        if total_chunks > 1 and chunk.start_time > 0:
+                            m, s = divmod(int(chunk.start_time), 60)
+                            h, m = divmod(m, 60)
+                            offset_str = f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m:02d}:{s:02d}"
+
+                            overlap_note = ""
+                            if chunk.overlap_duration > 0:
+                                overlap_note = (
+                                    f" The first ~{chunk.overlap_duration:.0f} seconds of this segment "
+                                    f"overlap with the end of the previous segment — use that overlap "
+                                    f"for context continuity but avoid duplicating content from it."
+                                )
+
+                            chunk_prompt = (
+                                f"{prompt}\n\n"
+                                f"IMPORTANT: This is part {ci + 1} of {total_chunks} from a longer recording. "
+                                f"This segment starts at {offset_str} in the full audio. "
+                                f"If you include any timestamps, they must be relative to the full recording "
+                                f"(i.e. start from {offset_str}, not from 00:00).{overlap_note}"
+                            )
+                        elif total_chunks > 1 and ci == 0 and chunk.overlap_duration > 0:
+                            chunk_prompt = (
+                                f"{prompt}\n\n"
+                                f"IMPORTANT: This is part 1 of {total_chunks} from a longer recording. "
+                                f"The last ~{chunk.overlap_duration:.0f} seconds of this segment overlap "
+                                f"with the beginning of the next segment for context continuity."
+                            )
+
+                        prompt_path = export_dir / f"{filepath.stem}_chunk{ci + 1:03d}_prompt.txt"
+                        with open(prompt_path, "w", encoding="utf-8") as f:
+                            f.write(chunk_prompt)
+
+                        if interactive:
+                            print(f"   ✅ → {chunk_name} + {prompt_path.name}")
+                finally:
+                    # Clean up temp chunk files
+                    for chunk in chunk_result.chunks:
+                        try:
+                            if chunk.path.exists():
+                                chunk.path.unlink()
+                        except Exception:
+                            pass
+            else:
+                # Small file (or force no-chunk): copy the (possibly preprocessed) file
+                dest_name = filepath.stem + process_path.suffix
+                dest = export_dir / dest_name
+                if dest.exists():
+                    counter = 1
+                    while dest.exists():
+                        dest = export_dir / f"{filepath.stem}_{counter}{process_path.suffix}"
+                        counter += 1
+
+                shutil.copy2(process_path, dest)
+
+                prompt_with_filename = prompt
+                if self._include_filename:
+                    prompt_with_filename = f"{prompt}\n\n[File: {filepath.name}]"
+
+                prompt_path = export_dir / f"{dest.stem}_prompt.txt"
+                with open(prompt_path, "w", encoding="utf-8") as f:
+                    f.write(prompt_with_filename)
+
+                if interactive:
+                    print(f"   ✅ → {dest.name} + {prompt_path.name}")
+        finally:
+            if preprocess_result:
+                preprocess_result.cleanup()
+
+    def _execute_export(self, interactive: bool = True) -> ToolResult:
+        """
+        Export files and prompts without making any API calls.
+
+        For audio: preprocesses, optimizes, and chunks exactly as the API path would,
+        then copies the resulting files to the export directory with companion prompt files.
+        For images/documents: copies the original file + writes a companion prompt.
+        For text/code: embeds file content into the prompt text and writes a single .txt.
+
+        A manifest.json summarising the batch is always written to the export directory.
+        """
+        import json
+        from datetime import datetime
+
+        if not self._current_checkpoint:
+            return ToolResult(success=False, message="No checkpoint — processing not configured")
+
+        cp = self._current_checkpoint
+        remaining = cp.remaining_files
+        total = len(cp.input_files)
+
+        export_dir = Path(cp.export_path or "export")
+        export_dir.mkdir(parents=True, exist_ok=True)
+
+        if interactive:
+            self._print_header("📁 FILE PROCESSOR - Exporting Files")
+            print(f"\n📦 Exporting {len(remaining)} file(s) to: {export_dir}")
+            print(f"   Prompt: {cp.prompt_key}")
+            if cp.audio_preprocessing:
+                print("   Audio preprocessing: configured")
+            print("─" * 60)
+
+        self.status = ToolStatus.RUNNING
+        result = ToolResult(success=True, total_count=total)
+
+        manifest_entries: List[Dict[str, Any]] = []
+
+        for file_path in remaining:
+            file_path_obj = Path(file_path)
+            progress = f"[{len(cp.completed_files) + len(cp.failed_files) + 1}/{total}]"
+
+            if interactive:
+                print(f"\n{progress} Exporting: {file_path_obj.name}")
+
+            try:
+                is_audio = is_audio_file(file_path_obj)
+                file_type = self.file_handler.detect_type(file_path_obj)
+                if is_audio:
+                    file_type = "audio"
+
+                per_file_instructions = cp.per_file_instructions.get(str(file_path))
+                final_prompt = self._build_final_prompt(
+                    cp.prompt_text, self._custom_instructions, per_file_instructions
+                )
+
+                if file_type in ("text", "code"):
+                    self._export_text_file(file_path_obj, final_prompt, export_dir, interactive)
+                elif is_audio:
+                    self._export_audio_file(file_path_obj, final_prompt, export_dir, interactive)
+                else:
+                    self._export_binary_file(file_path_obj, final_prompt, export_dir, interactive)
+
+                manifest_entries.append(
+                    {
+                        "original_path": str(file_path_obj),
+                        "filename": file_path_obj.name,
+                        "type": file_type,
+                        "status": "exported",
+                    }
+                )
+
+                cp.mark_completed(file_path)
+                result.processed_count += 1
+
+            except Exception as e:
+                error_msg = str(e)
+                cp.mark_failed(file_path, error_msg)
+                result.add_error(file_path, error_msg)
+                if interactive:
+                    print(f"   ❌ Error: {error_msg}")
+
+                manifest_entries.append(
+                    {
+                        "original_path": str(file_path_obj),
+                        "filename": file_path_obj.name,
+                        "type": self.file_handler.detect_type(file_path_obj),
+                        "status": "failed",
+                        "error": error_msg,
+                    }
+                )
+
+            self.checkpoint_manager.save(cp)
+
+        # Write manifest.json
+        manifest = {
+            "exported_at": datetime.now().isoformat(),
+            "prompt_key": cp.prompt_key,
+            "prompt_text": cp.prompt_text,
+            "custom_instructions": cp.custom_instructions,
+            "audio_preprocessing": cp.audio_preprocessing,
+            "total_files": total,
+            "exported_count": result.processed_count,
+            "failed_count": result.failed_count,
+            "files": manifest_entries,
+        }
+        manifest_path = export_dir / "manifest.json"
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2, ensure_ascii=False)
+
+        if interactive:
+            print(f"\n📋 Manifest: {manifest_path}")
+
+        # Final summary
+        if interactive:
+            print("\n" + "─" * 60)
+            print(f"✅ Exported: {result.processed_count}/{total}")
+            if result.failed_count > 0:
+                print(f"❌ Failed: {result.failed_count}")
+            print(f"📁 Export directory: {export_dir}")
+            print("─" * 60)
+
+        # Checkpoint lifecycle
+        if cp.is_complete:
+            self.checkpoint_manager.clear()
+            if cp.failed_files:
+                retry_checkpoint = self.checkpoint_manager.create_failed_checkpoint(cp)
+                if retry_checkpoint and interactive:
+                    print("\n💾 Failed-files checkpoint saved. Run File Processor again to retry.")
+                    self._display_failed_files_summary(cp.failed_files)
+                result.message = (
+                    f"Exported {result.processed_count} files, "
+                    f"{result.failed_count} failed (checkpoint saved for retry)"
+                )
+            else:
+                self.checkpoint_manager.clear_failed()
+                result.message = f"Exported {result.processed_count} files successfully"
+        else:
+            result.message = f"Exported {result.processed_count}/{total} files"
+
+        result.success = result.failed_count == 0 and not cp.failed_files and cp.is_complete
+        result.output_path = str(export_dir)
+        self.status = ToolStatus.COMPLETED if result.success else ToolStatus.FAILED
+        return result
 
     def _resolve_execution_settings(self, checkpoint: FileProcessorCheckpoint) -> Tuple[str, Optional[str], Any]:
         """
@@ -300,9 +637,12 @@ class FileProcessor(BaseTool):
                     include_filename=self._include_filename,
                     pdf_temp_dirs=[str(d) for d in self._pdf_temp_dirs],
                     profile_name=exec_settings.get("profile_name"),
+                    export_path=getattr(self, "_export_path", None),
                 )
 
-                # Step 5: Execute processing
+                # Step 5: Execute processing (or export if in export mode)
+                if self._is_export_mode():
+                    return self._execute_export()
                 return self._execute_processing()
             finally:
                 # If we didn't save a checkpoint to disk, clean up temp dirs immediately!
@@ -2173,6 +2513,8 @@ class FileProcessor(BaseTool):
         config = {"mode": output_mode, "path": output_path, "naming": naming, "extension": extension}
 
         print(f"\n✅ Output: {output_mode} files to {output_path}")
+        # Stash for export mode default path
+        self._last_output_path = output_path
         return config
 
     # ─────────────────────────────────────────────────────────────────
@@ -2215,6 +2557,7 @@ class FileProcessor(BaseTool):
         print("How would you like to configure execution settings?")
         print("  [1] Use active connection profile (default)")
         print("  [2] Select a different connection profile (this session only)")
+        print("  [3] Export files only (no API call)")
         print("  [Q] Cancel")
 
         try:
@@ -2227,6 +2570,36 @@ class FileProcessor(BaseTool):
 
         if not choice:
             choice = "1"
+
+        if choice == "3":
+            # Export mode — ask for export directory
+            default_export_path = str(Path(self._last_output_path or ".") / "export")
+            print("\n✅ Export Mode: Files will be exported without API calls.")
+            print("   Audio files will be preprocessed/optimized/chunked as configured.")
+            print("   Prompts will be saved alongside files for manual use.\n")
+            print("Export directory (Enter for default):")
+            try:
+                export_input = input(f"> [{default_export_path}]: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                return None
+
+            export_path = export_input if export_input else default_export_path
+
+            export_path_obj = Path(export_path)
+            if not export_path_obj.exists():
+                export_path_obj.mkdir(parents=True, exist_ok=True)
+                print(f"   📁 Created: {export_path}")
+
+            self._export_path = str(export_path_obj.resolve())
+
+            print("\n✅ Export mode configured")
+            return {
+                "provider": "export",
+                "model": "none",
+                "delay": 0,
+                "use_batch": False,
+                "profile_name": EXPORT_MODE_PROFILE,
+            }
 
         if choice not in ["1", "2"]:
             print("\n⚠️ Invalid choice. Using active connection profile.")
@@ -2926,10 +3299,16 @@ class FileProcessor(BaseTool):
         # Restore filename context preference from checkpoint
         self._include_filename = self._current_checkpoint.include_filename
 
+        # Restore export path from checkpoint
+        if getattr(self._current_checkpoint, "export_path", None):
+            self._export_path = self._current_checkpoint.export_path
+
         # Restore PDF temp dirs from checkpoint
         if hasattr(self._current_checkpoint, "pdf_temp_dirs") and self._current_checkpoint.pdf_temp_dirs:
             self._pdf_temp_dirs = [Path(p) for p in self._current_checkpoint.pdf_temp_dirs]
 
+        if self._is_export_mode():
+            return self._execute_export()
         return self._execute_processing()
 
     def _prompt_retry_failed(self) -> Optional[bool]:
@@ -2991,6 +3370,10 @@ class FileProcessor(BaseTool):
         # Restore filename context preference from checkpoint
         self._include_filename = self._current_checkpoint.include_filename
 
+        # Restore export path from checkpoint
+        if getattr(self._current_checkpoint, "export_path", None):
+            self._export_path = self._current_checkpoint.export_path
+
         # Restore PDF temp dirs from checkpoint
         if hasattr(self._current_checkpoint, "pdf_temp_dirs") and self._current_checkpoint.pdf_temp_dirs:
             self._pdf_temp_dirs = [Path(p) for p in self._current_checkpoint.pdf_temp_dirs]
@@ -3002,6 +3385,8 @@ class FileProcessor(BaseTool):
         # Save as main checkpoint
         self.checkpoint_manager.save(self._current_checkpoint)
 
+        if self._is_export_mode():
+            return self._execute_export()
         return self._execute_processing()
 
     def _display_failed_files_summary(self, failed_files: list):

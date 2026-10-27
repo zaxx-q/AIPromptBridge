@@ -68,6 +68,9 @@ class FileProcessorCheckpoint:
     # For combined output mode - accumulated content
     combined_output_content: str = ""
 
+    # Export mode (no API call, just write files)
+    export_path: Optional[str] = None
+
     # Retry checkpoint metadata
     is_retry_checkpoint: bool = False
     original_session_id: Optional[str] = None
@@ -163,9 +166,15 @@ class FileProcessorCheckpoint:
         """Get a summary of checkpoint state"""
         from src.connection_profiles import ProfileStore
 
-        profile = ProfileStore.get_instance().get_profile(self.profile_name)
-        provider = profile.provider if profile else "unknown"
-        model = profile.model if profile else "unknown"
+        is_export = getattr(self, "export_path", None) is not None and self.profile_name == "__export__"
+
+        if is_export:
+            provider = "export"
+            model = "none"
+        else:
+            profile = ProfileStore.get_instance().get_profile(self.profile_name)
+            provider = profile.provider if profile else "unknown"
+            model = profile.model if profile else "unknown"
 
         summary = {
             "session_id": self.session_id,
@@ -259,6 +268,7 @@ class FileProcessorCheckpoint:
             failed_files=[],  # Reset - these will be tracked fresh
             current_index=0,
             combined_output_content="",
+            export_path=original.export_path,  # Preserve export path for retry
             is_retry_checkpoint=True,
             original_session_id=original.session_id,
             retry_count=original.retry_count + 1,
@@ -443,6 +453,7 @@ class CheckpointManager:
         include_filename: bool = True,
         pdf_temp_dirs: Optional[List[str]] = None,
         profile_name: Optional[str] = None,
+        export_path: Optional[str] = None,
     ) -> FileProcessorCheckpoint:
         """
         Create a new checkpoint.
@@ -497,6 +508,7 @@ class CheckpointManager:
             skip_per_file_prompts=skip_per_file_prompts,
             include_filename=include_filename,
             pdf_temp_dirs=pdf_temp_dirs or [],
+            export_path=export_path,
             completed_files=[],
             failed_files=[],
             current_index=0,
