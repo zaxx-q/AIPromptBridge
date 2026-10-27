@@ -434,11 +434,21 @@ def test_even_chunk_distribution_calculation():
         result = proc.split_audio(Path("test.mp3"))
 
         assert result.success is True
-        # Total duration 1980s / 1200s target -> ceil(1980/1200) = 2 chunks
-        # Each chunk duration should be 1980 / 2 = 990 seconds (16.5 minutes)
+        # Total duration 1980s, estimate_chunk_duration=1200s
+        # With 10s overlap: effective_chunk_duration = max(30, 1200-10) = 1190
+        # num_chunks = ceil(1980/1190) = 2
+        # stride = (1980 - 10) / 2 = 985s
+        # chunk 0: 0 -> min(985+10, 1980) = 995s, overlap_duration=10s
+        # chunk 1: 985 -> 1980s (last), overlap_duration=0s
         assert len(result.chunks) == 2
-        assert result.chunks[0].duration == pytest.approx(990.0)
-        assert result.chunks[1].duration == pytest.approx(990.0)
+        assert result.chunks[0].start_time == pytest.approx(0.0)
+        assert result.chunks[0].end_time == pytest.approx(995.0)
+        assert result.chunks[0].duration == pytest.approx(995.0)
+        assert result.chunks[0].overlap_duration == pytest.approx(10.0)
+        assert result.chunks[1].start_time == pytest.approx(985.0)
+        assert result.chunks[1].end_time == pytest.approx(1980.0)
+        assert result.chunks[1].duration == pytest.approx(995.0)
+        assert result.chunks[1].overlap_duration == pytest.approx(0.0)
         result.cleanup()
 
 
@@ -564,13 +574,26 @@ def test_split_audio_by_duration():
 
         res = proc.split_audio_by_duration(Path("long.mp3"), max_duration_seconds=1500.0)
         assert res.success is True
+        # With 10s overlap: effective_max = 1500 - 10 = 1490
+        # num_chunks = ceil(3600/1490) = 3
+        # stride = 3600 / 3 = 1200s
+        # stride + overlap = 1210 <= 1500 ✓
+        # chunk 0: 0 -> 1210 (1210s, overlap=10s)
+        # chunk 1: 1200 -> 2410 (1210s, overlap=10s)
+        # chunk 2: 2400 -> 3600 (1200s, last, overlap=0s)
         assert len(res.chunks) == 3
         assert res.chunks[0].start_time == pytest.approx(0.0)
-        assert res.chunks[0].duration == pytest.approx(1200.0)
+        assert res.chunks[0].end_time == pytest.approx(1210.0)
+        assert res.chunks[0].duration == pytest.approx(1210.0)
+        assert res.chunks[0].overlap_duration == pytest.approx(10.0)
         assert res.chunks[1].start_time == pytest.approx(1200.0)
-        assert res.chunks[1].duration == pytest.approx(1200.0)
+        assert res.chunks[1].end_time == pytest.approx(2410.0)
+        assert res.chunks[1].duration == pytest.approx(1210.0)
+        assert res.chunks[1].overlap_duration == pytest.approx(10.0)
         assert res.chunks[2].start_time == pytest.approx(2400.0)
+        assert res.chunks[2].end_time == pytest.approx(3600.0)
         assert res.chunks[2].duration == pytest.approx(1200.0)
+        assert res.chunks[2].overlap_duration == pytest.approx(0.0)
         res.cleanup()
 
 
@@ -619,7 +642,7 @@ def test_merge_transcribe_transcripts():
     # Single
     assert merge_transcribe_transcripts([(c1, "Single chunk text")]) == "Single chunk text"
 
-    # Multi with speech
+    # Multi with speech, no overlap -> simple concatenation (legacy path)
     merged = merge_transcribe_transcripts(
         [
             (c2, "[spk_1] (1200.0s->1201.0s) Middle"),

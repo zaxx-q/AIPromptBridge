@@ -70,6 +70,11 @@ GROQ_TARGET_CHUNK_BYTES = 24 * 1024 * 1024
 # the provider package into this generic FFmpeg utility module).
 GROQ_SUPPORTED_EXTS = {".flac", ".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".ogg", ".wav", ".webm"}
 
+# Default overlap between consecutive chunks in seconds.
+# Each chunk extends this many seconds into the next chunk's territory,
+# providing redundant audio so that boundary speech isn't lost.
+DEFAULT_OVERLAP_SECONDS = 10.0
+
 # Supported audio formats
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".aiff", ".aac", ".ogg", ".flac", ".m4a", ".wma"}
 
@@ -747,6 +752,7 @@ class AudioChunk:
     end_time: float
     duration: float
     size_bytes: int
+    overlap_duration: float = 0.0  # seconds of overlap with next chunk
 
     @property
     def time_range_str(self) -> str:
@@ -1766,6 +1772,7 @@ class AudioProcessor:
         output_format: Optional[str] = None,
         target_bitrate: Optional[str] = None,
         volume_change_db: Optional[float] = None,
+        overlap_seconds: float = DEFAULT_OVERLAP_SECONDS,
     ) -> ChunkingResult:
         """
         Split audio file into chunks under the size limit.
@@ -1832,34 +1839,54 @@ class AudioProcessor:
             total_duration = audio_info.duration_seconds
 
             # Even distribution: if we need multiple chunks, divide evenly
-            # instead of having a short final chunk
+            # instead of having a short final chunk.
+            # When overlap is enabled, each chunk's audio is slightly longer, so
+            # reduce the effective chunk duration used for num_chunks estimation.
             if total_duration > chunk_duration:
-                num_chunks = max(2, -(-int(total_duration) // int(chunk_duration)))  # ceil division
+                effective_chunk_duration = chunk_duration
+                if overlap_seconds > 0:
+                    effective_chunk_duration = max(30, chunk_duration - overlap_seconds)
+
+                num_chunks = max(2, -(-int(total_duration) // int(effective_chunk_duration)))  # ceil division
                 # But also check that each chunk stays under the target size
                 even_duration = total_duration / num_chunks
 
                 # If even_duration exceeds our estimated safe chunk duration, add more chunks
-                while even_duration > chunk_duration and num_chunks < 100:
+                while even_duration > effective_chunk_duration and num_chunks < 100:
                     num_chunks += 1
                     even_duration = total_duration / num_chunks
-
-                chunk_duration = even_duration
             else:
                 num_chunks = 1
-                chunk_duration = total_duration
 
+            # Apply overlap only when splitting into multiple chunks
+            if num_chunks > 1 and overlap_seconds > 0:
+                stride = (total_duration - overlap_seconds) / num_chunks
+                if stride <= 0:
+                    # Audio too short for this many chunks with overlap; disable
+                    overlap_seconds = 0.0
+                    stride = total_duration / num_chunks
+            else:
+                overlap_seconds = 0.0
+                stride = total_duration / num_chunks if num_chunks > 1 else total_duration
+
+            overlap_str = f", {overlap_seconds:.0f}s overlap" if overlap_seconds > 0 else ""
             print_info(
-                f"Splitting {audio_info.size_mb:.1f} MB audio into {num_chunks} chunks (~{chunk_duration:.0f}s each)"
+                f"Splitting {audio_info.size_mb:.1f} MB audio into {num_chunks} chunks "
+                f"(~{stride:.0f}s each{overlap_str})"
             )
 
             for chunk_index in range(num_chunks):
-                start_time = chunk_index * total_duration / num_chunks
-                end_time = (
-                    total_duration if chunk_index == num_chunks - 1 else (chunk_index + 1) * total_duration / num_chunks
-                )
+                start_time = chunk_index * stride
+                if chunk_index == num_chunks - 1:
+                    end_time = total_duration
+                else:
+                    end_time = min(start_time + stride + overlap_seconds, total_duration)
                 duration = end_time - start_time
                 if duration <= 0.001:
                     continue
+
+                # How much this chunk overlaps with the next
+                chunk_overlap = overlap_seconds if chunk_index < num_chunks - 1 else 0.0
 
                 chunk_path = temp_dir / f"chunk_{chunk_index:03d}.{output_format}"
 
@@ -1931,6 +1958,7 @@ class AudioProcessor:
                         end_time=end_time,
                         duration=duration,
                         size_bytes=chunk_size,
+                        overlap_duration=chunk_overlap,
                     )
                 )
 
@@ -1948,6 +1976,7 @@ class AudioProcessor:
         filepath: Path,
         max_duration_seconds: float,
         output_format: Optional[str] = None,
+        overlap_seconds: float = DEFAULT_OVERLAP_SECONDS,
     ) -> ChunkingResult:
         """
         Split audio file into even chunks where each chunk's duration <= max_duration_seconds.
@@ -1956,6 +1985,7 @@ class AudioProcessor:
             filepath: Path to audio file
             max_duration_seconds: Maximum allowed duration per chunk in seconds
             output_format: Output format for chunks (default: follows input or mp3)
+            overlap_seconds: Seconds of overlap between consecutive chunks (default: 10s)
 
         Returns:
             ChunkingResult with list of AudioChunk objects
@@ -1996,27 +2026,43 @@ class AudioProcessor:
         chunks = []
 
         try:
-            # Even distribution: divide evenly under the threshold
-            num_chunks = max(2, -(-int(total_duration) // int(max_duration_seconds)))
-            even_duration = total_duration / num_chunks
+            # Even distribution: divide evenly under the threshold, accounting for overlap.
+            # With overlap, each chunk's total audio = stride + overlap_seconds, so the
+            # effective stride must be <= max_duration_seconds - overlap_seconds.
+            effective_max = max_duration_seconds - overlap_seconds if overlap_seconds > 0 else max_duration_seconds
+            if effective_max <= 0:
+                effective_max = max_duration_seconds
+                overlap_seconds = 0.0
 
-            while even_duration > max_duration_seconds and num_chunks < 200:
+            num_chunks = max(2, -(-int(total_duration) // int(effective_max)))
+            stride = total_duration / num_chunks
+
+            # Ensure stride + overlap doesn't exceed max_duration_seconds
+            while stride + overlap_seconds > max_duration_seconds and num_chunks < 200:
                 num_chunks += 1
-                even_duration = total_duration / num_chunks
+                stride = total_duration / num_chunks
 
-            chunk_duration = even_duration
+            # Disable overlap if still only 1 chunk (shouldn't reach here, but be safe)
+            if num_chunks == 1:
+                overlap_seconds = 0.0
+
+            overlap_str = f", {overlap_seconds:.0f}s overlap" if overlap_seconds > 0 else ""
             print_info(
-                f"Splitting {total_duration / 60:.1f}m audio into {num_chunks} chunks (~{chunk_duration / 60:.1f}m each)"
+                f"Splitting {total_duration / 60:.1f}m audio into {num_chunks} chunks "
+                f"(~{stride / 60:.1f}m each{overlap_str})"
             )
 
             for chunk_index in range(num_chunks):
-                start_time = chunk_index * total_duration / num_chunks
-                end_time = (
-                    total_duration if chunk_index == num_chunks - 1 else (chunk_index + 1) * total_duration / num_chunks
-                )
+                start_time = chunk_index * stride
+                if chunk_index == num_chunks - 1:
+                    end_time = total_duration
+                else:
+                    end_time = min(start_time + stride + overlap_seconds, total_duration)
                 duration = end_time - start_time
                 if duration <= 0.001:
                     continue
+
+                chunk_overlap = overlap_seconds if chunk_index < num_chunks - 1 else 0.0
 
                 chunk_path = temp_dir / f"chunk_{chunk_index:03d}.{output_format}"
 
@@ -2070,6 +2116,7 @@ class AudioProcessor:
                         end_time=end_time,
                         duration=duration,
                         size_bytes=chunk_size,
+                        overlap_duration=chunk_overlap,
                     )
                 )
 
@@ -2080,7 +2127,9 @@ class AudioProcessor:
             shutil.rmtree(temp_dir, ignore_errors=True)
             return ChunkingResult(success=False, error=str(e))
 
-    def split_audio_for_groq(self, filepath: Path, *, force_single: bool = False) -> ChunkingResult:
+    def split_audio_for_groq(
+        self, filepath: Path, *, force_single: bool = False, overlap_seconds: float = DEFAULT_OVERLAP_SECONDS
+    ) -> ChunkingResult:
         """
         Split/transcode audio for Groq transcription (size-based).
 
@@ -2146,15 +2195,27 @@ class AudioProcessor:
         if force_single or audio_info.size_bytes <= GROQ_TARGET_CHUNK_BYTES:
             num_chunks = 1
         else:
-            num_chunks = max(1, -(-int(total_duration) // int(chunk_duration)))
-            even_duration = total_duration / num_chunks
-            while even_duration > chunk_duration and num_chunks < 200:
+            # Account for overlap when estimating num_chunks: each chunk's audio is
+            # (stride + overlap_seconds), so the effective safe stride is shorter.
+            effective_chunk_duration = (
+                max(30, chunk_duration - overlap_seconds) if overlap_seconds > 0 else chunk_duration
+            )
+            num_chunks = max(1, -(-int(total_duration) // int(effective_chunk_duration)))
+            stride = total_duration / num_chunks
+            # Ensure each chunk (stride + overlap) stays under the byte target
+            while (stride + overlap_seconds) * bytes_per_second > GROQ_TARGET_CHUNK_BYTES and num_chunks < 200:
                 num_chunks += 1
+                stride = total_duration / num_chunks
+            if num_chunks > 1:
                 even_duration = total_duration / num_chunks
-            if even_duration > chunk_duration:
-                return ChunkingResult(
-                    success=False, error="Audio is too long to split into a safe number of Groq chunks"
-                )
+                if even_duration > effective_chunk_duration and num_chunks >= 200:
+                    return ChunkingResult(
+                        success=False, error="Audio is too long to split into a safe number of Groq chunks"
+                    )
+
+        # Disable overlap for single-chunk (or force_single) cases
+        if num_chunks == 1:
+            overlap_seconds = 0.0
 
         temp_dir = Path(tempfile.mkdtemp(prefix="groq_chunks_"))
         chunks: List[AudioChunk] = []
@@ -2162,17 +2223,23 @@ class AudioProcessor:
             if num_chunks == 1:
                 print_info("Transcoding to 16 kHz mono FLAC for Groq...")
             else:
+                stride = total_duration / num_chunks
+                overlap_str = f", {overlap_seconds:.0f}s overlap" if overlap_seconds > 0 else ""
                 print_info(
                     f"Splitting {audio_info.size_mb:.1f} MB audio into {num_chunks} FLAC chunks "
-                    f"(~{total_duration / num_chunks:.0f}s each)"
+                    f"(~{stride:.0f}s each{overlap_str})"
                 )
 
+            stride = total_duration / num_chunks
             for i in range(num_chunks):
-                start = i * total_duration / num_chunks
-                end = total_duration if i == num_chunks - 1 else (i + 1) * total_duration / num_chunks
+                start = i * stride
+                end = total_duration if i == num_chunks - 1 else min(start + stride + overlap_seconds, total_duration)
                 dur = end - start
                 if dur <= 0.001:
                     continue
+
+                chunk_overlap = overlap_seconds if i < num_chunks - 1 else 0.0
+
                 out = temp_dir / f"chunk_{i:03d}.flac"
                 cmd = [
                     get_ffmpeg_path(),
@@ -2208,7 +2275,15 @@ class AudioProcessor:
                         f"(over {GROQ_TARGET_CHUNK_BYTES / (1024 * 1024):.0f} MB target); attempting anyway"
                     )
                 chunks.append(
-                    AudioChunk(path=out, index=i, start_time=start, end_time=end, duration=dur, size_bytes=chunk_size)
+                    AudioChunk(
+                        path=out,
+                        index=i,
+                        start_time=start,
+                        end_time=end,
+                        duration=dur,
+                        size_bytes=chunk_size,
+                        overlap_duration=chunk_overlap,
+                    )
                 )
 
             return ChunkingResult(success=True, chunks=chunks, temp_dir=temp_dir, original_info=audio_info)
@@ -2395,9 +2470,92 @@ def adjust_transcript_timestamps(transcript: str, offset_seconds: float) -> str:
     return pattern.sub(_replace_ts, transcript)
 
 
+def find_longest_common_sequence(sequences: List[str], match_by_words: bool = True) -> str:
+    """
+    Find the optimal alignment between overlapping text sequences and merge them.
+
+    Uses a sliding-window approach to find the best alignment point between
+    consecutive sequences, then takes the left half from the left sequence
+    and the right half from the right sequence.
+
+    Args:
+        sequences: List of text strings to align and merge
+        match_by_words: Whether to match by words (True) or characters (False)
+
+    Returns:
+        Merged text with overlapping portions deduplicated
+    """
+    if not sequences:
+        return ""
+    if len(sequences) == 1:
+        return sequences[0]
+
+    # Convert input based on matching strategy
+    if match_by_words:
+        tokenized = [[word for word in re.split(r"(\s+\w+)", seq) if word] for seq in sequences]
+    else:
+        tokenized = [list(seq) for seq in sequences]
+
+    left_sequence = tokenized[0]
+    left_length = len(left_sequence)
+    total_sequence: List[str] = []
+
+    for right_sequence in tokenized[1:]:
+        max_matching = 0.0
+        right_length = len(right_sequence)
+        max_indices = (left_length, left_length, 0, 0)
+
+        # Try different alignments
+        for i in range(1, left_length + right_length + 1):
+            # Add epsilon to favor longer matches
+            eps = float(i) / 10000.0
+
+            left_start = max(0, left_length - i)
+            left_stop = min(left_length, left_length + right_length - i)
+            left = left_sequence[left_start:left_stop]
+
+            right_start = max(0, i - left_length)
+            right_stop = min(right_length, i)
+            right = right_sequence[right_start:right_stop]
+
+            if len(left) != len(right):
+                raise RuntimeError("Mismatched subsequences detected during transcript merging.")
+
+            matches = sum(a == b for a, b in zip(left, right))
+
+            # Normalize matches by position and add epsilon
+            matching = matches / float(i) + eps
+
+            # Require at least 2 matches
+            if matches > 1 and matching > max_matching:
+                max_matching = matching
+                max_indices = (left_start, left_stop, right_start, right_stop)
+
+        # Use the best alignment found
+        left_start, left_stop, right_start, right_stop = max_indices
+
+        # Take left half from left sequence and right half from right sequence
+        left_mid = (left_stop + left_start) // 2
+        right_mid = (right_stop + right_start) // 2
+
+        total_sequence.extend(left_sequence[:left_mid])
+        left_sequence = right_sequence[right_mid:]
+        left_length = len(left_sequence)
+
+    # Add remaining sequence
+    total_sequence.extend(left_sequence)
+
+    # Join back into text
+    return "".join(total_sequence)
+
+
 def merge_transcribe_transcripts(chunk_outputs: List[Tuple[AudioChunk, str]]) -> str:
     """
     Merge transcription outputs from multiple chunks into a unified transcript.
+
+    When chunks have overlap, uses longest-common-sequence alignment to
+    deduplicate the overlapping text regions. Falls back to simple
+    concatenation when there's no overlap.
 
     Filters out '(No speech detected)' placeholders when other chunks contain speech.
 
@@ -2415,16 +2573,31 @@ def merge_transcribe_transcripts(chunk_outputs: List[Tuple[AudioChunk, str]]) ->
 
     sorted_chunks = sorted(chunk_outputs, key=lambda x: x[0].index)
 
-    valid_texts = []
-    for _chunk, text in sorted_chunks:
+    valid_entries: List[Tuple[AudioChunk, str]] = []
+    for chunk, text in sorted_chunks:
         t = text.strip()
         if t and t != "(No speech detected)":
-            valid_texts.append(t)
+            valid_entries.append((chunk, t))
 
-    if not valid_texts:
+    if not valid_entries:
         return "(No speech detected)"
 
-    return "\n\n".join(valid_texts)
+    if len(valid_entries) == 1:
+        return valid_entries[0][1]
+
+    # Check if any chunk has overlap — use LCS merge to deduplicate
+    has_overlap = any(chunk.overlap_duration > 0 for chunk, _ in valid_entries)
+
+    if has_overlap:
+        texts = [text for _, text in valid_entries]
+        try:
+            return find_longest_common_sequence(texts)
+        except RuntimeError:
+            # Fall back to simple join if LCS alignment fails
+            return "\n\n".join(texts)
+    else:
+        # Simple concatenation (legacy / no-overlap behaviour)
+        return "\n\n".join(text for _, text in valid_entries)
 
 
 def check_ffmpeg_available() -> Tuple[bool, Optional[str]]:

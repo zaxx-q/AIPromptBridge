@@ -4004,12 +4004,30 @@ class FileProcessor(BaseTool):
                         offset_str = f"{h}:{m:02d}:{s:02d}"
                     else:
                         offset_str = f"{m:02d}:{s:02d}"
+
+                    # Build overlap context note for non-first chunks
+                    overlap_note = ""
+                    if chunk.overlap_duration > 0:
+                        overlap_note = (
+                            f" The first ~{chunk.overlap_duration:.0f} seconds of this segment "
+                            f"overlap with the end of the previous segment — use that overlap "
+                            f"for context continuity but avoid duplicating content from it."
+                        )
+
                     chunk_prompt = (
                         f"{prompt}\n\n"
                         f"IMPORTANT: This is part {i + 1} of {total_chunks} from a longer recording. "
                         f"This segment starts at {offset_str} in the full audio. "
                         f"If you include any timestamps, they must be relative to the full recording "
-                        f"(i.e. start from {offset_str}, not from 00:00)."
+                        f"(i.e. start from {offset_str}, not from 00:00).{overlap_note}"
+                    )
+                elif total_chunks > 1 and i == 0 and chunk.overlap_duration > 0:
+                    # First chunk with trailing overlap: mention it for context
+                    chunk_prompt = (
+                        f"{prompt}\n\n"
+                        f"IMPORTANT: This is part 1 of {total_chunks} from a longer recording. "
+                        f"The last ~{chunk.overlap_duration:.0f} seconds of this segment overlap "
+                        f"with the beginning of the next segment for context continuity."
                     )
 
                 message = self.file_handler.build_api_message(

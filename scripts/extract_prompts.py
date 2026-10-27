@@ -20,6 +20,7 @@ Usage
 -----
   python extract_prompts.py prompts.json tools_config.json -o out/
 """
+
 import argparse
 import json
 import re
@@ -96,9 +97,7 @@ def split_entry(entry: dict):
     """Split a prompt dict into (frontmatter fields, ordered body sections)."""
     meta, sections = {}, []
     for k, v in entry.items():
-        is_text = isinstance(v, str) and v != "" and (
-            k in SECTION_TITLES or "\n" in v or len(v) > 200
-        )
+        is_text = isinstance(v, str) and v != "" and (k in SECTION_TITLES or "\n" in v or len(v) > 200)
         if is_text:
             sections.append((SECTION_TITLES.get(k, title_case(k)), k, v))
         else:
@@ -139,9 +138,11 @@ def render_value(key: str, v, level: int = 2) -> str:
 
 
 def render_settings(title: str, d: dict) -> str:
-    table = [(k, v) for k, v in d.items()
-             if not isinstance(v, (dict, list))
-             and not (isinstance(v, str) and len(v) > SHORT_STRING_MAX)]
+    table = [
+        (k, v)
+        for k, v in d.items()
+        if not isinstance(v, (dict, list)) and not (isinstance(v, str) and len(v) > SHORT_STRING_MAX)
+    ]
     rest = [(k, v) for k, v in d.items() if (k, v) not in table]
     parts = [f"# {title}"]
     if table:
@@ -153,8 +154,7 @@ def render_settings(title: str, d: dict) -> str:
 
 
 def render_modifiers(mods: list) -> str:
-    parts = ["## Modifiers", "",
-             "Snippets appended to a prompt when the user toggles a modifier."]
+    parts = ["## Modifiers", "", "Snippets appended to a prompt when the user toggles a modifier."]
     for m in mods:
         icon, label = m.get("icon", ""), m.get("label", m.get("key", ""))
         parts += ["", f"### {icon} {label}".replace("  ", " ")]
@@ -168,9 +168,13 @@ def render_modifiers(mods: list) -> str:
 
 # ───────────────────────── main build ─────────────────────────
 def build(prompts: dict, tools: dict, out: Path):
-    index = ["# Prompt Library", "",
-             f"_Generated from `prompts.json` (v{prompts['_global_settings'].get('version', '?')}"
-             f": {prompts['_global_settings'].get('description', '')}) and `tools_config.json`._", ""]
+    index = [
+        "# Prompt Library",
+        "",
+        f"_Generated from `prompts.json` (v{prompts['_global_settings'].get('version', '?')}"
+        f": {prompts['_global_settings'].get('description', '')}) and `tools_config.json`._",
+        "",
+    ]
     written = {}  # relpath -> (kind, name, entry) for verification
 
     # ---- global.md
@@ -202,10 +206,10 @@ def build(prompts: dict, tools: dict, out: Path):
         index += [f"## {label}", "", f"[Settings]({dirname}/_settings.md)", ""]
         placed = set()
 
-        def line(n):
-            e = tool[n]
+        def line(n, _tool=tool, _dirname=dirname, _slugs=slugs):
+            e = _tool[n]
             first = blurb(e.get("task"))
-            return f"- {e.get('icon', '')} [{n}]({dirname}/{slugs[n]}.md)" + (f" — {first}" if first else "")
+            return f"- {e.get('icon', '')} [{n}]({_dirname}/{_slugs[n]}.md)" + (f" — {first}" if first else "")
 
         for grp in groups:
             present = [i for i in grp["items"] if i in tool]
@@ -221,8 +225,11 @@ def build(prompts: dict, tools: dict, out: Path):
     tts = prompts.get("tts_tool", {}).get("_settings", {})
     if tts:
         meta = {k: v for k, v in tts.items() if k not in ("director_system_prompt", "director_task_template")}
-        entry = {"system_prompt": tts.get("director_system_prompt", ""),
-                 "task": tts.get("director_task_template", ""), **meta}
+        entry = {
+            "system_prompt": tts.get("director_system_prompt", ""),
+            "task": tts.get("director_task_template", ""),
+            **meta,
+        }
         write(out / "tts-tool/director.md", render_prompt_file("TTS Director", entry))
         written["tts-tool/director.md"] = ("TTS Director", entry, None)
         index += ["## TTS Tool", "", "- [TTS Director](tts-tool/director.md)", ""]
@@ -279,12 +286,12 @@ def string_leaves(o):
 def verify(prompts, tools, out: Path, written: dict) -> bool:
     ok = True
     # 1) exact round-trip of every per-prompt file
-    for rel, (name, entry, _grp) in written.items():
+    for rel, (_name, entry, _grp) in written.items():
         meta, secs = parse_prompt_file((out / rel).read_text(encoding="utf-8"))
         rebuilt = dict(meta)
         rebuilt.pop("name", None)
         rebuilt.pop("group", None)
-        for heading, key, text in split_entry(entry)[1]:
+        for heading, key, _text in split_entry(entry)[1]:
             rebuilt[key] = secs.get(heading)
         if {k: rebuilt.get(k) for k in entry} != entry:
             print(f"  MISMATCH: {rel}")

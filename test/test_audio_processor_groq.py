@@ -61,7 +61,12 @@ def test_large_file_uses_estimated_chunk_count_and_flac(tmp_path, monkeypatch):
     result = processor.split_audio_for_groq(source)
     try:
         assert result.success
-        # At 32 kB/s + 10% safety, chunk duration is 710s; 2000s is split into 3.
+        # bytes_per_second = 32000 * 1.1 = 35200
+        # chunk_duration = floor(GROQ_TARGET_CHUNK_BYTES / 35200 / 10) * 10 = 710s
+        # With 10s overlap: effective_chunk_duration = max(30, 710-10) = 700
+        # num_chunks = ceil(2000/700) = 3
+        # stride = 2000/3 ~= 666.67
+        # Verify stride + overlap <= chunk_duration: 666.67+10=676.67 < 710 ✓
         assert len(result.chunks) == 3
         assert all(chunk.path.suffix == ".flac" for chunk in result.chunks)
         assert all(chunk.size_bytes == 4 for chunk in result.chunks)
@@ -70,6 +75,11 @@ def test_large_file_uses_estimated_chunk_count_and_flac(tmp_path, monkeypatch):
         assert all("flac" in cmd for cmd in commands)
         assert result.chunks[0].start_time == 0.0
         assert result.chunks[-1].end_time == duration
+        # Overlap fields
+        assert result.chunks[0].overlap_duration == pytest.approx(10.0)
+        assert result.chunks[-1].overlap_duration == pytest.approx(0.0)
+        # Consecutive chunks must overlap: chunk[1].start < chunk[0].end
+        assert result.chunks[1].start_time < result.chunks[0].end_time
     finally:
         result.cleanup()
 

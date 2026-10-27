@@ -14,6 +14,7 @@ from .audio_processor import (
     ARNNDN_MODELS,
     AUDIO_PRESETS,
     BITRATE_OPTIONS,
+    DEFAULT_OVERLAP_SECONDS,
     SAMPLE_RATE_OPTIONS,
     AudioChunk,
     # Voice enhancement system
@@ -29,6 +30,7 @@ from .audio_processor import (
     ProcessingResult,
     # Utility functions
     check_ffmpeg_available,
+    find_longest_common_sequence,
     get_all_presets,
     # Preset functions
     get_preset,
@@ -56,6 +58,7 @@ __all__ = [
     "ARNNDN_MODELS",
     "AUDIO_PRESETS",
     "BITRATE_OPTIONS",
+    "DEFAULT_OVERLAP_SECONDS",
     "SAMPLE_RATE_OPTIONS",
     "TOOLS_CONFIG_FILE",
     "AudioChunk",
@@ -90,6 +93,7 @@ __all__ = [
     # Audio processor - utilities
     "check_ffmpeg_available",
     "ensure_tools_config",
+    "find_longest_common_sequence",
     "get_all_presets",
     "get_default_config",
     "get_file_processor_prompts",
