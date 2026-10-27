@@ -80,6 +80,18 @@ LARGE_FILE_MODE_CHUNKING = "chunking"
 LARGE_FILE_MODE_SKIP = "skip"
 
 
+def _groq_srt_words_per_cue(transcribe_config: Dict[str, Any]) -> int:
+    """Map the profile's SRT cue preset to the maximum words per cue."""
+    preset = str(transcribe_config.get("groq_srt_words_per_cue") or "6-8").strip().lower()
+    if preset == "1":
+        return 1
+    if preset == "3-5":
+        return 5
+    if preset == "9-12":
+        return 12
+    return 8
+
+
 def _is_transcription_profile(profile_name: Optional[str]) -> bool:
     """Check whether the named connection profile is a transcription profile."""
     if not profile_name:
@@ -2437,6 +2449,7 @@ class FileProcessor(BaseTool):
                     "custom_vocabulary": [],
                     "groq_response_format": "text",
                     "groq_timestamp_granularity": "segment",
+                    "groq_srt_words_per_cue": "6-8",
                     "groq_temperature": None,
                 }
 
@@ -3569,6 +3582,7 @@ class FileProcessor(BaseTool):
         language = transcribe_config.get("language_codes", [""])[0] if transcribe_config.get("language_codes") else ""
         response_format = transcribe_config.get("groq_response_format", "text")
         timestamp_granularity = transcribe_config.get("groq_timestamp_granularity", "segment")
+        words_per_cue = _groq_srt_words_per_cue(transcribe_config)
         temperature = transcribe_config.get("groq_temperature")
 
         # Derive a style/context prompt from the batch prompt if available
@@ -3658,6 +3672,7 @@ class FileProcessor(BaseTool):
                         temperature=temperature,
                         response_format=response_format,
                         timestamp_granularity=timestamp_granularity,
+                        words_per_cue=words_per_cue,
                     ),
                 )
                 transcript, error = request_ctx.response_text, request_ctx.error

@@ -71,8 +71,9 @@ PROFILE_FIELDS = [
     ("transcribe_timestamps", "Word Timestamps", "toggle", None),
     ("transcribe_language", "Language Hint", "entry", None),
     ("transcribe_vocabulary", "Custom Vocabulary", "entry", None),
-    ("groq_response_format", "Response Format", "combobox", ["text", "json", "verbose_json"]),
-    ("groq_timestamp_granularity", "Timestamp Granularity", "combobox", ["segment", "word"]),
+    ("groq_response_format", "Response Format", "combobox", ["text", "json", "verbose_json", "srt"]),
+    ("groq_timestamp_granularity", "Granularity", "combobox", ["segment/normal", "word-by-word"]),
+    ("groq_srt_words_per_cue", "Words per line", "combobox", ["1", "3-5", "6-8", "9-12"]),
     ("groq_temperature", "Temperature (0-1)", "entry", None),
     ("api_key_name", "API Key Name", "key_name_dropdown", None),
     ("api_key_pool", "API Key Pool", "combobox", None),
@@ -100,6 +101,7 @@ PROVIDER_FIELD_VISIBILITY = {
     "transcribe_vocabulary": {"transcription"},
     "groq_response_format": {"transcription"},
     "groq_timestamp_granularity": {"transcription"},
+    "groq_srt_words_per_cue": {"transcription"},
     "groq_temperature": {"transcription"},
 }
 
@@ -132,8 +134,9 @@ FIELD_HELP = {
     "transcribe_language": "Language code hint. Gemini wants BCP-47 (e.g., 'en-US'); Groq uses ISO-639-1 (e.g., 'en') — longer codes are auto-normalized. Leave empty for auto-detection.",
     "transcribe_vocabulary": "Comma-separated domain terms, acronyms, or proper names to improve recognition (up to 1000 terms). Example: Kubernetes, BigQuery, gRPC",
     "transcribe_engine": "Transcription backend: 'gemini' (gemini-3.5-transcribe via Files API) or 'groq' (Whisper models via Groq's fast speech-to-text API).",
-    "groq_response_format": "Groq response format: 'text' (plain transcript), 'json' (JSON with text field), or 'verbose_json' (includes segments/words with timestamps).",
-    "groq_timestamp_granularity": "Timestamp granularity for verbose_json responses: 'segment' or 'word'. Only meaningful with verbose_json.",
+    "groq_response_format": "Groq response format: 'text' (plain transcript), 'json', 'verbose_json' (timestamped transcript), or 'srt' (subtitle file generated from word timestamps).",
+    "groq_timestamp_granularity": "Timestamp granularity: 'segment/normal' groups transcript ranges; 'word-by-word' returns timings for each word. Used by verbose_json; SRT always uses word timings.",
+    "groq_srt_words_per_cue": "Maximum words shown in each SRT subtitle cue: 1 (single word), 3-5, 6-8, or 9-12.",
     "groq_temperature": "Groq sampling temperature (0-1). Leave empty for the API default (0).",
     "api_key_name": "Use a specific named key from the pool. When set, key rotation is disabled and only this key will be used. Leave empty to use pool rotation.",
     "api_key_pool": "Override which key pool this profile uses. Leave empty to use provider default.",
@@ -161,6 +164,7 @@ SUMMARY_ICONS = {
     "transcribe_engine": "🛠️",
     "groq_response_format": "📨",
     "groq_timestamp_granularity": "⏬",
+    "groq_srt_words_per_cue": "📏",
     "groq_temperature": "🌡️",
     "api_key_name": "🔑",
     "api_key_pool": "🗝️",
@@ -817,7 +821,6 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                 for key in (
                     "transcribe_mode",
                     "transcribe_diarization",
-                    "transcribe_timestamps",
                     "transcribe_vocabulary",
                 ):
                     row = self.field_rows.get(key)
@@ -825,7 +828,12 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         row.pack_forget()
             else:
                 # Gemini engine: hide Groq fields
-                for key in ("groq_response_format", "groq_timestamp_granularity", "groq_temperature"):
+                for key in (
+                    "groq_response_format",
+                    "groq_timestamp_granularity",
+                    "groq_srt_words_per_cue",
+                    "groq_temperature",
+                ):
                     row = self.field_rows.get(key)
                     if row:
                         row.pack_forget()
@@ -839,14 +847,17 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         if row:
                             row.pack_forget()
 
-        # Timestamp granularity only meaningful with verbose_json
+        # Timestamp granularity is only meaningful for timestamped formats;
+        # the cue width only applies to SRT.
         if provider == "transcription" and transcribe_engine == "groq":
             fmt_info = self.field_widgets.get("groq_response_format")
             fmt_val = fmt_info["var"].get() if fmt_info else "text"
             gran_row = self.field_rows.get("groq_timestamp_granularity")
-            if gran_row:
-                if fmt_val != "verbose_json":
-                    gran_row.pack_forget()
+            if gran_row and fmt_val != "verbose_json":
+                gran_row.pack_forget()
+            srt_row = self.field_rows.get("groq_srt_words_per_cue")
+            if srt_row and fmt_val != "srt":
+                srt_row.pack_forget()
 
         # Dynamic bold for base_url label when provider is custom
         if self._custom_url_label:
@@ -1233,7 +1244,12 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                         ):
                             visible = False
                     else:
-                        if key_field in ("groq_response_format", "groq_timestamp_granularity", "groq_temperature"):
+                        if key_field in (
+                            "groq_response_format",
+                            "groq_timestamp_granularity",
+                            "groq_srt_words_per_cue",
+                            "groq_temperature",
+                        ):
                             visible = False
                         elif key_field in ("transcribe_diarization", "transcribe_timestamps"):
                             mode_info = self.field_widgets.get("transcribe_mode")
@@ -1242,6 +1258,10 @@ class ConnectionProfileManager(ctk.CTkToplevel if HAVE_CTK else tk.Toplevel):
                     if engine == "groq" and key_field == "groq_timestamp_granularity":
                         fmt_info = self.field_widgets.get("groq_response_format")
                         if fmt_info and fmt_info["var"].get() != "verbose_json":
+                            visible = False
+                    if engine == "groq" and key_field == "groq_srt_words_per_cue":
+                        fmt_info = self.field_widgets.get("groq_response_format")
+                        if fmt_info and fmt_info["var"].get() != "srt":
                             visible = False
 
             # Get display value

@@ -48,8 +48,9 @@ PROFILE_DEFAULTS: Dict[str, Any] = {
     # Engine selection ("gemini" or "groq"); other transcribe fields are Gemini-only
     "transcribe_engine": "gemini",
     # Groq-specific transcription fields (only used when transcribe_engine == "groq")
-    "groq_response_format": "text",  # "text", "json", "verbose_json"
+    "groq_response_format": "text",  # "text", "json", "verbose_json", or "srt"
     "groq_timestamp_granularity": "segment",  # "segment" or "word" (verbose_json only)
+    "groq_srt_words_per_cue": "6-8",  # SRT cue width preset
     "groq_temperature": None,  # 0-1; None = API default (0)
 }
 
@@ -84,6 +85,7 @@ class ConnectionProfile:
     # Groq-specific fields
     groq_response_format: str = "text"
     groq_timestamp_granularity: str = "segment"
+    groq_srt_words_per_cue: str = "6-8"
     groq_temperature: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -112,6 +114,7 @@ class ConnectionProfile:
             # Groq-specific keys
             "groq_response_format": self.groq_response_format or "text",
             "groq_timestamp_granularity": self.groq_timestamp_granularity or "segment",
+            "groq_srt_words_per_cue": self.groq_srt_words_per_cue or "6-8",
             "groq_temperature": self.groq_temperature,
         }
 
@@ -172,6 +175,7 @@ class ConnectionProfile:
                 "transcribe_engine",
                 "groq_response_format",
                 "groq_timestamp_granularity",
+                "groq_srt_words_per_cue",
             ):
                 val = str(val) if val is not None else default
 

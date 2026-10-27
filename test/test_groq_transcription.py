@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from src.providers import groq_transcription
 from src.providers.groq_transcription import (
     GROQ_TRANSCRIPTION_URL,
+    _format_verbose_transcript,
     _to_iso639_1,
     transcribe_file,
 )
@@ -74,6 +75,81 @@ class TestTranscribeFileRequestConstruction:
         assert err is None
         assert text == "hello"
         assert call.kwargs["data"]["timestamp_granularities[]"] == "word"
+
+    def test_verbose_json_returns_word_timestamps(self, tmp_path):
+        resp = _make_response()
+        resp.json.return_value = {
+            "text": "Hello world",
+            "words": [
+                {"word": "Hello", "start": 0.0, "end": 0.42},
+                {"word": "world", "start": 0.42, "end": 0.9},
+            ],
+        }
+        (text, err), _ = self._invoke(resp, tmp_path, response_format="verbose_json", timestamp_granularity="word")
+
+        assert err is None
+        assert text == "(0.000s->0.420s) Hello (0.420s->0.900s) world"
+
+    def test_verbose_json_returns_segment_timestamps_when_words_unavailable(self, tmp_path):
+        resp = _make_response()
+        resp.json.return_value = {
+            "text": "Hello world",
+            "segments": [
+                {"text": "Hello", "start": 0, "end": 0.42},
+                {"text": "world", "start": 0.42, "end": 0.9},
+            ],
+        }
+        (text, err), _ = self._invoke(resp, tmp_path, response_format="verbose_json")
+
+        assert err is None
+        assert text == "(0.000s->0.420s) Hello\n(0.420s->0.900s) world"
+
+    def test_verbose_format_falls_back_to_plain_text(self):
+        assert _format_verbose_transcript({"text": "Hello world"}) == "Hello world"
+
+    def test_srt_format_generates_cues_from_words(self, tmp_path):
+        resp = _make_response()
+        resp.json.return_value = {
+            "text": "Hello world",
+            "words": [
+                {"word": "Hello", "start": 0.0, "end": 0.42},
+                {"word": "world", "start": 0.42, "end": 0.9},
+            ],
+        }
+        (text, err), call = self._invoke(resp, tmp_path, response_format="srt")
+
+        assert err is None
+        assert text == "1\n00:00:00,000 --> 00:00:00,900\nHello world"
+        # SRT internally requests verbose_json word timestamps from Groq
+        assert call.kwargs["data"]["response_format"] == "verbose_json"
+        assert call.kwargs["data"]["timestamp_granularities[]"] == "word"
+
+    def test_srt_words_per_cue_groups_words(self, tmp_path):
+        resp = _make_response()
+        resp.json.return_value = {
+            "text": "one two three",
+            "words": [
+                {"word": "one", "start": 0.0, "end": 0.3},
+                {"word": "two", "start": 0.3, "end": 0.6},
+                {"word": "three", "start": 0.6, "end": 0.9},
+            ],
+        }
+        (text, err), _ = self._invoke(resp, tmp_path, response_format="srt", words_per_cue=1)
+
+        assert err is None
+        blocks = text.strip().split("\n\n")
+        assert len(blocks) == 3
+        assert "one" in blocks[0]
+        assert "two" in blocks[1]
+        assert "three" in blocks[2]
+
+    def test_srt_without_word_timestamps_errors(self, tmp_path):
+        resp = _make_response()
+        resp.json.return_value = {"text": "hello", "words": None}
+        (text, err), _ = self._invoke(resp, tmp_path, response_format="srt")
+
+        assert text is None
+        assert "word timestamps" in err
 
     def test_json_format_omits_granularity(self, tmp_path):
         resp = _make_response()

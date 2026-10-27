@@ -128,6 +128,16 @@ class TestProfileResolverOverrides(unittest.TestCase):
         self.assertEqual(cfg["language_codes"], ["es-ES"])
         self.assertEqual(cfg["custom_vocabulary"], ["Kubernetes", "BigQuery"])
 
+    def test_groq_srt_words_per_cue_mapping(self):
+        """SRT cue width presets map to max words per cue."""
+        from src.tools.file_processor import _groq_srt_words_per_cue
+
+        assert _groq_srt_words_per_cue({}) == 8
+        assert _groq_srt_words_per_cue({"groq_srt_words_per_cue": "3-5"}) == 5
+        assert _groq_srt_words_per_cue({"groq_srt_words_per_cue": "6-8"}) == 8
+        assert _groq_srt_words_per_cue({"groq_srt_words_per_cue": "9-12"}) == 12
+        assert _groq_srt_words_per_cue({"groq_srt_words_per_cue": "1"}) == 1
+
     def test_transcription_profile_groq_engine_resolution(self):
         """Groq-engine transcription profiles route to the groq key pool."""
         from unittest.mock import MagicMock

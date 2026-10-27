@@ -40,6 +40,122 @@ def _to_iso639_1(code: str) -> str:
     return code.strip().split("-")[0].split("_")[0].lower()
 
 
+def _format_timestamp(value: Any) -> str:
+    """Format a Groq timestamp consistently with Gemini transcript output."""
+    try:
+        return f"{float(value):.3f}s"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _format_verbose_transcript(payload: Dict[str, Any]) -> str:
+    """Render Groq verbose JSON as a timestamped transcript.
+
+    The File Processor and Audio Tool both consume text rather than raw provider
+    payloads. Keep the word/segment timing in that text using the same
+    ``(start->end) text`` convention as Gemini transcription so it survives
+    chunk timestamp adjustment and merging.
+    """
+    words = payload.get("words")
+    if isinstance(words, list) and words:
+        timed_words = []
+        for entry in words:
+            if not isinstance(entry, dict):
+                continue
+            word = str(entry.get("word") or "").strip()
+            start, end = entry.get("start"), entry.get("end")
+            if not word:
+                continue
+            if start is not None and end is not None:
+                timed_words.append(f"({_format_timestamp(start)}->{_format_timestamp(end)}) {word}")
+            else:
+                timed_words.append(word)
+        if timed_words:
+            return " ".join(timed_words)
+
+    segments = payload.get("segments")
+    if isinstance(segments, list) and segments:
+        timed_segments = []
+        for entry in segments:
+            if not isinstance(entry, dict):
+                continue
+            text = str(entry.get("text") or "").strip()
+            start, end = entry.get("start"), entry.get("end")
+            if not text:
+                continue
+            if start is not None and end is not None:
+                timed_segments.append(f"({_format_timestamp(start)}->{_format_timestamp(end)}) {text}")
+            else:
+                timed_segments.append(text)
+        if timed_segments:
+            return "\n".join(timed_segments)
+
+    return str(payload.get("text") or "").strip()
+
+
+def _format_srt_timestamp(value: Any) -> str:
+    """Format seconds as an SRT timestamp (``HH:MM:SS,mmm``)."""
+    try:
+        milliseconds = max(0, round(float(value) * 1000))
+    except (TypeError, ValueError):
+        milliseconds = 0
+    hours, milliseconds = divmod(milliseconds, 3_600_000)
+    minutes, milliseconds = divmod(milliseconds, 60_000)
+    seconds, milliseconds = divmod(milliseconds, 1_000)
+    return f"{hours:02}:{minutes:02}:{seconds:02},{milliseconds:03}"
+
+
+def _group_words_into_cues(
+    words: list,
+    *,
+    max_words: int = 8,
+    max_chars: int = 52,
+    max_duration: float = 5.5,
+) -> list:
+    """Group word entries into readable SRT cues from exact word timings."""
+    cues = []
+    current = []
+    for entry in words:
+        if not isinstance(entry, dict):
+            continue
+        word = str(entry.get("word") or "").strip()
+        if not word:
+            continue
+        try:
+            start = float(entry.get("start", 0))
+            end = float(entry.get("end", start))
+        except (TypeError, ValueError):
+            continue
+        if current:
+            previous = current[-1]
+            text = " ".join(item[0] for item in current)
+            gap = start - previous[2]
+            sentence_end = previous[0].endswith((".", "!", "?"))
+            should_break = (
+                len(current) >= max_words
+                or gap >= 0.65
+                or (sentence_end and len(text) >= 20)
+                or len(text) + len(word) + 1 > max_chars
+                or end - current[0][1] >= max_duration
+            )
+            if should_break:
+                cues.append(current)
+                current = []
+        current.append((word, start, end))
+    if current:
+        cues.append(current)
+    return cues
+
+
+def _format_srt(words: list, words_per_cue: int = 8) -> str:
+    """Render word timestamp entries as a readable SRT document."""
+    blocks = []
+    for number, cue in enumerate(_group_words_into_cues(words, max_words=words_per_cue), start=1):
+        text = " ".join(word for word, _, _ in cue)
+        blocks.append(f"{number}\n{_format_srt_timestamp(cue[0][1])} --> {_format_srt_timestamp(cue[-1][2])}\n{text}")
+    return "\n\n".join(blocks)
+
+
 def transcribe_file(
     filepath: Union[str, os.PathLike],
     *,
@@ -50,6 +166,7 @@ def transcribe_file(
     temperature: Optional[float] = None,
     response_format: str = "text",
     timestamp_granularity: str = "segment",
+    words_per_cue: int = 8,
     timeout: int = 300,
 ) -> Tuple[Optional[str], Optional[str]]:
     """
@@ -64,6 +181,7 @@ def transcribe_file(
         temperature: Optional 0-1 sampling temperature. None = API default (0).
         response_format: ``text`` | ``json`` | ``verbose_json``.
         timestamp_granularity: ``segment`` | ``word`` (only sent for verbose_json).
+        words_per_cue: Words per subtitle cue when ``response_format`` is ``srt``.
         timeout: Request timeout in seconds.
 
     Returns:
@@ -72,7 +190,13 @@ def transcribe_file(
     if not api_key:
         return None, "No Groq API key available"
 
-    data: Dict[str, Any] = {"model": model, "response_format": response_format}
+    # SRT is generated client-side from Groq's word timestamps: Groq has no
+    # native SRT response format or cue/grouping parameter.
+    request_format = "verbose_json" if response_format == "srt" else response_format
+    if response_format == "srt":
+        timestamp_granularity = "word"
+
+    data: Dict[str, Any] = {"model": model, "response_format": request_format}
     if language:
         data["language"] = _to_iso639_1(language)
     if prompt:
@@ -80,7 +204,7 @@ def transcribe_file(
         data["prompt"] = prompt[:GROQ_PROMPT_MAX_CHARS]
     if temperature is not None:
         data["temperature"] = temperature
-    if response_format == "verbose_json":
+    if request_format == "verbose_json":
         data["timestamp_granularities[]"] = timestamp_granularity
 
     headers = {"Authorization": f"Bearer {api_key}"}
@@ -102,7 +226,7 @@ def transcribe_file(
     if resp.status_code != 200:
         return None, f"Groq API error {resp.status_code}: {resp.text[:300]}"
 
-    if response_format == "text":
+    if request_format == "text":
         return resp.text.strip(), None
 
     try:
@@ -113,14 +237,24 @@ def transcribe_file(
     if isinstance(payload.get("error"), dict):
         return None, f"Groq API error: {payload['error'].get('message', 'unknown')}"
 
-    if response_format == "verbose_json":
-        # Log segment metadata for debugging; the merged text is the return
-        # value so it stays compatible with merge_transcribe_transcripts().
-        segments = payload.get("segments")
-        if segments and isinstance(segments, list):
-            logging.debug(f"[GroqTranscription] {len(segments)} segments returned")
+    if response_format == "srt":
         words = payload.get("words")
-        if words and isinstance(words, list):
-            logging.debug(f"[GroqTranscription] {len(words)} word entries returned")
+        if not isinstance(words, list) or not words:
+            return None, "Groq did not return word timestamps for SRT output"
+        transcript = _format_srt(words, words_per_cue)
+        if not transcript.strip():
+            return None, "Groq returned no timed words for SRT output"
+        return transcript, None
+
+    if request_format == "verbose_json":
+        # Render timing metadata into text so existing transcription consumers
+        # preserve it through chunk offset adjustment and transcript merging.
+        transcript = _format_verbose_transcript(payload)
+        logging.debug(
+            "[GroqTranscription] %d segments, %d word entries returned",
+            len(payload.get("segments", [])) if isinstance(payload.get("segments"), list) else 0,
+            len(payload.get("words", [])) if isinstance(payload.get("words"), list) else 0,
+        )
+        return transcript, None
 
     return (payload.get("text") or "").strip(), None

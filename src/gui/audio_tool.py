@@ -389,6 +389,7 @@ class AudioToolApp:
                     "custom_vocabulary": [],
                     "groq_response_format": "text",
                     "groq_timestamp_granularity": "segment",
+                    "groq_srt_words_per_cue": "6-8",
                     "groq_temperature": None,
                 }
 
@@ -609,6 +610,8 @@ class AudioToolApp:
             )
             response_format = transcribe_config.get("groq_response_format", "text")
             timestamp_granularity = transcribe_config.get("groq_timestamp_granularity", "segment")
+            srt_preset = str(transcribe_config.get("groq_srt_words_per_cue") or "6-8")
+            words_per_cue = 1 if srt_preset == "1" else {"3-5": 5, "9-12": 12}.get(srt_preset, 8)
             temperature = transcribe_config.get("groq_temperature")
 
             # Determine file extension for temp file
@@ -693,6 +696,7 @@ class AudioToolApp:
                             temperature=temperature,
                             response_format=response_format,
                             timestamp_granularity=timestamp_granularity,
+                            words_per_cue=words_per_cue,
                         ),
                     )
                     chunk_text, err = request_ctx.response_text, request_ctx.error

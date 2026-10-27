@@ -77,8 +77,13 @@ contains an `engine` (`gemini` by default for compatibility, or `groq`) and a
 transcription uses the Files API and chunks by duration.
 
 Groq profiles use `whisper-large-v3` or `whisper-large-v3-turbo` and support
-`groq_response_format` (`text`, `json`, or `verbose_json`),
-`groq_timestamp_granularity` (`segment` or `word`, for `verbose_json` only),
+`groq_response_format` (`text`, `json`, `verbose_json`, or `srt`),
+`groq_timestamp_granularity` (`segment` or `word`, for `verbose_json` only). With
+`verbose_json`, the generated transcript preserves timestamps as `(start->end) text`;
+choose `word` granularity for word-by-word output. `srt` generates a subtitle file
+from word timestamps; cue width is set by `groq_srt_words_per_cue` (`1`, `3-5`, `6-8`,
+or `9-12`).
+
 `groq_temperature` (0–1, omitted when null), and `language_codes`. Language
 hints are normalized from BCP-47 to ISO-639-1. Groq does not support Gemini's
 mode, diarization, or vocabulary options. Audio is uploaded directly as
