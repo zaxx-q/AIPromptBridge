@@ -235,11 +235,20 @@ class FileProcessor(BaseTool):
         if interactive:
             print(f"   ✅ → {dest.name} + {prompt_path.name}")
 
-    def _export_audio_file(self, filepath: Path, prompt: str, export_dir: Path, interactive: bool) -> None:
-        """Export an audio file: preprocess, optimize, chunk if needed, then copy + prompt files."""
+    def _export_audio_file(
+        self, filepath: Path, prompt: str, export_dir: Path, interactive: bool
+    ) -> List[Dict[str, Any]]:
+        """Export an audio file: preprocess, optimize, chunk if needed, then copy + prompt files.
+
+        Returns:
+            List of chunk metadata dicts (empty if the file was not chunked).
+        """
         import shutil
 
         process_path, preprocess_result = self._preprocess_audio_if_needed(filepath, interactive)
+
+        chunks_meta: List[Dict[str, Any]] = []
+        export_dir.mkdir(parents=True, exist_ok=True)
 
         try:
             file_size = process_path.stat().st_size
@@ -301,6 +310,18 @@ class FileProcessor(BaseTool):
                         with open(prompt_path, "w", encoding="utf-8") as f:
                             f.write(chunk_prompt)
 
+                        # Record chunk metadata for manifest
+                        chunks_meta.append(
+                            {
+                                "chunk_index": ci,
+                                "chunk_file": chunk_name,
+                                "prompt_file": prompt_path.name,
+                                "start_time": chunk.start_time,
+                                "end_time": chunk.end_time,
+                                "overlap_duration": chunk.overlap_duration,
+                            }
+                        )
+
                         if interactive:
                             print(f"   ✅ → {chunk_name} + {prompt_path.name}")
                 finally:
@@ -333,6 +354,8 @@ class FileProcessor(BaseTool):
 
                 if interactive:
                     print(f"   ✅ → {dest.name} + {prompt_path.name}")
+
+            return chunks_meta
         finally:
             if preprocess_result:
                 preprocess_result.cleanup()
@@ -418,21 +441,26 @@ class FileProcessor(BaseTool):
                     cp.prompt_text, self._custom_instructions, per_file_instructions
                 )
 
+                chunks_meta: List[Dict[str, Any]] = []
                 if file_type in ("text", "code"):
                     self._export_text_file(file_path_obj, final_prompt, export_dir, interactive)
                 elif is_audio:
-                    self._export_audio_file(file_path_obj, final_prompt, export_dir, interactive)
+                    chunks_meta = self._export_audio_file(file_path_obj, final_prompt, export_dir, interactive)
                 else:
                     self._export_binary_file(file_path_obj, final_prompt, export_dir, interactive)
 
-                manifest_entries.append(
-                    {
-                        "original_path": str(file_path_obj),
-                        "filename": file_path_obj.name,
-                        "type": file_type,
-                        "status": "exported",
-                    }
-                )
+                entry = {
+                    "original_path": str(file_path_obj),
+                    "filename": file_path_obj.name,
+                    "type": file_type,
+                    "status": "exported",
+                }
+                # Add chunk info for chunked audio files
+                if chunks_meta:
+                    entry["chunks"] = chunks_meta
+                    entry["total_chunks"] = len(chunks_meta)
+
+                manifest_entries.append(entry)
 
                 cp.mark_completed(file_path)
                 result.processed_count += 1
@@ -482,6 +510,17 @@ class FileProcessor(BaseTool):
             if result.failed_count > 0:
                 print(f"❌ Failed: {result.failed_count}")
             print(f"📁 Export directory: {export_dir}")
+
+            # Check if any files were chunked — print merge hint
+            has_chunks = any(e.get("chunks") for e in manifest_entries)
+            if has_chunks:
+                example_entry = next(e for e in manifest_entries if e.get("chunks"))
+                example_stem = Path(example_entry["chunks"][0].get("chunk_file", "file_chunk001.mp3")).stem
+                print("\n💡 Chunked audio exported. After processing each chunk through")
+                print("   a chat interface, save responses as *_response.txt files")
+                print(f"   (e.g. {example_stem}_response.txt)")
+                print(f"   then merge with: python -m src.tools merge {export_dir}")
+
             print("─" * 60)
 
         # Checkpoint lifecycle
@@ -4631,6 +4670,140 @@ Response will not be available immediately.
         return output
 
 
+def merge_export_responses(export_dir: str, interactive: bool = True) -> Optional[str]:
+    """
+    Merge chunked transcript responses from an export directory.
+
+    Reads manifest.json to find chunked audio files, auto-discovers
+    matching *_response.txt files, and merges them using LCS overlap
+    deduplication.
+
+    Args:
+        export_dir: Path to the export directory containing manifest.json
+        interactive: Whether to print progress
+
+    Returns:
+        Path to the merged output file (or export dir if multiple were merged),
+        or None on failure
+    """
+    import json
+
+    from .audio_processor import AudioChunk, merge_transcribe_transcripts
+
+    export_path = Path(export_dir)
+    manifest_path = export_path / "manifest.json"
+
+    if not manifest_path.exists():
+        if interactive:
+            print_error(f"No manifest.json found in {export_dir}")
+        return None
+
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        if interactive:
+            print_error(f"Failed to read manifest.json: {e}")
+        return None
+
+    # Find files with chunks
+    merge_targets = []
+    for entry in manifest.get("files", []):
+        chunks = entry.get("chunks")
+        if chunks and len(chunks) > 1:
+            merge_targets.append(entry)
+
+    if not merge_targets:
+        if interactive:
+            print_warning("No chunked audio files found in manifest. Nothing to merge.")
+        return None
+
+    if interactive:
+        print(f"\n📋 Found {len(merge_targets)} chunked audio file(s) to merge")
+
+    output_files: List[str] = []
+
+    for entry in merge_targets:
+        filename = entry["filename"]
+        chunks = entry["chunks"]
+        stem = Path(filename).stem
+
+        if interactive:
+            print(f"\n🔗 Merging: {filename} ({len(chunks)} chunks)")
+
+        # Auto-discover response files by naming convention
+        # Convention: {stem}_chunk{NNN}_response.txt
+        chunk_outputs: List[Tuple[AudioChunk, str]] = []
+        missing = []
+
+        for chunk_meta in sorted(chunks, key=lambda c: c["chunk_index"]):
+            ci = chunk_meta["chunk_index"]
+            chunk_file_stem = Path(chunk_meta["chunk_file"]).stem
+
+            # Try multiple naming patterns
+            response_candidates = [
+                export_path / f"{chunk_file_stem}_response.txt",
+                export_path / f"{chunk_file_stem}_response.md",
+                export_path / f"{chunk_file_stem}.txt",  # bare name without _response
+            ]
+
+            response_path = None
+            for candidate in response_candidates:
+                if candidate.exists():
+                    response_path = candidate
+                    break
+
+            if response_path is None:
+                missing.append(chunk_meta["chunk_file"])
+                continue
+
+            response_text = response_path.read_text(encoding="utf-8").strip()
+
+            # Create a synthetic AudioChunk for the merge function
+            start_time = float(chunk_meta.get("start_time", 0.0))
+            end_time = float(chunk_meta.get("end_time", start_time))
+            audio_chunk = AudioChunk(
+                path=Path(chunk_meta["chunk_file"]),
+                index=ci,
+                start_time=start_time,
+                end_time=end_time,
+                duration=end_time - start_time,
+                size_bytes=0,
+                overlap_duration=float(chunk_meta.get("overlap_duration", 0.0)),
+            )
+
+            chunk_outputs.append((audio_chunk, response_text))
+
+        if missing:
+            if interactive:
+                print_warning(f"   Missing response files for {len(missing)} chunk(s):")
+                for m in missing:
+                    chunk_stem = Path(m).stem
+                    print(f"     Expected: {chunk_stem}_response.txt")
+            if not chunk_outputs:
+                if interactive:
+                    print_error("   No response files found — skipping this file")
+                continue
+            if interactive:
+                print_warning(f"   Merging {len(chunk_outputs)}/{len(chunks)} available chunks")
+
+        # Merge using existing LCS deduplication
+        merged = merge_transcribe_transcripts(chunk_outputs)
+
+        # Write merged output
+        output_name = f"{stem}_merged.txt"
+        output_path = export_path / output_name
+        output_path.write_text(merged, encoding="utf-8")
+        output_files.append(str(output_path))
+
+        if interactive:
+            print_success(f"   ✅ → {output_name}")
+
+    if not output_files:
+        return None
+    return output_files[0] if len(output_files) == 1 else str(export_path)
+
+
 def show_tools_menu() -> bool:
     """
     Display the Tools menu and handle selection.
@@ -4641,7 +4814,8 @@ def show_tools_menu() -> bool:
     if HAVE_RICH:
         print_panel(
             "[1] 📁 File Processor   Process files with AI prompts\n"
-            "[2] 🔊 TTS Processor    Convert text files to speech audio\n\n"
+            "[2] 🔊 TTS Processor    Convert text files to speech audio\n"
+            "[3] 📋 Merge Exports    Merge chunked transcript responses\n\n"
             "[B] ← Back to main menu",
             title="🧰 TOOLS",
             border_style="cyan",
@@ -4653,6 +4827,7 @@ def show_tools_menu() -> bool:
         print()
         print("  [1] 📁 File Processor   Process files with AI prompts")
         print("  [2] 🔊 TTS Processor    Convert text files to speech audio")
+        print("  [3] 📋 Merge Exports    Merge chunked transcript responses")
         print()
         print("  [B] ← Back to main menu")
         print(f"{'═' * 60}")
@@ -4703,6 +4878,34 @@ def show_tools_menu() -> bool:
         else:
             if result.message != "Cancelled":
                 print_warning(f"\n{result.message}")
+        return True
+
+    elif choice == "3":
+        import os
+
+        print("\nEnter path to export directory (containing manifest.json):")
+        try:
+            dir_input = input("> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return False
+
+        if not dir_input:
+            print_warning("No path entered")
+            return False
+
+        # Strip surrounding quotes (common when pasting paths)
+        if (dir_input.startswith('"') and dir_input.endswith('"')) or (
+            dir_input.startswith("'") and dir_input.endswith("'")
+        ):
+            dir_input = dir_input[1:-1]
+
+        dir_path = os.path.expandvars(os.path.expanduser(dir_input))
+
+        result = merge_export_responses(dir_path, interactive=True)
+        if result:
+            print_success("\n✅ Merge complete")
+        else:
+            print_warning("\nMerge produced no output")
         return True
 
     elif choice == "b" or choice == "":

@@ -1,11 +1,5 @@
 # Changelog
 
-## [Unreleased]
-
-### New Features
-
-- **Groq Transcription**: Added Groq Whisper speech-to-text profiles (`whisper-large-v3` and `whisper-large-v3-turbo`) for the File Processor and Audio Tool, including Groq API options and size-based FLAC chunking for large files.
-
 ## [8.8.0] - 2026-10-15
 
 ### New Features

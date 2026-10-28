@@ -141,80 +141,87 @@ AIPromptBridge/
 
 ### Core (`src/`)
 
-| Module | Purpose |
-|--------|---------|
-| `tray.py` | System tray (Windows `infi.systray` / Linux `pystray`) + shared menu actions |
-| `web_server.py` | Flask server for internal API (sessions, models) |
-| `terminal.py` | Interactive terminal commands when console is visible |
-| `console.py` | Centralized Rich console configuration with custom theme |
-| `config.py` | Custom INI parser with multiline support, key name parsing, change notification pub/sub |
-| `key_manager.py` | Multi-key management with automatic rotation and named key lookup |
-| `connection_profiles.py` | Connection profile store — `ProfileStore` singleton, `profiles.json` CRUD |
-| `profile_resolver.py` | Connection profile resolution (merges per-action profile overrides with active profile) |
-| `request_pipeline.py` | Unified logging and token tracking for all requests |
-| `session_manager.py` | Chat session persistence to JSON with per-session model override |
-| `attachment_manager.py`| Manages external file storage for session attachments |
-| `updater.py` | Self-update: GitHub API, download, extraction, launcher signaling |
+| Module                   | Purpose                                                                                 |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| `tray.py`                | System tray (Windows `infi.systray` / Linux `pystray`) + shared menu actions            |
+| `web_server.py`          | Flask server for internal API (sessions, models)                                        |
+| `terminal.py`            | Interactive terminal commands when console is visible                                   |
+| `console.py`             | Centralized Rich console configuration with custom theme                                |
+| `config.py`              | Custom INI parser with multiline support, key name parsing, change notification pub/sub |
+| `key_manager.py`         | Multi-key management with automatic rotation and named key lookup                       |
+| `connection_profiles.py` | Connection profile store — `ProfileStore` singleton, `profiles.json` CRUD               |
+| `profile_resolver.py`    | Connection profile resolution (merges per-action profile overrides with active profile) |
+| `request_pipeline.py`    | Unified logging and token tracking for all requests                                     |
+| `session_manager.py`     | Chat session persistence to JSON with per-session model override                        |
+| `attachment_manager.py`  | Manages external file storage for session attachments                                   |
+| `updater.py`             | Self-update: GitHub API, download, extraction, launcher signaling                       |
 
 ### Platform (`src/platform/`)
 
-| Module | Purpose |
-|--------|---------|
-| `detect.py` | OS / session detection helpers |
-| `ipc.py` | Linux `--trigger` Unix-socket client/server |
-| `single_instance.py` | Single-instance lock (mutex or socket) |
-| `clipboard.py` | Wayland clipboard + primary + hybrid selection |
-| `input.py` | `wlrctl` typing and clipboard key chords |
-| `screenshot.py` | `grim`/`slurp` interactive region capture |
+| Module               | Purpose                                        |
+| -------------------- | ---------------------------------------------- |
+| `detect.py`          | OS / session detection helpers                 |
+| `ipc.py`             | Linux `--trigger` Unix-socket client/server    |
+| `single_instance.py` | Single-instance lock (mutex or socket)         |
+| `clipboard.py`       | Wayland clipboard + primary + hybrid selection |
+| `input.py`           | `wlrctl` typing and clipboard key chords       |
+| `screenshot.py`      | `grim`/`slurp` interactive region capture      |
 
 See [LINUX.md](LINUX.md) for runtime packages and niri usage.
 
 ### GUI (`src/gui/`)
 
-| Module | Purpose |
-|--------|---------|
-| `core.py` | GUICoordinator singleton managing all CustomTkinter windows |
-| `emoji_renderer.py` | EmojiRenderer for Windows color emoji support (Twemoji) |
-| `custom_widgets.py` | Custom scrollable lists and emoji-aware dropdowns (ScrollableComboBox) |
-| `text_edit_tool.py` | TextEditTool controller (hotkey or IPC trigger) |
-| `snip_tool.py` | Screen Snip controller (overlay or grim/slurp) |
-| `platform.py` | Central authority for UI toolkit availability and toolkit fallback |
-| `windows/` | Modular package for application windows |
-| `popups.py` | Themed popup dialogs with dual inputs (Edit/Ask) and scrollable ModifierBar |
-| `hotkey.py` | pynput global hotkeys (registered on Windows only) |
-| `themes.py` | ThemeRegistry with multi-theme dark/light variants, system detection |
-| `windows/settings_window/` | Modular settings window package (mixin-based) |
-| `windows/prompt_editor/` | Modular prompt editor package (mixin-based) |
+| Module                     | Purpose                                                                     |
+| -------------------------- | --------------------------------------------------------------------------- |
+| `core.py`                  | GUICoordinator singleton managing all CustomTkinter windows                 |
+| `emoji_renderer.py`        | EmojiRenderer for Windows color emoji support (Twemoji)                     |
+| `custom_widgets.py`        | Custom scrollable lists and emoji-aware dropdowns (ScrollableComboBox)      |
+| `text_edit_tool.py`        | TextEditTool controller (hotkey or IPC trigger)                             |
+| `snip_tool.py`             | Screen Snip controller (overlay or grim/slurp)                              |
+| `platform.py`              | Central authority for UI toolkit availability and toolkit fallback          |
+| `windows/`                 | Modular package for application windows                                     |
+| `popups.py`                | Themed popup dialogs with dual inputs (Edit/Ask) and scrollable ModifierBar |
+| `hotkey.py`                | pynput global hotkeys (registered on Windows only)                          |
+| `themes.py`                | ThemeRegistry with multi-theme dark/light variants, system detection        |
+| `windows/settings_window/` | Modular settings window package (mixin-based)                               |
+| `windows/prompt_editor/`   | Modular prompt editor package (mixin-based)                                 |
 
 ### Providers (`src/providers/`)
 
-| Module | Purpose |
-|--------|---------|
-| `base.py` | Abstract BaseProvider with centralized retry loops, abort checking, and HTTP error sanitization |
-| `registry.py` | Provider registry, metadata definitions, and `create_provider()` factory resolver |
-| `anthropic.py` | Native Anthropic Claude Messages API provider with SSE streaming and adaptive thinking |
-| `inline_thinking.py` | Regex-based inline `<think>` block extractor for models without native thinking channels |
-| `gemini_native.py` | Refactored Gemini Native provider focusing strictly on generation pipelines |
-| `gemini_services.py` | Google Gemini services: Files API upload/delete, Batch jobs, and official TTS |
-| `openai_compatible.py` | OpenAI format provider covering OpenAI, OpenRouter, xAI (Grok), Mistral, Cohere, and Custom |
+| Module                 | Purpose                                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------------------- |
+| `base.py`              | Abstract BaseProvider with centralized retry loops, abort checking, and HTTP error sanitization |
+| `registry.py`          | Provider registry, metadata definitions, and `create_provider()` factory resolver               |
+| `anthropic.py`         | Native Anthropic Claude Messages API provider with SSE streaming and adaptive thinking          |
+| `inline_thinking.py`   | Regex-based inline `<think>` block extractor for models without native thinking channels        |
+| `gemini_native.py`     | Refactored Gemini Native provider focusing strictly on generation pipelines                     |
+| `gemini_services.py`   | Google Gemini services: Files API upload/delete, Batch jobs, and official TTS                   |
+| `openai_compatible.py` | OpenAI format provider covering OpenAI, OpenRouter, xAI (Grok), Mistral, Cohere, and Custom     |
 
 ### Tools (`src/tools/`)
 
-| Module | Purpose |
-|--------|---------|
-| `base.py` | Abstract BaseTool class with pause/resume support |
-| `checkpoint.py` | Checkpoint persistence for interrupted batch processing |
-| `config.py` | Tools configuration loader with on-demand creation |
-| `defaults.py` | Default settings and prompts for tools |
-| `file_handler.py` | File type detection, directory scanning, API message building |
-| `file_processor.py` | File Processor tool - batch process images/text/code with AI |
+| Module              | Purpose                                                                                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `base.py`           | Abstract BaseTool class with pause/resume support                                                                                                                                          |
+| `checkpoint.py`     | Checkpoint persistence for interrupted batch processing                                                                                                                                    |
+| `config.py`         | Tools configuration loader with on-demand creation                                                                                                                                         |
+| `defaults.py`       | Default settings and prompts for tools                                                                                                                                                     |
+| `file_handler.py`   | File type detection, directory scanning, API message building                                                                                                                              |
+| `file_processor.py` | File Processor tool - batch process images/text/code with AI; export mode writes files + prompts without API calls, and `merge_export_responses()` recombines chunked transcript responses |
 
 ## Tools Configuration
 
 The `tools_config.json` file (auto-created on demand) contains:
+
 - Tool prompts (OCR, Describe, Summarize, Code Review, etc.)
 - Output modes (individual files or combined)
 - File type mappings for auto-detection
 - Settings (delay between requests, checkpoint options)
 
 Access via terminal: Press `[X]` → `[1] File Processor`
+
+**Merge Export Chunks**: Export mode splits large audio into `{stem}_chunk{NNN}` files with companion prompt files and a `manifest.json`. After running each chunk through a chat interface, save responses as `{stem}_chunk{NNN}_response.txt` next to the manifest, then merge with Tools menu `[3] Merge Exports` or directly:
+
+```sh
+python -m src.tools merge <export_dir>
+```

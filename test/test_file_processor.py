@@ -1062,3 +1062,297 @@ def test_files_api_uses_original_name_and_context(tmp_path):
         messages = call_kwargs["messages"]
         user_msg = next(m for m in messages if m["role"] == "user")
         assert any("[File: real_recording.mp3]" in part.get("text", "") for part in user_msg["content"])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Export mode: chunk metadata + merge tool
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _make_export_checkpoint(tmp_path: Path, files, export_dir: Path):
+    """Build a minimal FileProcessorCheckpoint in export mode."""
+    from src.tools.checkpoint import FileProcessorCheckpoint
+    from src.tools.file_processor import EXPORT_MODE_PROFILE
+
+    return FileProcessorCheckpoint(
+        session_id="export_test",
+        created_at="2026-01-01T00:00:00",
+        updated_at="2026-01-01T00:00:00",
+        input_path=str(tmp_path),
+        input_files=[str(f) for f in files],
+        prompt_key="Transcribe",
+        prompt_text="Transcribe this audio",
+        output_mode="individual",
+        output_path=str(tmp_path / "out"),
+        naming_template="{filename}",
+        output_extension=".txt",
+        profile_name=EXPORT_MODE_PROFILE,
+        delay_between_requests=0.0,
+        export_path=str(export_dir),
+    )
+
+
+def test_export_audio_chunk_metadata(tmp_path):
+    """Chunked audio export returns per-chunk metadata and writes chunk + prompt files."""
+    from src.tools.audio_processor import AudioChunk, ChunkingResult
+    from src.tools.file_processor import MAX_INLINE_SIZE, FileProcessor
+
+    export_dir = tmp_path / "export"
+    export_dir.mkdir()
+    src_audio = tmp_path / "interview.mp3"
+    src_audio.write_bytes(b"\x00" * (MAX_INLINE_SIZE + 1))
+
+    fp = FileProcessor()
+
+    def _make_chunks():
+        chunks = [
+            AudioChunk(
+                path=tmp_path / "c1.mp3",
+                index=0,
+                start_time=0.0,
+                end_time=600.0,
+                duration=600.0,
+                size_bytes=10,
+                overlap_duration=30.0,
+            ),
+            AudioChunk(
+                path=tmp_path / "c2.mp3",
+                index=1,
+                start_time=570.0,
+                end_time=1200.0,
+                duration=630.0,
+                size_bytes=10,
+                overlap_duration=30.0,
+            ),
+            AudioChunk(
+                path=tmp_path / "c3.mp3", index=2, start_time=1170.0, end_time=1500.0, duration=330.0, size_bytes=10
+            ),
+        ]
+        for c in chunks:
+            c.path.write_bytes(b"chunk")
+        return ChunkingResult(success=True, chunks=chunks)
+
+    with (
+        patch.object(fp, "_preprocess_audio_if_needed", return_value=(src_audio, None)),
+        patch.object(fp.audio_processor, "split_audio", side_effect=lambda _p: _make_chunks()),
+    ):
+        meta = fp._export_audio_file(src_audio, "Transcribe this audio", export_dir, interactive=False)
+
+    assert len(meta) == 3
+    assert meta[0]["chunk_file"] == "interview_chunk001.mp3"
+    assert meta[0]["prompt_file"] == "interview_chunk001_prompt.txt"
+    assert meta[1]["start_time"] == 570.0
+    assert meta[0]["overlap_duration"] == 30.0
+    assert meta[0]["chunk_index"] == 0
+    # Chunk files + prompts exported to the export dir
+    assert (export_dir / "interview_chunk001.mp3").exists()
+    assert (export_dir / "interview_chunk002_prompt.txt").exists()
+
+
+def test_export_manifest_embeds_chunk_metadata(tmp_path):
+    """_execute_export embeds chunk metadata into manifest.json."""
+    import json
+
+    from src.tools.audio_processor import AudioChunk, ChunkingResult
+    from src.tools.checkpoint import CheckpointManager
+    from src.tools.file_processor import MAX_INLINE_SIZE, FileProcessor
+
+    export_dir = tmp_path / "export"
+    src_audio = tmp_path / "interview.mp3"
+    src_audio.write_bytes(b"\x00" * (MAX_INLINE_SIZE + 1))
+
+    fp = FileProcessor()
+    # Keep checkpoint files out of the repo working directory
+    fp.checkpoint_manager = CheckpointManager(checkpoint_dir=tmp_path)
+    fp._current_checkpoint = _make_export_checkpoint(tmp_path, [src_audio], export_dir)
+
+    chunks = [
+        AudioChunk(
+            path=tmp_path / "c1.mp3",
+            index=0,
+            start_time=0.0,
+            end_time=600.0,
+            duration=600.0,
+            size_bytes=10,
+            overlap_duration=30.0,
+        ),
+        AudioChunk(
+            path=tmp_path / "c2.mp3",
+            index=1,
+            start_time=570.0,
+            end_time=1200.0,
+            duration=630.0,
+            size_bytes=10,
+            overlap_duration=30.0,
+        ),
+        AudioChunk(
+            path=tmp_path / "c3.mp3", index=2, start_time=1170.0, end_time=1500.0, duration=330.0, size_bytes=10
+        ),
+    ]
+    for c in chunks:
+        c.path.write_bytes(b"chunk")
+
+    with (
+        patch.object(fp, "_preprocess_audio_if_needed", return_value=(src_audio, None)),
+        patch.object(fp.audio_processor, "split_audio", return_value=ChunkingResult(success=True, chunks=chunks)),
+    ):
+        result = fp._execute_export(interactive=False)
+
+    assert result.success
+    manifest = json.loads((export_dir / "manifest.json").read_text(encoding="utf-8"))
+    entry = manifest["files"][0]
+    assert entry["total_chunks"] == 3
+    assert len(entry["chunks"]) == 3
+    assert entry["chunks"][1]["start_time"] == 570.0
+    assert entry["chunks"][1]["overlap_duration"] == 30.0
+    assert entry["chunks"][2]["chunk_file"] == "interview_chunk003.mp3"
+
+
+def test_export_small_audio_no_chunks_key(tmp_path):
+    """Small audio export keeps manifest entry without 'chunks' key."""
+    import json
+
+    from src.tools.checkpoint import CheckpointManager
+    from src.tools.file_processor import FileProcessor
+
+    export_dir = tmp_path / "export"
+    src_audio = tmp_path / "small.mp3"
+    src_audio.write_bytes(b"\x00" * 16)
+
+    fp = FileProcessor()
+    # Keep checkpoint files out of the repo working directory
+    fp.checkpoint_manager = CheckpointManager(checkpoint_dir=tmp_path)
+    fp._current_checkpoint = _make_export_checkpoint(tmp_path, [src_audio], export_dir)
+
+    with patch.object(fp, "_preprocess_audio_if_needed", return_value=(src_audio, None)):
+        meta = fp._export_audio_file(src_audio, "Transcribe", export_dir, interactive=False)
+
+    assert meta == []
+    result = fp._execute_export(interactive=False)
+    assert result.success
+
+    manifest = json.loads((export_dir / "manifest.json").read_text(encoding="utf-8"))
+    entry = manifest["files"][0]
+    assert "chunks" not in entry
+    assert "total_chunks" not in entry
+
+
+def _write_merge_fixture(tmp_path: Path):
+    """Create an export dir with manifest.json + per-chunk response files."""
+    import json
+
+    export_dir = tmp_path / "export"
+    export_dir.mkdir()
+    (export_dir / "interview_chunk001.mp3").write_bytes(b"a")
+    (export_dir / "interview_chunk002.mp3").write_bytes(b"b")
+
+    manifest = {
+        "files": [
+            {
+                "original_path": "/orig/interview.mp3",
+                "filename": "interview.mp3",
+                "type": "audio",
+                "status": "exported",
+                "total_chunks": 2,
+                "chunks": [
+                    {
+                        "chunk_index": 0,
+                        "chunk_file": "interview_chunk001.mp3",
+                        "prompt_file": "interview_chunk001_prompt.txt",
+                        "start_time": 0.0,
+                        "end_time": 600.0,
+                        "overlap_duration": 30.0,
+                    },
+                    {
+                        "chunk_index": 1,
+                        "chunk_file": "interview_chunk002.mp3",
+                        "prompt_file": "interview_chunk002_prompt.txt",
+                        "start_time": 570.0,
+                        "end_time": 1200.0,
+                        "overlap_duration": 0.0,
+                    },
+                ],
+            }
+        ]
+    }
+    (export_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    return export_dir
+
+
+def test_merge_export_responses_basic(tmp_path):
+    """Merge tool recombines per-chunk responses into one transcript file."""
+    from src.tools.file_processor import merge_export_responses
+
+    export_dir = _write_merge_fixture(tmp_path)
+    (export_dir / "interview_chunk001_response.txt").write_text(
+        "Hello world this is a test of the emergency broadcast system", encoding="utf-8"
+    )
+    (export_dir / "interview_chunk002_response.txt").write_text(
+        "of the emergency broadcast system please stand by", encoding="utf-8"
+    )
+
+    result = merge_export_responses(str(export_dir), interactive=False)
+
+    assert result == str(export_dir / "interview_merged.txt")
+    merged = (export_dir / "interview_merged.txt").read_text(encoding="utf-8")
+    assert "Hello world" in merged
+    assert "please stand by" in merged
+    assert merged.count("emergency broadcast") == 1  # overlap deduplicated
+
+
+def test_merge_export_responses_missing_chunk(tmp_path, capsys):
+    """Missing response files warn and merge the available chunks."""
+    from src.tools.file_processor import merge_export_responses
+
+    export_dir = _write_merge_fixture(tmp_path)
+    (export_dir / "interview_chunk001_response.txt").write_text("Only first chunk", encoding="utf-8")
+    # chunk002 response intentionally missing
+
+    result = merge_export_responses(str(export_dir), interactive=True)
+    assert result == str(export_dir / "interview_merged.txt")
+    merged = (export_dir / "interview_merged.txt").read_text(encoding="utf-8")
+    assert merged == "Only first chunk"
+    out = capsys.readouterr().out
+    assert "Missing response files" in out
+    assert "1/2" in out
+
+
+def test_merge_export_responses_no_manifest(tmp_path):
+    """Missing manifest.json returns None."""
+    from src.tools.file_processor import merge_export_responses
+
+    result = merge_export_responses(str(tmp_path), interactive=False)
+    assert result is None
+
+
+def test_merge_export_responses_nothing_to_merge(tmp_path):
+    """Manifest without chunk entries returns None."""
+    import json
+
+    from src.tools.file_processor import merge_export_responses
+
+    export_dir = tmp_path
+    (export_dir / "manifest.json").write_text(
+        json.dumps({"files": [{"filename": "a.mp3", "type": "audio", "status": "exported"}]}), encoding="utf-8"
+    )
+    assert merge_export_responses(str(export_dir), interactive=False) is None
+
+
+def test_merge_export_responses_alternate_naming(tmp_path):
+    """Fallback naming conventions (.md, bare .txt) are discovered."""
+    from src.tools.file_processor import merge_export_responses
+
+    export_dir = _write_merge_fixture(tmp_path)
+    (export_dir / "interview_chunk001_response.md").write_text(
+        "Hello world this is a test of the emergency broadcast system", encoding="utf-8"
+    )
+    (export_dir / "interview_chunk002.txt").write_text(
+        "of the emergency broadcast system please stand by", encoding="utf-8"
+    )
+
+    result = merge_export_responses(str(export_dir), interactive=False)
+    assert result == str(export_dir / "interview_merged.txt")
+    merged = (export_dir / "interview_merged.txt").read_text(encoding="utf-8")
+    assert "Hello world" in merged
+    assert "please stand by" in merged
+    assert merged.count("emergency broadcast") == 1  # overlap deduplicated

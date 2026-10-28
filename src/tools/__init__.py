@@ -51,7 +51,7 @@ from .config import (
     load_tools_config,
 )
 from .file_handler import FileHandler, FileInfo, ScanResult
-from .file_processor import FileProcessor, show_tools_menu
+from .file_processor import FileProcessor, merge_export_responses, show_tools_menu
 from .tts_processor import TTSProcessor
 
 __all__ = [
@@ -105,6 +105,7 @@ __all__ = [
     "list_available_prompts",
     # Config
     "load_tools_config",
+    "merge_export_responses",
     "needs_chunking",
     "show_tools_menu",
 ]
