@@ -387,7 +387,33 @@ class FileProcessor(BaseTool):
                 if is_audio:
                     file_type = "audio"
 
-                per_file_instructions = cp.per_file_instructions.get(str(file_path))
+                # Handle per-file instructions (mirrors _execute_processing)
+                per_file_instructions = None
+                if self._ask_per_file and not cp.skip_per_file_prompts:
+                    per_file_instructions = cp.per_file_instructions.get(str(file_path))
+
+                    if per_file_instructions is None and interactive:
+                        per_file_result = self._prompt_per_file_instructions(
+                            file_path_obj,
+                            file_index=len(cp.completed_files) + len(cp.failed_files),
+                            total_files=total,
+                        )
+
+                        if per_file_result is None:
+                            self.checkpoint_manager.save(cp)
+                            result.message = "Stopped by user"
+                            break
+                        elif per_file_result == "SKIP_ALL":
+                            cp.skip_per_file_prompts = True
+                            self._ask_per_file = False
+                            self.checkpoint_manager.save(cp)
+                        elif per_file_result:
+                            per_file_instructions = per_file_result
+                            cp.per_file_instructions[str(file_path)] = per_file_result
+                            self.checkpoint_manager.save(cp)
+                else:
+                    per_file_instructions = cp.per_file_instructions.get(str(file_path))
+
                 final_prompt = self._build_final_prompt(
                     cp.prompt_text, self._custom_instructions, per_file_instructions
                 )
