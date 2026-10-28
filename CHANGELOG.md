@@ -1,5 +1,23 @@
 # Changelog
 
+## [8.9.0] - 2026-10-28
+
+### New Features
+
+- **Groq Whisper Transcription**: Added Groq speech-to-text connection profiles (`whisper-large-v3` and `whisper-large-v3-turbo`) for the File Processor and Audio Tool, with response format, timestamp granularity, temperature, and language hint options. Large files are automatically split and transcoded to 16 kHz mono FLAC to stay under Groq's 25 MB free-tier request limit.
+- **Groq SRT Output & Word Timings**: The `verbose_json` response format now preserves word or segment timings inline as `(start->end) text`, and a new `srt` response format generates subtitle files from word timestamps with a configurable words-per-cue width.
+- **File Processor Export Mode**: New "Export files only" execution option that runs without any API call. Text and code files are embedded into ready-to-paste prompt files, images and documents are copied alongside companion prompt files, and audio runs the full preprocess/optimize/chunk pipeline locally. A `manifest.json` summarizes the batch, and interrupted exports resume from their checkpoint.
+- **Export Merge Tool**: New Tools menu option (or `python -m src.tools merge <dir>`) recombines per-chunk `*_response.txt` files from an export directory into a single merged transcript using overlap-aware deduplication, without API keys or full app initialization.
+
+### Improvements
+
+- **Overlapping Audio Chunks**: Split audio chunks now overlap by 10 seconds (configurable) so boundary speech is captured by two consecutive chunks, and transcripts are merged with a longest-common-sequence aligner that removes the duplicated overlap text instead of naively concatenating.
+- **Digest Source Language**: The Digest prompts in TextEdit and the File Processor now output the digest in the same language as the source content.
+
+### Fixes
+
+- **Export Mode Per-File Instructions**: Export mode now prompts for and applies per-file instructions exactly like the normal API processing path.
+
 ## [8.8.0] - 2026-10-15
 
 ### New Features
