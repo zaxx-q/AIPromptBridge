@@ -19,6 +19,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from src.audio.export import CODEC_MAP, export_audio_from_file, get_format_ext
+
 # Import console utilities
 from src.console import (
     HAVE_RICH,
@@ -238,12 +240,33 @@ class FileProcessor(BaseTool):
     def _export_audio_file(
         self, filepath: Path, prompt: str, export_dir: Path, interactive: bool
     ) -> List[Dict[str, Any]]:
-        """Export an audio file: preprocess, optimize, chunk if needed, then copy + prompt files.
+        """Export audio in the configured format, splitting large files into chunks.
 
         Returns:
             List of chunk metadata dicts (empty if the file was not chunked).
         """
         import shutil
+
+        configured_format = str(self.config.get("audio_output_format", "ogg")).lower()
+        export_format = get_format_ext(configured_format)
+        if export_format not in CODEC_MAP:
+            export_format = "ogg"
+        codec_args = list(CODEC_MAP[export_format][0])
+
+        # Audio File Optimization's selected bitrate takes precedence over the
+        # shared format default (e.g., 96k Opus instead of the default 32k).
+        optimization = (self._audio_preprocessing or {}).get("optimization") or {}
+        optimized_bitrate = optimization.get("bitrate_kbps")
+        if optimized_bitrate and export_format in {"ogg", "mp3", "m4a"}:
+            bitrate_arg = f"{optimized_bitrate}k"
+            if "-b:a" in codec_args:
+                codec_args[codec_args.index("-b:a") + 1] = bitrate_arg
+            else:
+                codec_args.extend(["-b:a", bitrate_arg])
+
+        target_bitrate = None
+        if "-b:a" in codec_args:
+            target_bitrate = codec_args[codec_args.index("-b:a") + 1]
 
         process_path, preprocess_result = self._preprocess_audio_if_needed(filepath, interactive)
 
@@ -262,7 +285,12 @@ class FileProcessor(BaseTool):
                 if interactive:
                     print(f"   ✂️ Splitting audio ({file_size / (1024 * 1024):.1f} MB)...")
 
-                chunk_result = self.audio_processor.split_audio(process_path)
+                chunk_result = self.audio_processor.split_audio(
+                    process_path,
+                    output_format=export_format,
+                    target_bitrate=target_bitrate,
+                    codec_args=codec_args,
+                )
                 if not chunk_result.success:
                     raise Exception(f"Chunking failed: {chunk_result.error}")
 
@@ -306,6 +334,14 @@ class FileProcessor(BaseTool):
                                 f"with the beginning of the next segment for context continuity."
                             )
 
+                        # Match the normal chunked API path: preserve the original
+                        # source filename while identifying the part being processed.
+                        if self._include_filename:
+                            chunk_display = (
+                                f"{filepath.name} (Part {ci + 1}/{total_chunks})" if total_chunks > 1 else filepath.name
+                            )
+                            chunk_prompt = f"{chunk_prompt}\n\n[File: {chunk_display}]"
+
                         prompt_path = export_dir / f"{filepath.stem}_chunk{ci + 1:03d}_prompt.txt"
                         with open(prompt_path, "w", encoding="utf-8") as f:
                             f.write(chunk_prompt)
@@ -333,16 +369,17 @@ class FileProcessor(BaseTool):
                         except Exception:
                             pass
             else:
-                # Small file (or force no-chunk): copy the (possibly preprocessed) file
-                dest_name = filepath.stem + process_path.suffix
-                dest = export_dir / dest_name
+                # Small file (or force no-chunk): export using the configured codec.
+                dest = export_dir / f"{filepath.stem}.{export_format}"
                 if dest.exists():
                     counter = 1
                     while dest.exists():
-                        dest = export_dir / f"{filepath.stem}_{counter}{process_path.suffix}"
+                        dest = export_dir / f"{filepath.stem}_{counter}.{export_format}"
                         counter += 1
 
-                shutil.copy2(process_path, dest)
+                error = export_audio_from_file(str(process_path), str(dest), export_format, codec_override=codec_args)
+                if error:
+                    raise RuntimeError(f"Audio export failed: {error}")
 
                 prompt_with_filename = prompt
                 if self._include_filename:

@@ -1350,6 +1350,10 @@ class AudioProcessor:
                 cmd.extend(["-c:a", "aac"])
                 if not has_bitrate:
                     cmd.extend(["-b:a", "192k"])
+            elif output_path.suffix.lower() == ".ogg":
+                cmd.extend(["-c:a", "libopus"])
+                if not has_bitrate:
+                    cmd.extend(["-b:a", "32k"])
             elif output_path.suffix.lower() == ".flac":
                 cmd.extend(["-c:a", "flac"])
             elif output_path.suffix.lower() == ".wav":
@@ -1772,6 +1776,7 @@ class AudioProcessor:
         output_format: Optional[str] = None,
         target_bitrate: Optional[str] = None,
         volume_change_db: Optional[float] = None,
+        codec_args: Optional[List[str]] = None,
         overlap_seconds: float = DEFAULT_OVERLAP_SECONDS,
     ) -> ChunkingResult:
         """
@@ -1782,6 +1787,7 @@ class AudioProcessor:
             output_format: Output format for chunks (default: follows input or mp3)
             target_bitrate: Optional target bitrate (e.g., "128k")
             volume_change_db: Optional volume adjustment in dB
+            codec_args: Optional explicit FFmpeg codec arguments for re-encoding
 
         Returns:
             ChunkingResult with list of chunk paths
@@ -1911,7 +1917,9 @@ class AudioProcessor:
                 if filters:
                     cmd.extend(["-af", ",".join(filters)])
 
-                if target_bitrate:
+                if codec_args:
+                    cmd.extend(codec_args)
+                elif target_bitrate:
                     cmd.extend(["-b:a", target_bitrate])
                 elif not filters and filepath.suffix.lstrip(".").lower() == output_format:
                     cmd.extend(["-c:a", "copy"])
