@@ -76,7 +76,7 @@ GROQ_SUPPORTED_EXTS = {".flac", ".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".ogg"
 DEFAULT_OVERLAP_SECONDS = 10.0
 
 # Supported audio formats
-AUDIO_EXTENSIONS = {".mp3", ".wav", ".aiff", ".aac", ".ogg", ".flac", ".m4a", ".wma"}
+AUDIO_EXTENSIONS = {".mp3", ".wav", ".aiff", ".aac", ".opus", ".ogg", ".flac", ".m4a", ".wma"}
 
 
 # =============================================================================
@@ -924,7 +924,9 @@ class AudioProcessor:
             ]
 
             # Choose codec based on output format
-            if output_path.suffix.lower() == ".mp3":
+            if output_path.suffix.lower() == ".opus":
+                cmd.extend(["-c:a", "libopus", "-b:a", "32k"])
+            elif output_path.suffix.lower() == ".mp3":
                 cmd.extend(["-c:a", "libmp3lame", "-q:a", "2"])  # High quality MP3
             elif output_path.suffix.lower() == ".m4a":
                 cmd.extend(["-c:a", "aac", "-b:a", "192k"])
@@ -1262,7 +1264,11 @@ class AudioProcessor:
             # Note: if optimization specifies bitrate, don't override with quality setting
             has_bitrate = optimization and optimization.bitrate_kbps
 
-            if output_path.suffix.lower() == ".mp3":
+            if output_path.suffix.lower() == ".opus":
+                cmd.extend(["-c:a", "libopus"])
+                if not has_bitrate:
+                    cmd.extend(["-b:a", "32k"])
+            elif output_path.suffix.lower() == ".mp3":
                 cmd.extend(["-c:a", "libmp3lame"])
                 if not has_bitrate:
                     cmd.extend(["-q:a", "2"])  # High quality MP3
@@ -1270,10 +1276,6 @@ class AudioProcessor:
                 cmd.extend(["-c:a", "aac"])
                 if not has_bitrate:
                     cmd.extend(["-b:a", "192k"])
-            elif output_path.suffix.lower() == ".ogg":
-                cmd.extend(["-c:a", "libopus"])
-                if not has_bitrate:
-                    cmd.extend(["-b:a", "32k"])
             elif output_path.suffix.lower() == ".flac":
                 cmd.extend(["-c:a", "flac"])
             elif output_path.suffix.lower() == ".wav":

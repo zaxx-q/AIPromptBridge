@@ -1526,7 +1526,7 @@ class PlaygroundTabMixin:
     def _select_playground_audio_file(self):
         """Open file dialog to upload an audio file."""
         file_path = filedialog.askopenfilename(
-            title="Select Audio File", filetypes=[("Audio Files", "*.wav *.mp3 *.ogg *.m4a *.aac *.flac")]
+            title="Select Audio File", filetypes=[("Audio Files", "*.wav *.mp3 *.opus *.ogg *.m4a *.aac *.flac")]
         )
         if file_path:
             self._load_playground_audio(file_path)
@@ -1543,6 +1543,7 @@ class PlaygroundTabMixin:
             mime_map = {
                 ".wav": "audio/wav",
                 ".mp3": "audio/mp3",
+                ".opus": "audio/opus",
                 ".ogg": "audio/ogg",
                 ".m4a": "audio/m4a",
                 ".aac": "audio/aac",

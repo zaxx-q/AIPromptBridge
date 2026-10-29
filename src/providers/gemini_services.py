@@ -61,6 +61,7 @@ def upload_file(
             ".wav": "audio/wav",
             ".aiff": "audio/aiff",
             ".aac": "audio/aac",
+            ".opus": "audio/opus",
             ".ogg": "audio/ogg",
             ".flac": "audio/flac",
             ".m4a": "audio/mp4",

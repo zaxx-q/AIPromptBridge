@@ -90,7 +90,7 @@ class FileHandler:
     # Default file type mappings
     DEFAULT_FILE_TYPES: ClassVar[Dict[str, List[str]]] = {
         "image": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".tif"],
-        "audio": [".mp3", ".wav", ".aiff", ".aac", ".ogg", ".flac", ".m4a", ".wma"],
+        "audio": [".mp3", ".wav", ".aiff", ".aac", ".opus", ".ogg", ".flac", ".m4a", ".wma"],
         "text": [".txt", ".md", ".rst", ".log", ".csv"],
         "document": [".pdf"],
         "code": [
@@ -181,6 +181,7 @@ class FileHandler:
         ".wav": "audio/wav",
         ".aiff": "audio/aiff",
         ".aac": "audio/aac",
+        ".opus": "audio/opus",
         ".ogg": "audio/ogg",
         ".flac": "audio/flac",
         ".m4a": "audio/mp4",  # M4A is typically AAC in MP4 container

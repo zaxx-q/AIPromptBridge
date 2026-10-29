@@ -247,17 +247,17 @@ class FileProcessor(BaseTool):
         """
         import shutil
 
-        configured_format = str(self.config.get("audio_output_format", "ogg")).lower()
+        configured_format = str(self.config.get("audio_output_format", "opus")).lower()
         export_format = get_format_ext(configured_format)
         if export_format not in CODEC_MAP:
-            export_format = "ogg"
+            export_format = "opus"
         codec_args = list(CODEC_MAP[export_format][0])
 
         # Audio File Optimization's selected bitrate takes precedence over the
         # shared format default (e.g., 96k Opus instead of the default 32k).
         optimization = (self._audio_preprocessing or {}).get("optimization") or {}
         optimized_bitrate = optimization.get("bitrate_kbps")
-        if optimized_bitrate and export_format in {"ogg", "mp3", "m4a"}:
+        if optimized_bitrate and export_format in {"opus", "ogg", "mp3", "m4a"}:
             bitrate_arg = f"{optimized_bitrate}k"
             if "-b:a" in codec_args:
                 codec_args[codec_args.index("-b:a") + 1] = bitrate_arg

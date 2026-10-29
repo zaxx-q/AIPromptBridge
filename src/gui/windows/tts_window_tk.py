@@ -331,7 +331,7 @@ def _create_export_section_tk(window, parent):
     content = _create_section_frame_tk(parent, "Export", colors)
 
     # Format info label (read from config)
-    fmt = window.config.get("audio_output_format", "ogg").upper()
+    fmt = window.config.get("audio_output_format", "opus").upper()
     tk.Label(
         content, text=f"Format: {fmt} (set in config)", font=get_tk_font(9), bg=colors.surface0, fg=colors.overlay0
     ).pack(fill="x", pady=(0, 5))

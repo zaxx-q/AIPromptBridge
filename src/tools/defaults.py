@@ -170,7 +170,7 @@ DEFAULT_TOOLS_CONFIG = {
         },
         "file_type_mappings": {
             "image": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".tif"],
-            "audio": [".mp3", ".wav", ".aiff", ".aac", ".ogg", ".flac", ".m4a", ".wma"],
+            "audio": [".mp3", ".wav", ".aiff", ".aac", ".opus", ".ogg", ".flac", ".m4a", ".wma"],
             "text": [".txt", ".md", ".rst", ".log", ".csv"],
             "code": [
                 ".py",

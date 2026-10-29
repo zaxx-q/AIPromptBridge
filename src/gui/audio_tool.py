@@ -284,7 +284,9 @@ class AudioToolApp:
 
                     # Determine extension
                     ext = ".wav"
-                    if "ogg" in mime_type:
+                    if "opus" in mime_type:
+                        ext = ".opus"
+                    elif "ogg" in mime_type:
                         ext = ".ogg"
                     elif "mpeg" in mime_type or "mp3" in mime_type:
                         ext = ".mp3"
@@ -426,7 +428,9 @@ class AudioToolApp:
 
             # Determine file extension for temp file
             ext = ".wav"
-            if "ogg" in mime_type:
+            if "opus" in mime_type:
+                ext = ".opus"
+            elif "ogg" in mime_type:
                 ext = ".ogg"
             elif "mpeg" in mime_type or "mp3" in mime_type:
                 ext = ".mp3"
@@ -616,7 +620,9 @@ class AudioToolApp:
 
             # Determine file extension for temp file
             ext = ".wav"
-            if "ogg" in mime_type:
+            if "opus" in mime_type:
+                ext = ".opus"
+            elif "ogg" in mime_type:
                 ext = ".ogg"
             elif "mpeg" in mime_type or "mp3" in mime_type:
                 ext = ".mp3"

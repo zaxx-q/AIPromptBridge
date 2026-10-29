@@ -143,10 +143,10 @@ class TTSTabMixin:
             content,
             "audio_output_format",
             "Audio output format:",
-            self.config_data.config.get("audio_output_format", "ogg"),
-            options=["ogg", "mp3", "wav", "flac", "m4a"],
+            self.config_data.config.get("audio_output_format", "opus"),
+            options=["opus", "ogg", "mp3", "wav", "flac", "m4a"],
             size="sm",
-            hint="Format for TTS & Audio Analyzer saved files (ogg = Opus, m4a = AAC)",
+            hint="Format for TTS & Audio Analyzer saved files (opus = Opus, ogg = Vorbis, m4a = AAC)",
         )
 
         self._add_entry_field(

@@ -45,19 +45,19 @@ COMPRESSION_PRESETS = {
         "name": "Recommended",
         "description": "Best for speech with silence removal",
         "ffmpeg_args": "-af silenceremove=start_periods=1:start_duration=0.1:start_threshold=-50dB:detection=peak,aformat=sample_fmts=s16:sample_rates=16000:channel_layouts=mono -c:a libopus -b:a 32k -ar 16000 -ac 1 -compression_level 10",
-        "output_ext": ".ogg",
+        "output_ext": ".opus",
     },
     "preserve_audio": {
         "name": "Preserve Audio",
         "description": "Compress but no silence removal, preserves original audio",
         "ffmpeg_args": "-c:a libopus -b:a 32k -ar 16000 -ac 1 -compression_level 10",
-        "output_ext": ".ogg",
+        "output_ext": ".opus",
     },
     "smallest": {
         "name": "Smallest",
         "description": "Maximum compression with silence removal",
         "ffmpeg_args": "-af silenceremove=start_periods=1:start_duration=0.1:start_threshold=-50dB:detection=peak,aformat=sample_fmts=s16:sample_rates=16000:channel_layouts=mono -c:a libopus -b:a 16k -ar 16000 -ac 1 -compression_level 10",
-        "output_ext": ".ogg",
+        "output_ext": ".opus",
     },
     "mp3_compat": {
         "name": "MP3 Compatible",
@@ -69,7 +69,7 @@ COMPRESSION_PRESETS = {
         "name": "Music",
         "description": "Higher quality for music content",
         "ffmpeg_args": "-c:a libopus -b:a 96k -ar 48000 -ac 2 -compression_level 10",
-        "output_ext": ".ogg",
+        "output_ext": ".opus",
     },
 }
 
@@ -1040,7 +1040,7 @@ class AudioRecorder:
             return None
 
         preset_config = COMPRESSION_PRESETS.get(preset, COMPRESSION_PRESETS["recommended"])
-        output_ext = preset_config.get("output_ext", ".ogg")
+        output_ext = preset_config.get("output_ext", ".opus")
         ffmpeg_args = preset_config.get("ffmpeg_args", "")
 
         try:

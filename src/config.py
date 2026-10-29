@@ -76,8 +76,8 @@ DEFAULT_CONFIG = {
     "audio_level_meter_style": "canvas",
     # TTS (Text-to-Speech) settings
     # Audio output format for all tools (Audio Analyzer save, TTS save)
-    # Options: ogg (Opus, recommended), mp3, wav, flac, m4a (AAC)
-    "audio_output_format": "ogg",
+    # Options: opus (recommended), ogg (Vorbis), mp3, wav, flac, m4a (AAC)
+    "audio_output_format": "opus",
     "tts_enabled": True,
     "tts_hotkey": "ctrl+alt+t",
     "tts_default_voice": "Kore",
@@ -472,8 +472,8 @@ audio_level_meter_style = canvas
 # AUDIO OUTPUT FORMAT (shared across tools)
 # ============================================================
 # Format for saved audio files (Audio Analyzer, TTS)
-# Options: ogg (Opus, recommended), mp3, wav, flac, m4a (AAC)
-audio_output_format = ogg
+# Options: opus (recommended), ogg (Vorbis), mp3, wav, flac, m4a (AAC)
+audio_output_format = opus
 
 # ============================================================
 # TTS (TEXT-TO-SPEECH) - Gemini-powered speech synthesis

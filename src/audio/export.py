@@ -36,7 +36,9 @@ CODEC_MAP = {
     # Opus: 32k mono is transparent for speech; Opus always resamples to 48kHz
     # internally (spec requirement), so a lower target bitrate properly leverages
     # its superior compression efficiency vs AAC/MP3.
-    "ogg": (["-c:a", "libopus", "-b:a", "32k"], ".ogg"),
+    "opus": (["-c:a", "libopus", "-b:a", "32k"], ".opus"),
+    # Ogg Vorbis is a distinct codec/container choice from Opus.
+    "ogg": (["-c:a", "libvorbis", "-b:a", "96k"], ".ogg"),
     "mp3": (["-c:a", "libmp3lame", "-b:a", "128k"], ".mp3"),
     "m4a": (["-c:a", "aac", "-b:a", "64k"], ".m4a"),
     "flac": (["-c:a", "flac"], ".flac"),
@@ -74,10 +76,10 @@ def get_format_ext(format_name: str) -> str:
     Map a format name to its file extension.
 
     Args:
-        format_name: Format name (ogg, mp3, aac, m4a, flac, wav).
+        format_name: Format name (opus, ogg, mp3, aac, m4a, flac, wav).
 
     Returns:
-        File extension without dot (e.g., "ogg", "m4a").
+        File extension without dot (e.g., "opus", "m4a").
     """
     fmt = format_name.lower()
     if fmt == "aac":
@@ -101,7 +103,7 @@ def export_audio_file(
     Args:
         wav_data: Input audio as WAV bytes.
         output_path: Full path for the output file.
-        format_ext: Target format extension (ogg, mp3, m4a, flac, wav).
+        format_ext: Target format extension (opus, ogg, mp3, m4a, flac, wav).
         metadata_comment: Optional text to embed as metadata comment tag.
         extra_input_args: Optional extra FFmpeg args inserted after input
                          (e.g., filter chains like ["-af", "silenceremove=..."]).
@@ -124,7 +126,7 @@ def export_audio_file(
     if not ffmpeg_path:
         return "FFmpeg not available for conversion"
 
-    codec_args, _ = CODEC_MAP.get(format_ext, CODEC_MAP["ogg"])
+    codec_args, _ = CODEC_MAP.get(format_ext, CODEC_MAP["opus"])
 
     try:
         # Base command: read WAV from stdin
@@ -171,7 +173,7 @@ def export_audio_from_file(
     Args:
         input_path: Path to input audio file.
         output_path: Path for output file.
-        format_ext: Target format extension.
+        format_ext: Target format extension (opus, ogg, mp3, m4a, flac, wav).
         ffmpeg_filter_args: Optional audio filter string (e.g., "-af silenceremove=...").
                            Will be split and inserted into the command.
         codec_override: Optional explicit codec args (overrides CODEC_MAP).
@@ -188,7 +190,7 @@ def export_audio_from_file(
     if codec_override:
         codec_args = codec_override
     else:
-        codec_args, _ = CODEC_MAP.get(format_ext, CODEC_MAP["ogg"])
+        codec_args, _ = CODEC_MAP.get(format_ext, CODEC_MAP["opus"])
 
     try:
         cmd = [ffmpeg_path, "-y", "-i", input_path, "-v", "error"]
@@ -221,7 +223,7 @@ def build_output_filename(
     prefix: str,
     text_source: Optional[str] = None,
     fallback_name: Optional[str] = None,
-    format_ext: str = "ogg",
+    format_ext: str = "opus",
     max_words: int = 5,
 ) -> str:
     """
@@ -237,7 +239,7 @@ def build_output_filename(
         max_words: Max words for the slug.
 
     Returns:
-        Filename string like "tts_hello_world_20260323_110100.ogg"
+        Filename string like "tts_hello_world_20260323_110100.opus"
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 

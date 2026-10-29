@@ -1107,7 +1107,7 @@ def test_export_audio_chunk_metadata(tmp_path):
     def _make_chunks():
         chunks = [
             AudioChunk(
-                path=tmp_path / "c1.ogg",
+                path=tmp_path / "c1.opus",
                 index=0,
                 start_time=0.0,
                 end_time=600.0,
@@ -1116,7 +1116,7 @@ def test_export_audio_chunk_metadata(tmp_path):
                 overlap_duration=30.0,
             ),
             AudioChunk(
-                path=tmp_path / "c2.ogg",
+                path=tmp_path / "c2.opus",
                 index=1,
                 start_time=570.0,
                 end_time=1200.0,
@@ -1125,7 +1125,7 @@ def test_export_audio_chunk_metadata(tmp_path):
                 overlap_duration=30.0,
             ),
             AudioChunk(
-                path=tmp_path / "c3.ogg", index=2, start_time=1170.0, end_time=1500.0, duration=330.0, size_bytes=10
+                path=tmp_path / "c3.opus", index=2, start_time=1170.0, end_time=1500.0, duration=330.0, size_bytes=10
             ),
         ]
         for c in chunks:
@@ -1140,17 +1140,17 @@ def test_export_audio_chunk_metadata(tmp_path):
     ):
         meta = fp._export_audio_file(src_audio, "Transcribe this audio", export_dir, interactive=False)
 
-    assert split_audio.call_args.kwargs["output_format"] == "ogg"
+    assert split_audio.call_args.kwargs["output_format"] == "opus"
     assert split_audio.call_args.kwargs["target_bitrate"] == "32k"
     assert split_audio.call_args.kwargs["codec_args"] == ["-c:a", "libopus", "-b:a", "32k"]
     assert len(meta) == 3
-    assert meta[0]["chunk_file"] == "interview_chunk001.ogg"
+    assert meta[0]["chunk_file"] == "interview_chunk001.opus"
     assert meta[0]["prompt_file"] == "interview_chunk001_prompt.txt"
     assert meta[1]["start_time"] == 570.0
     assert meta[0]["overlap_duration"] == 30.0
     assert meta[0]["chunk_index"] == 0
     # Chunk files + prompts exported to the export dir
-    assert (export_dir / "interview_chunk001.ogg").exists()
+    assert (export_dir / "interview_chunk001.opus").exists()
     first_prompt = (export_dir / "interview_chunk001_prompt.txt").read_text(encoding="utf-8")
     second_prompt = (export_dir / "interview_chunk002_prompt.txt").read_text(encoding="utf-8")
     assert "[File: interview.mp3 (Part 1/3)]" in first_prompt
@@ -1165,7 +1165,7 @@ def test_export_chunk_prompt_respects_filename_context_preference(tmp_path):
     export_dir = tmp_path / "export"
     src_audio = tmp_path / "interview.mp3"
     src_audio.write_bytes(b"\x00" * (MAX_INLINE_SIZE + 1))
-    chunk = AudioChunk(path=tmp_path / "c1.ogg", index=0, start_time=0, end_time=10, duration=10, size_bytes=1)
+    chunk = AudioChunk(path=tmp_path / "c1.opus", index=0, start_time=0, end_time=10, duration=10, size_bytes=1)
     chunk.path.write_bytes(b"chunk")
 
     fp = FileProcessor()
@@ -1199,7 +1199,7 @@ def test_export_manifest_embeds_chunk_metadata(tmp_path):
 
     chunks = [
         AudioChunk(
-            path=tmp_path / "c1.ogg",
+            path=tmp_path / "c1.opus",
             index=0,
             start_time=0.0,
             end_time=600.0,
@@ -1208,7 +1208,7 @@ def test_export_manifest_embeds_chunk_metadata(tmp_path):
             overlap_duration=30.0,
         ),
         AudioChunk(
-            path=tmp_path / "c2.ogg",
+            path=tmp_path / "c2.opus",
             index=1,
             start_time=570.0,
             end_time=1200.0,
@@ -1217,7 +1217,7 @@ def test_export_manifest_embeds_chunk_metadata(tmp_path):
             overlap_duration=30.0,
         ),
         AudioChunk(
-            path=tmp_path / "c3.ogg", index=2, start_time=1170.0, end_time=1500.0, duration=330.0, size_bytes=10
+            path=tmp_path / "c3.opus", index=2, start_time=1170.0, end_time=1500.0, duration=330.0, size_bytes=10
         ),
     ]
     for c in chunks:
@@ -1231,7 +1231,7 @@ def test_export_manifest_embeds_chunk_metadata(tmp_path):
     ):
         result = fp._execute_export(interactive=False)
 
-    assert split_audio.call_args.kwargs["output_format"] == "ogg"
+    assert split_audio.call_args.kwargs["output_format"] == "opus"
     assert split_audio.call_args.kwargs["target_bitrate"] == "32k"
     assert split_audio.call_args.kwargs["codec_args"] == ["-c:a", "libopus", "-b:a", "32k"]
 
@@ -1242,7 +1242,7 @@ def test_export_manifest_embeds_chunk_metadata(tmp_path):
     assert len(entry["chunks"]) == 3
     assert entry["chunks"][1]["start_time"] == 570.0
     assert entry["chunks"][1]["overlap_duration"] == 30.0
-    assert entry["chunks"][2]["chunk_file"] == "interview_chunk003.ogg"
+    assert entry["chunks"][2]["chunk_file"] == "interview_chunk003.opus"
 
 
 def test_export_small_audio_no_chunks_key(tmp_path):
@@ -1268,7 +1268,7 @@ def test_export_small_audio_no_chunks_key(tmp_path):
         meta = fp._export_audio_file(src_audio, "Transcribe", export_dir, interactive=False)
 
     assert meta == []
-    assert export_audio.call_args.args[2] == "ogg"
+    assert export_audio.call_args.args[2] == "opus"
     assert export_audio.call_args.kwargs["codec_override"] == ["-c:a", "libopus", "-b:a", "32k"]
 
     with (
@@ -1282,6 +1282,76 @@ def test_export_small_audio_no_chunks_key(tmp_path):
     entry = manifest["files"][0]
     assert "chunks" not in entry
     assert "total_chunks" not in entry
+
+
+def test_ogg_preset_processing_keeps_optimization_sample_rate(tmp_path):
+    """Temporary Ogg preprocessing does not force Opus output settings."""
+    from src.tools.audio_processor import AudioInfo, AudioProcessor, OutputOptimization
+
+    source = tmp_path / "source.ogg"
+    source.write_bytes(b"source")
+    processor = AudioProcessor()
+    info = AudioInfo(
+        path=source,
+        duration_seconds=60,
+        bitrate_kbps=64,
+        size_bytes=1024,
+        format="ogg",
+        sample_rate=48000,
+        channels=1,
+    )
+
+    with (
+        patch.object(processor, "is_available", return_value=True),
+        patch.object(processor, "get_audio_info", return_value=info),
+        patch("src.tools.audio_processor.subprocess.run", return_value=MagicMock(returncode=0, stderr="")) as run,
+    ):
+        result = processor.apply_filter_chain(
+            source,
+            "highpass=f=80",
+            output_path=tmp_path / "processed.ogg",
+            optimization=OutputOptimization(convert_to_mono=True, sample_rate=22050, bitrate_kbps=64),
+        )
+
+    assert result.success
+    command = run.call_args.args[0]
+    assert command[command.index("-ar") + 1] == "22050"
+    assert "-c:a" not in command
+
+
+def test_opus_preset_processing_uses_opus_codec(tmp_path):
+    """Temporary Opus preprocessing explicitly preserves its codec."""
+    from src.tools.audio_processor import AudioInfo, AudioProcessor, OutputOptimization
+
+    source = tmp_path / "source.opus"
+    source.write_bytes(b"source")
+    processor = AudioProcessor()
+    info = AudioInfo(
+        path=source,
+        duration_seconds=60,
+        bitrate_kbps=32,
+        size_bytes=1024,
+        format="opus",
+        sample_rate=48000,
+        channels=1,
+    )
+
+    with (
+        patch.object(processor, "is_available", return_value=True),
+        patch.object(processor, "get_audio_info", return_value=info),
+        patch("src.tools.audio_processor.subprocess.run", return_value=MagicMock(returncode=0, stderr="")) as run,
+    ):
+        result = processor.apply_filter_chain(
+            source,
+            "highpass=f=80",
+            output_path=tmp_path / "processed.opus",
+            optimization=OutputOptimization(convert_to_mono=True, sample_rate=22050, bitrate_kbps=64),
+        )
+
+    assert result.success
+    command = run.call_args.args[0]
+    assert command[command.index("-c:a") + 1] == "libopus"
+    assert command[command.index("-b:a") + 1] == "64k"
 
 
 def test_export_audio_uses_selected_output_format(tmp_path):
@@ -1311,7 +1381,7 @@ def test_export_audio_optimization_bitrate_overrides_format_default(tmp_path):
     export_dir = tmp_path / "export"
     src_audio = tmp_path / "small.wav"
     src_audio.write_bytes(b"source")
-    fp = FileProcessor(config={"audio_output_format": "ogg"})
+    fp = FileProcessor(config={"audio_output_format": "opus"})
     fp._audio_preprocessing = {"optimization": {"bitrate_kbps": 96}}
 
     with (
@@ -1320,7 +1390,7 @@ def test_export_audio_optimization_bitrate_overrides_format_default(tmp_path):
     ):
         fp._export_audio_file(src_audio, "Transcribe", export_dir, interactive=False)
 
-    assert export_audio.call_args.args[1].endswith("small.ogg")
+    assert export_audio.call_args.args[1].endswith("small.opus")
     assert export_audio.call_args.kwargs["codec_override"] == ["-c:a", "libopus", "-b:a", "96k"]
 
 

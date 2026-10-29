@@ -1383,7 +1383,7 @@ class AudioAnalyzerWindow:
         from tkinter import filedialog
 
         file_path = filedialog.askopenfilename(
-            title="Select Audio File", filetypes=[("Audio Files", "*.wav *.mp3 *.ogg *.m4a *.aac *.flac")]
+            title="Select Audio File", filetypes=[("Audio Files", "*.wav *.mp3 *.opus *.ogg *.m4a *.aac *.flac")]
         )
 
         if not file_path:
@@ -1506,7 +1506,7 @@ class AudioAnalyzerWindow:
         from ...audio.recorder import COMPRESSION_PRESETS
 
         # Get format from config
-        ext = get_format_ext(self.config.get("audio_output_format", "ogg"))
+        ext = get_format_ext(self.config.get("audio_output_format", "opus"))
 
         # Build filename: result text → device name → timestamp only
         device_name = self.current_device.name if self.current_device else None
@@ -1526,10 +1526,10 @@ class AudioAnalyzerWindow:
                 preset_config = COMPRESSION_PRESETS.get(self.compression_preset, COMPRESSION_PRESETS["recommended"])
                 preset_args = preset_config.get("ffmpeg_args", "")
 
-                # Extract filter args (-af ...) from preset for non-ogg formats
-                # For ogg, the full preset args work directly
+                # Compression presets contain an Opus encoder, so only use their
+                # complete command for the explicit Opus output format.
                 filter_args = None
-                if ext != "ogg":
+                if ext != "opus":
                     # Only extract the -af filter portion; codec will come from CODEC_MAP
                     parts = preset_args.split()
                     if "-af" in parts:
@@ -1543,8 +1543,8 @@ class AudioAnalyzerWindow:
                     tmp_path = tmp.name
 
                 try:
-                    if ext == "ogg":
-                        # For OGG, use full preset args (includes filters + opus codec)
+                    if ext == "opus":
+                        # Opus presets include their encoder settings.
                         error = export_audio_from_file(
                             input_path=tmp_path,
                             output_path=filepath,
@@ -1799,7 +1799,7 @@ class AudioAnalyzerWindow:
             from ...audio.recorder import COMPRESSION_PRESETS
 
             preset = COMPRESSION_PRESETS.get(self.compression_preset, {})
-            ext = preset.get("output_ext", ".ogg").upper().lstrip(".")
+            ext = preset.get("output_ext", ".opus").upper().lstrip(".")
 
             text = f"{original_mb:.1f} MB → ~{estimated_mb:.2f} MB ({ext})"
         else:
@@ -2090,7 +2090,8 @@ class AudioAnalyzerWindow:
             from ...audio.recorder import COMPRESSION_PRESETS
 
             preset = COMPRESSION_PRESETS.get(self.compression_preset, {})
-            mime_type = "audio/ogg" if preset.get("output_ext", ".ogg") == ".ogg" else "audio/mpeg"
+            output_ext = preset.get("output_ext", ".opus")
+            mime_type = {".opus": "audio/opus", ".ogg": "audio/ogg", ".mp3": "audio/mpeg"}.get(output_ext, "audio/wav")
 
             self._process_or_callback(action_key, audio_data, mime_type, custom_text)
 

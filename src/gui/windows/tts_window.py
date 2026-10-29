@@ -529,7 +529,7 @@ class TTSWindow:
         content = self._create_section_frame(parent, "Export")
 
         # Format info label (read from config)
-        fmt = self.config.get("audio_output_format", "ogg").upper()
+        fmt = self.config.get("audio_output_format", "opus").upper()
         self._format_label = ctk.CTkLabel(
             content, text=f"Format: {fmt} (set in config)", font=get_ctk_font(size=10), text_color=self.colors.overlay0
         )
@@ -1116,7 +1116,7 @@ class TTSWindow:
             return
 
         save_dir = self.config.get("tts_save_directory", "audio_output")
-        fmt = self.config.get("audio_output_format", "ogg").lower()
+        fmt = self.config.get("audio_output_format", "opus").lower()
         if fmt == "aac":
             ext = "m4a"
         else:
