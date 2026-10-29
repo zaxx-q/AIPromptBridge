@@ -179,46 +179,25 @@ def _get_arnndn_model_path(model_name: str) -> Optional[Path]:
 
 ARNNDN_MODELS = {
     "sh": {
-        "name": "Speech Recording",
-        "description": "Tuned for speech with recording noise (fans, hiss, hum)",
+        "name": "Speech (Indoor)",
+        "description": "Removes recording noise (fans, hiss, hum) from speech — best all-round choice",
         "signal": "Speech",
         "noise": "Recording",
-        "recommended_for": "Lectures, interviews, voice memos",
-    },
-    "bd": {
-        "name": "Voice Recording",
-        "description": "Tuned for voice (incl. laughter, non-speech) with recording noise",
-        "signal": "Voice",
-        "noise": "Recording",
-        "recommended_for": "Meetings, casual conversations",
-    },
-    "cb": {
-        "name": "Crowd/Chatter",
-        "description": "Tuned for general audio with recording/room noise",
-        "signal": "General",
-        "noise": "Recording",
-        "recommended_for": "Noisy rooms, conferences, events",
-    },
-    "std": {
-        "name": "Standard (Baseline)",
-        "description": "Original Xiph RNNoise model, general purpose",
-        "signal": "General",
-        "noise": "General",
-        "recommended_for": "Default fallback, balanced",
+        "recommended_for": "Lectures, interviews, meetings, voice memos",
     },
     "mp": {
-        "name": "Noisy Environment",
-        "description": "Tuned for general audio with heavy environmental noise",
+        "name": "Heavy Noise (Outdoor)",
+        "description": "Handles loud environmental noise around speech",
         "signal": "General",
         "noise": "Heavy/Environmental",
-        "recommended_for": "Outdoor, traffic, construction",
+        "recommended_for": "Outdoor, traffic, construction, wind",
     },
     "lq": {
         "name": "Voice in Noise",
-        "description": "Tuned for voice extraction from noisy environments",
+        "description": "Extracts voice from chaotic or noisy environments",
         "signal": "Voice",
         "noise": "Heavy/Environmental",
-        "recommended_for": "Phone calls in noisy places",
+        "recommended_for": "Phone calls in noisy places, crowds",
     },
 }
 
@@ -229,7 +208,7 @@ ARNNDN_MODELS = {
 
 
 def _create_voice_clarity_preset() -> AudioPreset:
-    """Voice Clarity - Enhance speech intelligibility"""
+    """Voice Clarity - Enhance speech intelligibility (absorbs Boost Quiet Speech at LOW)"""
     return AudioPreset(
         id="voice_clarity",
         name="🎤 Voice Clarity",
@@ -237,8 +216,7 @@ def _create_voice_clarity_preset() -> AudioPreset:
         category="voice",
         effects_by_intensity={
             Intensity.LOW: [
-                AudioEffect("highpass", {"f": 60}, "Remove very low rumble"),
-                AudioEffect("speechnorm", {"e": 6.25, "r": 0.00001, "l": 1}, "Light speech normalization"),
+                AudioEffect("speechnorm", {"e": 6.25, "r": 0.00001, "l": 1}, "Light speech-aware boost"),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "EBU R128 loudness"),
             ],
             Intensity.MEDIUM: [
@@ -260,7 +238,7 @@ def _create_voice_clarity_preset() -> AudioPreset:
 
 
 def _create_noise_reduction_preset() -> AudioPreset:
-    """Noise Reduction - Remove background noise"""
+    """Noise Reduction - Remove background noise (HIGH absorbs Room Echo Reduction's gate)"""
     return AudioPreset(
         id="noise_reduction",
         name="🔇 Noise Reduction",
@@ -276,8 +254,13 @@ def _create_noise_reduction_preset() -> AudioPreset:
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
             ],
             Intensity.HIGH: [
-                AudioEffect("afftdn", {"nr": 25, "nf": -30, "tn": 1}, "Strong FFT denoising"),
-                AudioEffect("anlmdn", {"s": 0.3, "p": 0.002, "r": 0.002}, "Non-local means denoise"),
+                AudioEffect("highpass", {"f": 100}, "Remove low reverb tail"),
+                AudioEffect("afftdn", {"nr": 20, "nf": -35, "tn": 1}, "Strong FFT denoising"),
+                AudioEffect(
+                    "compand",
+                    {"attacks": 0.02, "decays": 0.1, "points": "-80/-80|-40/-45|-25/-30|-15/-20|0/-8"},
+                    "Noise gate to tighten residual",
+                ),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
             ],
         },
@@ -389,30 +372,6 @@ def _create_dynamic_volume_preset() -> AudioPreset:
     )
 
 
-def _create_boost_quiet_preset() -> AudioPreset:
-    """Boost Quiet Speech - Amplify quiet sections without clipping"""
-    return AudioPreset(
-        id="boost_quiet",
-        name="🔊 Boost Quiet Speech",
-        description="Amplify quiet speech sections while preventing clipping",
-        category="volume",
-        effects_by_intensity={
-            Intensity.LOW: [
-                AudioEffect("speechnorm", {"e": 6.25, "r": 0.00001, "l": 1}, "Light speech-aware boost"),
-                AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
-            ],
-            Intensity.MEDIUM: [
-                AudioEffect("speechnorm", {"e": 12.5, "r": 0.0001, "l": 1}, "Medium speech boost"),
-                AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
-            ],
-            Intensity.HIGH: [
-                AudioEffect("speechnorm", {"e": 20, "r": 0.0001, "l": 1}, "Strong speech boost"),
-                AudioEffect("loudnorm", {"I": -14, "LRA": 7, "TP": -1.5}, "Louder target"),
-            ],
-        },
-    )
-
-
 def _create_de_ess_preset() -> AudioPreset:
     """De-Ess - Reduce harsh sibilance (s/sh sounds)"""
     return AudioPreset(
@@ -434,43 +393,6 @@ def _create_de_ess_preset() -> AudioPreset:
                 AudioEffect("equalizer", {"f": 5000, "t": "q", "w": 0.8, "g": -4}, "Strong de-ess low"),
                 AudioEffect("equalizer", {"f": 6500, "t": "q", "w": 0.8, "g": -4}, "Strong de-ess mid"),
                 AudioEffect("equalizer", {"f": 8000, "t": "q", "w": 0.8, "g": -4}, "Strong de-ess high"),
-                AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
-            ],
-        },
-    )
-
-
-def _create_room_echo_reduction_preset() -> AudioPreset:
-    """Room Echo Reduction - Reduce reverb and room echo"""
-    return AudioPreset(
-        id="room_echo",
-        name="🏠 Room Echo Reduction",
-        description="Reduce reverb and room echo (limited effectiveness)",
-        category="cleanup",
-        effects_by_intensity={
-            Intensity.LOW: [
-                AudioEffect("highpass", {"f": 80}, "Remove low rumble"),
-                AudioEffect("afftdn", {"nr": 5, "nf": -60, "tn": 1}, "Light reverb reduction"),
-                AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
-            ],
-            Intensity.MEDIUM: [
-                AudioEffect("highpass", {"f": 100}, "Remove low reverb"),
-                AudioEffect("afftdn", {"nr": 10, "nf": -50, "tn": 1}, "Reverb reduction"),
-                AudioEffect(
-                    "compand",
-                    {"attacks": 0.05, "decays": 0.2, "points": "-80/-80|-45/-45|-30/-32|-20/-22|0/-10"},
-                    "Gentle expansion",
-                ),
-                AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
-            ],
-            Intensity.HIGH: [
-                AudioEffect("highpass", {"f": 120}, "Remove low reverb"),
-                AudioEffect("afftdn", {"nr": 18, "nf": -45, "tn": 1}, "Strong reverb reduction"),
-                AudioEffect(
-                    "compand",
-                    {"attacks": 0.02, "decays": 0.1, "points": "-80/-80|-40/-45|-25/-30|-15/-20|0/-8"},
-                    "Medium gate",
-                ),
                 AudioEffect("loudnorm", {"I": -16, "LRA": 11, "TP": -1.5}, "Normalize"),
             ],
         },
@@ -577,9 +499,7 @@ def _init_presets():
         _create_podcast_preset(),
         _create_phone_recording_preset(),
         _create_dynamic_volume_preset(),
-        _create_boost_quiet_preset(),
         _create_de_ess_preset(),
-        _create_room_echo_reduction_preset(),
         # AI-powered presets
         _create_ai_noise_reduction_preset(),
         _create_ai_lecture_cleanup_preset(),

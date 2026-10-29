@@ -1085,12 +1085,13 @@ class FileProcessor(BaseTool):
             print("  [4] Noise Reduction - Remove background noise")
             print("  [5] Podcast Ready - Broadcast-quality voice")
             print("  [6] Phone Recording - Enhance low-quality audio")
-            print("  [7] More presets...")
+            print("  [7] Dynamic Volume - Even out quiet and loud sections")
+            print("  [8] De-Ess - Reduce harsh sibilance")
 
             print("\n🧠 AI-Powered Presets:")
-            print("  [8] AI Noise Reduction - Neural network noise removal")
-            print("  [9] AI Lecture Cleanup - Full AI lecture pipeline")
-            print("  [10] AI Deep Denoise - Premium DeepFilterNet (requires install)")
+            print("  [9] AI Noise Reduction - Neural network noise removal")
+            print("  [10] AI Lecture Cleanup - Full AI lecture pipeline")
+            print("  [11] AI Deep Denoise - Premium DeepFilterNet (requires install)")
 
             print("\n🔧 Advanced:")
             print("  [A] Advanced mode - Custom effect chains")
@@ -1130,24 +1131,17 @@ class FileProcessor(BaseTool):
                 "4": "noise_reduction",
                 "5": "podcast",
                 "6": "phone_recording",
+                "7": "dynamic_volume",
+                "8": "de_ess",
                 # AI presets
-                "8": "ai_noise_reduction",
-                "9": "ai_lecture_cleanup",
-                "10": "ai_deep_denoise",
+                "9": "ai_noise_reduction",
+                "10": "ai_lecture_cleanup",
+                "11": "ai_deep_denoise",
             }
 
             if choice in preset_map:
                 preset_id = preset_map[choice]
                 config = self._select_preset_intensity(preset_id)
-                if config is None:
-                    return None
-                if config:
-                    current_config = config
-                continue
-
-            if choice == "7":
-                # Show all presets
-                config = self._show_all_presets()
                 if config is None:
                     return None
                 if config:
@@ -1188,13 +1182,15 @@ class FileProcessor(BaseTool):
                 "  the standard Noise Reduction preset instead."
             )
 
-        print("\n🧠 Select AI Noise Model:")
-        print("  Each model is trained for different noise/signal combinations.\n")
+        # Only expose the three meaningfully distinct models
+        exposed_models = ["sh", "mp", "lq"]
 
-        model_keys = list(ARNNDN_MODELS.keys())
-        for i, key in enumerate(model_keys, 1):
+        print("\n🧠 Select AI Noise Model:")
+        print("  Pick based on your noise environment.\n")
+
+        for i, key in enumerate(exposed_models, 1):
             info = ARNNDN_MODELS[key]
-            recommended = " ◄ recommended" if key == "sh" else ""
+            recommended = " ◄ default" if key == "sh" else ""
             print(f"  [{i}] {info['name']}{recommended}")
             print(f"      {info['description']}")
             print(f"      Best for: {info['recommended_for']}")
@@ -1211,8 +1207,8 @@ class FileProcessor(BaseTool):
 
         try:
             idx = int(choice) - 1
-            if 0 <= idx < len(model_keys):
-                selected = model_keys[idx]
+            if 0 <= idx < len(exposed_models):
+                selected = exposed_models[idx]
                 print(f"  ✓ Selected: {ARNNDN_MODELS[selected]['name']} ({selected}.rnnn)")
                 return selected
         except ValueError:

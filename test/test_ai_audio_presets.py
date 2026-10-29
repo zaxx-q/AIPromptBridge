@@ -18,16 +18,21 @@ from src.tools.file_processor import FileProcessor
 
 
 def test_arnndn_model_files_exist():
-    """Verify all 6 arnndn model files exist in assets/models/arnndn."""
-    expected_models = ["sh", "cb", "bd", "std", "mp", "lq"]
-    assert set(ARNNDN_MODELS.keys()) == set(expected_models)
+    """Verify the 3 exposed arnndn models exist in ARNNDN_MODELS and their .rnnn files are on disk.
+    The other model files (bd, cb, std) remain bundled but are not exposed in the UI.
+    """
+    exposed_models = ["sh", "mp", "lq"]
+    assert set(ARNNDN_MODELS.keys()) == set(exposed_models)
 
-    for model_name in expected_models:
+    # All bundled model files should still exist on disk (they are always shipped)
+    all_bundled = ["sh", "cb", "bd", "std", "mp", "lq"]
+    for model_name in all_bundled:
         path = _get_arnndn_model_path(model_name)
         assert path is not None, f"Model {model_name}.rnnn not found"
         assert path.exists()
         assert path.stat().st_size > 100_000, f"Model {model_name}.rnnn too small"
 
+    for model_name in exposed_models:
         info = ARNNDN_MODELS[model_name]
         assert "name" in info
         assert "description" in info
@@ -258,9 +263,9 @@ def test_file_processor_select_arnndn_model():
     with patch("builtins.input", return_value="1"):
         assert fp._select_arnndn_model() == "sh"
 
-    # User selects "3" (Crowd/Chatter / cb)
+    # User selects "3" (Voice in Noise / lq)
     with patch("builtins.input", return_value="3"):
-        assert fp._select_arnndn_model() == "cb"
+        assert fp._select_arnndn_model() == "lq"
 
     # User presses Enter (default "1")
     with patch("builtins.input", return_value=""):
@@ -309,7 +314,7 @@ def test_file_processor_preprocess_audio_passes_arnndn_model():
         "type": "preset",
         "preset_id": "ai_noise_reduction",
         "intensity": "high",
-        "arnndn_model": "bd",
+        "arnndn_model": "sh",
     }
 
     mock_result = MagicMock(success=True, output_path=Path("/tmp/cleaned.mp3"))
@@ -323,7 +328,7 @@ def test_file_processor_preprocess_audio_passes_arnndn_model():
             "ai_noise_reduction",
             intensity=Intensity.HIGH,
             optimization=None,
-            arnndn_model="bd",
+            arnndn_model="sh",
         )
 
 
