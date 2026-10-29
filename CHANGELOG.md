@@ -1,6 +1,6 @@
 # Changelog
 
-## [8.9.0] - 2026-10-28
+## [8.9.4] - 2026-10-28
 
 ### New Features
 
@@ -13,9 +13,12 @@
 
 - **Overlapping Audio Chunks**: Split audio chunks now overlap by 10 seconds (configurable) so boundary speech is captured by two consecutive chunks, and transcripts are merged with a longest-common-sequence aligner that removes the duplicated overlap text instead of naively concatenating.
 - **Digest Source Language**: The Digest prompts in TextEdit and the File Processor now output the digest in the same language as the source content.
+- **Audio Processing Presets**: Simplified the preset menu by merging overlapping speech-boost and room-echo options into existing presets, showing Dynamic Volume and De-Ess directly, and trimming the ARNNDN model choices to three focused options.
+- **Audio Format Choices**: Split Opus and Ogg Vorbis into distinct export formats. Opus remains the default, while Ogg now uses the Vorbis codec; `.opus` files are recognized throughout audio processing and upload workflows.
 
 ### Fixes
 
+- **File Processor Audio Exports**: Audio exports, including split chunks, now honor the configured output format and selected optimization bitrate. Chunk prompts also include the original filename and part number when filename context is enabled.
 - **Export Mode Per-File Instructions**: Export mode now prompts for and applies per-file instructions exactly like the normal API processing path.
 
 ## [8.8.0] - 2026-10-15
