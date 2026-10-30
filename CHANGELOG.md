@@ -1,6 +1,6 @@
 # Changelog
 
-## [8.9.4] - 2026-10-28
+## [8.9.6] - 2026-10-28
 
 ### New Features
 
@@ -18,7 +18,10 @@
 
 ### Fixes
 
-- **File Processor Audio Exports**: Audio exports, including split chunks, now honor the configured output format and selected optimization bitrate. Chunk prompts also include the original filename and part number when filename context is enabled.
+- **File Processor Audio Exports**: Audio exports, including split chunks, now honor the configured output format and selected optimization bitrate. Chunk prompts include the original source filename when filename context is enabled.
+- **Audio Chunk Prompt Simplification**: Chunk-specific metadata — part number, absolute time offset, and overlap annotations — is no longer injected into model-facing prompts. The model receives only the task and source filename; chunk boundaries are tracked locally for post-processing merges, eliminating prompt noise that could confuse timestamp generation.
+- **Audio Transcription Completeness**: Both verbatim and Markdown transcription prompts now explicitly instruct the model not to skip, cut off, or trim any speech, improving full-coverage transcription of long recordings split across chunks.
+- **Audio Transcript Merge Reliability**: Rewrote the chunk overlap-deduplication algorithm to match only suffix-to-prefix word boundaries between consecutive chunks. The previous sliding-window approach could silently discard large sections of a transcript when speaker labels, repeated phrases, or common words appeared in both chunks; the new implementation falls back to appending with a paragraph break when no genuine boundary overlap is detected.
 - **Export Mode Per-File Instructions**: Export mode now prompts for and applies per-file instructions exactly like the normal API processing path.
 
 ## [8.8.0] - 2026-10-15
