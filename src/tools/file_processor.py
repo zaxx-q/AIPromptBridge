@@ -298,49 +298,18 @@ class FileProcessor(BaseTool):
                     print(f"   📊 {len(chunk_result.chunks)} chunks created")
 
                 try:
-                    total_chunks = len(chunk_result.chunks)
                     for ci, chunk in enumerate(chunk_result.chunks):
                         chunk_name = f"{filepath.stem}_chunk{ci + 1:03d}{chunk.path.suffix}"
                         chunk_dest = export_dir / chunk_name
                         shutil.copy2(chunk.path, chunk_dest)
 
-                        # Build chunk-specific prompt (mirrors _process_audio_with_chunking)
+                        # Chunk boundaries and overlap remain in manifest.json for
+                        # deterministic merging; they are not model instructions.
                         chunk_prompt = prompt
-                        if total_chunks > 1 and chunk.start_time > 0:
-                            m, s = divmod(int(chunk.start_time), 60)
-                            h, m = divmod(m, 60)
-                            offset_str = f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m:02d}:{s:02d}"
 
-                            overlap_note = ""
-                            if chunk.overlap_duration > 0:
-                                overlap_note = (
-                                    f" The first ~{chunk.overlap_duration:.0f} seconds of this segment "
-                                    f"overlap with the end of the previous segment — use that overlap "
-                                    f"for context continuity but avoid duplicating content from it."
-                                )
-
-                            chunk_prompt = (
-                                f"{prompt}\n\n"
-                                f"IMPORTANT: This is part {ci + 1} of {total_chunks} from a longer recording. "
-                                f"This segment starts at {offset_str} in the full audio. "
-                                f"If you include any timestamps, they must be relative to the full recording "
-                                f"(i.e. start from {offset_str}, not from 00:00).{overlap_note}"
-                            )
-                        elif total_chunks > 1 and ci == 0 and chunk.overlap_duration > 0:
-                            chunk_prompt = (
-                                f"{prompt}\n\n"
-                                f"IMPORTANT: This is part 1 of {total_chunks} from a longer recording. "
-                                f"The last ~{chunk.overlap_duration:.0f} seconds of this segment overlap "
-                                f"with the beginning of the next segment for context continuity."
-                            )
-
-                        # Match the normal chunked API path: preserve the original
-                        # source filename while identifying the part being processed.
+                        # Preserve only the source filename as model-facing context.
                         if self._include_filename:
-                            chunk_display = (
-                                f"{filepath.name} (Part {ci + 1}/{total_chunks})" if total_chunks > 1 else filepath.name
-                            )
-                            chunk_prompt = f"{chunk_prompt}\n\n[File: {chunk_display}]"
+                            chunk_prompt = f"{chunk_prompt}\n\n[File: {filepath.name}]"
 
                         prompt_path = export_dir / f"{filepath.stem}_chunk{ci + 1:03d}_prompt.txt"
                         with open(prompt_path, "w", encoding="utf-8") as f:
@@ -4068,7 +4037,7 @@ class FileProcessor(BaseTool):
         words_per_cue = _groq_srt_words_per_cue(transcribe_config)
         temperature = transcribe_config.get("groq_temperature")
 
-        # Derive a style/context prompt from the batch prompt if available
+        # Derive a style/context prompt from the batch prompt if available.
         groq_prompt = ""
         if checkpoint.prompt_text:
             groq_prompt = checkpoint.prompt_text.strip()[: groq_transcription.GROQ_PROMPT_MAX_CHARS]
@@ -4466,52 +4435,13 @@ class FileProcessor(BaseTool):
                 if interactive:
                     print(f"   [{i + 1}/{len(result.chunks)}] Processing {chunk.time_range_str}...")
 
-                # Build message for chunk
-                # Use original filename with part number for context
-                total_chunks = len(result.chunks)
-                if original_name and total_chunks > 1:
-                    # e.g., "interview.mp3 (Part 1/3)"
-                    chunk_display = f"{original_name} (Part {i + 1}/{total_chunks})"
-                elif original_name:
-                    chunk_display = original_name
-                else:
-                    chunk_display = None
+                # Build message for chunk.
+                # Preserve only the source filename as model-facing context.
+                chunk_display = original_name
 
-                # For multi-chunk audio: tell the model the real time offset so
-                # any timestamps it generates are absolute, not chunk-local.
+                # Chunk boundaries and overlap remain in the local merge data;
+                # the model only receives the requested task for this audio.
                 chunk_prompt = prompt
-                if total_chunks > 1 and chunk.start_time > 0:
-                    m, s = divmod(int(chunk.start_time), 60)
-                    h, m = divmod(m, 60)
-                    if h > 0:
-                        offset_str = f"{h}:{m:02d}:{s:02d}"
-                    else:
-                        offset_str = f"{m:02d}:{s:02d}"
-
-                    # Build overlap context note for non-first chunks
-                    overlap_note = ""
-                    if chunk.overlap_duration > 0:
-                        overlap_note = (
-                            f" The first ~{chunk.overlap_duration:.0f} seconds of this segment "
-                            f"overlap with the end of the previous segment — use that overlap "
-                            f"for context continuity but avoid duplicating content from it."
-                        )
-
-                    chunk_prompt = (
-                        f"{prompt}\n\n"
-                        f"IMPORTANT: This is part {i + 1} of {total_chunks} from a longer recording. "
-                        f"This segment starts at {offset_str} in the full audio. "
-                        f"If you include any timestamps, they must be relative to the full recording "
-                        f"(i.e. start from {offset_str}, not from 00:00).{overlap_note}"
-                    )
-                elif total_chunks > 1 and i == 0 and chunk.overlap_duration > 0:
-                    # First chunk with trailing overlap: mention it for context
-                    chunk_prompt = (
-                        f"{prompt}\n\n"
-                        f"IMPORTANT: This is part 1 of {total_chunks} from a longer recording. "
-                        f"The last ~{chunk.overlap_duration:.0f} seconds of this segment overlap "
-                        f"with the beginning of the next segment for context continuity."
-                    )
 
                 message = self.file_handler.build_api_message(
                     chunk.path, chunk_prompt, include_filename=self._include_filename, display_name=chunk_display

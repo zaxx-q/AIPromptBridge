@@ -126,6 +126,8 @@ def test_defaults_include_new_audio_settings_and_prompts():
     prompts = DEFAULT_TOOLS_CONFIG["file_processor"]["prompts"]
     assert "Transcribe (Native Model)" in prompts
     assert prompts["Transcribe (Native Model)"]["transcribe_model"] is True
+    assert "You must not skip, cut off, or trim any speech." in prompts["Transcribe Audio (Verbatim)"]["prompt"]
+    assert "You must not skip, cut off, or trim any speech." in prompts["Transcribe Audio (to Markdown)"]["prompt"]
 
 
 def test_checkpoint_transcribe_config_serialization():
@@ -1153,8 +1155,11 @@ def test_export_audio_chunk_metadata(tmp_path):
     assert (export_dir / "interview_chunk001.opus").exists()
     first_prompt = (export_dir / "interview_chunk001_prompt.txt").read_text(encoding="utf-8")
     second_prompt = (export_dir / "interview_chunk002_prompt.txt").read_text(encoding="utf-8")
-    assert "[File: interview.mp3 (Part 1/3)]" in first_prompt
-    assert "[File: interview.mp3 (Part 2/3)]" in second_prompt
+    assert "[File: interview.mp3]" in first_prompt
+    assert "[File: interview.mp3]" in second_prompt
+    assert "This is part" not in first_prompt
+    assert "This segment starts" not in second_prompt
+    assert "overlap" not in first_prompt
 
 
 def test_export_chunk_prompt_respects_filename_context_preference(tmp_path):
@@ -1178,6 +1183,45 @@ def test_export_chunk_prompt_respects_filename_context_preference(tmp_path):
 
     prompt = (export_dir / "interview_chunk001_prompt.txt").read_text(encoding="utf-8")
     assert "[File:" not in prompt
+
+
+def test_chunked_api_prompt_excludes_chunk_metadata(tmp_path):
+    """Chunk boundaries remain local and are never sent in API prompt text."""
+    from src.tools.audio_processor import AudioChunk, ChunkingResult
+    from src.tools.file_processor import FileProcessor
+
+    chunk = AudioChunk(
+        path=tmp_path / "chunk.opus",
+        index=1,
+        start_time=570.0,
+        end_time=1200.0,
+        duration=630.0,
+        size_bytes=1,
+        overlap_duration=30.0,
+    )
+    chunk.path.write_bytes(b"chunk")
+    fp = FileProcessor()
+    resolved = MagicMock(config={}, ai_params={}, key_managers={})
+
+    with (
+        patch.object(fp.audio_processor, "split_audio", return_value=ChunkingResult(success=True, chunks=[chunk])),
+        patch.object(fp.file_handler, "build_api_message", return_value={"role": "user"}) as build_message,
+        patch.object(fp.audio_processor, "merge_transcripts", return_value="merged"),
+        patch.object(fp, "_resolve_execution_settings", return_value=("google", None, resolved)),
+        patch("src.api_client.call_api_with_retry", return_value=("chunk text", None)),
+    ):
+        result = fp._process_audio_with_chunking(
+            chunk.path,
+            "Transcribe this audio",
+            MagicMock(delay_between_requests=0),
+            interactive=False,
+            skip_preprocessing=True,
+            original_name="interview.mp3",
+        )
+
+    assert result == "merged"
+    assert build_message.call_args.args[1] == "Transcribe this audio"
+    assert build_message.call_args.kwargs["display_name"] == "interview.mp3"
 
 
 def test_export_manifest_embeds_chunk_metadata(tmp_path):
