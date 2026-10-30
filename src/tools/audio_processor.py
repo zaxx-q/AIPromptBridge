@@ -2401,82 +2401,55 @@ def adjust_transcript_timestamps(transcript: str, offset_seconds: float) -> str:
 
 
 def find_longest_common_sequence(sequences: List[str], match_by_words: bool = True) -> str:
-    """
-    Find the optimal alignment between overlapping text sequences and merge them.
+    """Merge overlapping text sequences without discarding unique content.
 
-    Uses a sliding-window approach to find the best alignment point between
-    consecutive sequences, then takes the left half from the left sequence
-    and the right half from the right sequence.
+    Only a contiguous suffix of one response and prefix of the next can be
+    considered overlap. Matching words elsewhere is unsafe: repeated labels,
+    common words, and inconsistent response formatting can otherwise cause
+    large portions of a transcript to be lost.
 
     Args:
         sequences: List of text strings to align and merge
         match_by_words: Whether to match by words (True) or characters (False)
 
     Returns:
-        Merged text with overlapping portions deduplicated
+        Merged text with reliable boundary overlaps deduplicated
     """
     if not sequences:
         return ""
-    if len(sequences) == 1:
-        return sequences[0]
 
-    # Convert input based on matching strategy
-    if match_by_words:
-        tokenized = [[word for word in re.split(r"(\s+\w+)", seq) if word] for seq in sequences]
-    else:
-        tokenized = [list(seq) for seq in sequences]
+    merged = sequences[0].strip()
+    for sequence in sequences[1:]:
+        right = sequence.strip()
+        if not right:
+            continue
+        if not merged:
+            merged = right
+            continue
 
-    left_sequence = tokenized[0]
-    left_length = len(left_sequence)
-    total_sequence: List[str] = []
+        if match_by_words:
+            # Keep the source text intact while comparing case- and
+            # punctuation-insensitive words. Four words avoids treating common
+            # labels such as "Speaker 1" as overlap.
+            left_words = [(match.group().casefold(), match.end()) for match in re.finditer(r"\w+", merged)]
+            right_words = [(match.group().casefold(), match.end()) for match in re.finditer(r"\w+", right)]
+            for count in range(min(len(left_words), len(right_words)), 3, -1):
+                if [word for word, _ in left_words[-count:]] == [word for word, _ in right_words[:count]]:
+                    merged = merged.rstrip() + right[right_words[count - 1][1] :]
+                    break
+            else:
+                merged = f"{merged.rstrip()}\n\n{right.lstrip()}"
+        else:
+            # Character mode is retained for callers that explicitly request
+            # it, with a conservative minimum for the same reason as words.
+            for count in range(min(len(merged), len(right)), 19, -1):
+                if merged[-count:] == right[:count]:
+                    merged = merged.rstrip() + right[count:]
+                    break
+            else:
+                merged = f"{merged.rstrip()}\n\n{right.lstrip()}"
 
-    for right_sequence in tokenized[1:]:
-        max_matching = 0.0
-        right_length = len(right_sequence)
-        max_indices = (left_length, left_length, 0, 0)
-
-        # Try different alignments
-        for i in range(1, left_length + right_length + 1):
-            # Add epsilon to favor longer matches
-            eps = float(i) / 10000.0
-
-            left_start = max(0, left_length - i)
-            left_stop = min(left_length, left_length + right_length - i)
-            left = left_sequence[left_start:left_stop]
-
-            right_start = max(0, i - left_length)
-            right_stop = min(right_length, i)
-            right = right_sequence[right_start:right_stop]
-
-            if len(left) != len(right):
-                raise RuntimeError("Mismatched subsequences detected during transcript merging.")
-
-            matches = sum(a == b for a, b in zip(left, right))
-
-            # Normalize matches by position and add epsilon
-            matching = matches / float(i) + eps
-
-            # Require at least 2 matches
-            if matches > 1 and matching > max_matching:
-                max_matching = matching
-                max_indices = (left_start, left_stop, right_start, right_stop)
-
-        # Use the best alignment found
-        left_start, left_stop, right_start, right_stop = max_indices
-
-        # Take left half from left sequence and right half from right sequence
-        left_mid = (left_stop + left_start) // 2
-        right_mid = (right_stop + right_start) // 2
-
-        total_sequence.extend(left_sequence[:left_mid])
-        left_sequence = right_sequence[right_mid:]
-        left_length = len(left_sequence)
-
-    # Add remaining sequence
-    total_sequence.extend(left_sequence)
-
-    # Join back into text
-    return "".join(total_sequence)
+    return merged
 
 
 def merge_transcribe_transcripts(chunk_outputs: List[Tuple[AudioChunk, str]]) -> str:

@@ -24,12 +24,24 @@ def test_find_longest_common_sequence_basic():
 def test_find_longest_common_sequence_no_overlap():
     from src.tools.audio_processor import find_longest_common_sequence
 
-    # No shared words — algorithm still produces a merged string containing both halves
+    # No shared boundary overlap must preserve both responses.
     seq1 = "First segment content"
     seq2 = "Second segment content"
 
     merged = find_longest_common_sequence([seq1, seq2])
-    assert "First segment" in merged or "Second segment" in merged
+    assert merged == "First segment content\n\nSecond segment content"
+
+
+def test_find_longest_common_sequence_ignores_non_boundary_matches():
+    """Repeated words and speaker labels cannot truncate full responses."""
+    from src.tools.audio_processor import find_longest_common_sequence
+
+    first = "Speaker 1: Start of a long lesson. The ending is completely different."
+    second = "Speaker 1: Another section that shares no boundary with the first."
+
+    merged = find_longest_common_sequence([first, second])
+
+    assert merged == f"{first}\n\n{second}"
 
 
 def test_find_longest_common_sequence_empty():
@@ -43,7 +55,7 @@ def test_find_longest_common_sequence_three_segments():
     from src.tools.audio_processor import find_longest_common_sequence
 
     seg1 = "the cat sat on the mat near the door"
-    seg2 = "near the door and watched the rain fall down"
+    seg2 = "mat near the door and watched the rain fall down"
     seg3 = "the rain fall down and turned the street grey"
 
     merged = find_longest_common_sequence([seg1, seg2, seg3])
