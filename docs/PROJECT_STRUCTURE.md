@@ -220,7 +220,7 @@ The `tools_config.json` file (auto-created on demand) contains:
 
 Access via terminal: Press `[X]` → `[1] File Processor`
 
-**Merge Export Chunks**: Export mode splits large audio into `{stem}_chunk{NNN}` files with companion prompt files and a `manifest.json`. After running each chunk through a chat interface, save responses as `{stem}_chunk{NNN}_response.txt` next to the manifest, then merge with Tools menu `[3] Merge Exports` or directly:
+**Merge Export Chunks**: Export mode splits large audio into `{stem}_chunk{NNN}` files with companion prompt files and a `manifest.json`. After running each chunk through a chat interface, save responses as `{stem}_chunk{NNN}_response.txt` next to the manifest, then merge directly:
 
 ```sh
 python -m src.tools merge <export_dir>

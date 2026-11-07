@@ -4777,8 +4777,7 @@ def show_tools_menu() -> bool:
     if HAVE_RICH:
         print_panel(
             "[1] 📁 File Processor   Process files with AI prompts\n"
-            "[2] 🔊 TTS Processor    Convert text files to speech audio\n"
-            "[3] 📋 Merge Exports    Merge chunked transcript responses\n\n"
+            "[2] 🔊 TTS Processor    Convert text files to speech audio\n\n"
             "[B] ← Back to main menu",
             title="🧰 TOOLS",
             border_style="cyan",
@@ -4790,7 +4789,6 @@ def show_tools_menu() -> bool:
         print()
         print("  [1] 📁 File Processor   Process files with AI prompts")
         print("  [2] 🔊 TTS Processor    Convert text files to speech audio")
-        print("  [3] 📋 Merge Exports    Merge chunked transcript responses")
         print()
         print("  [B] ← Back to main menu")
         print(f"{'═' * 60}")
@@ -4841,34 +4839,6 @@ def show_tools_menu() -> bool:
         else:
             if result.message != "Cancelled":
                 print_warning(f"\n{result.message}")
-        return True
-
-    elif choice == "3":
-        import os
-
-        print("\nEnter path to export directory (containing manifest.json):")
-        try:
-            dir_input = input("> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            return False
-
-        if not dir_input:
-            print_warning("No path entered")
-            return False
-
-        # Strip surrounding quotes (common when pasting paths)
-        if (dir_input.startswith('"') and dir_input.endswith('"')) or (
-            dir_input.startswith("'") and dir_input.endswith("'")
-        ):
-            dir_input = dir_input[1:-1]
-
-        dir_path = os.path.expandvars(os.path.expanduser(dir_input))
-
-        result = merge_export_responses(dir_path, interactive=True)
-        if result:
-            print_success("\n✅ Merge complete")
-        else:
-            print_warning("\nMerge produced no output")
         return True
 
     elif choice == "b" or choice == "":

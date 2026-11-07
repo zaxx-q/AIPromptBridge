@@ -1557,3 +1557,32 @@ def test_merge_export_responses_alternate_naming(tmp_path):
     assert "Hello world" in merged
     assert "please stand by" in merged
     assert merged.count("emergency broadcast") == 1  # overlap deduplicated
+
+
+def test_show_tools_menu_no_merge_export_option(capsys):
+    """Tools menu offers File Processor and TTS Processor, without Merge Exports."""
+    from unittest.mock import patch
+
+    from src.tools.file_processor import show_tools_menu
+
+    with patch("builtins.input", return_value="b"):
+        result = show_tools_menu()
+
+    assert result is False
+    out = capsys.readouterr().out
+    assert "File Processor" in out
+    assert "TTS Processor" in out
+    assert "Merge Exports" not in out
+    assert "Merge Export" not in out
+
+
+def test_show_tools_menu_option_3_not_supported():
+    """Option 3 is now an invalid choice in Tools menu."""
+    from unittest.mock import patch
+
+    from src.tools.file_processor import show_tools_menu
+
+    with patch("builtins.input", return_value="3"):
+        result = show_tools_menu()
+
+    assert result is False
