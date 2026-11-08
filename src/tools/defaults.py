@@ -145,6 +145,15 @@ DEFAULT_TOOLS_CONFIG = {
                 "output_extension": ".json",
                 "default_naming": "{filename}_data",
             },
+            "To Markdown": {
+                "_is_default": True,
+                "icon": "📄",
+                "description": "Convert input of any type into structured standard Markdown",
+                "input_types": ["image", "text", "code", "audio"],
+                "prompt": "Convert the provided input into clean, well-structured, standard Markdown (CommonMark / GFM). Adapt intelligently to the input type and content:\n\nINPUT ADAPTATION (BEST-EFFORT):\n- **Text & Documents**: Organize unstructured, messy, or plain text into a clear document hierarchy with headings (#, ##, ###), natural paragraphs, bullet/numbered lists, and blockquotes where appropriate.\n- **HTML & Web Content**: Convert HTML elements, entities, and rich text styling into clean Markdown equivalents; strip tags, scripts, and navigation clutter while preserving all substantive content and links ([text](url)).\n- **Data & Tables**: Convert tabular data, spreadsheets, CSV, or aligned columns into standard Markdown tables (| Header |). Format key-value pairs cleanly (**Key:** Value).\n- **Code & Technical Content**: Place code, configuration, terminal commands, and scripts inside fenced code blocks with appropriate syntax highlighting language identifiers (```lang). Use inline code (`code`) for technical terms, identifiers, variables, and paths.\n- **Images & Visuals**: Transcribe all visible text, headings, and data accurately. Convert visual structures (forms, slides, screenshots, diagrams) into corresponding Markdown headings, lists, tables, or descriptive notes.\n- **Audio & Speech**: Transcribe spoken content into well-structured Markdown with topic headings, speaker labels (e.g., **Speaker 1:**), and formatted paragraphs or lists.\n\nMARKDOWN CONVENTIONS:\n1. Use standard Markdown syntax (headings, bold, italic, lists, blockquotes, code blocks, tables).\n2. Preserve original meaning, terminology, facts, numbers, and data without hallucination or omission.\n3. Match the language(s) of the input.\n4. If the input is already valid Markdown, refine its formatting and structure without breaking content.\n\nOUTPUT FORMAT:\n- Provide ONLY the formatted Markdown.\n- No preamble, conversational intro (e.g., 'Here is the markdown:'), or meta-commentary.\n- Begin directly with the Markdown content.",
+                "output_extension": ".md",
+                "default_naming": "{filename}_markdown",
+            },
             "Custom Prompt": {
                 "_is_default": True,
                 "icon": "⚡",

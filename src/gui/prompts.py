@@ -215,7 +215,17 @@ DEFAULT_TEXT_EDIT_SETTINGS = {
         {
             "name": "Suggestor",
             "enabled": True,
-            "items": ["Answer", "Table", "Continue", "Reply Suggest", "Emojify", "Kaomojify", "Kaomoji Suggest"],
+            "items": [
+                "Answer",
+                "Table",
+                "To Markdown",
+                "To WhatsApp",
+                "Continue",
+                "Reply Suggest",
+                "Emojify",
+                "Kaomojify",
+                "Kaomoji Suggest",
+            ],
         },
         {
             "name": "Compare",
@@ -350,6 +360,20 @@ DEFAULT_TEXT_EDIT_ACTIONS = {
         "prompt_type": "general",
         "system_prompt": 'You are a data organization specialist who converts text into structured tables.\n\n<format>\n- Use Markdown table syntax.\n- Choose appropriate column headers based on the content.\n- Align columns appropriately (left for text, right for numbers).\n</format>\n\n<constraints>\n- If the text cannot be meaningfully tabulated, respond with: "This text is not suitable for table conversion."\n- Include all relevant data from the source.\n</constraints>',
         "task": "Convert this text into a well-organized Markdown table with appropriate headers.",
+        "show_chat_window_instead_of_replace": True,
+    },
+    "To Markdown": {
+        "icon": "📄",
+        "prompt_type": "general",
+        "system_prompt": "You are a Markdown formatting specialist who converts content of any type into clean, well-structured, standard Markdown.\n\n<approach>\nAdapt intelligently to the input type:\n- **Text & Notes**: Organize into a clear document hierarchy with headings (#, ##, ###), natural paragraphs, and lists.\n- **HTML & Web Content**: Convert HTML elements and rich text into standard Markdown; strip tags, scripts, and clutter while preserving content and links.\n- **Tables & Data**: Convert tabular or aligned data into clean Markdown tables (| Header |) and format key-value pairs clearly (**Key:** Value).\n- **Code & Technical Content**: Use fenced code blocks with language identifiers (```lang) and inline code (`code`) for technical terms.\n- **Transcripts & Logs**: Structure conversations with speaker labels and format action items, logs, or notes cleanly.\n</approach>\n\n<constraints>\n- Preserve all original meaning, facts, numbers, and terminology—do not invent or omit information.\n- Output standard CommonMark / GitHub Flavored Markdown.\n- Match the language of the input.\n- Provide ONLY the processed Markdown—no preamble, conversational intro, or commentary.\n</constraints>",
+        "task": "Convert this content into clean, well-structured standard Markdown. Adapt the formatting to the content type (headings, lists, tables, code blocks) while preserving all original information.",
+        "show_chat_window_instead_of_replace": True,
+    },
+    "To WhatsApp": {
+        "icon": "📱",
+        "prompt_type": "edit",
+        "system_prompt": "You format text strictly for WhatsApp. WhatsApp supports ONLY the following formatting features—never use any other Markdown or HTML tags:\n\n<whatsapp_formatting_features>\n1. Bold: Place an asterisk on both sides of the text: *text* (never use double asterisks **)\n2. Italic: Place an underscore on both sides of the text: _text_\n3. Strikethrough: Place a tilde on both sides of the text: ~text~\n4. Monospace: Place three backticks on both sides of the text: ```text```\n5. Bulleted list: Place an asterisk or hyphen and a space before each item:\n* text\n* text\nor\n- text\n- text\n6. Numbered list: Place a number, period, and space before each line of text:\n1. text\n2. text\n7. Quote: Place an angle bracket and space before the text:\n> text\n8. Inline code: Place a backtick on both sides of the message: `text`\n</whatsapp_formatting_features>\n\n<strict_constraints>\n- WhatsApp does NOT support Markdown headings (#, ##, etc.). Use *BOLD* or *Title:* instead.\n- WhatsApp does NOT support Markdown tables. Convert tables into clean bulleted lists, numbered lists, or key-value pairs.\n- WhatsApp does NOT support Markdown links ([text](url)). Write out the plain text followed by the full URL.\n- WhatsApp does NOT support HTML tags.\n- Maintain all original content, facts, and meaning faithfully.\n- Provide ONLY the processed WhatsApp-formatted text—no preamble, explanations, or meta-commentary.\n</strict_constraints>",
+        "task": "Format this text using strictly WhatsApp-supported formatting features.",
         "show_chat_window_instead_of_replace": True,
     },
     "Continue": {
@@ -722,6 +746,53 @@ DEFAULT_AUDIO_ACTIONS = {
 DEFAULT_TTS_SETTINGS = {
     "director_system_prompt": 'You are an expert voice director crafting performance prompts for Gemini TTS — a model that knows not only WHAT to say, but HOW to say it. Your job is to analyze text and produce a structured directorial prompt that guides a virtual voice talent to deliver a natural, compelling, expressive performance.\n\n<output_format>\nYou MUST output a prompt in this exact structure:\n\n# AUDIO PROFILE: [Character Name]\n## "[Short Role/Archetype Descriptor]"\n\n## THE SCENE: [Setting Name]\n[2-4 sentences describing the physical environment, mood, and emotional "vibe". What is around the character? How does the setting affect their delivery? Paint a vivid picture that subtly guides the performance.]\n\n### DIRECTOR\'S NOTES\nStyle:\n[Describe the vocal style, emotion, and energy. Be descriptive — "Infectious enthusiasm; the listener should feel like they are part of a massive, exciting community event" works better than just "energetic and enthusiastic". You may use voiceover industry terms like "vocal smile", "high projection without shouting", "punchy consonants", etc. Layer multiple style characteristics when the text warrants it.]\n\nPace:\n[Describe the overall pacing, rhythm, and cadence. Include pace variation if appropriate — e.g., "builds from a slow, contemplative opening to an energetic crescendo". Can range from simple ("Speak at a measured, deliberate pace") to complex ("A bouncing cadence with high-speed delivery and fluid transitions — no dead air, no gaps.")]\n\nAccent:\n[Only include if the text suggests a specific regional or cultural voice. Be specific — "British English as heard in Croydon, England" rather than just "British accent". If no accent is implied, omit this field entirely.]\n\n### SAMPLE CONTEXT\n[1-2 sentences giving the model a contextual starting point. Who is this character? What are they known for? This helps the virtual actor enter the scene naturally.]\n\n#### TRANSCRIPT\n[The exact original text, unchanged]\n</output_format>\n\n<philosophy>\n- Think like a director setting a scene for a talented actor. Give clear direction but leave room for natural performance — too many strict rules limit the model\'s creativity and may produce worse results.\n- The script and direction must be COHERENT. The transcript\'s topic and writing style should correlate with the directions you give. A casual blog post shouldn\'t get opera-level dramatic direction.\n- Match the intensity of your direction to the text. Simple, neutral text needs light direction. Dramatic or emotional text can handle rich, layered direction.\n- When in doubt, give the model space to fill in the gaps — just like a talented actor, it performs better with creative freedom.\n</philosophy>\n\n<rules>\n- The #### TRANSCRIPT section MUST contain the exact original text, unchanged.\n- Analyze the text\'s tone, intent, audience, and emotional arc before writing directions.\n- Invent a fitting character name and archetype that matches the text\'s context.\n- Omit the Accent field if no specific accent is implied by the text.\n- Do NOT include meta-commentary, explanations, or notes outside the format.\n</rules>',
     "director_task_template": "Analyze the following text and create a TTS directorial prompt for an expressive voice performance. Consider the text's tone, emotional content, intended audience, and natural rhythm when crafting your direction.\n\nText to direct:\n\n{text}",
+}
+
+# =============================================================================
+# Minimal Prompt Presets (Curated essential actions for onboarding & quick setup)
+# =============================================================================
+
+MINIMAL_TEXT_EDIT_ACTIONS: set[str] = {
+    "Explain",
+    "Summary",
+    "Proofread",
+    "Refine",
+    "Humanize",
+    "Translate to English",
+    "Answer",
+    "To Markdown",
+}
+
+MINIMAL_SNIP_ACTIONS: set[str] = {
+    "Quick Extract",
+    "Smart Extract",
+    "Explain",
+    "Answer",
+    "Summarize",
+    "Describe",
+    "Translate to English",
+    "To Markdown",
+}
+
+MINIMAL_AUDIO_ACTIONS: set[str] = {
+    "Transcribe",
+    "Summarize",
+    "Extract Key Points",
+    "Translate to English",
+}
+
+MINIMAL_MODIFIERS: set[str] = {
+    "direct",
+    "shorter",
+    "longer",
+    "language",
+}
+
+MINIMAL_PROMPT_PRESETS: Dict[str, set[str]] = {
+    "text_edit_tool": MINIMAL_TEXT_EDIT_ACTIONS,
+    "snip_tool": MINIMAL_SNIP_ACTIONS,
+    "audio_tool": MINIMAL_AUDIO_ACTIONS,
+    "modifiers": MINIMAL_MODIFIERS,
 }
 
 
@@ -1247,3 +1318,8 @@ def get_prompts_config() -> PromptsConfig:
 def reload_prompts():
     """Reload prompts configuration from file."""
     PromptsConfig.get_instance().reload()
+
+
+def get_minimal_prompt_preset(tool_key: str) -> set[str]:
+    """Get a copy of the curated minimal action/modifier preset for a given tool."""
+    return MINIMAL_PROMPT_PRESETS.get(tool_key, set()).copy()

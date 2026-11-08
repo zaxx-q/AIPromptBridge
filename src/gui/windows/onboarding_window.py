@@ -21,6 +21,12 @@ from ...providers.registry import get_provider_definitions
 from ...version import __version__
 from ..custom_widgets import ScrollableButtonList, ScrollableComboBox, TkScrollableFrame, create_emoji_button
 from ..platform import HAVE_CTK, ctk
+from ..prompts import (
+    MINIMAL_AUDIO_ACTIONS,
+    MINIMAL_MODIFIERS,
+    MINIMAL_SNIP_ACTIONS,
+    MINIMAL_TEXT_EDIT_ACTIONS,
+)
 from ..themes import (
     ThemeColors,
     get_colors,
@@ -71,24 +77,10 @@ class OnboardingWizard:
     Onboarding wizard guiding first-time users through configuration.
     """
 
-    WIZARD_MINIMAL_TEXT_EDIT: ClassVar[set[str]] = {
-        "Explain",
-        "Proofread",
-        "Refine",
-        "Translate to English",
-        "Answer",
-        "Humanize",
-    }
-    WIZARD_MINIMAL_SNIP: ClassVar[set[str]] = {
-        "Quick Extract",
-        "Smart Extract",
-        "Explain",
-        "Answer",
-        "Describe",
-        "Translate to English",
-    }
-    WIZARD_MINIMAL_AUDIO: ClassVar[set[str]] = {"Transcribe", "Summarize", "Translate to English"}
-    WIZARD_MINIMAL_MODIFIERS: ClassVar[set[str]] = {"direct", "shorter", "longer", "language"}
+    WIZARD_MINIMAL_TEXT_EDIT: ClassVar[set[str]] = MINIMAL_TEXT_EDIT_ACTIONS
+    WIZARD_MINIMAL_SNIP: ClassVar[set[str]] = MINIMAL_SNIP_ACTIONS
+    WIZARD_MINIMAL_AUDIO: ClassVar[set[str]] = MINIMAL_AUDIO_ACTIONS
+    WIZARD_MINIMAL_MODIFIERS: ClassVar[set[str]] = MINIMAL_MODIFIERS
 
     def __init__(self, master=None, on_close=None):
         self.master = master
