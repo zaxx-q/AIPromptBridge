@@ -208,6 +208,59 @@ class ScrollableButtonList(ctk.CTkScrollableFrame if HAVE_CTK else tk.Frame):
     def size(self) -> int:
         return len(self.items)
 
+    def _scroll_canvas(self):
+        """The tk.Canvas that does the scrolling (it differs between CTk and standard Tk)."""
+        return getattr(self, "_parent_canvas", None) if HAVE_CTK else getattr(self, "canvas", None)
+
+    def _sync_scrollregion(self, canvas):
+        """Flush pending layout so the scrollregion covers items added a moment ago."""
+        canvas.update_idletasks()
+        region = canvas.bbox("all")
+        if region:
+            canvas.configure(scrollregion=region)
+
+    def get_scroll_position(self) -> float:
+        """Current vertical scroll position (0.0 = top, 1.0 = bottom)."""
+        canvas = self._scroll_canvas()
+        try:
+            return canvas.yview()[0] if canvas else 0.0
+        except tk.TclError:
+            return 0.0
+
+    def set_scroll_position(self, fraction: float):
+        """Scroll to a position previously returned by get_scroll_position (1.0 = bottom)."""
+        canvas = self._scroll_canvas()
+        if not canvas:
+            return
+        try:
+            self._sync_scrollregion(canvas)
+            canvas.yview_moveto(fraction)
+        except tk.TclError:
+            pass
+
+    def see(self, item_id: str):
+        """Scroll just far enough to bring an item fully into view."""
+        canvas = self._scroll_canvas()
+        btn = self.buttons.get(item_id)
+        if not canvas or btn is None:
+            return
+        try:
+            self._sync_scrollregion(canvas)
+            region = canvas.bbox("all")
+            if not region:
+                return
+            total = max(region[3] - region[1], 1)
+            view_top = canvas.canvasy(0)
+            view_height = canvas.winfo_height()
+            top = btn.winfo_y()
+            bottom = top + btn.winfo_height()
+            if top < view_top:
+                canvas.yview_moveto(top / total)
+            elif bottom > view_top + view_height:
+                canvas.yview_moveto((bottom - view_height) / total)
+        except tk.TclError:
+            pass
+
     def update_item(self, item_id: str, text: str, icon: str | None = None):
         """Update an existing item's text and icon."""
         if item_id not in self.buttons:

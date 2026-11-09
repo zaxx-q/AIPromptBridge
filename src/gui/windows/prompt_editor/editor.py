@@ -396,6 +396,8 @@ class PromptEditorWindow(
             self._create_modifiers_tab(modifiers_frame)
             self._create_playground_tab(playground_frame)
 
+            self.tabview.bind("<<NotebookTabChanged>>", lambda e: self._on_notebook_tab_changed(groups_frame))
+
     def _on_tab_changed(self):
         """Handle tab change event - lazy load tab content."""
         if not self.use_ctk or not hasattr(self, "_tab_configs"):
@@ -403,6 +405,18 @@ class PromptEditorWindow(
 
         current_tab = self.tabview.get()
         self._load_tab_content(current_tab)
+
+        # The Groups tab's action picker must reflect actions edited on other tabs
+        if self._tab_configs.get(current_tab, ("", False))[0] == "_create_groups_tab":
+            self._on_groups_tab_shown()
+
+    def _on_notebook_tab_changed(self, groups_frame):
+        """Standard-Tk equivalent of the Groups hook in _on_tab_changed."""
+        try:
+            if self.tabview.select() == str(groups_frame):
+                self._on_groups_tab_shown()
+        except tk.TclError:
+            pass
 
     def _load_tab_content(self, tab_name: str):
         """Load content for a tab if not already loaded."""
