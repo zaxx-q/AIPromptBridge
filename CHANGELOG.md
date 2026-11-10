@@ -1,5 +1,26 @@
 # Changelog
 
+## [8.10.0] - 2026-11-10
+
+### New Features
+
+- **Prompt Formatting Actions**: Added built-in Text Edit actions for converting
+  content to standard Markdown and WhatsApp-compatible formatting. The File
+  Processor also includes a Markdown formatting action for text, code, images,
+  and audio inputs.
+- **Prompt Editor Group Action Picker**: Replaced manual group item entry with a
+  two-pane action picker that supports filtering, adding, removing, and
+  reordering actions while identifying hidden or missing actions.
+
+### Improvements
+
+- **Centralized Minimal Presets**: Moved onboarding's minimal action and
+  modifier presets into the shared prompt configuration and expanded the
+  curated essentials across Text Edit, Snip, and Audio tools.
+- **Export Merge Menu**: Removed the dedicated Merge Export entry from the
+  interactive Tools menu while retaining the `python -m src.tools merge <dir>`
+  command for direct use.
+
 ## [8.9.6] - 2026-10-28
 
 ### New Features
